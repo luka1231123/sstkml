@@ -116,6 +116,31 @@ def letter_full(it: dict) -> str:
             + "\n")
 
 
+def desk_screen(recipient: str, intent: str, draft) -> str:
+    score = draft.score
+    checks = (
+        ("address", score.address_ok),
+        ("prostration", score.prostration_ok),
+        ("self-designation", score.self_designation_ok),
+        ("one topic", score.topic_count <= 1),
+    )
+    lines = [
+        f"  THE DESK — to {actor_name(recipient)}",
+        f"  intent: {intent}   source: {draft.source}",
+        "",
+        "  " + draft.text.replace("\n", "\n  "),
+        "",
+        "  PROTOCOL  " + "  ".join(f"{'✓' if ok else '✗'} {name}" for name, ok in checks),
+        f"  score {score.total} / 1000",
+    ]
+    if score.violations:
+        lines.append("  Yabninu warns: " + ", ".join(score.violations))
+    else:
+        lines.append("  Yabninu: the forms are in order, my lord.")
+    lines.append("\n  [send] [split] [dictate] [burn]")
+    return "\n".join(lines)
+
+
 def lists_screen(b: dict) -> str:
     """The payroll. The most important screen in the game (spec 9.3)."""
     lines = ["  RATION LISTS, in the order they are paid", ""]

@@ -113,6 +113,16 @@ class Letter:
 
 
 @dataclasses.dataclass(frozen=True)
+class ProtocolRecord:
+    """Derived result retained for M6 consequences; prose stays in the action log."""
+    letter_id: str
+    recipient: ActorId
+    profile: str
+    total: int
+    violations: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class World:
     seed: int
     scenario: str
@@ -128,6 +138,7 @@ class World:
     letters_in_transit: tuple[Letter, ...] = ()
     inbox: tuple[Letter, ...] = ()            # arrived letters: the Stack's source
     letter_seq: int = 0                       # monotonic id counter
+    protocol_log: tuple[ProtocolRecord, ...] = ()
     # Debug-only breadcrumb of rng draws; excluded from the state hash.
     rng_ledger: tuple[str, ...] = ()
 

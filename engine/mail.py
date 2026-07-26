@@ -13,7 +13,7 @@ import heapq
 
 from engine import actions as A
 from engine.core import stream
-from engine.state import Letter, World
+from engine.state import Letter, ProtocolRecord, World
 from engine.systems import sea_open
 
 
@@ -165,7 +165,9 @@ def generate_incoming(world: World) -> tuple[World, list]:
 
 # --- dispatch (D1): the player's reply leaves the seat -----------------------
 def dispatch_reply(world: World, target_actor: str, target_place: str,
-                   topic: str, facts: tuple) -> tuple[World, list]:
+                   topic: str, facts: tuple, profile: str = "",
+                   protocol_total: int = 0,
+                   protocol_violations: tuple[str, ...] = ()) -> tuple[World, list]:
     seq = world.letter_seq + 1
     L = _new_letter(world, seq, world.court.actor, target_place, topic, facts,
                     outgoing=True, recipient=target_actor)
@@ -176,7 +178,12 @@ def dispatch_reply(world: World, target_actor: str, target_place: str,
         if r:
             risk = max(risk, r.risk)
     events: list = [A.LetterSent(L.id, target_actor, topic)]
-    world = dataclasses.replace(world, letter_seq=seq)
+    protocol_log = world.protocol_log
+    if profile:
+        protocol_log += (ProtocolRecord(
+            L.id, target_actor, profile, protocol_total,
+            tuple(protocol_violations)),)
+    world = dataclasses.replace(world, letter_seq=seq, protocol_log=protocol_log)
     if risk and stream(world.seed, world.date.absolute, "letters.interception", L.id).chance(risk, 1000):
         # Diverted to someone else; the sender never learns (spec 6.6).
         return world, events + [A.LetterIntercepted(L.id)]

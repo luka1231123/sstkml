@@ -21,6 +21,9 @@ build deviates from it.
 - **M3/M4 — belief and interpretation.** Scribe distortion, ledger inspection,
   the archive, a numeric guard, deterministic prose pre-parser, and an optional
   validated Ollama parser. Invalid or unavailable model output never reaches state.
+- **M5 — the desk.** Authored diplomatic formulae, deterministic protocol
+  grading, guarded composition with offline fallback, raw player dictation,
+  splitting, burning, and exact sent-text replay.
 
 ## Play
 
@@ -46,12 +49,16 @@ replay("save.json")   # rebuilds from seed, refuses on hash divergence
 Run `pytest` if installed; the test modules are also plain functions and require
 no runtime dependencies.
 
+```sh
+python3 tools/corpus_lint.py
+```
+
 ## Layout
 
 ```
 engine/   stdlib only. core, state, actions, reduce, tick, systems.
 belief/   World -> Belief projection (plain dicts; the only thing UI/AI read).
-ai/       optional Ollama client, validated parser, numeric guard; later prose roles.
+ai/       optional Ollama client, parser/composer, numeric guard, protocol grader.
 tui/      rendering + command parsing.
 content/  authored TOML: scenarios, months, (later) goods, routes, decks, corpus.
 load.py   content -> initial World.  session.py  headless driver + save/replay.

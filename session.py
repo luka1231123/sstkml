@@ -15,7 +15,27 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 
-SAVE_VERSION = 4
+SAVE_VERSION = 5
+
+
+def _verify_protocol(world, action):
+    """Bind a logged grade to its real recipient and recompute it from prose."""
+    if not (getattr(action, "text", "") and getattr(action, "profile", "")):
+        return
+    from ai.grader import grade_for, profile_for
+    letter = next((item for item in world.inbox
+                   if item.id == action.letter_id), None)
+    if letter is None:
+        raise ValueError(f"protocol reply names unknown letter: {action.letter_id}")
+    expected = profile_for(letter.sender)
+    if action.profile != expected:
+        raise ValueError(
+            f"protocol profile mismatch: got {action.profile}, expected {expected}")
+    score = grade_for(
+        action.text, action.profile, recipient=letter.sender)
+    if (action.protocol_total != score.total
+            or tuple(action.protocol_violations) != score.violations):
+        raise ValueError("protocol grade divergence in logged reply")
 
 
 def play(seed: int, scenario: str, script: list[list]) -> tuple[object, list, list]:
@@ -30,6 +50,7 @@ def play(seed: int, scenario: str, script: list[list]) -> tuple[object, list, li
         world, _ = advance(world)
         turn = world.date.absolute
         for act in turn_actions:
+            _verify_protocol(world, act)
             world, _ = apply(world, act)
             log.append({"turn": turn, "action": to_dict(act)})
         hashes.append(state_hash(world))          # Phase D: snapshot
@@ -58,12 +79,14 @@ def replay(path: str | Path):
     world = load_scenario(data["scenario"], data["seed"])
     by_turn: dict[int, list] = {}
     for entry in data["log"]:
-        by_turn.setdefault(entry["turn"], []).append(from_dict(entry["action"]))
+        action = from_dict(entry["action"])
+        by_turn.setdefault(entry["turn"], []).append(action)
 
     for _ in range(data["turns"]):
         world, _ = advance(world)
         turn = world.date.absolute
         for act in by_turn.get(turn, []):
+            _verify_protocol(world, act)
             world, _ = apply(world, act)
 
     got = state_hash(world)

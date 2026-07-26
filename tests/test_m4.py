@@ -6,6 +6,7 @@ from ai.numeric_guard import guard, normalise
 from ai.parser import parse, preparse
 from belief.project import project
 from engine import actions as A
+from engine.tick import advance
 from load import load_scenario
 
 
@@ -49,6 +50,13 @@ def test_preparser_handles_high_confidence_prose():
     result = preparse("give smiths_palace 8400 qa", _belief())
     assert result.actions == (A.Allocate("smiths_palace", 8400),)
     assert result.source == "preparser"
+
+    world = load_scenario("ugarit", 8814402919)
+    while not world.inbox:
+        world, _ = advance(world)
+    result = preparse(
+        "reply i excuse the closed sea and promise attention", project(world))
+    assert result.actions[0].intent == "excuse the closed sea and promise attention"
 
 
 def test_parser_accepts_only_current_ids():

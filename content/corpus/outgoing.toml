@@ -1,0 +1,43 @@
+# Clean exemplars used both as composer few-shot material and grader fixtures.
+
+[[letters]]
+profile = "hatti.servant_to_lord"
+recipient = "hatti_king"
+text = """To the Sun, Great King, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+The command of my lord rests before me. I shall perform it."""
+
+[[letters]]
+profile = "hatti.servant_to_lord"
+recipient = "hatti_king"
+text = """To the Sun, Great King, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+By the Storm God of Hatti and the Sun Goddess of Arinna, I attend to my oath."""
+
+[[letters]]
+profile = "peer.equal_to_equal"
+recipient = "pharaoh"
+text = """To Pharaoh, the Sun, my brother: thus says Ammurapi, your brother.
+May it be well with my brother, with your health and your house.
+Let your heart be reassured; friendship stands between our houses."""
+
+[[letters]]
+profile = "peer.equal_to_equal"
+recipient = "babylon_king"
+text = """To the king of Karduniash, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+Ships approach the coast; I warn my brother so that danger does not surprise him."""
+
+[[letters]]
+profile = "ugarit.ruler_to_other"
+recipient = "alashiya_gov"
+text = """To Abdi-milki, governor at Alashiya: thus says Ammurapi, king of Ugarit.
+Let your heart be reassured. Your words have reached my house.
+Do not fear; I have not forgotten you."""
+
+[[letters]]
+profile = "ugarit.ruler_to_other"
+recipient = "sinaranu"
+text = """To Sinaranu the merchant: thus says Ammurapi, king of Ugarit.
+I cannot grant what you seek.
+Let this answer stand until I write again."""

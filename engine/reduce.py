@@ -55,11 +55,15 @@ def apply(world: World, action) -> tuple[World, list]:
 
     if isinstance(action, A.DictateReply):
         from engine import mail
+        if action.profile and not 0 <= action.protocol_total <= 1000:
+            raise ValueError("protocol score must be in 0..1000")
         letter = next((L for L in world.inbox if L.id == action.letter_id), None)
         if letter is None:
             raise ValueError(f"no such letter: {action.letter_id}")
         target_place = letter.path[0]      # where the sender is
         return mail.dispatch_reply(world, letter.sender, target_place,
-                                   f"reply_{action.intent}", ())
+                                   "reply", (),
+                                   action.profile, action.protocol_total,
+                                   action.protocol_violations)
 
     raise TypeError(f"unhandled action: {type(action).__name__}")

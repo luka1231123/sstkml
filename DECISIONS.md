@@ -56,3 +56,11 @@ and the Ollama client uses `urllib` rather than adding an HTTP dependency.
 High-confidence prose is parsed locally; all model JSON is checked against current
 Belief IDs and the numeric guard before Actions are constructed. Transport failure
 does not charge attention, while a genuine model clarification costs one hour.
+
+## D9 — Protocol text lives in the action log (M5)
+Outgoing prose still does not enter `World`; a sent `DictateReply` records the
+exact text and its authored protocol profile as primitive fields. The desk grades
+that text for display, and replay recomputes the grade rather than trusting a
+stored total. The engine retains only the derived `ProtocolRecord` (never prose)
+for M6 consequences. Dedicated, recipient/profile-tagged outgoing exemplars live
+apart from intentionally unreliable incoming NPC templates.

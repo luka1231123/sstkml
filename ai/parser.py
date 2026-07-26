@@ -8,7 +8,6 @@ import re
 from ai.numeric_guard import extract_numerals_and_number_words, guard
 from engine import actions as A
 
-INTENTS = {"reassure", "refuse", "promise", "warn"}
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
     "INSPECT_LEDGER", "EAT_SEED", "END_TURN",
@@ -67,7 +66,7 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     match = re.fullmatch(r"(?:eat|use)\s+(\d+)(?:\s+qa)?(?:\s+of)?\s+seed(?:\s+grain)?", text)
     if match:
         return ParseResult((A.EatSeed(int(match[1])),), source="preparser")
-    match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(reassure|refuse|promise|warn)", text)
+    match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(.{1,200})", text)
     if match and (letter := _resolve_letter(match[1], belief)):
         return ParseResult((A.DictateReply(letter, match[2]),), source="preparser")
     if text in {"end", "end turn", "finish", "finish turn"}:
@@ -81,7 +80,7 @@ def _affordances(belief: dict, hours_left: int) -> str:
     return (
         f"Hours left: {hours_left}\n"
         f"Letters (use exact id): {letters}\nGroups: {groups}\n"
-        "Ledgers: granary, seed\nReply intents: reassure, refuse, promise, warn\n"
+        "Ledgers: granary, seed\nReply intent: free text, at most 200 characters\n"
         "Legal verbs: " + ", ".join(sorted(VERBS))
     )
 
@@ -109,9 +108,9 @@ def _action(item: dict, belief: dict):
     if verb == "DICTATE":
         letter = _resolve_letter(args.get("item", ""), belief)
         intent = args.get("intent")
-        if not letter or intent not in INTENTS:
+        if not letter or not isinstance(intent, str) or not intent.strip() or len(intent) > 200:
             raise ValueError("invalid reply")
-        return A.DictateReply(letter, intent)
+        return A.DictateReply(letter, intent.strip())
     if verb == "INSPECT_LEDGER" and args.get("ledger") in {"granary", "seed"}:
         return A.InspectLedger(args["ledger"])
     if verb == "EAT_SEED" and type(args.get("qa")) is int:

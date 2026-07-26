@@ -40,7 +40,11 @@ class ReadLetter:
 @dataclasses.dataclass(frozen=True)
 class DictateReply:
     letter_id: str   # the Stack item being answered
-    intent: str      # "reassure" | "refuse" | "promise" | "warn"
+    intent: str      # free-text purpose; prose is composed outside engine/
+    text: str = ""   # exact sent text; replay re-grades this, never a stored score
+    profile: str = ""
+    protocol_total: int = 0
+    protocol_violations: tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -182,6 +186,11 @@ def from_dict(d: dict):
     cls = _TYPES[d["_t"]]
     kwargs = {}
     for f in dataclasses.fields(cls):
+        if f.name not in d:
+            if f.default is not dataclasses.MISSING:
+                kwargs[f.name] = f.default
+                continue
+            raise KeyError(f.name)
         v = d[f.name]
         if isinstance(v, list):
             v = tuple(v)

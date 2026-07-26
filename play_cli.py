@@ -26,7 +26,8 @@ SEARCH_COST = 1
 HELP = """  commands (a leading ':' is optional)
     stack | lists | stores | archive   switch screen
     read <i>                 read a letter in full            (2 hours)
-    reply <i> <intent>       answer it: reassure|refuse|promise|warn  (2 hours)
+    reply <i> <intent>       answer it with a free-text intent        (2 hours)
+    dictate <i>              write the reply yourself, ending with '.' (2 hours)
     inspect granary|seed     count it yourself; see the true number   (1 hour)
     search <word>            search the archive               (1 hour)
     alloc <group> <qa>       set what a group is paid  (effect next turn)
@@ -55,8 +56,19 @@ def _resolve(token: str, stack: list) -> str | None:
     return None
 
 
+def _raw_tablet() -> str:
+    print("  Dictate the tablet. A line containing only '.' seals the text.")
+    lines = []
+    while True:
+        line = input("  tablet> ")
+        if line == ".":
+            return "\n".join(lines)
+        lines.append(line)
+
+
 def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -> None:
     from ai.client import OllamaClient
+    from ai.composer import compose, raw_draft, split_draft
     from ai.parser import action_cost, parse
 
     world = load_scenario(scenario, seed)
@@ -83,6 +95,62 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
             world, evs = apply(world, action)
             log.append({"turn": world.date.absolute, "action": A.to_dict(action)})
             return evs
+
+        def desk_reply(letter_id: str, intent: str, hours_left: int,
+                       raw: bool = False) -> int:
+            if hours_left < REPLY_COST:
+                print(f"  not hours enough. a reply is {REPLY_COST}; you have {hours_left}.")
+                return 0
+            item = next((x for x in project(world)["stack"] if x["id"] == letter_id), None)
+            if item is None:
+                print("  no such item to answer.")
+                return 0
+            try:
+                draft = (raw_draft(_raw_tablet(), item["sender"]) if raw else
+                         compose(item["sender"], intent, item["facts"], seed,
+                                 world.date.absolute, client))
+            except (EOFError, KeyboardInterrupt):
+                print("\n  (the unfinished tablet is burned)")
+                return REPLY_COST
+            while True:
+                print("\n" + render.desk_screen(item["sender"], intent, draft))
+                try:
+                    choice = input("\n  desk> ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    print("\n  (the draft is burned)")
+                    return REPLY_COST
+                if choice in ("burn", "b"):
+                    print("  the clay is wetted and returned to the bin.")
+                    return REPLY_COST
+                if choice in ("dictate", "d"):
+                    try:
+                        draft = raw_draft(_raw_tablet(), item["sender"])
+                    except (EOFError, KeyboardInterrupt):
+                        print("\n  (the unfinished tablet is burned)")
+                        return REPLY_COST
+                    continue
+                if choice in ("split", "s"):
+                    parts = split_draft(draft, item["sender"])
+                    if not parts:
+                        print("  Yabninu: I find no two separable topics in this tablet.")
+                        continue
+                    if hours_left < REPLY_COST * 2:
+                        print("  two tablets need four hours; there is not time enough.")
+                        continue
+                    for part in parts:
+                        commit(A.DictateReply(
+                            letter_id, intent, part.text, part.profile,
+                            part.score.total, part.score.violations))
+                    print("  two tablets are sealed and given to two couriers.")
+                    return REPLY_COST * 2
+                if choice in ("send", "y"):
+                    evs = commit(A.DictateReply(
+                        letter_id, intent, draft.text, draft.profile,
+                        draft.score.total, draft.score.violations))
+                    if any(isinstance(event, A.LetterSent) for event in evs):
+                        print("  the tablet is sealed and given to a courier.")
+                    return REPLY_COST
+                print("  choose send, split, dictate, or burn.")
 
         search_results = None
         end = False
@@ -156,17 +224,22 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                     spent += SEARCH_COST
                     screen = "archive"
                     print(f"  the scribe searches. {len(search_results)} found.")
-            elif verb == "reply" and len(args) == 2:
+            elif verb == "reply" and len(args) >= 2:
                 lid = _resolve(args[0], search_results if search_results is not None else active)
                 if lid is None:
                     print("  no such item to answer.")
                 elif left < REPLY_COST:
                     print(f"  not hours enough. a reply is {REPLY_COST}; you have {left}.")
                 else:
-                    evs = commit(A.DictateReply(lid, args[1].lower()))
-                    spent += REPLY_COST
-                    if any(isinstance(e, A.LetterSent) for e in evs):
-                        print("  the tablet is sealed and given to a courier.")
+                    spent += desk_reply(lid, " ".join(args[1:]), left)
+            elif verb == "dictate" and len(args) == 1:
+                lid = _resolve(args[0], search_results if search_results is not None else active)
+                if lid is None:
+                    print("  no such item to answer.")
+                elif left < REPLY_COST:
+                    print(f"  not hours enough. a reply is {REPLY_COST}; you have {left}.")
+                else:
+                    spent += desk_reply(lid, "raw dictation", left, raw=True)
             elif verb == "alloc" and len(args) == 2:
                 try:
                     commit(A.Allocate(args[0], int(args[1])))
@@ -204,16 +277,25 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                     if not proceed:
                         print(f"  not hours enough. that would take {cost}; you have {left}.")
                         continue
+                    used = 0
                     for action in result.actions:
                         try:
+                            needed = action_cost(action)
+                            if used + needed > left:
+                                print("  the remaining actions do not fit in the audience.")
+                                break
                             if isinstance(action, A.EndTurn):
                                 end = True
                             elif isinstance(action, A.ReadLetter):
                                 item = next(x for x in b["stack"] if x["id"] == action.letter_id)
                                 print("\n" + render.letter_full(item))
                                 commit(action)
+                                used += action_cost(action)
+                            elif isinstance(action, A.DictateReply):
+                                used += desk_reply(action.letter_id, action.intent, left - used)
                             else:
                                 evs = commit(action)
+                                used += action_cost(action)
                                 if isinstance(action, A.InspectLedger):
                                     event = next((e for e in evs if isinstance(e, A.LedgerInspected)), None)
                                     if event:
@@ -221,7 +303,7 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                         except ValueError as ex:
                             print(f"  {ex}")
                             break
-                    spent += cost
+                    spent += used
 
 
 if __name__ == "__main__":

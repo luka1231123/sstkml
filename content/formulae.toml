@@ -1,0 +1,84 @@
+# Epistolary protocol known to Ammurapi's scribes (spec 8.5).
+
+[meta]
+formulaic_numbers = ["seven", "thousand"]
+
+[recipients]
+hatti_king = "hatti.servant_to_lord"
+carchemish_viceroy = "hatti.servant_to_lord"
+pharaoh = "peer.equal_to_equal"
+assyria_king = "peer.equal_to_equal"
+babylon_king = "peer.equal_to_equal"
+
+[weights]
+address = 250
+prostration = 180
+self_designation = 150
+forbidden_term = 250
+extra_topic = 100
+excuse_and_request = 90
+oath_gods = 120
+
+[hatti.servant_to_lord]
+label = "servant writing to the Great King"
+opening = "To the Sun, Great King, my lord: thus says Ammurapi, your servant."
+opening_regex = "^To the Sun,? Great King, my lord"
+requires_self_designation = "your servant"
+prostration = "At the feet of my lord, seven times and seven times I fall."
+prostration_regex = "seven times and seven times"
+forbidden_terms = ["my brother", "we are equals", "I ask in return"]
+max_topics = 1
+forbidden_pattern_excuse_and_request = true
+excuse_terms = ["because", "closed sea", "season prevented", "could not"]
+request_terms = ["I ask", "send me", "grant me", "in return"]
+oath_terms = ["oath", "sworn"]
+gods_required_if_oath_mentioned = ["Storm God of Hatti", "Sun Goddess of Arinna"]
+
+[hatti.servant_to_lord.topics]
+compliance = ["I shall", "I will send", "I attend"]
+refusal = ["cannot perform", "beyond what my house"]
+warning = ["danger", "enemy", "ships approach"]
+excuse = ["because", "closed sea", "season prevented"]
+request = ["I ask", "send me", "grant me"]
+
+[peer.equal_to_equal]
+label = "one king writing to an equal king"
+opening = "To {recipient}, my brother: thus says Ammurapi, your brother."
+opening_regex = "^To .+, my brother: thus says Ammurapi, your brother"
+requires_self_designation = ""
+prostration = ""
+prostration_regex = ""
+forbidden_terms = ["your servant", "at the feet of my lord"]
+max_topics = 1
+forbidden_pattern_excuse_and_request = false
+excuse_terms = ["because", "closed sea", "season prevented"]
+request_terms = ["I ask", "send me", "grant me"]
+oath_terms = ["oath", "sworn"]
+gods_required_if_oath_mentioned = []
+
+[peer.equal_to_equal.topics]
+greeting = ["your health", "your house", "heart be reassured"]
+promise = ["I shall", "I promise"]
+warning = ["danger", "enemy", "ships approach"]
+request = ["I ask", "send me", "grant me"]
+
+[ugarit.ruler_to_other]
+label = "the king of Ugarit writing without a status formula"
+opening = "To {recipient}: thus says Ammurapi, king of Ugarit."
+opening_regex = "^To .+: thus says Ammurapi, king of Ugarit"
+requires_self_designation = ""
+prostration = ""
+prostration_regex = ""
+forbidden_terms = ["we are equals"]
+max_topics = 1
+forbidden_pattern_excuse_and_request = false
+excuse_terms = ["because", "closed sea", "season prevented"]
+request_terms = ["I ask", "send me", "grant me"]
+oath_terms = ["oath", "sworn"]
+gods_required_if_oath_mentioned = []
+
+[ugarit.ruler_to_other.topics]
+reassurance = ["heart be reassured", "do not fear"]
+refusal = ["I refuse", "cannot grant", "cannot send"]
+promise = ["I shall", "I promise"]
+warning = ["danger", "enemy", "ships approach"]
