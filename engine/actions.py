@@ -52,6 +52,13 @@ class InspectLedger:
     ledger: str      # "granary" | "seed" — spend an hour, see the true count
 
 
+@dataclasses.dataclass(frozen=True)
+class SendGift:
+    recipient: str
+    good: str
+    quantity: int
+
+
 # --- Events ------------------------------------------------------------------
 
 
@@ -160,16 +167,78 @@ class LedgerInspected:
     true_value: int
 
 
+@dataclasses.dataclass(frozen=True)
+class GiftSent:
+    gift_id: str
+    recipient: str
+    good: str
+    quantity: int
+    value: int
+    arrival_turn: int
+
+
+@dataclasses.dataclass(frozen=True)
+class GiftArrived:
+    gift_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class GiftJudged:
+    gift_id: str
+    recipient: str
+    adequacy: int
+    esteem_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class RumourArrived:
+    observer: str
+    subject: str
+    gift_value: int
+
+
+@dataclasses.dataclass(frozen=True)
+class PatronNoticeDue:
+    actor: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PatronSought:
+    actor: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ProtocolApplied:
+    recipient: str
+    esteem_delta: int
+    violations: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class OathViolated:
+    oath_id: str
+    clause_kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class MisfortuneOccurred:
+    card_id: str
+    good: str
+    loss: int
+
+
 # --- Registry for log round-tripping -----------------------------------------
 
 _TYPES = {
     c.__name__: c for c in (
         EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, DictateReply,
-        InspectLedger,
+        InspectLedger, SendGift,
         TurnAdvanced, GrainReceived, Spoiled, RationsPaid, RitePerformed,
         RiteSkipped, UnrestChanged, Grumbling, SeedEaten, AllocationSet,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,
-        LetterIntercepted, LetterRead, LedgerInspected,
+        LetterIntercepted, LetterRead, LedgerInspected, GiftSent, GiftArrived,
+        GiftJudged, RumourArrived, PatronNoticeDue, PatronSought,
+        ProtocolApplied, OathViolated, MisfortuneOccurred,
     )
 }
 

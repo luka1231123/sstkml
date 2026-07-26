@@ -615,6 +615,126 @@ offset = 4
 topic = "warning"
 facts = { enemy = "no caravan from the east", ships = 0 }
 
+# Relationship claims are deliberately not all symmetrical. The mismatch with
+# Gubla is a live diplomatic trap, not a tooltip.
+[[relations]]
+other = "hatti_king"
+status_claim = "servant"
+their_status_claim = "servant"
+esteem = 520
+obligation = -3000
+last_gift_from_us = 0
+last_gift_from_them = 0
+best_known_rival_gift = 5000
+known_rival_gift_source = "pharaoh"
+
+[[relations]]
+other = "carchemish_viceroy"
+status_claim = "servant"
+their_status_claim = "servant"
+esteem = 560
+obligation = -1000
+
+[[relations]]
+other = "alashiya_gov"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 650
+obligation = 0
+
+[[relations]]
+other = "pharaoh"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 720
+obligation = 2000
+last_gift_from_them = 4500
+
+[[relations]]
+other = "byblos_king"
+status_claim = "brother"
+their_status_claim = "lord"
+esteem = 480
+obligation = 0
+is_vassal = true
+
+[[relations]]
+other = "amurru_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 430
+obligation = 0
+
+[[relations]]
+other = "sidon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 600
+obligation = 0
+
+[[relations]]
+other = "tyre_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 590
+obligation = 0
+
+[[relations]]
+other = "assyria_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 540
+obligation = 0
+
+[[relations]]
+other = "babylon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 560
+obligation = 0
+
+[[relations]]
+other = "ura_merchant"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 620
+obligation = 0
+
+[[relations]]
+other = "sinaranu"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 680
+obligation = 0
+
+[[relations]]
+other = "mira_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 500
+obligation = 0
+
+[[relations]]
+other = "emar_overseer"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 580
+obligation = 0
+
+[[oaths]]
+id = "oath_hatti_grain"
+parties = ["ammurapi", "hatti_king"]
+superior = "hatti_king"
+gods = ["storm_god_of_hatti", "sun_goddess_of_arinna"]
+sworn_turn = 0
+sworn_by = "ammurapi"
+
+[[oaths.clauses]]
+kind = "provide_goods"
+good = "grain"
+qty = 48000
+per_year = true
+
 [[rites]]
 id = "new_year_baal"
 fortnight = 1

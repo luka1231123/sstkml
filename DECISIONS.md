@@ -64,3 +64,13 @@ that text for display, and replay recomputes the grade rather than trusting a
 stored total. The engine retains only the derived `ProtocolRecord` (never prose)
 for M6 consequences. Dedicated, recipient/profile-tagged outgoing exemplars live
 apart from intentionally unreliable incoming NPC templates.
+
+## D10 — Compact, authored diplomacy balance (M6)
+Relations, gifts, gossip, oath audits, and misfortune share
+`engine/relations.py` while the system is small. The spec fixes gift adequacy
+bands and named protocol penalties but leaves exchange values, status floors,
+reciprocity, god ranks, generic protocol effects, and deck weights to content;
+those values live in `content/relations.toml` and
+`content/decks/misfortune.toml`. Annual goods clauses are audited once, at
+fortnight 24. M6 rejects unsupported oath clause kinds rather than silently
+treating them as satisfied.

@@ -164,6 +164,46 @@ def stores_screen(b: dict) -> str:
     return "\n".join(lines)
 
 
+def relations_screen(b: dict) -> str:
+    lines = ["  KNOWN WORLD — claims, gifts, and obligations", ""]
+    for relation in b["relations"]:
+        theirs = relation["their_status_claim"]
+        status = relation["status_claim"]
+        if theirs != status:
+            status = f"{status} / they say {theirs}"
+        obligation = relation["obligation"]
+        debt = (f"they owe {obligation}" if obligation >= 0
+                else f"we owe {-obligation}")
+        lines.append(f"  {actor_name(relation['other'])}")
+        lines.append(
+            f"      esteem {relation['esteem']}; status {status}; {debt}")
+        if relation["best_known_rival_gift"]:
+            source = relation["known_rival_gift_source"] or "another court"
+            lines.append(
+                f"      compares gifts against {relation['best_known_rival_gift']} "
+                f"received by {actor_name(source)}")
+        if relation["seeking_patron"]:
+            lines.append("      ! word has come: they are seeking another patron")
+    return "\n".join(lines)
+
+
+def oaths_screen(b: dict) -> str:
+    lines = ["  OATH TABLETS — the clauses are readable; divine liability is not", ""]
+    for oath in b["oaths"]:
+        state = "dissolved" if oath["dissolved"] else "sworn"
+        lines.append(
+            f"  {oath['id']}  ({state})  before {', '.join(oath['gods'])}")
+        lines.append(
+            f"      parties: {', '.join(actor_name(p) for p in oath['parties'])}")
+        for clause in oath["clauses"]:
+            args = ", ".join(
+                f"{key}={value}" for key, value in sorted(clause["args"].items()))
+            lines.append(f"      · {clause['kind']}({args})")
+    if not b["oaths"]:
+        lines.append("    (no oath tablet is held in this archive.)")
+    return "\n".join(lines)
+
+
 def events_lines(events, court) -> list[str]:
     """Diegetic footer lines for what the turn's advance surfaced."""
     from engine import actions as A
@@ -175,4 +215,16 @@ def events_lines(events, court) -> list[str]:
     for e in events:
         if isinstance(e, A.RiteSkipped):
             out.append(f"  The temple records that the rite '{e.rite_id}' was not kept.")
+        elif isinstance(e, A.GiftSent):
+            out.append(
+                f"  Gift {e.gift_id} leaves for {actor_name(e.recipient)}.")
+        elif isinstance(e, A.GiftJudged):
+            out.append(
+                f"  Word comes that gift {e.gift_id} reached "
+                f"{actor_name(e.recipient)}.")
+        elif isinstance(e, A.PatronSought):
+            out.append(
+                f"  A merchant whispers: {actor_name(e.actor)} seeks another patron.")
+        elif isinstance(e, A.MisfortuneOccurred):
+            out.append("  Misfortune has fallen upon the house. The diviners take note.")
     return out

@@ -76,6 +76,14 @@ def _loyalty_word(loyalty: int) -> str:
     return "seditious"
 
 
+def _esteem_word(esteem: int) -> str:
+    for floor, word in ((800, "honoured"), (650, "warm"), (500, "formal"),
+                        (350, "displeased"), (0, "hostile")):
+        if esteem >= floor:
+            return word
+    return "hostile"
+
+
 def project(world) -> dict:
     c = world.court
     d = world.date
@@ -100,6 +108,37 @@ def project(world) -> dict:
             "loyalty": _loyalty_word(g.loyalty),
             "member_name": g.member_name,
         })
+    relations = []
+    for actor, relation in sorted(world.relations.items()):
+        claim_known = (
+            relation.status_claim == relation.their_status_claim
+            or relation.status_mismatch_known)
+        relations.append({
+            "other": actor, "place": relation.place,
+            "status_claim": relation.status_claim,
+            "their_status_claim": (
+                relation.their_status_claim if claim_known else "uncertain"),
+            "esteem": _esteem_word(relation.esteem),
+            "obligation": relation.obligation,
+            "last_gift_from_us": relation.last_gift_from_us,
+            "last_gift_from_them": relation.last_gift_from_them,
+            "best_known_rival_gift": relation.best_known_rival_gift,
+            "known_rival_gift_source": relation.known_rival_gift_source,
+            "unanswered": relation.unanswered_letters_from_them,
+            "seeking_patron": (
+                relation.seeking_patron
+                if relation.patron_notice_received else None),
+        })
+    oaths = [{
+        "id": oath.id, "parties": list(oath.parties),
+        "superior": oath.superior, "gods": list(oath.gods),
+        "sworn_turn": oath.sworn_turn, "sworn_by": oath.sworn_by,
+        "dissolved": oath.dissolved,
+        "clauses": [{
+            "kind": clause.kind, "args": dict(clause.args),
+        } for clause in oath.clauses],
+    } for oath in world.oaths]
+    stores = _stores(world, perr)
     return {
         "scenario": world.scenario,
         "actor": c.actor,
@@ -113,7 +152,14 @@ def project(world) -> dict:
         "inspected": list(c.inspected),
         "unrest": c.unrest,
         "legitimacy": c.legitimacy,
-        "stores": _stores(world, perr),
+        "stores": stores,
         "priority": list(c.priority),
         "groups": groups,
+        "relations": relations,
+        "oaths": oaths,
+        "gift_goods": [
+            {"id": good, "available": stores.get(good, 0)}
+            for good in sorted(world.gift_values)
+            if stores.get(good, 0) > 0
+        ],
     }

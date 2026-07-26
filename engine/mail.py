@@ -62,6 +62,30 @@ def _route_between(routes, a: str, b: str):
     return None
 
 
+def route_latency(routes, src: str, dst: str, season,
+                  start_fortnight: int) -> int:
+    """Travel time using the same seasonal-entry rule as letter transit."""
+    path = shortest_path(routes, src, dst)
+    if not path:
+        return 1
+    elapsed = 0
+    for a, b in zip(path, path[1:]):
+        route = _route_between(routes, a, b)
+        legs = route.legs if route else 1
+        progress = 0
+        while progress < legs:
+            elapsed += 1
+            fortnight = (start_fortnight + elapsed - 1) % 24 + 1
+            blocked = (
+                progress == 0 and route is not None
+                and route.seasonal and route.mode == "sea"
+                and not sea_open(season, fortnight)
+            )
+            if not blocked:
+                progress += 1
+    return max(1, elapsed)
+
+
 # --- transit -----------------------------------------------------------------
 def step_letters(world: World) -> tuple[World, list]:
     """Advance every in-transit letter one fortnight. Deliver those that finish."""
@@ -105,13 +129,21 @@ def step_letters(world: World) -> tuple[World, list]:
             inbox = inbox + (L,)                    # into the Stack
             events.append(A.LetterArrived(L.id, L.sender, L.topic))
 
-    return dataclasses.replace(world, letters_in_transit=tuple(still),
-                               inbox=inbox), events
+    world = dataclasses.replace(
+        world, letters_in_transit=tuple(still), inbox=inbox)
+    from engine import relations
+    for letter in delivered:
+        if letter.outgoing:
+            world, applied = relations.deliver_protocol(world, letter)
+            events += applied
+    return world, events
 
 
 # --- generation (A15): who writes this turn ----------------------------------
 def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
-                facts: tuple, outgoing: bool = False, recipient: str | None = None) -> Letter:
+                facts: tuple, outgoing: bool = False, recipient: str | None = None,
+                protocol_profile: str = "", protocol_total: int = 0,
+                protocol_violations: tuple[str, ...] = ()) -> Letter:
     seat = world.court.seat
     if outgoing:
         src, dst = seat, origin      # replies go the other way; origin is the target place
@@ -124,6 +156,8 @@ def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
         topic=topic, facts=facts, sent_turn=world.date.absolute,
         path=path, edge_index=0, legs_into_edge=0, at_node=src,
         outgoing=outgoing,
+        protocol_profile=protocol_profile, protocol_total=protocol_total,
+        protocol_violations=protocol_violations,
     )
 
 
@@ -147,7 +181,10 @@ def generate_incoming(world: World) -> tuple[World, list]:
             transit.append(L)
 
     for c in world.correspondents:
-        if c.cadence > 0 and now - c.offset >= 0 and (now - c.offset) % c.cadence == 0:
+        relation = world.relations.get(c.actor)
+        delayed = relation is not None and now < relation.reply_delay_until
+        if (not delayed and c.cadence > 0 and now - c.offset >= 0
+                and (now - c.offset) % c.cadence == 0):
             emit(c.actor, c.place, c.topic, c.facts)
 
     # A group deep in arrears: a named member writes. Sparse, offset by group.
@@ -163,6 +200,20 @@ def generate_incoming(world: World) -> tuple[World, list]:
                                inbox=inbox, letter_seq=seq), events
 
 
+def inject_incoming(world: World, sender: str, origin: str, topic: str,
+                    facts: tuple) -> World:
+    """Create an engine-decided incoming letter outside the cadence deck."""
+    seq = world.letter_seq + 1
+    letter = _new_letter(world, seq, sender, origin, topic, facts)
+    if len(letter.path) <= 1:
+        letter = dataclasses.replace(letter, arrive_turn=world.date.absolute)
+        return dataclasses.replace(
+            world, inbox=world.inbox + (letter,), letter_seq=seq)
+    return dataclasses.replace(
+        world, letters_in_transit=world.letters_in_transit + (letter,),
+        letter_seq=seq)
+
+
 # --- dispatch (D1): the player's reply leaves the seat -----------------------
 def dispatch_reply(world: World, target_actor: str, target_place: str,
                    topic: str, facts: tuple, profile: str = "",
@@ -170,7 +221,9 @@ def dispatch_reply(world: World, target_actor: str, target_place: str,
                    protocol_violations: tuple[str, ...] = ()) -> tuple[World, list]:
     seq = world.letter_seq + 1
     L = _new_letter(world, seq, world.court.actor, target_place, topic, facts,
-                    outgoing=True, recipient=target_actor)
+                    outgoing=True, recipient=target_actor,
+                    protocol_profile=profile, protocol_total=protocol_total,
+                    protocol_violations=protocol_violations)
     # Interception rolled once at dispatch against the riskiest leg on the path.
     risk = 0
     for a, b in zip(L.path, L.path[1:]):

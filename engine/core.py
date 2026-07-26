@@ -30,6 +30,7 @@ DOMAINS: frozenset[str] = frozenset({
     "deck",
     "rivals",
     "displacement",
+    "relations.patron_notice",
 })
 
 
@@ -119,6 +120,18 @@ def in_range(fortnight: int, span: tuple[int, ...]) -> bool:
             return a <= fortnight <= b
         return fortnight >= a or fortnight <= b
     return fortnight in span
+
+
+def lerp_table(table: tuple[tuple[int, int], ...], x: int) -> int:
+    """Integer linear interpolation over authored, sorted points (spec 2.3)."""
+    if not table:
+        raise ValueError("lerp_table needs at least one point")
+    if x <= table[0][0]:
+        return table[0][1]
+    for (x0, y0), (x1, y1) in zip(table, table[1:]):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) // max(1, x1 - x0)
+    return table[-1][1]
 
 
 # --- Canonical JSON + hashing (spec 2.3, 2.4, 2.5) ---------------------------

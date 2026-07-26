@@ -109,6 +109,7 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
     stores = dict(court.stores)
     legitimacy = court.legitimacy
     unrest = court.unrest
+    deck_weight = court.misfortune_weight
     for rite in court.rites:
         if rite.fortnight != fortnight:
             continue
@@ -119,9 +120,11 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
         else:
             legitimacy = _clamp(legitimacy + rite.skip_legitimacy)
             unrest = _clamp(unrest + rite.skip_unrest)
+            deck_weight += rite.skip_deck_weight
             events.append(A.RiteSkipped(rite.id))
     return dataclasses.replace(court, stores=stores, legitimacy=legitimacy,
-                               unrest=unrest), events
+                               unrest=unrest,
+                               misfortune_weight=deck_weight), events
 
 
 # --- A9: unrest recompute -----------------------------------------------------

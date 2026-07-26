@@ -10,7 +10,7 @@ from engine import actions as A
 
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
-    "INSPECT_LEDGER", "EAT_SEED", "END_TURN",
+    "INSPECT_LEDGER", "EAT_SEED", "SEND_GIFT", "END_TURN",
 }
 _ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
           "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx")
@@ -66,6 +66,24 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     match = re.fullmatch(r"(?:eat|use)\s+(\d+)(?:\s+qa)?(?:\s+of)?\s+seed(?:\s+grain)?", text)
     if match:
         return ParseResult((A.EatSeed(int(match[1])),), source="preparser")
+    match = re.fullmatch(
+        r"(?:gift|send)\s+(\w+)\s+(\w+)\s+(\d+)", text)
+    if match:
+        actors = {r["other"] for r in belief.get("relations", [])}
+        goods = {g["id"] for g in belief.get("gift_goods", [])}
+        if match[1] in actors and match[2] in goods:
+            return ParseResult((
+                A.SendGift(match[1], match[2], int(match[3])),),
+                source="preparser")
+    match = re.fullmatch(
+        r"send\s+(\d+)\s+(\w+)\s+to\s+(\w+)", text)
+    if match:
+        actors = {r["other"] for r in belief.get("relations", [])}
+        goods = {g["id"] for g in belief.get("gift_goods", [])}
+        if match[3] in actors and match[2] in goods:
+            return ParseResult((
+                A.SendGift(match[3], match[2], int(match[1])),),
+                source="preparser")
     match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(.{1,200})", text)
     if match and (letter := _resolve_letter(match[1], belief)):
         return ParseResult((A.DictateReply(letter, match[2]),), source="preparser")
@@ -77,9 +95,12 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
 def _affordances(belief: dict, hours_left: int) -> str:
     letters = ", ".join(f"{roman}={lid}" for roman, lid in _letters(belief).items()) or "none"
     groups = ", ".join(g["id"] for g in belief["groups"])
+    actors = ", ".join(r["other"] for r in belief.get("relations", []))
+    goods = ", ".join(g["id"] for g in belief.get("gift_goods", []))
     return (
         f"Hours left: {hours_left}\n"
         f"Letters (use exact id): {letters}\nGroups: {groups}\n"
+        f"Correspondents: {actors}\nGift goods: {goods}\n"
         "Ledgers: granary, seed\nReply intent: free text, at most 200 characters\n"
         "Legal verbs: " + ", ".join(sorted(VERBS))
     )
@@ -115,6 +136,15 @@ def _action(item: dict, belief: dict):
         return A.InspectLedger(args["ledger"])
     if verb == "EAT_SEED" and type(args.get("qa")) is int:
         return A.EatSeed(args["qa"])
+    if verb == "SEND_GIFT":
+        recipient = args.get("recipient")
+        good, quantity = args.get("good"), args.get("quantity")
+        actors = {r["other"] for r in belief.get("relations", [])}
+        goods = {g["id"] for g in belief.get("gift_goods", [])}
+        if (recipient not in actors or good not in goods
+                or type(quantity) is not int):
+            raise ValueError("invalid gift")
+        return A.SendGift(recipient, good, quantity)
     if verb == "END_TURN":
         return A.EndTurn()
     raise ValueError("invalid arguments")
@@ -161,5 +191,7 @@ def action_cost(action) -> int:
     if isinstance(action, (A.ReadLetter, A.DictateReply)):
         return 2
     if isinstance(action, A.InspectLedger):
+        return 1
+    if isinstance(action, A.SendGift):
         return 1
     return 0

@@ -24,6 +24,9 @@ build deviates from it.
 - **M5 — the desk.** Authored diplomatic formulae, deterministic protocol
   grading, guarded composition with offline fallback, raw player dictation,
   splitting, burning, and exact sent-text replay.
+- **M6 — relations and oaths.** Status claims, delayed gifts and gossip,
+  unanswered-letter decay, delivery-time protocol consequences, readable oath
+  clauses, hidden divine liability, and deterministic misfortune.
 
 ## Play
 
@@ -56,10 +59,10 @@ python3 tools/corpus_lint.py
 ## Layout
 
 ```
-engine/   stdlib only. core, state, actions, reduce, tick, systems.
+engine/   stdlib only. core, state, actions, reduce, tick, systems, relations.
 belief/   World -> Belief projection (plain dicts; the only thing UI/AI read).
 ai/       optional Ollama client, parser/composer, numeric guard, protocol grader.
 tui/      rendering + command parsing.
-content/  authored TOML: scenarios, months, (later) goods, routes, decks, corpus.
+content/  authored TOML: scenarios, months, relations, routes, decks, corpus.
 load.py   content -> initial World.  session.py  headless driver + save/replay.
 ```

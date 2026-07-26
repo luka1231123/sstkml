@@ -31,12 +31,22 @@ def advance(world: World) -> tuple[World, list]:
     # A1: date advance. A fresh fortnight: last turn's ledger inspections lapse,
     # so the scribe's count is what the ruler sees again until he inspects anew.
     world = dataclasses.replace(world, date=world.date.advance())
-    world = dataclasses.replace(world, court=dataclasses.replace(world.court, inspected=()))
+    world = dataclasses.replace(
+        world, court=dataclasses.replace(
+            world.court, inspected=(), misfortune_weight=0))
     events.append(_turn_advanced(world))
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)
+    from engine import relations
+    world, fired = relations.resolve_scheduled(world, fired)
     events += fired
+
+    # Letters already in transit arrive in A3. Delivery-time protocol effects
+    # must therefore exist before the A10 oath audit and A12 deck draw.
+    from engine import mail
+    world, e = mail.step_letters(world); events += e
+    world = relations.update_unanswered(world)
 
     court = world.court
     # A8 spoilage (stock sitting through the fortnight), then A6 deliveries,
@@ -49,11 +59,13 @@ def advance(world: World) -> tuple[World, list]:
     court, e = systems.recompute_unrest(court); events += e
     world = dataclasses.replace(world, court=court)
 
-    # Mail: move letters already travelling (delivering arrivals into the Stack),
-    # THEN generate this turn's new letters so every one carries at least a leg
-    # of latency. Order matters and is fixed.
-    from engine import mail
-    world, e = mail.step_letters(world); events += e
+    # A10/A12: audit explicit oath clauses, then let hidden liability weight
+    # misfortune. Neither the liability total nor the causing oath enters Belief.
+    world, e = relations.audit_oaths(world); events += e
+    world, e = relations.draw_misfortune(world); events += e
+
+    # A15: generate new intents after arrivals, so each new travelling letter
+    # still carries at least one full turn of latency.
     world, e = mail.generate_incoming(world); events += e
 
     return world, events

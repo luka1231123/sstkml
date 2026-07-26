@@ -22,9 +22,10 @@ READ_COST = 2
 REPLY_COST = 2
 INSPECT_COST = 1
 SEARCH_COST = 1
+GIFT_COST = 1
 
 HELP = """  commands (a leading ':' is optional)
-    stack | lists | stores | archive   switch screen
+    stack | lists | stores | archive | relations | oaths   switch screen
     read <i>                 read a letter in full            (2 hours)
     reply <i> <intent>       answer it with a free-text intent        (2 hours)
     dictate <i>              write the reply yourself, ending with '.' (2 hours)
@@ -33,6 +34,7 @@ HELP = """  commands (a leading ':' is optional)
     alloc <group> <qa>       set what a group is paid  (effect next turn)
     pri <group> <group>..    set the pay-down order
     eat <qa>                 move seed grain into the granary now
+    gift <actor> <good> <n>  send goods to a correspondent        (1 hour)
     end                      end the fortnight
     save <path>              write a save file
     help  |  quit
@@ -160,6 +162,10 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
             active = b["archive"] if screen == "archive" else b["stack"]
             if screen == "archive":
                 print(render.archive_screen(b, search_results))
+            elif screen == "relations":
+                print(render.relations_screen(b))
+            elif screen == "oaths":
+                print(render.oaths_screen(b))
             else:
                 print({"stack": render.stack_screen, "lists": render.lists_screen,
                        "stores": render.stores_screen}[screen](b))
@@ -176,7 +182,7 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
             parts = line.split()
             verb, args = parts[0].lower(), parts[1:]
 
-            if verb in ("stack", "lists", "stores", "archive"):
+            if verb in ("stack", "lists", "stores", "archive", "relations", "oaths"):
                 screen = verb
                 if verb != "archive":
                     search_results = None
@@ -255,6 +261,22 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                     commit(A.EatSeed(int(args[0])))
                 except ValueError:
                     print("  eat needs an integer qa.")
+            elif verb == "gift" and len(args) == 3:
+                if left < GIFT_COST:
+                    print("  no hour remains to seal and dispatch a gift.")
+                else:
+                    try:
+                        events = commit(A.SendGift(
+                            args[0], args[1], int(args[2])))
+                        spent += GIFT_COST
+                        sent = next(
+                            (e for e in events if isinstance(e, A.GiftSent)), None)
+                        if sent:
+                            print(
+                                f"  gift {sent.gift_id} leaves; expected turn "
+                                f"{sent.arrival_turn}.")
+                    except (ValueError, TypeError) as ex:
+                        print(f"  {ex}")
             else:
                 if command_mode:
                     print(f"  don't understand command: {line!r}  (try ':help')")
@@ -296,6 +318,12 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                             else:
                                 evs = commit(action)
                                 used += action_cost(action)
+                                if isinstance(action, A.SendGift):
+                                    sent = next(
+                                        (e for e in evs if isinstance(e, A.GiftSent)),
+                                        None)
+                                    if sent:
+                                        print(f"  gift {sent.gift_id} is dispatched.")
                                 if isinstance(action, A.InspectLedger):
                                     event = next((e for e in evs if isinstance(e, A.LedgerInspected)), None)
                                     if event:

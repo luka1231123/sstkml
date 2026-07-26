@@ -1,0 +1,38 @@
+[gifts.value_per_unit]
+grain = 1
+seed_grain = 1
+oil = 12
+wine = 10
+copper = 4
+tin = 12
+bronze = 8
+gold = 30
+silver = 1
+
+[gifts.status_floor]
+servant = 500
+son = 750
+lord = 1000
+brother = 3000
+father = 5000
+
+# x = esteem, y = reciprocity permille.
+[gifts]
+reciprocity = [[0, 700], [500, 1000], [1000, 1300]]
+
+[gods.rank]
+storm_god_of_hatti = 120
+sun_goddess_of_arinna = 100
+baal = 80
+dagan = 70
+
+[protocol]
+good_floor = 900
+good_delta = 20
+poor_floor = 700
+poor_delta = -40
+kinship_overreach = -200
+excuse_and_request = -90
+missing_prostration = -120
+other_violation = -40
+wrong_god_reply_delay = 2

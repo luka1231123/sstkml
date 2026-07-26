@@ -15,7 +15,7 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 
-SAVE_VERSION = 5
+SAVE_VERSION = 6
 
 
 def _verify_protocol(world, action):
@@ -76,6 +76,10 @@ def replay(path: str | Path):
     Never invokes the model. Raises on divergence, naming the turn.
     """
     data = json.loads(Path(path).read_text())
+    if data.get("version") != SAVE_VERSION:
+        raise ValueError(
+            f"unsupported save version: {data.get('version')!r}; "
+            f"expected {SAVE_VERSION}")
     world = load_scenario(data["scenario"], data["seed"])
     by_turn: dict[int, list] = {}
     for entry in data["log"]:

@@ -74,6 +74,12 @@ measures of good grain lying on the quay, and the season is short. I will let it
 go for {price_copper} of copper the measure, no less, for the risk is mine. Send
 word and send the metal, and it is yours before the sea shuts."""
 
+[gift_insult]
+summary = "A royal seal. The gift was weighed. The words are colder than the scale."
+template = """To the king of Ugarit: your gift has been weighed before my servants.
+You sent {quantity} of {good}. Is this how your house values mine? Other kings
+know the measure of honour. Send no explanation; send what is fitting."""
+
 [warning]
 summary = "A distant hand. Movement, rumour, a name to remember."
 template = """To the king of Ugarit. I am {sender}, and I write what I have seen,

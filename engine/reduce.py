@@ -53,6 +53,10 @@ def apply(world: World, action) -> tuple[World, list]:
         true_value = world.court.stores.get(good, 0)
         return replace_court(world, inspected=inspected), [A.LedgerInspected(action.ledger, true_value)]
 
+    if isinstance(action, A.SendGift):
+        from engine.relations import send_gift
+        return send_gift(world, action)
+
     if isinstance(action, A.DictateReply):
         from engine import mail
         if action.profile and not 0 <= action.protocol_total <= 1000:
@@ -61,9 +65,23 @@ def apply(world: World, action) -> tuple[World, list]:
         if letter is None:
             raise ValueError(f"no such letter: {action.letter_id}")
         target_place = letter.path[0]      # where the sender is
+        if letter.answered_turn is None:
+            inbox = tuple(
+                dataclasses.replace(item, answered_turn=world.date.absolute)
+                if item.id == letter.id else item
+                for item in world.inbox
+            )
+            world = dataclasses.replace(world, inbox=inbox)
+        violations = tuple(action.protocol_violations)
+        relation = world.relations.get(letter.sender)
+        if (relation is not None
+                and relation.status_claim != relation.their_status_claim
+                and "my brother" in action.text.casefold()
+                and "kinship_overreach" not in violations):
+            violations += ("kinship_overreach",)
         return mail.dispatch_reply(world, letter.sender, target_place,
                                    "reply", (),
                                    action.profile, action.protocol_total,
-                                   action.protocol_violations)
+                                   violations)
 
     raise TypeError(f"unhandled action: {type(action).__name__}")
