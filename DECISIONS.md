@@ -49,3 +49,10 @@ the spring flood (verified: 4 Alashiya letters arriving together at fortnight 8)
 Liberty: a letter already mid-crossing when the season turns *completes* the leg
 rather than retreating — matters only for the 4-leg Egypt route and keeps the
 model simple. Interception is rolled once at dispatch against the riskiest leg.
+
+## D8 — Flat, stdlib-only parser layer (M4)
+The small parser lives at `ai/parser.py` rather than a one-file `roles/` package,
+and the Ollama client uses `urllib` rather than adding an HTTP dependency.
+High-confidence prose is parsed locally; all model JSON is checked against current
+Belief IDs and the numeric guard before Actions are constructed. Transport failure
+does not charge attention, while a genuine model clarification costs one hour.

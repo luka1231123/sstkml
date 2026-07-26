@@ -34,7 +34,10 @@ HELP = """  commands (a leading ':' is optional)
     eat <qa>                 move seed grain into the granary now
     end                      end the fortnight
     save <path>              write a save file
-    help  |  quit"""
+    help  |  quit
+
+  Plain English is tried through the deterministic pre-parser, then Ollama.
+  Run with --no-ai to keep command mode only."""
 
 
 def _resolve(token: str, stack: list) -> str | None:
@@ -52,9 +55,14 @@ def _resolve(token: str, stack: list) -> str | None:
     return None
 
 
-def run(scenario: str = "ugarit", seed: int = 8814402919) -> None:
+def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -> None:
+    from ai.client import OllamaClient
+    from ai.parser import action_cost, parse
+
     world = load_scenario(scenario, seed)
     log: list[dict] = []
+    ai_log: list[dict] = []
+    client = None if no_ai else OllamaClient(ai_log, f"saves/{scenario}/ai_cache")
     turns = 0
     screen = "stack"
     print("\n  SAY TO THE KING, MY LORD\n")
@@ -94,7 +102,8 @@ def run(scenario: str = "ugarit", seed: int = 8814402919) -> None:
                 return
             if not line:
                 continue
-            if line.startswith(":"):
+            command_mode = line.startswith(":")
+            if command_mode:
                 line = line[1:]
             parts = line.split()
             verb, args = parts[0].lower(), parts[1:]
@@ -111,11 +120,11 @@ def run(scenario: str = "ugarit", seed: int = 8814402919) -> None:
             elif verb == "save":
                 from session import save
                 path = args[0] if args else "save.json"
-                save(path, seed, scenario, turns, log, world)
+                save(path, seed, scenario, turns, log, world, ai_log)
                 print(f"  saved to {path}")
             elif verb in ("end", "e"):
                 end = True
-            elif verb == "read" and args:
+            elif verb == "read" and len(args) == 1:
                 lid = _resolve(args[0], search_results if search_results is not None else active)
                 if lid is None:
                     print("  no such item on the pile.")
@@ -174,10 +183,49 @@ def run(scenario: str = "ugarit", seed: int = 8814402919) -> None:
                 except ValueError:
                     print("  eat needs an integer qa.")
             else:
-                print(f"  don't understand: {line!r}  (try 'help')")
+                if command_mode:
+                    print(f"  don't understand command: {line!r}  (try ':help')")
+                    continue
+                result = parse(line, b, left, seed, world.date.absolute, client)
+                if result.unavailable:
+                    print("  the model is unavailable. use ':' commands (try ':help').")
+                elif result.question:
+                    if left:
+                        spent += 1
+                        print(f"  Yabninu: {result.question}")
+                    else:
+                        print("  Yabninu has no audience hour left to clarify.")
+                else:
+                    cost = sum(action_cost(action) for action in result.actions)
+                    proceed = cost <= left
+                    if proceed and cost > 3:
+                        answer = input(f"  That is {cost} hours of your {left}. Proceed? [y/N] ")
+                        proceed = answer.lower().startswith("y")
+                    if not proceed:
+                        print(f"  not hours enough. that would take {cost}; you have {left}.")
+                        continue
+                    for action in result.actions:
+                        try:
+                            if isinstance(action, A.EndTurn):
+                                end = True
+                            elif isinstance(action, A.ReadLetter):
+                                item = next(x for x in b["stack"] if x["id"] == action.letter_id)
+                                print("\n" + render.letter_full(item))
+                                commit(action)
+                            else:
+                                evs = commit(action)
+                                if isinstance(action, A.InspectLedger):
+                                    event = next((e for e in evs if isinstance(e, A.LedgerInspected)), None)
+                                    if event:
+                                        print(f"  you count {render.fmt_good('grain', event.true_value)}.")
+                        except ValueError as ex:
+                            print(f"  {ex}")
+                            break
+                    spent += cost
 
 
 if __name__ == "__main__":
-    sc = sys.argv[1] if len(sys.argv) > 1 else "ugarit"
-    sd = int(sys.argv[2]) if len(sys.argv) > 2 else 8814402919
-    run(sc, sd)
+    argv = [arg for arg in sys.argv[1:] if arg != "--no-ai"]
+    sc = argv[0] if argv else "ugarit"
+    sd = int(argv[1]) if len(argv) > 1 else 8814402919
+    run(sc, sd, "--no-ai" in sys.argv)

@@ -1,5 +1,12 @@
-"""M4 numeric guard: model prose may repeat prompted numbers and no others."""
+"""M4 guard/parser: model output is optional, closed, and number-safe."""
+import json
+
+from ai.client import ModelUnavailable
 from ai.numeric_guard import guard, normalise
+from ai.parser import parse, preparse
+from belief.project import project
+from engine import actions as A
+from load import load_scenario
 
 
 def test_digit_and_word_forms_share_a_value():
@@ -21,3 +28,48 @@ def test_sexagesimal_and_grouped_digits():
 def test_authored_formula_numbers_can_be_allowed():
     text = "At my lord's feet, seven times and seven times I fall."
     assert guard(text, {"seven"}) == (True, [])
+
+
+class _Client:
+    def __init__(self, response=None, unavailable=False):
+        self.response = response
+        self.unavailable = unavailable
+
+    def call(self, *args):
+        if self.unavailable:
+            raise ModelUnavailable("offline")
+        return json.dumps(self.response)
+
+
+def _belief():
+    return project(load_scenario("ugarit", 8814402919))
+
+
+def test_preparser_handles_high_confidence_prose():
+    result = preparse("give smiths_palace 8400 qa", _belief())
+    assert result.actions == (A.Allocate("smiths_palace", 8400),)
+    assert result.source == "preparser"
+
+
+def test_parser_accepts_only_current_ids():
+    valid = {"kind": "actions", "actions": [
+        {"verb": "ALLOCATE", "args": {"group": "smiths_palace", "qa": 8400}},
+    ]}
+    result = parse("see that smiths_palace receive 8400", _belief(), 6, 1, 1, _Client(valid))
+    assert result.actions == (A.Allocate("smiths_palace", 8400),)
+
+    invented = {"kind": "actions", "actions": [
+        {"verb": "ALLOCATE", "args": {"group": "invented_group", "qa": 8400}},
+    ]}
+    result = parse("give somebody 8400", _belief(), 6, 1, 1, _Client(invented))
+    assert result.question and not result.actions
+
+
+def test_parser_rejects_model_invented_numbers_and_survives_offline():
+    invented = {"kind": "actions", "actions": [
+        {"verb": "EAT_SEED", "args": {"qa": 999}},
+    ]}
+    result = parse("use some seed", _belief(), 6, 1, 1, _Client(invented))
+    assert result.question and not result.actions
+    assert parse("do something subtle", _belief(), 6, 1, 1,
+                 _Client(unavailable=True)).unavailable

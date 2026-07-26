@@ -37,14 +37,14 @@ def play(seed: int, scenario: str, script: list[list]) -> tuple[object, list, li
 
 
 def save(path: str | Path, seed: int, scenario: str, turns: int,
-         log: list, world) -> None:
+         log: list, world, ai_log: list | None = None) -> None:
     Path(path).write_text(json.dumps({
         "version": SAVE_VERSION,
         "seed": seed,
         "scenario": scenario,
         "turns": turns,
         "log": log,
-        "ai_log": [],
+        "ai_log": ai_log or [],
         "state_hash_at_save": state_hash(world),
     }, indent=2))
 

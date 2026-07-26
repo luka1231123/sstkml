@@ -18,11 +18,15 @@ build deviates from it.
   sea and the spring flood, the schedule, correspondents on cadence, the STACK
   screen, reading (costs hours), and template replies from the desk. The pile
   outgrows the audience budget; the famine now writes to you by name.
+- **M3/M4 — belief and interpretation.** Scribe distortion, ledger inspection,
+  the archive, a numeric guard, deterministic prose pre-parser, and an optional
+  validated Ollama parser. Invalid or unavailable model output never reaches state.
 
 ## Play
 
 ```sh
 python3 play_cli.py ugarit          # optional: <scenario> <seed>
+python3 play_cli.py ugarit --no-ai  # deterministic command mode only
 ```
 
 Type `help` at the prompt. Everything is reachable by command; there is no GUI
@@ -39,19 +43,15 @@ replay("save.json")   # rebuilds from seed, refuses on hash divergence
 
 ## Tests
 
-```sh
-python3 -c "import tests.test_m1 as t; t.test_replay_matches(); \
-t.test_grain_is_conserved(); t.test_arrears_monotone_under_zero_allocation()"
-```
-
-(Or `pytest` if installed.)
+Run `pytest` if installed; the test modules are also plain functions and require
+no runtime dependencies.
 
 ## Layout
 
 ```
 engine/   stdlib only. core, state, actions, reduce, tick, systems.
 belief/   World -> Belief projection (plain dicts; the only thing UI/AI read).
-ai/       (M4+) Ollama client, parser, composer, grader, numeric guard.
+ai/       optional Ollama client, validated parser, numeric guard; later prose roles.
 tui/      rendering + command parsing.
 content/  authored TOML: scenarios, months, (later) goods, routes, decks, corpus.
 load.py   content -> initial World.  session.py  headless driver + save/replay.
