@@ -1,0 +1,8 @@
+[project]
+name = "sttkml"
+version = "0.0.1"
+description = "SAY TO THE KING, MY LORD — a deterministic Late Bronze Age archive game"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

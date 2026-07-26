@@ -1,0 +1,14 @@
+# Cultures share one engine calendar (the fortnight) and differ only in labels
+# (spec 3.1). 12 month names, 2 half-names. The engine never reads these.
+
+[ugarit]
+months = ["Ittabnu","Hiyaru","Nisanu","Ayyaru","Simanu","Duuzu","Abu","Ululu","Tashritu","Arahsamnu","Kislimu","Tebetu"]
+halves = ["former half","latter half"]
+
+[egypt]
+months = ["Akhet I","Akhet II","Akhet III","Akhet IV","Peret I","Peret II","Peret III","Peret IV","Shemu I","Shemu II","Shemu III","Shemu IV"]
+halves = ["first fifteen days","second fifteen days"]
+
+[pylos]
+months = ["po-ro-wi-to","me-tu-wo ne-wo","pa-ki-ja-ni-jo","ka-ra-e-ri-jo","de-u-ki-jo-jo","wo-de-wi-jo","a-ma-ko-to","di-wi-jo-jo","ple-i-sto","ka-ra-e-ri-jo-me-no","me-no-e-jo","pa-ki-ja-ni-jo-me-no"]
+halves = ["waxing","waning"]

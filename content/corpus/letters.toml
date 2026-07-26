@@ -1,0 +1,81 @@
+# Authored letter templates (spec 8.7 fallback prose; the model rewrites these
+# from M7). The summary is the scribe's line -- cheap, always available. The
+# template is the full body -- costs hours to read. {placeholders} are filled
+# from the letter's structured facts; no number appears that wasn't authored.
+
+[grain_owed]
+summary = "Hattusa. Royal seal. The grain owed under oath. Not warm."
+template = """To Ammurapi of Ugarit: thus the Sun, Great King, your lord.
+The grain you owe me under your oath has not come. {ships_promised} ships were
+promised to me; one has sailed. The season turns and my storehouses stand open
+and empty. See to it. Do not make me write to you a third time."""
+
+[ships_sighted]
+summary = "Alashiya. Sealed, the governor. Ships off the coast. He is afraid."
+template = """To the king of Ugarit, from {sender}, your servant.
+Ships not our own have been seen off my coast, {ships} of them, and I have but
+{men} men under arms. I have written to you before and had no answer. In the
+name of the gods, send word, and send men, before they are upon us."""
+
+[exemption]
+summary = "Sinaranu, merchant. Unsealed. Wants his exemption again."
+template = """To my lord the king: I, {sender}, your servant, at your feet.
+Again I ask my lord for the exemption on my ship that comes in from Crete. My
+oil and my copper serve your house and no other. Grant me this, my lord, and I
+shall not forget it, nor shall your storehouses."""
+
+[greeting]
+summary = "The Delta. Warm words and gold from Pharaoh."
+template = """To my brother, the king of Ugarit: thus the Sun, king of Egypt.
+May it be well with you, with your house, your wives, your sons, your troops.
+I have sent you {gold} talents of gold, a gift between brothers. Write to me of
+your health, and of the ships that pass before your harbour these days."""
+
+[arrears_complaint]
+summary = "A servant of your house. The ration has not come."
+template = """To the king, my lord: I am {sender}, of {group}.
+The ration has not reached us these {weeks} fortnights. The children ask for it
+and I have no answer to give them. I have not forgotten my lord. I beg my lord:
+do not forget his servants."""
+
+[great_king_demand]
+summary = "The viceroy. Troops are summoned. A date is named."
+template = """To Ammurapi: thus {sender}. In the name of the Sun, my lord and
+yours, send me {troops} men of your household troops, and let them be here
+within {within} fortnights. The Sun does not ask twice. See that they come, and
+that they come armed. Do not write to me of the sea; write to me of soldiers."""
+
+[vassal_plea]
+summary = "A vassal. His towns are being taken. He begs, again."
+template = """To the king of Ugarit, my brother -- would that I could say my
+lord. This is {sender}. {enemy} have taken {towns_taken} of my towns, and no one
+comes. I have written and written. Behold, if help does not come before the sea
+opens, there will be no kingdom here to help. Send word to the Sun on my behalf,
+for he listens to you and not to me."""
+
+[tribute_due]
+summary = "Sidon. A reminder, courteous and cold, of what is owed."
+template = """To my brother the king of Ugarit, thus {sender}. The purple you
+promised for the house of the god -- {purple} measures -- has not come with the
+last ship. I say nothing of it to others. But the god counts, and so do I. Let
+it come with the next, and we remain brothers."""
+
+[brother_greeting]
+summary = "A great king, as an equal. Gifts, and a scale being taken."
+template = """To Ammurapi, my brother, thus {sender}: may it be well with you,
+your house, your wives, your sons, your chariots. I send you {number} of {gift}
+as a gift between brothers who are equals. Write to me of your health -- and tell
+me, my brother, what the king of Egypt last sent to your house. I would know it."""
+
+[grain_offer]
+summary = "Ura. Grain for copper, if the sea allows and the price suits."
+template = """To the house of the king of Ugarit, from {sender}. I have {grain}
+measures of good grain lying on the quay, and the season is short. I will let it
+go for {price_copper} of copper the measure, no less, for the risk is mine. Send
+word and send the metal, and it is yours before the sea shuts."""
+
+[warning]
+summary = "A distant hand. Movement, rumour, a name to remember."
+template = """To the king of Ugarit. I am {sender}, and I write what I have seen,
+not what I have been told. {enemy}. Believe it or not as you will; I have
+discharged my duty in the writing. Watch your coast, and count your friends."""

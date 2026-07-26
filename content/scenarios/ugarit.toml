@@ -1,0 +1,634 @@
+# Ammurapi of Ugarit (spec 7.2).
+# Wealthy because everyone passes through, sworn to Hatti, militarily hopeless.
+# The tightest, cleanest ruleset -- the default and the tutorial.
+# Grain income is a flat estate delivery here; agriculture (M8) makes it real.
+# The economy runs a structural deficit: you cannot feed everyone forever.
+# The game is the order in which you let them starve.
+
+scenario = "ugarit"
+actor = "ammurapi"
+seat = "seat"
+attention_base = 10
+grain_income = 34000            # qa per fortnight from crown + temple estates
+
+# Names for the faces of a ration cut (spec 6.3). One is drawn per group at load.
+names = [
+  "Abdi", "Rap'anu", "Sinaranu", "Kurwanu", "Ili-milku",
+  "Takhulinu", "Munahhimu", "Ewri-sharri", "Baaluya", "Yadudanu",
+]
+
+# Pay-down order when grain runs short. The single most important screen.
+priority = ["household", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers"]
+
+# The palace scribe who copies every number the ruler reads (spec 6.7). Ugarit's
+# ruler is literate, but the granary is still counted by a tired junior hand.
+# p_error = fatigue * (1000 - competence) / 1000  ->  here ~100 permille.
+[scribe]
+competence = 800
+fatigue = 500
+
+[stores]
+grain = 180000
+seed_grain = 60000
+oil = 4000
+wine = 3000
+copper = 3600
+tin = 1800
+bronze = 900
+
+[[groups]]
+id = "household"
+name = "the king's household"
+size = 120
+entitlement = 100
+function = "household"
+place = "seat"
+
+[[groups]]
+id = "garrison_mahadu"
+name = "garrison at Ma'hadu"
+size = 60
+entitlement = 90
+function = "garrison"
+place = "ma_hadu"
+
+[[groups]]
+id = "cult_baal"
+name = "servants of the temple of Baal"
+size = 80
+entitlement = 80
+function = "cult"
+place = "seat"
+
+[[groups]]
+id = "smiths_palace"
+name = "smiths of the palace quarter"
+size = 140
+entitlement = 70
+function = "bronze_working"
+place = "seat"
+
+[[groups]]
+id = "weavers"
+name = "weavers of the queen's house"
+size = 210
+entitlement = 60
+function = "weaving"
+place = "seat"
+
+# The sea shuts outside this window (spec 3.2). Nine fortnights of frozen
+# information, then the spring flood. sailing_open is inclusive [7, 21].
+[season]
+sailing_open = [7, 21]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE CORRESPONDENCE GRAPH (spec 6.6). No map, no scale, no coordinates -- only
+# who is how many courier-legs away, and whether the sea lies between you. This
+# is the Late Bronze Age eastern Mediterranean seen from Ugarit: the Levantine
+# coast, the Syrian interior, the Hittite plateau, Cyprus and the Aegean, the
+# long fragile eastern road that brings the tin, and Egypt.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[places]]
+id = "seat"
+name = "Ugarit"
+[[places]]
+id = "ma_hadu"
+name = "Ma'hadu"
+[[places]]
+id = "gibala"
+name = "Gib'ala"
+[[places]]
+id = "mukish"
+name = "Alalakh"
+[[places]]
+id = "halab"
+name = "Halab"
+[[places]]
+id = "carchemish"
+name = "Carchemish"
+[[places]]
+id = "emar"
+name = "Emar"
+[[places]]
+id = "tunip"
+name = "Tunip"
+[[places]]
+id = "qadesh"
+name = "Qadesh"
+[[places]]
+id = "amurru"
+name = "Sumur"
+[[places]]
+id = "arwad"
+name = "Arwad"
+[[places]]
+id = "byblos"
+name = "Gubla"
+[[places]]
+id = "beirut"
+name = "Beirut"
+[[places]]
+id = "sidon"
+name = "Sidon"
+[[places]]
+id = "tyre"
+name = "Tyre"
+[[places]]
+id = "akko"
+name = "Akko"
+[[places]]
+id = "ashkelon"
+name = "Ashkelon"
+[[places]]
+id = "gaza"
+name = "Gaza"
+[[places]]
+id = "damascus"
+name = "Upe"
+[[places]]
+id = "hattusa"
+name = "Hattusa"
+[[places]]
+id = "tarhuntassa"
+name = "Tarhuntassa"
+[[places]]
+id = "ura"
+name = "Ura"
+[[places]]
+id = "mira"
+name = "Mira"
+[[places]]
+id = "millawanda"
+name = "Millawanda"
+[[places]]
+id = "lukka"
+name = "the Lukka lands"
+[[places]]
+id = "alashiya"
+name = "Alashiya"
+[[places]]
+id = "kition"
+name = "Kition"
+[[places]]
+id = "kaphtor"
+name = "Kaphtor"
+[[places]]
+id = "rhodes"
+name = "Rhodes"
+[[places]]
+id = "mari"
+name = "Mari"
+[[places]]
+id = "assur"
+name = "Assur"
+[[places]]
+id = "babylon"
+name = "Babylon"
+[[places]]
+id = "egypt"
+name = "the Delta"
+[[places]]
+id = "memphis"
+name = "Memphis"
+
+# ── Routes. legs = fortnights. Sea legs are seasonal; land and river stay open
+# all winter -- so in winter the Hittite and Syrian letters keep coming and the
+# sea ones simply stop. Risk is the base interception/loss weight (0..1000).
+# The graph has real chokepoints: Emar gates the eastern tin road, Carchemish
+# gates the Hittite plateau.
+
+# The Levantine coast, hop by hop (sea).
+[[routes]]
+a = "seat"
+b = "ma_hadu"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 20
+[[routes]]
+a = "ma_hadu"
+b = "gibala"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 60
+[[routes]]
+a = "gibala"
+b = "arwad"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 70
+[[routes]]
+a = "arwad"
+b = "amurru"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 70
+[[routes]]
+a = "amurru"
+b = "byblos"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 80
+[[routes]]
+a = "byblos"
+b = "beirut"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 80
+[[routes]]
+a = "beirut"
+b = "sidon"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 90
+[[routes]]
+a = "sidon"
+b = "tyre"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 90
+[[routes]]
+a = "tyre"
+b = "akko"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 100
+[[routes]]
+a = "akko"
+b = "ashkelon"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 120
+[[routes]]
+a = "ashkelon"
+b = "gaza"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 110
+[[routes]]
+a = "gaza"
+b = "egypt"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 130
+
+# The Syrian interior (land + the Euphrates).
+[[routes]]
+a = "seat"
+b = "mukish"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 40
+[[routes]]
+a = "mukish"
+b = "halab"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 90
+[[routes]]
+a = "halab"
+b = "carchemish"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 90
+[[routes]]
+a = "halab"
+b = "emar"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 110
+[[routes]]
+a = "carchemish"
+b = "emar"
+legs = 2
+mode = "river"
+seasonal = false
+risk = 80
+[[routes]]
+a = "seat"
+b = "tunip"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 80
+[[routes]]
+a = "tunip"
+b = "qadesh"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 110
+[[routes]]
+a = "tunip"
+b = "amurru"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 100
+[[routes]]
+a = "qadesh"
+b = "amurru"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 110
+[[routes]]
+a = "qadesh"
+b = "damascus"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 120
+
+# The Hittite plateau (land). Carchemish is the gate.
+[[routes]]
+a = "carchemish"
+b = "hattusa"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 130
+[[routes]]
+a = "halab"
+b = "hattusa"
+legs = 4
+mode = "land"
+seasonal = false
+risk = 150
+[[routes]]
+a = "hattusa"
+b = "tarhuntassa"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 110
+[[routes]]
+a = "tarhuntassa"
+b = "ura"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 120
+[[routes]]
+a = "hattusa"
+b = "mira"
+legs = 4
+mode = "land"
+seasonal = false
+risk = 160
+[[routes]]
+a = "mira"
+b = "millawanda"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 140
+[[routes]]
+a = "mira"
+b = "lukka"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 150
+
+# Cyprus and the Aegean (sea). Alashiya is near; Kaphtor and the west are far.
+[[routes]]
+a = "ma_hadu"
+b = "alashiya"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 80
+[[routes]]
+a = "alashiya"
+b = "kition"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 40
+[[routes]]
+a = "kition"
+b = "gibala"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 90
+[[routes]]
+a = "alashiya"
+b = "ura"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 110
+[[routes]]
+a = "alashiya"
+b = "kaphtor"
+legs = 4
+mode = "sea"
+seasonal = true
+risk = 200
+[[routes]]
+a = "kaphtor"
+b = "rhodes"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 180
+[[routes]]
+a = "rhodes"
+b = "millawanda"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 160
+[[routes]]
+a = "rhodes"
+b = "lukka"
+legs = 2
+mode = "sea"
+seasonal = true
+risk = 170
+
+# The open crossing to Egypt (sea), the fast and dangerous alternative to
+# hugging the whole coast.
+[[routes]]
+a = "seat"
+b = "egypt"
+legs = 4
+mode = "sea"
+seasonal = true
+risk = 220
+[[routes]]
+a = "egypt"
+b = "memphis"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 30
+
+# The eastern road that brings the tin (river + land). Long, and every leg is
+# in someone else's hand. Losing it is invisible for a long time (spec 6.5).
+[[routes]]
+a = "emar"
+b = "mari"
+legs = 3
+mode = "river"
+seasonal = false
+risk = 160
+[[routes]]
+a = "mari"
+b = "babylon"
+legs = 4
+mode = "river"
+seasonal = false
+risk = 200
+[[routes]]
+a = "mari"
+b = "assur"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 220
+[[routes]]
+a = "assur"
+b = "babylon"
+legs = 3
+mode = "river"
+seasonal = false
+risk = 190
+
+# ── Who writes, and how often. Facts are authored here in M2/M3; report bias
+# and distortion (M7) will twist them at the source later. The frantic vassal
+# (Gubla) writes oftenest and is oftenest right (spec 6.8).
+[[correspondents]]
+actor = "hatti_king"
+place = "hattusa"
+cadence = 6
+offset = 2
+topic = "grain_owed"
+facts = { ships_promised = 4, ships_sailed = 1 }
+[[correspondents]]
+actor = "carchemish_viceroy"
+place = "carchemish"
+cadence = 5
+offset = 1
+topic = "great_king_demand"
+facts = { troops = 200, within = 2 }
+[[correspondents]]
+actor = "alashiya_gov"
+place = "alashiya"
+cadence = 3
+offset = 0
+topic = "ships_sighted"
+facts = { ships = 12, men = 30 }
+[[correspondents]]
+actor = "pharaoh"
+place = "egypt"
+cadence = 9
+offset = 4
+topic = "greeting"
+facts = { gold = 5 }
+[[correspondents]]
+actor = "byblos_king"
+place = "byblos"
+cadence = 4
+offset = 1
+topic = "vassal_plea"
+facts = { towns_taken = 3, enemy = "the men of Amurru" }
+[[correspondents]]
+actor = "amurru_king"
+place = "amurru"
+cadence = 7
+offset = 3
+topic = "vassal_plea"
+facts = { towns_taken = 1, enemy = "raiders from the sea" }
+[[correspondents]]
+actor = "sidon_king"
+place = "sidon"
+cadence = 8
+offset = 5
+topic = "tribute_due"
+facts = { purple = 40 }
+[[correspondents]]
+actor = "tyre_king"
+place = "tyre"
+cadence = 8
+offset = 2
+topic = "vassal_plea"
+facts = { towns_taken = 2, enemy = "the king of Sidon" }
+[[correspondents]]
+actor = "assyria_king"
+place = "assur"
+cadence = 12
+offset = 6
+topic = "brother_greeting"
+facts = { gift = "fine horses", number = 6 }
+[[correspondents]]
+actor = "babylon_king"
+place = "babylon"
+cadence = 14
+offset = 8
+topic = "brother_greeting"
+facts = { gift = "lapis", number = 20 }
+[[correspondents]]
+actor = "ura_merchant"
+place = "ura"
+cadence = 6
+offset = 2
+topic = "grain_offer"
+facts = { grain = 8000, price_copper = 400 }
+[[correspondents]]
+actor = "sinaranu"
+place = "ma_hadu"
+cadence = 4
+offset = 1
+topic = "exemption"
+facts = {}
+[[correspondents]]
+actor = "mira_king"
+place = "mira"
+cadence = 10
+offset = 3
+topic = "warning"
+facts = { enemy = "the Lukka", ships = 30 }
+[[correspondents]]
+actor = "emar_overseer"
+place = "emar"
+cadence = 7
+offset = 4
+topic = "warning"
+facts = { enemy = "no caravan from the east", ships = 0 }
+
+[[rites]]
+id = "new_year_baal"
+fortnight = 1
+hours = 3
+requires = { grain = 400, wine = 60, oil = 20 }
+skip_legitimacy = -180
+skip_unrest = 120
+skip_deck_weight = 200
+
+[[rites]]
+id = "first_fruits"
+fortnight = 9
+hours = 2
+requires = { grain = 300, oil = 10 }
+skip_legitimacy = -80
+skip_unrest = 40
+skip_deck_weight = 100
