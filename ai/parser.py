@@ -5,6 +5,7 @@ import dataclasses
 import json
 import re
 
+import registry
 from ai.numeric_guard import extract_numerals_and_number_words, guard
 from engine import actions as A
 
@@ -592,16 +593,12 @@ def parse(line: str, belief: dict, hours_left: int, seed: int, turn: int,
 
 
 def action_cost(action) -> int:
-    if isinstance(action, (A.ReadLetter, A.DictateReply)):
-        return 2
-    if isinstance(action, A.InspectLedger):
-        return 1
-    if isinstance(action, (A.ConsultDiviner, A.MarryAbroad, A.SwearOath,
-                           A.SuppressOmen, A.Expiate)):
-        return 2
-    if isinstance(action, (A.SendGift, A.SendToHarvest, A.RaiseCorvee,
-                           A.DredgeCanal, A.AssignTroops, A.BeginBuild,
-                           A.BeginRepair, A.AbandonWork, A.Quarantine,
-                           A.SearchArchive, A.HearPetition)):
-        return 1
-    return 0
+    """What the typed path charges -- which is what every path charges.
+
+    This used to be a second cost table, and it had already drifted: it had no
+    branch for `DelegateLetter`, so delegating through Counsel was free while
+    delegating through the Inbox cost an hour. The registry is now the single
+    statement of cost (UI/UX spec 19, 21), and this function is a lookup so the
+    two cannot disagree again.
+    """
+    return registry.cost_of(action)

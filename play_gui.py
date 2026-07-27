@@ -28,6 +28,7 @@ if sys.version_info < (3, 12):
         "the game needs 3.12 or newer -- /usr/bin/python3 is Apple's and is "
         "too old.\nuse the project's own interpreter:  ./run.sh")
 
+import registry
 from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
@@ -45,12 +46,13 @@ from tui import (altar, archive, city, composer, counsel, document, hall,
                  help as help_page, render, worldmap)
 from tui.grid import Screen
 
-ORDER_COST = 1
-READ_COST = 2
-REPLY_COST = 2
-OMEN_COST = 2
-SEARCH_COST = 1
-INSPECT_COST = 1
+# Costs are the registry's, never this file's. These two names survive only
+# because both screens must quote the price *before* building the action --
+# the Desk warns that answering needs two hours while the draft is still
+# empty, and the Altar deducts for a consultation it performs itself rather
+# than through `do`. Everything else lets `do` ask the registry (spec 19).
+REPLY_COST = registry.BY_ID["dictate_reply"].cost
+OMEN_COST = registry.BY_ID["consult_diviner"].cost
 
 # Where `STK_DUMP=1` writes what the windows are showing, for `tools/screens.py
 # live`. A running game is otherwise unreadable from outside without a camera.
@@ -234,9 +236,17 @@ class Game:
     def belief(self) -> dict:
         return project(self.world)
 
-    def do(self, action, cost: int = 0) -> bool:
+    def do(self, action, cost: int | None = None) -> bool:
         """Apply an action if the hours are there. Logged the same way the
-        headless driver logs it, so a session here saves and replays."""
+        headless driver logs it, so a session here saves and replays.
+
+        `cost` defaults to the registry's, which is the product contract and
+        the same number the typed path charges. Passing one explicitly is for
+        the rare case where a screen genuinely charges something else; it is
+        not a place to restate a constant that already exists (UI/UX spec 19).
+        """
+        if cost is None:
+            cost = registry.cost_of(action)
         if cost > self.hours:
             unit = "hour" if cost == 1 else "hours"
             self.session_notice = (
@@ -1221,7 +1231,7 @@ class Game:
         if char == "x" and self.works_pick:
             index = works_page.PICK.index(self.works_pick)
             if index < len(projects):
-                self.do(A.AbandonWork(projects[index]["id"]), ORDER_COST)
+                self.do(A.AbandonWork(projects[index]["id"]))
             self.works_pick = ""
             self.repaint()
             return
@@ -1246,7 +1256,7 @@ class Game:
 
     def order(self, action) -> None:
         """Issue one direct order and leave a visible receipt or refusal."""
-        self.do(action, ORDER_COST)
+        self.do(action)
         self.repaint()
 
     def on_city_key(self, event) -> None:
@@ -1271,7 +1281,7 @@ class Game:
             if not inst["inspected"]:
                 if not self.do(
                         A.InspectLedger(f"institution:{inst['id']}"),
-                        INSPECT_COST):
+                        ):
                     self.city_notice = self.session_notice
                     self.repaint()
                     return
@@ -1350,7 +1360,7 @@ class Game:
         self.justice_pick = petition["id"]
         try:
             if char == "h" and not petition["heard"]:
-                self.do(A.HearPetition(petition["id"]), INSPECT_COST)
+                self.do(A.HearPetition(petition["id"]))
                 return
             verdict = {"f": "for", "a": "against", "s": "split",
                        "d": "defer"}.get(char)
@@ -1519,7 +1529,7 @@ class Game:
             if not self.do(
                     A.Quarantine(
                         self.plague_pick, lift=self.plague_pick in closed),
-                    ORDER_COST):
+                    ):
                 self.plague_notice = self.session_notice
             else:
                 self.plague_notice = ""
@@ -1528,7 +1538,7 @@ class Game:
     def search_archive(self) -> None:
         """One hour per query (spec 6.17), and the hour is the mechanic."""
         query = self.archive_query.strip().lower()
-        if not query or not self.do(A.SearchArchive(query), SEARCH_COST):
+        if not query or not self.do(A.SearchArchive(query)):
             self.repaint()
             return
         hits = self.belief.get("archive_index", {}).get("hits", {}).get(query, [])
@@ -1612,7 +1622,7 @@ class Game:
                 None)
             if item is not None and item["read"]:
                 self.do(
-                    A.DelegateLetter(letter_id, person_id), ORDER_COST)
+                    A.DelegateLetter(letter_id, person_id))
             return
 
         char = (event.char or "").lower()
@@ -1659,7 +1669,7 @@ class Game:
                 and self.inbox_filter != "outbox"
                 and selected_item["read"] and self.inbox_delegate_pick):
             self.do(A.DelegateLetter(
-                selected_item["id"], self.inbox_delegate_pick), ORDER_COST)
+                selected_item["id"], self.inbox_delegate_pick))
             return
         if (char == "x" and selected_item is not None
                 and self.inbox_filter != "outbox"
@@ -1708,7 +1718,7 @@ class Game:
                 else items[current_index or 0])
             self.inbox_pick = item["id"]
             if not item["read"]:
-                self.do(A.ReadLetter(item["id"]), READ_COST)
+                self.do(A.ReadLetter(item["id"]))
             else:
                 self.repaint()
 

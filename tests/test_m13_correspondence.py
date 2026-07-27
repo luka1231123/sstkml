@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import registry
 from belief.project import project
 from engine import actions as A
 from engine import archive as engine_archive
@@ -181,7 +182,7 @@ def test_inbox_controller_executes_compare_delegate_and_archive_paths() -> None:
         letter for letter in project(game.world)["stack"]
         if letter["id"] == item["id"])
     assert delegated["delegated_to"] == "ehli_nikkalu"
-    assert game.hours == before - play_gui.ORDER_COST
+    assert game.hours == before - registry.BY_ID["delegate_letter"].cost
 
     game.on_inbox_key(Key("x"))
     assert game.inbox_filter == "archived"

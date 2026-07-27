@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import registry
 from belief.project import project
 from engine.tick import advance
 from load import load_scenario
@@ -206,7 +207,7 @@ def test_reading_from_the_inbox_costs_hours_and_keeps_the_tablet_selected():
     before = game.hours
     first = game.stack_order[0]
     game.on_inbox_key(_Key(keysym="Return"))
-    assert game.hours == before - play_gui.READ_COST
+    assert game.hours == before - registry.BY_ID["read_letter"].cost
     assert game.inbox_pick == first
     assert next(i for i in game.belief["stack"] if i["id"] == first)["read"]
     # Reading it a second time is free, and selection does not disappear merely
