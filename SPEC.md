@@ -1111,6 +1111,7 @@ should sit beside the thing it changes.
 | Archive grows with cadence spam | Event-driven reports, bundles, retained causal records | Replace by M13.4 |
 | Global `letter_seq`/`omen_seq`/`gift_seq` counters | Runtime IDs derived from parent, turn, domain, and local ordinal | Replace in M13.1 |
 | Detailed player `Court` as source of truth | `legacy_court` adapter over kernel entities | Delete at the M13.2 exit |
+| Save version 13 (court-shaped world) | Version 14, when kernel entities are first persisted | Bump in M13.2 |
 
 Migration rules:
 
@@ -1350,9 +1351,16 @@ choose nothing.
 
 ### 10.12 Save version 14 and the legacy court
 
-The kernel changes what world state means, so the save version becomes 14.
-Saves below 14 are refused with a message naming the version found and the
-version required. Two world ontologies are not maintained (migration rule 5).
+The save version becomes 14 on the turn the kernel enters the save file, and
+not before. In M13.1 the kernel is built, authored, and run, but nothing of it
+is serialized: the saved world is still the M13.0 court, and version 13 remains
+the honest number. Bumping it earlier would refuse valid saves to no purpose
+and would claim a migration that had not happened.
+
+When the bump lands — with the M13.2 grain slice, which is what first persists
+kernel entities — saves below 14 are refused with a message naming the version
+found and the version required. Two world ontologies are not maintained
+(migration rule 5).
 
 Ugarit's detailed `Court` survives M13.1 as the adapter `legacy_court` under
 migration rule 2. It is a converted view over kernel entities, not a second
