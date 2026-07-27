@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-MODEL = "qwen3:14b"
+MODEL = "qwen3:4b"
 OLLAMA = "http://127.0.0.1:11434/api/chat"
 
 

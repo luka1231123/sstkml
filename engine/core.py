@@ -36,6 +36,9 @@ DOMAINS: frozenset[str] = frozenset({
     "succession",
     "justice.correction",
     "revenue.merchant",
+    # M13.1 kernel (spec 10.10). Its own domain, so that adding a draw to the
+    # kernel cannot perturb any of the single-city systems above.
+    "kernel.hunger",
 })
 
 

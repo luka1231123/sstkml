@@ -1,0 +1,221 @@
+# The M13.1 kernel world.
+#
+# Three settlements under one accounting grammar. Ugarit is the player's seat
+# and does not decide for itself here -- its detailed state is still the legacy
+# court (spec 10.12) and its intents come from the player. Ma'hadu and the
+# Alashiyan port do decide for themselves, and the M13.1 exit gate is that they
+# go on producing, consuming, deciding, and changing when Ugarit is idle or
+# removed entirely.
+#
+# Quantities are qa of grain. Person-days are per fortnight. Rates scaled by
+# 1000 are integer ratios, never floats (spec 10.3).
+
+[seasons]
+sowing    = [19, 22]
+growing   = [23, 7]
+harvest   = [8, 11]
+threshing = [12, 13]
+low_water = [14, 18]
+sailing   = [5, 20]     # the sea is shut outside this span
+
+# By absolute turn, wrapping. 100 is an ordinary year. The dip is not a scripted
+# crisis: it is weather, it is the same weather for everyone in the region, and
+# what it does to each settlement depends on what that settlement decided.
+climate = [100, 100, 96, 92, 88, 80, 72, 64, 60, 64, 72, 84,
+           96, 104, 108, 112, 108, 104, 100, 96, 100, 104, 100, 100]
+
+[[regions]]
+id = "region:north_levant"
+name = "the northern Levant"
+
+[[regions]]
+id = "region:alashiya"
+name = "Alashiya"
+travel_modifier = 900
+
+[[polities]]
+id = "polity:ugarit"
+name = "the kingdom of Ugarit"
+seat = "settlement:ugarit"
+controls = ["settlement:ugarit", "settlement:mahadu"]
+
+[[polities]]
+id = "polity:alashiya"
+name = "Alashiya"
+seat = "settlement:alashiya_port"
+controls = ["settlement:alashiya_port"]
+
+# --- Ugarit: the seat, and not autonomous in M13.1 ----------------------------
+
+[[settlements]]
+id = "settlement:ugarit"
+name = "Ugarit"
+region = "region:north_levant"
+polity = "polity:ugarit"
+sites = ["site:ugarit_fields"]
+autonomous = false
+
+[[sites]]
+id = "site:ugarit_fields"
+name = "the fields of Ugarit"
+settlement = "settlement:ugarit"
+region = "region:north_levant"
+function = "estate"
+capacity = 1050          # qa per person-day, scaled 1000
+
+[[cohorts]]
+id = "cohort:ugarit_fields"
+settlement = "settlement:ugarit"
+kind = "field_labour"
+households = 260
+people = 1300
+
+[[stores]]
+settlement = "settlement:ugarit"
+good = "grain"
+quantity = 26000
+
+# --- Ma'hadu: the port, and it runs itself ------------------------------------
+
+[[settlements]]
+id = "settlement:mahadu"
+name = "Ma'hadu"
+region = "region:north_levant"
+polity = "polity:ugarit"
+sites = ["site:mahadu_fields", "site:mahadu_harbour"]
+
+[[sites]]
+id = "site:mahadu_fields"
+name = "the fields behind Ma'hadu"
+settlement = "settlement:mahadu"
+region = "region:north_levant"
+function = "estate"
+capacity = 880           # thinner ground than the plain of Ugarit
+
+[[sites]]
+id = "site:mahadu_harbour"
+name = "the harbour of Ma'hadu"
+settlement = "settlement:mahadu"
+region = "region:north_levant"
+function = "harbour"
+capacity = 4000
+
+[[orgs]]
+id = "org:mahadu_council"
+name = "the elders of Ma'hadu"
+settlement = "settlement:mahadu"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+# A second claimant on the same body of people. The elders and the temple both
+# want the fortnight's hands, and in a thin year the allocator decides who goes
+# short -- there is no authored split between them.
+[[orgs]]
+id = "org:mahadu_temple"
+name = "the house of Baal at the harbour"
+settlement = "settlement:mahadu"
+kind = "temple"
+policy = "cult"
+authority = 700
+
+[[cohorts]]
+id = "cohort:mahadu_fields"
+settlement = "settlement:mahadu"
+kind = "field_labour"
+households = 90
+people = 440
+
+[[cohorts]]
+id = "cohort:mahadu_carriers"
+settlement = "settlement:mahadu"
+kind = "carrier"
+households = 30
+people = 120
+labour_per_head = 10
+
+[[stores]]
+settlement = "settlement:mahadu"
+good = "grain"
+quantity = 9000
+
+# The port owes the crown a fixed render each harvest. It is not deducted
+# automatically: the elders decide whether they can spare it, and when they
+# cannot, the obligation defaults and the crown finds out later.
+[[obligations]]
+id = "settlement:mahadu/0/obligation/0"
+party = "settlement:mahadu"
+beneficiary = "polity:ugarit"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 1800
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ugarit"
+consequence = "the king would send for the elders"
+
+# --- the Alashiyan port: foreign, and it runs itself --------------------------
+
+[[settlements]]
+id = "settlement:alashiya_port"
+name = "the Alashiyan port"
+region = "region:alashiya"
+polity = "polity:alashiya"
+sites = ["site:alashiya_fields", "site:alashiya_mine"]
+
+[[sites]]
+id = "site:alashiya_fields"
+name = "the Alashiyan fields"
+settlement = "settlement:alashiya_port"
+region = "region:alashiya"
+function = "estate"
+capacity = 760
+
+[[sites]]
+id = "site:alashiya_mine"
+name = "the copper workings"
+settlement = "settlement:alashiya_port"
+region = "region:alashiya"
+function = "mine"
+capacity = 200
+
+[[orgs]]
+id = "org:alashiya_council"
+name = "the harbour master and his people"
+settlement = "settlement:alashiya_port"
+kind = "council"
+policy = "subsistence"
+authority = 500
+
+[[cohorts]]
+id = "cohort:alashiya_fields"
+settlement = "settlement:alashiya_port"
+kind = "field_labour"
+households = 70
+people = 330
+
+[[cohorts]]
+id = "cohort:alashiya_miners"
+settlement = "settlement:alashiya_port"
+kind = "craft"
+households = 40
+people = 170
+ration_per_head = 11
+
+[[stores]]
+settlement = "settlement:alashiya_port"
+good = "grain"
+quantity = 6200
+
+[[routes]]
+id = "route:mahadu_alashiya"
+name = "the crossing to Alashiya"
+capacity = 3000
+risk = 120
+
+[[routes.legs]]
+origin = "site:mahadu_harbour"
+destination = "settlement:alashiya_port"
+mode = "sea"
+fortnights = 2
+season = "sailing"
