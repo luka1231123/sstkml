@@ -42,8 +42,8 @@ from tui import household as household_page
 from tui import plague as plague_page
 from tui import relations as relations_page
 from tui import works as works_page
-from tui import (altar, archive, city, composer, counsel, document, hall,
-                 help as help_page, render, worldmap)
+from tui import (altar, archive, city, composer, counsel, desktop, document,
+                 hall, help as help_page, render, switcher, worldmap)
 from tui.grid import Screen
 
 # Costs are the registry's, never this file's. These two names survive only
@@ -58,30 +58,32 @@ OMEN_COST = registry.BY_ID["consult_diviner"].cost
 # live`. A running game is otherwise unreadable from outside without a camera.
 DUMP = Path(__file__).parent / "saves" / "screens.txt"
 
-# key -> (window key, title, size, how to compose it from Belief)
-TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
-    "s": ("stack", "The Inbox", (108, 36), inbox_page.compose),
-    "t": ("stores", "The Stores", (62, 22), document.stores),
-    "r": ("roll", "The Roll", (78, 22), document.roll),
-    "m": ("muster", "The Muster", (62, 18), document.muster),
-    "o": ("oaths", "The Oaths", (76, 28), document.oaths),
-    "l": ("land", "The Land", (70, 24), document.land),
+# key -> (window key, title, how to compose it from Belief). Sizes are not
+# here: they belong to `tui.desktop`, which states one default and one minimum
+# per window and is the only place either number appears (UI/UX spec 6).
+TABLETS: dict[str, tuple[str, str, object]] = {
+    "s": ("stack", "The Inbox", inbox_page.compose),
+    "t": ("stores", "The Stores", document.stores),
+    "r": ("roll", "The Roll", document.roll),
+    "m": ("muster", "The Muster", document.muster),
+    "o": ("oaths", "The Oaths", document.oaths),
+    "l": ("land", "The Land", document.land),
 }
 
 # The windows that hold a conversation: they own their own keys, because most
 # of them take typing and none of them can afford to fall through to the hall's
 # door list. key -> (window key, title, size, which handler)
-ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
-    "w": ("world", "The Known World", (86, 30), "on_world_key"),
-    "c": ("counsel", "Counsel", (92, 36), "on_counsel_key"),
-    "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
-    "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
-    "y": ("city", "The City", (96, 36), "on_city_key"),
-    "j": ("justice", "The Court of Justice", (90, 34), "on_justice_key"),
-    "h": ("house", "The House", (86, 34), "on_house_key"),
-    "f": ("relations", "Relations", (92, 32), "on_relations_key"),
-    "p": ("plague", "Sickness and Closures", (78, 28), "on_plague_key"),
-    "?": ("help", "The Palace Tutor — Help", (100, 38), "on_help_key"),
+ROOMS: dict[str, tuple[str, str, str]] = {
+    "w": ("world", "The Known World", "on_world_key"),
+    "c": ("counsel", "Counsel", "on_counsel_key"),
+    "v": ("altar", "The Altar", "on_altar_key"),
+    "a": ("archive", "The Tablet House", "on_archive_key"),
+    "y": ("city", "The City", "on_city_key"),
+    "j": ("justice", "The Court of Justice", "on_justice_key"),
+    "h": ("house", "The House", "on_house_key"),
+    "f": ("relations", "Relations", "on_relations_key"),
+    "p": ("plague", "Sickness and Closures", "on_plague_key"),
+    "?": ("help", "Help", "on_help_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -89,8 +91,8 @@ ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
 # reads the hall's rather than keeping a second one. The desk is reached from a
 # letter rather than from a key of its own, so it is listed by hand.
 assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
-    {window_key for window_key, _t, _s, _how in TABLETS.values()}
-    | {window_key for window_key, _t, _s, _h in ROOMS.values()} | {"desk"})
+    {window_key for window_key, _t, _how in TABLETS.values()}
+    | {window_key for window_key, _t, _h in ROOMS.values()} | {"desk"})
 
 
 class Game:
@@ -109,7 +111,11 @@ class Game:
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
         self.log: list[dict] = []
-        self.app = App()
+        # Presentation is remembered between runs; the world is not. A broken
+        # settings file yields defaults rather than refusing to start.
+        self.settings_path = Path(__file__).parent / "saves" / "settings.json"
+        self.prefs = desktop.Preferences.load(self.settings_path)
+        self.app = App(self.prefs)
         # Yabninu speaks through a model when one is running (D38). Built once
         # and shared; if there is no Ollama the calls fall back to authored
         # lines and nothing on screen says which the player got.
@@ -194,9 +200,16 @@ class Game:
         # numbers do not move under the player's finger (see document.order_of).
         self.stack_order: list[str] = document.order_of(project(self.world))
 
+        self.switcher_pick = ""
+        self.switcher_notice = ""
+        self.app.desktop_bindings = self._desktop_bindings()
+
+        hall_width, hall_height = desktop.default_size("hall")
         self.hall_window = self.app.window(
-            "hall", f"Say to the King, my lord — seed {seed}", 104, 36,
-            on_key=self.on_key, on_close=self.quit)
+            "hall", f"Say to the King, my lord — seed {seed}",
+            hall_width, hall_height,
+            on_key=self.on_key, on_close=self.quit,
+            on_resize=self.on_resize)
         self.repaint()
         # A Tk program launched from a terminal opens *behind* the terminal on
         # macOS, which is indistinguishable from nothing having happened.
@@ -374,46 +387,65 @@ class Game:
 
     # --- windows -------------------------------------------------------------
 
+    def _size(self, key: str) -> tuple[int, int]:
+        """The cells a window actually has, or the size it would open at.
+
+        Composers are pure functions of Belief *and size*, so recomposing at
+        the live capacity is the whole of the responsive behaviour: the window
+        says how much room there is, the screen is built to fit it, and nothing
+        is ever scaled or clipped (UI/UX spec 6).
+        """
+        window = self.app.windows.get(key)
+        if window is not None and window.root.winfo_exists():
+            return window.width, window.height
+        return desktop.default_size(key)
+
     def compose(self, key: str) -> Screen | None:
         b = self.belief
+        width, height = self._size(key)
         if key == "hall":
             return hall.compose(
-                b, 104, 36, hours_left=self.hours,
+                b, width, height, hours_left=self.hours,
                 notice=getattr(self, "session_notice", ""))
         if key == "stack":
             return inbox_page.compose(
-                b, 108, 36, self.stack_order, self.inbox_pick,
+                b, width, height, self.stack_order, self.inbox_pick,
                 self.inbox_filter, self.inbox_scroll, self.hours,
                 self.inbox_delegate_pick,
                 notice=getattr(self, "inbox_notice", ""))
+        if key == "switcher":
+            return switcher.compose(
+                self.switcher_entries(), self.switcher_pick, width, height,
+                notice=self.switcher_notice)
         if key == "fortnight":
-            return document.fortnight(b, self.events, 66, 18)
+            return document.fortnight(b, self.events, width, height)
         if key == "world":
             return worldmap.compose(
-                b, 86, 30, self.world_place_scroll,
+                b, width, height, self.world_place_scroll,
                 self.world_route_scroll, self.world_place_pick)
         if key == "city":
             return city.compose(
-                b, None, 96, 36, notice=getattr(self, "city_notice", ""))
+                b, None, width, height,
+                notice=getattr(self, "city_notice", ""))
         if key == "works":
-            return works_page.compose(b, self.works_pick, 82, 32)
+            return works_page.compose(b, self.works_pick, width, height)
         if key == "justice":
-            return justice_page.compose(b, self.justice_pick, 90, 34)
+            return justice_page.compose(b, self.justice_pick, width, height)
         if key == "house":
-            return household_page.compose(b, self.house_pick, 86, 34)
+            return household_page.compose(b, self.house_pick, width, height)
         if key == "relations":
             return relations_page.compose(
-                b, self.relation_pick, self.relation_scroll, 92, 32)
+                b, self.relation_pick, self.relation_scroll, width, height)
         if key == "plague":
             return plague_page.compose(
-                b, self.plague_pick, 78, 28,
+                b, self.plague_pick, width, height,
                 scroll=getattr(self, "plague_scroll", 0),
                 notice=getattr(self, "plague_notice", ""))
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
             if inst is not None:
-                return city.detail(b, inst, inst.get("history"), 68, 22)
+                return city.detail(b, inst, inst.get("history"), width, height)
         if key == "counsel":
             suggestions = [
                 concern.order_prompt or concern.suggestion
@@ -422,22 +454,22 @@ class Game:
             ]
             return counsel.compose(b, self.counsel_said, self.hours,
                                    self.counsel_typed, self.counsel_typing,
-                                   92, 36, suggestions,
+                                   width, height, suggestions,
                                    (self.counsel_pending["descriptions"]
                                     if self.counsel_pending else None))
         if key == "help":
             return help_page.compose(
-                100, 38, self.help_said, self.help_typed,
+                width, height, self.help_said, self.help_typed,
                 self.help_typing, self.help_sources)
         if key == "altar":
             return altar.compose(b, self.altar_readings, self.altar_question,
-                                 self.altar_offering, 78, 32,
+                                 self.altar_offering, width, height,
                                  subject=self.altar_subject,
                                  notice=self.altar_notice)
         if key == "archive":
             return archive.compose(b, self.archive_query, self.archive_hits,
                                    self.archive_summary, self.archive_typing,
-                                   84, 32)
+                                   width, height)
         if key.startswith("archive:"):
             item = self.archive_documents.get(key)
             return None if item is None else archive.tablet(
@@ -451,15 +483,176 @@ class Game:
                 return composer.compose(
                     item, self.desk["draft"], self.desk["intent"],
                     self.desk["dictating"], house=b.get("house"),
-                    width=84, height=30)
-        for _, (window_key, _title, (w, h), how) in TABLETS.items():
+                    width=width, height=height)
+        for _, (window_key, _title, how) in TABLETS.items():
             if key == window_key:
-                return how(b, w, h)
+                return how(b, width, height)
         if key.startswith("letter:"):
             item = self.open_letters.get(key)
             return None if item is None else document.tablet(
                 item, house=b.get("house"))
         return None
+
+    # --- the desktop ---------------------------------------------------------
+
+    def _desktop_bindings(self) -> dict:
+        """Keys that manage windows rather than the kingdom (UI/UX spec 6).
+
+        Bound on every window. `Command` is listed beside `Control` because a
+        Mac player will reach for it first and Tk does not treat them as the
+        same modifier.
+        """
+        def bind(handler):
+            def wrapped(_event=None):
+                handler()
+                return "break"
+            return wrapped
+
+        bindings = {
+            "<F2>": bind(self.raise_hall),
+            "<F6>": bind(self.open_switcher),
+            "<F8>": bind(self.tile_windows),
+            "<Shift-F8>": bind(self.cascade_windows),
+            "<Control-Tab>": bind(self.cycle_windows),
+            "<Control-Shift-Tab>": bind(lambda: self.cycle_windows(True)),
+        }
+        for modifier in ("Control", "Command"):
+            bindings[f"<{modifier}-plus>"] = bind(lambda: self.zoom(1))
+            # The unshifted key on most layouts is `=`, and a player pressing
+            # it means "bigger" whatever the keycap says.
+            bindings[f"<{modifier}-equal>"] = bind(lambda: self.zoom(1))
+            bindings[f"<{modifier}-minus>"] = bind(lambda: self.zoom(-1))
+            bindings[f"<{modifier}-Key-0>"] = bind(self.reset_zoom)
+            bindings[f"<{modifier}-Tab>"] = bind(self.cycle_windows)
+        return bindings
+
+    def zoom(self, step: int) -> None:
+        size = self.app.set_font_size(self.prefs.font_size + step)
+        self.session_notice = f"Type is now {size} point."
+        self.save_settings()
+        self.repaint()
+
+    def reset_zoom(self) -> None:
+        size = self.app.set_font_size(desktop.FONT_DEFAULT)
+        self.session_notice = f"Type is back to {size} point."
+        self.save_settings()
+        self.repaint()
+
+    def on_resize(self, key: str) -> None:
+        """A window changed how many cells it holds, so compose it again."""
+        window = self.app.windows.get(key)
+        if window is None or not window.root.winfo_exists():
+            return
+        screen = self.compose(key)
+        if screen is not None:
+            window.paint(screen)
+
+    def raise_hall(self) -> None:
+        self.hall_window.focus()
+        self.app.note_focus("hall")
+
+    def tile_windows(self) -> None:
+        self.app.tile()
+        self.session_notice = "Windows tiled."
+        self.repaint()
+
+    def cascade_windows(self) -> None:
+        self.app.cascade()
+        self.session_notice = "Windows cascaded."
+        self.repaint()
+
+    def cycle_windows(self, backwards: bool = False) -> None:
+        self.app.cycle(backwards)
+
+    def switcher_entries(self) -> list:
+        """What the switcher lists: every open window and what it is holding."""
+        entries = []
+        for key in self.app.live():
+            if key == "switcher":
+                continue
+            window = self.app.windows[key]
+            entries.append(switcher.Entry(
+                key=key,
+                title=window.title.split(" — ")[0],
+                note=self._window_note(key),
+                closable=key != "hall",
+                dirty=(key == "desk" and self.desk is not None
+                       and bool(self.desk.get("draft"))),
+            ))
+        return entries
+
+    def _window_note(self, key: str) -> str:
+        """One line saying what state a window is carrying."""
+        b = self.belief
+        if key == "hall":
+            return f"{self.hours}h left"
+        if key == "stack":
+            unread = sum(1 for item in b["stack"] if not item["read"])
+            return f"{unread} unread" if unread else self.inbox_filter
+        if key == "desk" and self.desk is not None:
+            return "unsent reply"
+        if key.startswith("letter:") or key.startswith("archive:"):
+            return "tablet"
+        if key == "city":
+            return "the seat"
+        if key == "counsel":
+            return "order pending" if self.counsel_pending else "advice"
+        return ""
+
+    def open_switcher(self) -> None:
+        entries = self.switcher_entries()
+        if entries and self.switcher_pick not in {e.key for e in entries}:
+            self.switcher_pick = entries[0].key
+        width, height = desktop.default_size("switcher")
+        window = self.app.window(
+            "switcher", "Windows", width, height,
+            on_key=self.on_switcher_key,
+            on_close=lambda: self.app.close("switcher"),
+            on_resize=self.on_resize)
+        self.repaint()
+        window.focus()
+
+    def on_switcher_key(self, event) -> None:
+        entries = self.switcher_entries()
+        keys = [entry.key for entry in entries]
+        char = (event.char or "").lower()
+        keysym = event.keysym
+
+        if keysym == "Escape":
+            self.app.close("switcher")
+            return
+        if getattr(event, "command", "").startswith("switch:"):
+            self.switcher_pick = event.command.split(":", 1)[1]
+            keysym = "Return"
+        if keysym in ("Down", "Up") and keys:
+            index = keys.index(self.switcher_pick) if self.switcher_pick in keys else 0
+            index = (index + (1 if keysym == "Down" else -1)) % len(keys)
+            self.switcher_pick = keys[index]
+        elif char.isdigit() and char != "0":
+            index = int(char) - 1
+            if index < len(keys):
+                self.switcher_pick = keys[index]
+        elif keysym == "Return" and self.switcher_pick in keys:
+            self.app.windows[self.switcher_pick].focus()
+            self.app.note_focus(self.switcher_pick)
+            self.switcher_notice = ""
+        elif char == "x" and self.switcher_pick in keys:
+            if self.switcher_pick == "hall":
+                self.switcher_notice = (
+                    "The hall holds the session; leave by its own door.")
+            else:
+                self.app.close(self.switcher_pick)
+                self.switcher_pick = ""
+                self.switcher_notice = ""
+        elif char == "t":
+            self.tile_windows()
+        elif char == "c":
+            self.cascade_windows()
+        self.repaint()
+
+    def save_settings(self) -> None:
+        self.app.remember_geometry()
+        self.prefs.save(self.settings_path)
 
     def repaint(self) -> None:
         for key, window in list(self.app.windows.items()):
@@ -488,23 +681,27 @@ class Game:
             pass
 
     def open_tablet(self, char: str) -> None:
-        window_key, title, (w, h), _how = TABLETS[char]
+        window_key, title, _how = TABLETS[char]
+        width, height = desktop.default_size(window_key)
         handler = (self.on_inbox_key if window_key == "stack"
                    else lambda e, k=window_key: self.on_tablet_key(e, k))
         window = self.app.window(
-            window_key, title, w, h,
-            on_key=handler,
+            window_key, title, width, height,
+            on_key=handler, on_resize=self.on_resize,
             on_close=lambda k=window_key: self.app.close(k))
         self.repaint()
         window.focus()
 
     def open_room(self, char: str) -> None:
         """A conversation window. It binds its own handler and never shares."""
-        window_key, title, (w, h), handler = ROOMS[char]
+        window_key, title, handler = ROOMS[char]
+        width, height = desktop.default_size(window_key)
         window = self.app.window(
-            window_key, title, w, h, on_key=getattr(self, handler)
+            window_key, title, width, height,
+            on_key=getattr(self, handler)
             if handler != "on_tablet_key"
             else (lambda e, k=window_key: self.on_tablet_key(e, k)),
+            on_resize=self.on_resize,
             on_close=lambda k=window_key: self.app.close(k))
         self.repaint()
         window.focus()
@@ -1816,6 +2013,9 @@ class Game:
     def quit(self) -> None:
         """The hall owns the session; every other window closes freely (D33)."""
         self.save_current(automatic=True)
+        # Where the windows were is part of what the player set up, so it is
+        # written before the loop ends rather than left to the next crash.
+        self.save_settings()
         self.app.stop()
 
     def run(self) -> None:

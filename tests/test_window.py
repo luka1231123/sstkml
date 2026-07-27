@@ -15,6 +15,7 @@ from belief.project import project
 from engine.tick import advance
 from load import load_scenario
 from tui import document, hall, inbox
+from tui import desktop
 from tui.backend_tk import App, available
 from tui.grid import Surface, plain_text
 
@@ -145,7 +146,8 @@ def test_every_tablet_the_controller_opens_has_a_door_in_the_hall():
 def test_the_composers_the_controller_names_all_return_a_screen():
     _, b = _belief(6)
     import play_gui
-    for _key, (_window, _title, (width, height), how) in play_gui.TABLETS.items():
+    for _key, (window_key, _title, how) in play_gui.TABLETS.items():
+        width, height = desktop.default_size(window_key)
         screen = how(b, width, height)
         assert len(screen) == height
         assert all(len(row) == width for row in screen)

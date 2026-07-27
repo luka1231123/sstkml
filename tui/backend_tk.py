@@ -19,6 +19,7 @@ import os
 import platform
 import subprocess
 
+from tui import desktop
 from tui.grid import InteractiveScreen, RGB, Screen, ScreenLike, cells
 
 # One monospace family per platform, first that exists wins. Tk silently
@@ -72,7 +73,7 @@ def _activate_process() -> None:
         pass
 
 
-def pick_font(root, size: int = 14) -> tuple[str, int]:
+def pick_font(root, size: int = desktop.FONT_DEFAULT) -> tuple[str, int]:
     """First family in the stack the toolkit actually has."""
     from tkinter import font as tkfont
     available = {name.lower() for name in tkfont.families(root)}
@@ -92,16 +93,24 @@ class GridWindow:
     """
 
     def __init__(self, app, title: str, width: int, height: int,
-                 on_key=None, on_close=None, font_size: int = 14) -> None:
+                 on_key=None, on_close=None,
+                 font_size: int = desktop.FONT_DEFAULT,
+                 key: str = "", on_resize=None) -> None:
         import tkinter as tk
 
         self.app = app
         self.title = title
+        self.key = key or title
         self.width = width
         self.height = height
         self._tags: set[str] = set()
         self.hits = ()
         self.on_key = on_key
+        # Called when the window's *cell* capacity changes, which happens when
+        # it is dragged to a new size or the type changes. The controller
+        # recomposes at the new size; nothing here scales a picture.
+        self.on_resize = on_resize
+        self._resize_pending = False
         # The last screen painted, kept so the window can be *read* rather than
         # screenshotted (`tools/screens.py live`). One rectangle of tuples per
         # window; it costs nothing and it is the only way to see what a running
@@ -116,10 +125,16 @@ class GridWindow:
         self.root.title(title)
         self.root.configure(bg=_hex(0), padx=8, pady=6)
 
-        family, size = pick_font(self.root, font_size)
+        # A real Font object rather than a (family, size) tuple, because the
+        # window has to be able to *measure* a cell: font scaling is a
+        # recomposition, and to recompose you must know how many glyphs now fit
+        # in the rectangle the player sized (spec 6).
+        from tkinter import font as tkfont
+        family, size = pick_font(self.root, desktop.clamp_font(font_size))
+        self.font = tkfont.Font(family=family, size=size)
         self.text = tk.Text(
             self.root, width=width, height=height,
-            font=(family, size), bg=_hex(0), fg=_hex(1),
+            font=self.font, bg=_hex(0), fg=_hex(1),
             borderwidth=0, highlightthickness=0, padx=0, pady=0,
             wrap="none", cursor="arrow", insertwidth=0,
             spacing1=0, spacing2=0, spacing3=0,
@@ -138,6 +153,90 @@ class GridWindow:
                 lambda _event: self.text.configure(cursor="arrow"))
         self.root.protocol(
             "WM_DELETE_WINDOW", on_close or self.close)
+        self.text.bind("<Configure>", self._configured)
+
+        # Desktop-level keys -- tile, cascade, switch, font size -- belong to
+        # every window, not to whichever one happens to own the keyboard. Bound
+        # per sequence rather than routed through `on_key`, so Tk's own
+        # most-specific-binding rule keeps them from reaching a screen that
+        # would read them as a game verb.
+        for sequence, handler in getattr(app, "desktop_bindings", {}).items():
+            try:
+                self.root.bind(sequence, handler)
+            except Exception:
+                continue
+
+    # --- size and type -------------------------------------------------------
+
+    def cell_size(self) -> tuple[int, int]:
+        """One character cell, in pixels."""
+        return max(1, self.font.measure("0")), max(1, self.font.metrics("linespace"))
+
+    def capacity(self) -> tuple[int, int]:
+        """How many cells fit in the widget right now, floored at the minimum.
+
+        Clamped rather than clipped: a window dragged smaller than its class
+        minimum keeps composing at the minimum and lets the surplus rows fall
+        outside the viewport, which loses decoration rather than controls.
+        """
+        cell_width, cell_height = self.cell_size()
+        pixel_width = self.text.winfo_width()
+        pixel_height = self.text.winfo_height()
+        if pixel_width <= 1 or pixel_height <= 1:
+            return self.width, self.height
+        columns, rows = desktop.capacity(
+            pixel_width, pixel_height, cell_width, cell_height)
+        return desktop.clamp_size(self.key, columns, rows)
+
+    def _configured(self, _event=None) -> None:
+        """Recompose when the cell capacity actually changed.
+
+        Tk emits `<Configure>` for every pixel of a drag; recomposing on each
+        one would rebuild the whole screen dozens of times per second for no
+        visible difference. Only a change in the number of *cells* matters, and
+        the work is deferred to idle so a drag stays smooth.
+        """
+        columns, rows = self.capacity()
+        if (columns, rows) == (self.width, self.height):
+            return
+        self.width, self.height = columns, rows
+        if self.on_resize is None or self._resize_pending:
+            return
+        self._resize_pending = True
+        self.root.after_idle(self._do_resize)
+
+    def _do_resize(self) -> None:
+        self._resize_pending = False
+        if self.on_resize is not None and self.root.winfo_exists():
+            self.on_resize(self.key)
+
+    def set_font_size(self, size: int) -> tuple[int, int]:
+        """Change the type and report the new cell capacity.
+
+        The window keeps the rectangle the player gave it. Larger glyphs mean
+        fewer of them fit, so the screen is composed again at the smaller grid
+        -- the specification's "recompose cells at every size; do not scale a
+        screen bitmap".
+        """
+        self.font.configure(size=desktop.clamp_font(size))
+        self.width, self.height = self.capacity()
+        return self.width, self.height
+
+    def geometry(self) -> tuple[int, int, int, int]:
+        """Where the window is, in pixels, as (x, y, width, height)."""
+        self.root.update_idletasks()
+        return (self.root.winfo_x(), self.root.winfo_y(),
+                self.root.winfo_width(), self.root.winfo_height())
+
+    def move(self, x: int, y: int) -> None:
+        self.root.geometry(f"+{int(x)}+{int(y)}")
+
+    def resize_pixels(self, width: int, height: int) -> None:
+        self.root.geometry(f"{int(width)}x{int(height)}")
+
+    def place(self, rect) -> None:
+        x, y, width, height = rect
+        self.root.geometry(f"{int(width)}x{int(height)}+{int(x)}+{int(y)}")
 
     def _tag(self, fg: int, bg: int) -> str:
         name = f"c{fg}_{bg}"
@@ -271,9 +370,15 @@ class App:
     reachable again from the hall by keyboard (D33).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, prefs: desktop.Preferences | None = None) -> None:
         self.tk = None
         self.windows: dict[str, GridWindow] = {}
+        self.prefs = prefs or desktop.Preferences()
+        # Sequence -> handler, applied to every window as it is created.
+        self.desktop_bindings: dict[str, object] = {}
+        # Most-recently-focused first. Ctrl+Tab walks it and the Window
+        # Switcher lists it, so "the window I was just in" is one key away.
+        self.focus_order: list[str] = []
 
     def root(self):
         """The hidden interpreter root every window hangs off.
@@ -287,18 +392,123 @@ class App:
 
     def window(self, key: str, title: str, width: int, height: int,
                **kwargs) -> GridWindow:
-        """Open a window, or raise and return the one already open under `key`."""
+        """Open a window, or raise and return the one already open under `key`.
+
+        Reopening never resets work: the existing window is raised as it
+        stands, and a fresh one restores the geometry the player left it at
+        (spec 6, "reopening raises an existing workbench without resetting
+        state").
+        """
         existing = self.windows.get(key)
         if existing is not None and existing.root.winfo_exists():
             existing.focus()
+            self.note_focus(key)
             return existing
+        kwargs.setdefault("key", key)
+        kwargs.setdefault("font_size", self.prefs.font_size)
+        remembered = (self.prefs.recall(key)
+                      if self.prefs.restore_placement else None)
+        if remembered is not None:
+            width, height = remembered["columns"], remembered["rows"]
         window = GridWindow(self, title, width, height, **kwargs)
         self.windows[key] = window
+        if remembered is not None:
+            self._restore(window, remembered)
+        self.note_focus(key)
         return window
+
+    def _restore(self, window: GridWindow, remembered: dict) -> None:
+        """Put a window back where it was, if that place still exists."""
+        try:
+            window.root.update_idletasks()
+            pixel_width = window.root.winfo_reqwidth()
+            pixel_height = window.root.winfo_reqheight()
+            rect = desktop.clamp_to_area(
+                (remembered["x"], remembered["y"], pixel_width, pixel_height),
+                self.work_area())
+            window.move(rect[0], rect[1])
+        except Exception:
+            pass
+
+    def note_focus(self, key: str) -> None:
+        if key in self.focus_order:
+            self.focus_order.remove(key)
+        self.focus_order.insert(0, key)
+
+    def remember_geometry(self) -> None:
+        """Record where every live window is, for the next run."""
+        for key, window in self.windows.items():
+            if not window.root.winfo_exists():
+                continue
+            try:
+                x, y, _width, _height = window.geometry()
+                self.prefs.remember(key, x, y, window.width, window.height)
+            except Exception:
+                continue
+
+    def work_area(self) -> tuple[int, int, int, int]:
+        """The usable rectangle of the display, in pixels.
+
+        Tk can only really see one screen, so this is the primary monitor. It
+        is enough for the job it does here -- keeping a restored window from
+        landing somewhere no display covers -- and it degrades to a sane
+        rectangle when there is no display at all.
+        """
+        try:
+            root = self.root()
+            return (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
+        except Exception:
+            return (0, 0, 1440, 900)
+
+    def live(self) -> list[str]:
+        """Open window keys, most recently focused first."""
+        alive = [key for key, window in self.windows.items()
+                 if window.root.winfo_exists()]
+        ordered = [key for key in self.focus_order if key in alive]
+        return ordered + [key for key in alive if key not in ordered]
+
+    def cycle(self, backwards: bool = False) -> str:
+        """Focus the next window in the list, and say which."""
+        keys = self.live()
+        if len(keys) < 2:
+            return keys[0] if keys else ""
+        target = keys[-1] if backwards else keys[1]
+        self.windows[target].focus()
+        self.note_focus(target)
+        return target
+
+    def tile(self) -> None:
+        keys = self.live()
+        for key, rect in zip(keys, desktop.tiled(len(keys), self.work_area())):
+            self.windows[key].place(rect)
+
+    def cascade(self) -> None:
+        keys = self.live()
+        area = self.work_area()
+        size = (int(area[2] * 0.6), int(area[3] * 0.6))
+        for key, rect in zip(keys, desktop.cascaded(len(keys), area, size)):
+            self.windows[key].place(rect)
+
+    def set_font_size(self, size: int) -> int:
+        """Retype every window at once and report the size settled on."""
+        size = desktop.clamp_font(size)
+        self.prefs.font_size = size
+        for window in self.windows.values():
+            if window.root.winfo_exists():
+                window.set_font_size(size)
+        return size
 
     def close(self, key: str) -> None:
         window = self.windows.pop(key, None)
+        if key in self.focus_order:
+            self.focus_order.remove(key)
         if window is not None:
+            if window.root.winfo_exists():
+                try:
+                    x, y, _w, _h = window.geometry()
+                    self.prefs.remember(key, x, y, window.width, window.height)
+                except Exception:
+                    pass
             window.close()
 
     def transcript(self) -> str:
