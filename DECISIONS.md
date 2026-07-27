@@ -776,3 +776,104 @@ deterministically, unexplained, with no tell to learn. When he is wrong he gives
 a real figure from a real ledger, only the wrong one: the same rule as the
 scribes (D11) and the diviner (M9). The only defence is the ledger, which is two
 keystrokes away and costs nothing, and that is the lesson.
+
+---
+
+## D38. Counsel speaks through a model, and the command line is a person
+
+**Reverses the "ships with no model" position in D33.** Yabninu is a chat. The
+player types anything and he answers in character, with the run of everything
+the king could see for himself — the roll, the stores, the oath clauses, the
+men, the house, who is waiting — plus the conversation so far, so a follow-up is
+a question he can answer. He advises, disagrees, and says what he would do,
+because that is what a counsellor is for. A six-question menu is not a
+character; it is a menu, and the player can already read a menu off the ledgers.
+
+What is held back is game design, not caution: figures handed to him stale stay
+stale (he is wrong about one thing in five, decided in `tui/counsel.py` before
+any prompt exists, so it replays), and the answers to the game's puzzles are not
+in his digest. He does not know which oath the gods are angry about any more
+than the king does.
+
+Authored lines remain for a machine with no Ollama. They are a fallback, not the
+design, and nothing on screen says which the player got.
+
+**The command line should be Yabninu.** The player does not type into a void; he
+tells his scribe, who writes it down or misunderstands him. One box, one
+character, whether the input is a question or an order.
+
+### Three tiers of input, and only one of them may be wrong
+
+| tier | interpreted by | may it be wrong |
+|---|---|---|
+| direct manipulation — a ration, the pay order, a posting | nothing | **never.** Fiddling with numbers must not go through a model |
+| prose to the game — "read the tablet from Gubla" | the parser: deterministic first, model second | **no.** It is a keyboard shortcut; the player sees the result |
+| prose to a person — "buy grain at Gubla if the granary falls under four thousand" | the man you gave it to | **yes, and that is the content of the game** |
+
+Interpretation by the parser must never be wrong, because it is UI.
+Interpretation by a person should be wrong, because it is the game.
+
+---
+
+## D39. The city is a machine, and the payroll row was always an institution
+
+**Spec 6.18.** A `DependentGroup` becomes the staff of an `Institution` — a
+building with a head, a condition and an output. `DependentGroup` is not
+replaced and not touched: arrears, loyalty, desertion and the named petitioner
+all keep working, and the institution is a derived layer over them.
+
+The reason this is worth an entity rather than a screen: today, starving a group
+produces a grudge. With institutions, starving the harbour **stops clearing
+ships**, and the tin does not arrive, and no letter explains why. The same
+decision the player already makes acquires a mechanism he can watch fail. That
+is the difference between a number he regrets and a machine he broke.
+
+Two multipliers, neither announced: `output_modifier` from arrears (6.3,
+unchanged) and `condition` from neglect. Both are on the CITY screen for anyone
+who looks, exactly as the melt ledger is on STORES (D19).
+
+**Heads carry the three layers of number into the city (D11).** A head reports
+his own institution's condition, and a head who has gone unpaid reports a
+granary fuller than it is. `inspect` costs an hour and returns the truth. The
+player finds out at the threshing otherwise.
+
+**Every foreign city has the same shape and none of it is visible.**
+`knowledge[place]` is `never | hearsay | visited`, and even `visited` shows the
+head's figure rather than the truth. This is what makes M13's trade a thing done
+with people instead of with a price table.
+
+---
+
+## D40. The four things a king did that the game had no verb for
+
+Judging, taxing, appointing, and building. All four are added; **the bindings
+that were paperwork are cut.**
+
+* **Justice (6.19).** The hall already queues the people waiting. They become
+  petitioners with a claim, a counter-claim, and a truth that is never
+  projected. Four verdicts — for, against, split, defer — and deferring is a
+  verdict that compounds. **Precedent is the mechanic worth building:** a ruling
+  in year 2 is quoted back in year 9, and contradicting yourself costs double.
+  Nothing marks a petitioner as honest and nothing says which verdict was right;
+  the correction arrives later, as a letter, from someone who was there.
+* **Revenue (6.20).** The land due and the harbour due. Both are a squeeze with
+  a lag: raise the harbour due and the income lands this fortnight, the
+  merchants leave three to six fortnights later. The lag is the design.
+* **Appointment and the heir (6.22).** `place` generalises M9's marry-abroad to
+  every post at home and abroad. Every trustworthy man is a member of your
+  house; every one you place is a rival you have armed; every post you leave
+  empty decays at 40 a fortnight.
+* **Building (6.21).** The **corvée keeps its name** — it is the right word for
+  the thing and the player should learn it. Projects consume materials as they
+  proceed, only run in the right season, and use the same hands as the harvest.
+  A wall is 4,000 days: a year and a half of labour spent on a guess about which
+  crisis is coming, resolved long after you have forgotten you guessed.
+
+**Cut:** `expiate` as a verb (it is what you do at the altar), `harvest` and
+`recall` (an overseer's job — give the order to a man), `dredge` (a project),
+`close`/`open` (quarantine with another name), `pri` (a column you order), and
+`hush`/`defy` as separate verbs (one choice about one omen).
+
+**Kept and given teeth:** `swear`. It is inert today because nothing pursues a
+broken oath; it becomes the spine at M14, when the clause that says two hundred
+men is the reason Carchemish comes or does not.
