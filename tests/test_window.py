@@ -323,3 +323,25 @@ def test_the_launcher_and_the_venv_are_part_of_the_project():
     assert launcher.exists(), "run.sh is how the game is started"
     assert os.access(launcher, os.X_OK), "run.sh must be executable"
     assert ".venv" in (root / ".gitignore").read_text()
+
+
+def test_there_is_only_ever_one_tk_root_in_a_process():
+    """The crash this project actually shipped: `main()` called `available()`,
+    which made a root and destroyed it, and then the game made a second one.
+    Creating a root, destroying it and creating another aborts on macOS Aqua --
+    SIGTRAP, no traceback, nothing on stderr, which is why it took a bisect to
+    find. The root is now made once and never destroyed."""
+    if not available():
+        return
+    from tui import backend_tk
+    first = backend_tk._root()
+    assert backend_tk._root() is first
+    app_one, app_two = App(), App()
+    assert app_one.root() is first and app_two.root() is first
+    window = app_one.window("t", "t", 8, 2)
+    window.root.withdraw()
+    app_one.shutdown()
+    # The App is done, and the shared root outlives it intact.
+    assert app_one.windows == {}
+    assert backend_tk._root() is first
+    assert first.winfo_exists()

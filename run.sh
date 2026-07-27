@@ -11,6 +11,7 @@
 #   ./run.sh --check      say which interpreter and whether Tk is there
 #   ./run.sh --cli        the terminal game
 #   ./run.sh --test       the suite
+#   ./run.sh --probe      find which Tk step kills the process
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,6 +25,7 @@ fi
 
 case "${1:-}" in
     --check) exec "$PY" play_gui.py --check ;;
+    --probe) exec "$PY" tools/tkprobe.py ;;
     --cli)   shift; exec "$PY" play_cli.py "${@:-ugarit}" ;;
     --test)  shift; exec "$PY" tools/run_tests.py "$@" ;;
     *)       exec "$PY" play_gui.py "$@" ;;

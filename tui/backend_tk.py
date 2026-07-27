@@ -30,6 +30,25 @@ FONT_STACK = (
 )
 
 
+# The one Tk root this process will ever have.
+#
+# Creating a root, destroying it, and creating another in the same process
+# aborts on macOS Aqua -- SIGTRAP, no traceback, nothing on stderr. That is
+# exactly what `main()` used to do: `available()` made a root to test with and
+# threw it away, then `App` made a second one to play in. So the root is made
+# once, withdrawn, shared by everything, and never destroyed.
+_ROOT = None
+
+
+def _root():
+    global _ROOT
+    if _ROOT is None:
+        import tkinter as tk
+        _ROOT = tk.Tk()
+        _ROOT.withdraw()
+    return _ROOT
+
+
 def _hex(index: int) -> str:
     return f"#{RGB[index]}"
 
@@ -202,14 +221,11 @@ class App:
     def root(self):
         """The hidden interpreter root every window hangs off.
 
-        It is withdrawn and never shown: it exists so that no player-visible
-        window is structurally special, and so the game can close its last
-        window without taking Tk down with it.
+        Withdrawn and never shown, so that no player-visible window is
+        structurally special and the game can close its last window without
+        taking Tk down. Shared process-wide: see `_root`.
         """
-        if self.tk is None:
-            import tkinter as tk
-            self.tk = tk.Tk()
-            self.tk.withdraw()
+        self.tk = _root()
         return self.tk
 
     def window(self, key: str, title: str, width: int, height: int,
@@ -248,25 +264,21 @@ class App:
             self.tk.quit()
 
     def shutdown(self) -> None:
-        """Take Tk down deliberately, once the main loop has returned.
+        """Close this App's windows once the main loop has returned.
 
-        Letting the interpreter exit with a live Tk still holding windows means
-        Tcl is finalised from whatever state the garbage collector happens to
-        reach it in, which on macOS is an intermittent crash *after* the game
-        has apparently ended normally.
+        The shared root is deliberately *not* destroyed: another App in the
+        same process would then have to make a second one, which is the abort
+        this whole arrangement exists to avoid. Tk goes down when the process
+        does, with no windows left holding it.
         """
-        if self.tk is None:
-            return
         try:
             for window in list(self.windows.values()):
                 if window.root.winfo_exists():
                     window.root.destroy()
-            self.tk.destroy()
         except Exception:
             pass
         finally:
             self.windows.clear()
-            self.tk = None
 
 
 def diagnose() -> dict:
@@ -288,8 +300,7 @@ def diagnose() -> dict:
     report["tkinter"] = "present"
     report["tk_version"] = str(tkinter.TkVersion)
     try:
-        root = tkinter.Tk()
-        root.destroy()
+        _root()                      # made once, kept; never made twice
         report["display"] = "yes"
     except Exception as error:
         report["display"] = f"no ({type(error).__name__}: {error})"
@@ -303,9 +314,8 @@ def available() -> bool:
     a headless box rather than dying with a traceback about a display name.
     """
     try:
-        import tkinter
-        root = tkinter.Tk()
-        root.destroy()
+        import tkinter                                  # noqa: F401
+        _root()
         return True
     except Exception:
         return False
