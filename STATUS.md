@@ -2,7 +2,9 @@
 
 **Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian) · D25 (troops: task, place, garrison strength, troops on the harvest, the `provide_troops` clause and its summons). 139 tests green. Plays: `python3 play_cli.py ugarit`.
 
-**Next:** M11 — displacement: rival courts, displaced groups, reception policy, the coalition, raid targeting. Target per spec: a coalition assembled entirely from refusals, verifiable in the log. `engine/troops.garrison_strength(court, place)` is there for 6.13's weighting now (D32); the one number in it that was invented rather than specified is the half-weight for `watch`, so check that first if raid targeting reads wrong.
+**Next:** M11 — **the interface** (D33 for the host, D34 for the shape; spec 9.6). The cell grid and its two backends, six reusable window kinds — conversation, document, ledger, composer, diagram, utility — instantiated many times, with three of them given a drawn setting where it earns it (the hall for an audience, the altar for divination, the tablet house for a search) and the rest plain. Plus HELP and COUNSEL, the dramatized turn boundary, and a double-clickable build. Aliveness comes from people who talk back, not from drawn rooms. Target: a stranger who has never read the spec opens the executable and knows what a fortnight costs him. Then M12 — **the world, the envoy, and the standing order** (D35): a large persistent world of cities, trading houses and travellers, a trade network whose prices you can only learn by asking, the envoy as the verb for reaching it, agency for the persons and cities in it, and free-text standing orders delegated to fallible people. Displacement is now M13, scenarios M14, epilogue M15.
+
+`engine/troops.garrison_strength(court, place)` is there for 6.13's weighting whenever M12 starts (D32); the one number in it that was invented rather than specified is the half-weight for `watch`, so check that first if raid targeting reads wrong.
 
 **Rules that bite:** engine/ = stdlib only, integers only, no `random`/`hash()`/floats in engine. Read `SAY_TO_THE_KING_spec.md` Part 0 + `DECISIONS.md` before changing anything.
 
@@ -47,6 +49,22 @@ over, read or not, and the tablet asks for more men than the oath obliges
 because the viceroy exaggerates. The true figure is in the clause, on the OATHS
 page, from turn 1. Nothing points this out. Still absent and meant to be: combat
 resolution, unit types, morale, terrain.
+
+**The renderer's output is a grid, from M11 (D33).** `Screen` is a rectangle of
+`(glyph, fg, bg)` and it is the only thing `tui/` produces. The terminal backend
+and the shipped Tk backend are both consumers of it; neither is privileged and
+the terminal one must keep working. Screens are **asserted, not screenshotted** —
+a test indexes a cell and checks a glyph, in the same headless run as the engine.
+Colour never carries meaning alone: every distinction is duplicated by a glyph or
+a word, and monochrome is a supported path.
+
+**Windows are OS windows.** The hub is terminal-sized and stays that way; the
+archive, the map, the desk and a letter each open as a real window with its own
+title bar, moved and closed on its own. The player puts the granary beside the
+letter that makes a claim about it — cross-checking is the game's central act and
+two windows make it reading instead of memory. The hub owns the session: closing
+it ends the game, closing anything else is free. Every window is reachable from
+the hub by keyboard, always.
 
 **Known gap.** The balance numbers (D16, `tools/balance.py`) are verified on one
 seed, `8814402919`. A seed sweep is worth doing before M13.

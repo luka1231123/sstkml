@@ -442,3 +442,255 @@ spec 7.2's "under 400". Now 390 — chariotry 90, household troops 260, and a
 Still deliberately absent, exactly as D25 said: no combat resolution, no unit
 types, no morale, no terrain. M11 needs raids against garrison strength and
 nothing more.
+
+## D33 — The interface becomes M11, and it is built for a double-click (pre-M12)
+The game is good and nobody can get into it. `play_cli.py` is a 561-line command
+loop with a 40-line help string, and the first thing a new player meets is a
+prompt and a wall of verbs. Part 9 of the spec — the node map, the sparklines,
+the house tree, the desk — was written at M0 and is still mostly unbuilt. This
+milestone is Part 9, and it goes in front of displacement because the coalition
+is the system that most needs a map and a chart to be legible at all, and
+building those after M12 would mean building M12's screens twice.
+
+Displacement, scenarios and the epilogue each shift back one: M12, M13, M14.
+
+**The target is an executable, so the host is a graphics toolkit, not a terminal
+framework.** A store launches a binary and expects a real window: a console
+program gets no proper window at all, and on Windows it gets a `cmd.exe` frame
+around the art. The setup the player performs is a double-click.
+
+**The toolkit is Tk**, which follows from the windows (below) more than from
+anything else. It is the only option that is in the standard library, gives
+genuine operating-system windows, and bundles into a single artifact with the
+Tcl/Tk runtime inside it — so the Linux `python3-tk` problem, which is real when
+a user installs from source, does not exist for someone who downloads a build.
+The project's stdlib-only norm survives intact, which no other candidate managed.
+Rendering is a grid of cells into a `Text` widget with a tag per palette pair;
+if that proves too slow or too soft-edged, a font-atlas blit onto a `Canvas`
+replaces it without anything above the backend noticing, which is the point of
+spec 9.6.
+
+**The grid abstraction is the whole design** (spec 9.6). `Screen` is a rectangle
+of `(glyph, fg, bg)` and the renderer's only output. The terminal backend and
+the window backend are both consumers, and neither is privileged. Three things
+fall out, and all three are the reason to do it this way rather than draw
+straight into a window:
+
+- Screens are **asserted, not screenshotted**. A test indexes a cell and checks
+  a glyph. The interface joins the engine in the headless suite instead of being
+  the one part of the project nobody can test.
+- The terminal path survives, so the game stays playable over `ssh` and the
+  80-column degrade path (M14) is a backend, not a rewrite.
+- `belief/project.py` stays the only thing the interface reads. The grid sits
+  below the renderer, not beside the Belief boundary, and cannot become a second
+  door into `World`.
+
+**Colour never carries meaning alone.** Sixteen entries, authored in content.
+Every colour distinction is duplicated by a glyph or a word, and monochrome and
+`--pure-ascii` are supported paths. Part 0's information rules did not stop
+being true because the terminal got nicer, and a freshness that is only a hue is
+a freshness the player cannot cross-check.
+
+**Operating-system windows, and they are the organising idea.** The hub is a
+small window, about the size of a terminal, and it stays that size. The archive,
+the map, the desk and a letter each open as *another OS window*: own title bar,
+own taskbar entry, moved and closed on its own. The player arranges his own
+table.
+
+The argument for paying real money for this — and it does cost exclusive
+fullscreen and any launcher overlay, both of which hook a graphics context Tk
+does not have — is that the game's central act is cross-checking one number
+against another. M3's whole target was "the player cross-checks a number and
+finds it wrong", and there are now three layers between him and any figure
+(D11). On a single surface that comparison is an act of memory, which is exactly
+the faculty the game is already taxing on purpose. Two windows side by side make
+it an act of reading. A king's table has several tablets open on it at once, and
+this is the one place where the interface should imitate the desk rather than
+the terminal.
+
+Two rules follow and are not optional. The hub owns the session: closing it ends
+the game, closing anything else is free. And every window is reachable from the
+hub by keyboard alone, because a player who has closed a window and cannot find
+it again has lost the game to the interface.
+
+**Two advisors, and the split is the point.**
+
+- **HELP** is free, always right, and out of fiction. Rules, syntax, hour costs,
+  what is available this turn. It is built on the deterministic pre-parser's
+  existing `_affordances` (`ai/parser.py`) and it does not call a model, ever.
+- **COUNSEL** is a named courtier who costs an hour and can be wrong. He reads
+  the same Belief the player does, and he is subject to competence and loyalty
+  the way the diviner is (D23) and the scribes are (D11). He will not check the
+  oath unless asked. He is the game's thesis applied to its own tutorial.
+
+Keeping them apart is what makes both honest. A single advisor would have to be
+either a liar you cannot learn the controls from or an oracle that hands the
+player the clean channel the entire game is built to deny him.
+
+**COUNSEL must work with no model, because it ships.** A downloaded binary
+cannot assume a local Ollama, and paying per player is not a plan. So the
+offline floor is authored lines selected by persona and bias, on the machinery
+`ai/voicer.py` and `engine/report.py` already have; a live model is an upgrade
+for the player who configures one, not a dependency of the build. This also
+keeps the prompt boundary (spec 8.9, `FORBIDDEN_KEYS`) defensible: an advisor
+holding the whole action surface is the single feature most likely to leak
+`liability` or `cause_oath_id`, and a deterministic core cannot leak at all.
+
+
+## D34 — Window kinds, not rooms: the shape of M11
+The instruction was a living world rather than a management screen. A first pass
+answered it with a palace of six drawn rooms, which was the wrong answer: it
+forces one metaphor onto seven different jobs, and most of those jobs are better
+served by an ordinary abstract window. A chat is a better advisor than a painted
+chamber is.
+
+**The principle is that form follows function, and there is no rule beyond
+that.** A window is given the flavour of a place when being somewhere makes the
+moment better, and is a plain functional window when it does not. This is a
+judgement made per window, not a system. Most windows are plain.
+
+**Where a place earns it, and why — three of them:**
+
+- **The hall.** The hub, always open, owns the session: the date, the season, the
+  hours burning down, who is waiting on you. It is also where an audience
+  happens, and that is the real argument. Being *received* is different from
+  being messaged; an envoy who is standing in your hall, in front of the people
+  waiting behind him, is a different conversation from a chat window.
+- **The temple.** Divination, rites, expiation. An omen delivered in a plain
+  window is a string. Delivered at an altar, after a walk, it is a ritual, and
+  the game already turns on the player half-believing it (D23).
+- **The tablet house.** Search costs an hour, and the room is the reason that
+  reads as expensive rather than arbitrary. The M10 puzzle depends on the player
+  feeling the hour before he spends it.
+
+Everything else is a plain window with no setting: stores, the roll, the muster,
+letters, oaths, the graph, the composer. Dressing a table of numbers as a room
+adds nothing and costs art.
+
+**Six window kinds, reused.** Each is one widget class instantiated many times,
+which is why this is cheaper than six bespoke rooms and not more expensive:
+
+1. **Conversation.** Scrollback, typed input, a portrait, a name, turn-taking,
+   persona-driven, costs hours. Plain for the everyday ones — COUNSEL at your
+   shoulder, a word with the scribe. Staged in the hall when someone is
+   *received*, and at the altar when it is the diviner: same widget, a setting
+   drawn behind it.
+2. **Document.** A letter, an archive record, an oath, a predecessor's tablet.
+   Plain, small, many open at once, closed in a keystroke, and all identical in
+   furniture so the eye goes to the figures. This is the kind that makes
+   cross-checking work, which is what D33 bought the OS windows for.
+3. **Ledger.** Stores, the court roll, the muster, an estate. A table: dense,
+   cold, sortable, sparklines where a series exists. Spec 9.3 says the roll
+   should look like a payroll because it is one, and that is the aesthetic for
+   the whole kind.
+4. **Composer.** Writing, which is half the game. An editor with the draft, the
+   grader marking against `formulae.toml` as you type, and the scribe's advisory
+   line. The one kind that deserves bespoke work.
+5. **Diagram.** The correspondence graph (spec 9.3.6 — a graph, never a map) and
+   the family tree. Nodes, edges, freshness.
+6. **Utility.** HELP, settings, the save dialog. Out of fiction, plain, free.
+
+**Aliveness comes from people who talk, not places you look at.** This is the
+correction that matters. A drawn storeroom is looked at once and is wallpaper by
+the third fortnight; a scribe who answers when addressed is alive every time he
+is opened. The project already has the machinery for this and is not using it for
+anything but letters: `content/personas.toml`, `ai/voicer.py`, `engine/report.py`
+give every figure a voice, a temper, and a bias. Pointing that at conversation
+windows — courtiers, the diviner, envoys — is the highest-yield work in the
+milestone, and it is mostly authoring rather than code.
+
+Two supporting levers, both cheap:
+
+- **The hall shows people, not counters.** The rations officer is waiting
+  *because* arrears crossed four fortnights; the brother is waiting because he
+  wants something. State embodied as persons, projected from Belief, no new
+  systems.
+- **The fortnight ends like something happens.** `end` is currently a command
+  that reprints a screen. It is the only moment the world moves on its own and it
+  should be the heaviest beat in the loop: what arrived arrives, what changed is
+  shown rather than summarised, consequence seen before cause is understood.
+
+Anything a conversation, a document, a ledger or a diagram already does well, it
+keeps doing. No screen is dressed as a place to make it feel important.
+
+**Deliberately not built, each a real sink:**
+
+- **Bespoke art per screen.** Six painted rooms was the rejected design. Art
+  budget goes to portraits for the ~15 people who recur, and to three settings:
+  the hall, the altar, the tablet house.
+- **Animation or a frame loop.** Redraw on state change; nothing here moves.
+- **Geography.** No coastline, coordinates or distances (spec 9.3.6). A pretty
+  map is not merely wasted work but a lie about what the player knows.
+- **A dashboard.** Spec 9.4 forbids it, and separate windows are what make
+  knowing two things at once cost a decision.
+- **Procedural art.** Hand-author the little there is.
+- **Custom window chrome.** Use the operating system's title bars.
+- **Sound.** After M14, or never.
+- **Mouse-first interaction.** Writing is the game; every window fully
+  keyboard-operable, none requiring a mouse.
+
+## D35 — The world, the envoy, and the standing order (M12)
+Displacement was M12. It moves to M13, because a coalition assembled out of
+refused people is thin if there are four places to be refused from, and because
+scenarios and the epilogue both read a world that does not exist yet. This
+milestone builds the world the rest of the game has been assuming.
+
+Rumour is explicitly **not** in scope. It was proposed and declined.
+
+**A big world, and the cast is not bounded.** Many named cities, trading houses
+that persist for generations, and travellers who do not. A small cast was
+proposed and rejected: the point of the period is a dense, interconnected
+Mediterranean, and a court that corresponds with six people is a diorama.
+
+Scale is bought with **detail, not headcount**. A person is a cheap record —
+id, name, place, house, a trait or two, a memory of the player. Only persons in
+contact with the court are carried at full detail; the rest are records that
+become detailed when the player's attention reaches them, and quietly stop being
+detailed when it leaves. Determinism is unaffected either way: everything is
+integers under seeded substreams and hashes as it always has. The thing to watch
+is `state_hash` cost per turn, not correctness.
+
+**The trade network is real and invisible.** Cities produce and demand; routes
+have capacity and a season (the closed sea already exists, D7); prices move with
+supply, demand, and events. None of it is projected to Belief. The player never
+sees a price he has not been told, and the same three layers apply to being told
+(D11), so a market report is a claim by a man with a reason to shade it.
+
+**The envoy is the verb.** Reaching the network means sending a person: he
+travels, which takes fortnights; he negotiates with his own competence, loyalty
+and instructions; he comes back, or does not, and what he reports is his
+account. He can exceed his instructions, be intercepted, take a better offer, or
+come home having agreed something the king would not have. This is the main new
+interaction and it is deliberately high-latency: the game is already about
+acting on old information, and trade is where that hurts most concretely.
+
+**Agency, generalised.** Cities and persons pursue their own wants each tick —
+trade, ally, refuse, marry, move, raid. M9's marry-abroad-as-an-agent is the
+working precedent and this is that, everywhere. The player learns what happened
+by letter, from a participant with a bias, or from a third party who saw it.
+Nothing is announced.
+
+**The standing order is the open-ended verb, and it is the milestone's real
+idea.** The player writes an instruction in prose. It is parsed into a structured
+order — a trigger, a scope, a limit — and then *given to a person*, who carries
+it out with his own competence, loyalty and reading of what was meant. He is not
+a script the engine runs; he is a man doing his best with a sentence.
+
+    "if the granary falls below four thousand parisu, buy grain at Gubla,
+     up to twenty talents of bronze"
+
+The competent, loyal official does roughly that. The literal one buys at Gubla
+when Byblos was cheaper and closer, because Gubla is what the letter said. The
+lazy one waits until it is convenient. The disloyal one buys at the price he
+reports and pockets the difference. Every one of them writes back saying it is
+done. This is what turns free text from a flavour feature into the deepest
+system in the game, and it reuses `ai/parser.py`, the persona machinery, and the
+oath-clause shape rather than inventing anything.
+
+Orders are structured before they are stored, so replay stays deterministic: the
+log holds the parsed order and the prose, and nothing is re-interpreted by a
+model at load. Same rule as protocol grades (D9).
+
+**Target:** a run in which the grain arrives late because the man sent to buy it
+did what he was told rather than what was meant, and the letter saying so is
+perfectly polite.

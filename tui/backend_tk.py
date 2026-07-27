@@ -1,0 +1,168 @@
+"""Window backend: a `Screen` in a real operating-system window (D33, spec 9.6).
+
+This is the shipped path. Each `GridWindow` is a genuine OS window with its own
+title bar and its own entry in the taskbar, moved and closed on its own, so the
+player can put the granary beside the letter that makes a claim about it. That
+side-by-side reading is the whole reason D33 paid for OS windows.
+
+Tk is imported lazily and only here. Nothing else in the project may import it,
+so the headless suite, `session.replay` and the terminal backend never touch a
+display -- which is what lets the interface be tested by asserting cells.
+
+Rendering is a `Text` widget with one tag per (fg, bg) pair actually used. A
+font-atlas blit onto a `Canvas` can replace the innards later without anything
+above this file noticing; that is the point of the grid being a type.
+"""
+from __future__ import annotations
+
+from tui.grid import RGB, Screen
+
+# One monospace family per platform, first that exists wins. Tk silently
+# substitutes an unknown family, and a proportional substitution would shear
+# every column in the game, so the fallback chain ends somewhere guaranteed.
+FONT_STACK = (
+    "Menlo", "DejaVu Sans Mono", "Consolas", "Liberation Mono",
+    "Courier New", "TkFixedFont",
+)
+
+
+def _hex(index: int) -> str:
+    return f"#{RGB[index]}"
+
+
+def pick_font(root, size: int = 14) -> tuple[str, int]:
+    """First family in the stack the toolkit actually has."""
+    from tkinter import font as tkfont
+    available = {name.lower() for name in tkfont.families(root)}
+    for family in FONT_STACK:
+        if family.lower() in available or family == "TkFixedFont":
+            return family, size
+    return "TkFixedFont", size
+
+
+class GridWindow:
+    """One OS window showing one `Screen`.
+
+    `on_key` receives a `tkinter.Event`; `on_close` is called when the player
+    closes the window from its own title bar, which every window except the
+    hall must survive (D33: closing the hall ends the session, closing anything
+    else is free).
+    """
+
+    def __init__(self, app, title: str, width: int, height: int,
+                 on_key=None, on_close=None, font_size: int = 14) -> None:
+        import tkinter as tk
+
+        self.app = app
+        self.width = width
+        self.height = height
+        self._tags: set[str] = set()
+
+        self.root = tk.Toplevel(app.tk) if app.tk is not None else tk.Tk()
+        if app.tk is None:
+            app.tk = self.root
+        self.root.title(title)
+        self.root.configure(bg=_hex(0), padx=8, pady=6)
+
+        family, size = pick_font(self.root, font_size)
+        self.text = tk.Text(
+            self.root, width=width, height=height,
+            font=(family, size), bg=_hex(0), fg=_hex(1),
+            borderwidth=0, highlightthickness=0, padx=0, pady=0,
+            wrap="none", cursor="arrow", insertwidth=0,
+            spacing1=0, spacing2=0, spacing3=0,
+        )
+        self.text.pack(fill="both", expand=True)
+        self.text.configure(state="disabled")
+
+        # Keys are bound on the window, not the widget, so a click anywhere in
+        # the window keeps typing working.
+        if on_key is not None:
+            self.root.bind("<Key>", on_key)
+        self.root.protocol(
+            "WM_DELETE_WINDOW", on_close or self.close)
+
+    def _tag(self, fg: int, bg: int) -> str:
+        name = f"c{fg}_{bg}"
+        if name not in self._tags:
+            self.text.tag_configure(name, foreground=_hex(fg), background=_hex(bg))
+            self._tags.add(name)
+        return name
+
+    def paint(self, screen: Screen) -> None:
+        """Replace the contents with one screen.
+
+        Runs of identical (fg, bg) are inserted as single spans, so a row of
+        ordinary text costs one insert rather than one per cell.
+        """
+        self.text.configure(state="normal")
+        self.text.delete("1.0", "end")
+        for y, row in enumerate(screen):
+            run: list[str] = []
+            current: tuple[int, int] | None = None
+            for glyph, fg, bg in row:
+                if (fg, bg) != current:
+                    if run:
+                        self.text.insert("end", "".join(run), self._tag(*current))
+                    run, current = [], (fg, bg)
+                run.append(glyph)
+            if run and current is not None:
+                self.text.insert("end", "".join(run), self._tag(*current))
+            if y != len(screen) - 1:
+                self.text.insert("end", "\n")
+        self.text.configure(state="disabled")
+
+    def focus(self) -> None:
+        self.root.lift()
+        self.root.focus_force()
+
+    def close(self) -> None:
+        self.root.destroy()
+
+
+class App:
+    """Owns the Tk main loop and the windows open on it.
+
+    The hall is the first window created and owns the session: closing it ends
+    the game. Every other window is opened and closed freely, and must always
+    be reachable again from the hall by keyboard (D33).
+    """
+
+    def __init__(self) -> None:
+        self.tk = None
+        self.windows: dict[str, GridWindow] = {}
+
+    def window(self, key: str, title: str, width: int, height: int,
+               **kwargs) -> GridWindow:
+        """Open a window, or raise and return the one already open under `key`."""
+        existing = self.windows.get(key)
+        if existing is not None and existing.root.winfo_exists():
+            existing.focus()
+            return existing
+        window = GridWindow(self, title, width, height, **kwargs)
+        self.windows[key] = window
+        return window
+
+    def close(self, key: str) -> None:
+        window = self.windows.pop(key, None)
+        if window is not None and window.root.winfo_exists():
+            window.close()
+
+    def run(self) -> None:
+        if self.tk is not None:
+            self.tk.mainloop()
+
+
+def available() -> bool:
+    """Whether a display and a working Tk are both present.
+
+    Called before choosing a backend so the game falls back to the terminal on
+    a headless box rather than dying with a traceback about a display name.
+    """
+    try:
+        import tkinter
+        root = tkinter.Tk()
+        root.destroy()
+        return True
+    except Exception:
+        return False
