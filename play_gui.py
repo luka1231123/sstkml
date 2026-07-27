@@ -14,7 +14,9 @@ than dying with a traceback about a display name.
 """
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
 if sys.version_info < (3, 12):
     # Apple's /usr/bin/python3 is old enough to lack tomllib, and the failure
@@ -34,6 +36,10 @@ from tui import document, hall
 from tui.grid import Screen
 
 READ_COST = 2
+
+# Where `STK_DUMP=1` writes what the windows are showing, for `tools/screens.py
+# live`. A running game is otherwise unreadable from outside without a camera.
+DUMP = Path(__file__).parent / "saves" / "screens.txt"
 
 # key -> (window key, title, size, how to compose it from Belief)
 TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
@@ -122,6 +128,23 @@ class Game:
             screen = self.compose(key)
             if screen is not None:
                 window.paint(screen)
+        if os.environ.get("STK_DUMP") == "1":
+            self.dump()
+
+    def dump(self) -> None:
+        """Write every open window to `saves/screens.txt`, as text.
+
+        Best effort: a game that cannot write its debug file should still be
+        playable, so nothing here is allowed to interrupt a repaint.
+        """
+        try:
+            DUMP.parent.mkdir(parents=True, exist_ok=True)
+            b = self.belief
+            head = (f"seed {self.seed} · turn {self.world.date.absolute} · "
+                    f"{self.hours} of {b['attention']} hours left\n\n")
+            DUMP.write_text(head + self.app.transcript() + "\n")
+        except Exception:
+            pass
 
     def open_tablet(self, char: str) -> None:
         window_key, title, (w, h), _how = TABLETS[char]
@@ -150,6 +173,12 @@ class Game:
             self.end_fortnight()
         elif char in TABLETS:
             self.open_tablet(char)
+        elif char == "\\":
+            # Read the windows out loud. Not a game verb: it costs no hours,
+            # changes nothing, and is how a player reports what he was looking
+            # at when something went wrong.
+            self.dump()
+            print(self.app.transcript(), flush=True)
         elif char == "q":
             self.quit()
 

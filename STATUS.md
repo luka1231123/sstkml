@@ -60,6 +60,15 @@ a test indexes a cell and checks a glyph, in the same headless run as the engine
 Colour never carries meaning alone: every distinction is duplicated by a glyph or
 a word, and monochrome is a supported path.
 
+**Read a screen, never photograph one.** `./run.sh --screens [hall|stack|stores|
+roll|muster|letter <n>|all] [--turns=N] [--seed=N]` composes any screen from the
+seed and prints its glyphs — no display, no window, no image. Because every
+screen is a pure function of Belief, that text *is* what the window paints. For a
+game already running, `STK_DUMP=1 ./run.sh` writes every window to
+`saves/screens.txt` on each repaint (or press `\` to write and print on demand)
+and `--screens live` reads it back; that is the only path that reads a real
+window, and it exists for when the two disagree.
+
 **Windows are OS windows.** The hub is terminal-sized and stays that way; the
 archive, the map, the desk and a letter each open as a real window with its own
 title bar, moved and closed on its own. The player puts the granary beside the

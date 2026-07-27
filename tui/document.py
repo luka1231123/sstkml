@@ -85,7 +85,10 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
     who = render.actor_name(item["sender"], house)
     _frame(surface, who.upper(), "[esc] close")
 
-    surface.text(3, 2, render.letter_summary(item["topic"]), C["dim"], C["ink"])
+    # Truncated against the frame, not the surface: `text` clips at the edge of
+    # the world, which for a boxed window means writing over the right border.
+    surface.text(3, 2, _trunc(render.letter_summary(item["topic"]), width - 6),
+                 C["dim"], C["ink"])
     stamp = f"reached your hand, turn {item['received_turn']}"
     surface.text(3, 3, stamp, C["ash"], C["ink"])
     surface.text(3, 4, "─" * (width - 6), C["faint"], C["ink"])

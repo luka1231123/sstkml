@@ -96,9 +96,15 @@ class GridWindow:
         import tkinter as tk
 
         self.app = app
+        self.title = title
         self.width = width
         self.height = height
         self._tags: set[str] = set()
+        # The last screen painted, kept so the window can be *read* rather than
+        # screenshotted (`tools/screens.py live`). One rectangle of tuples per
+        # window; it costs nothing and it is the only way to see what a running
+        # game is actually showing.
+        self.last: Screen | None = None
 
         # Always a Toplevel, never the interpreter's root. The App holds a
         # withdrawn root of its own, so that closing *any* window -- including
@@ -139,6 +145,7 @@ class GridWindow:
         Runs of identical (fg, bg) are inserted as single spans, so a row of
         ordinary text costs one insert rather than one per cell.
         """
+        self.last = screen
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")
         for y, row in enumerate(screen):
@@ -243,6 +250,26 @@ class App:
         window = self.windows.pop(key, None)
         if window is not None:
             window.close()
+
+    def transcript(self) -> str:
+        """Everything currently on screen, as text, in the order it was opened.
+
+        The counterpart to asserting cells in the headless suite: this reads a
+        window that is genuinely open, so a disagreement between it and
+        `tools/screens.py hall` means the controller painted something other
+        than what the composer would produce -- which is the only class of bug
+        the headless tests structurally cannot see.
+        """
+        from tui.grid import plain_text
+
+        parts = []
+        for key, window in self.windows.items():
+            if window.last is None or not window.root.winfo_exists():
+                continue
+            rule = "─" * max(0, 60 - len(window.title))
+            parts.append(f"── {window.title} [{key}] {rule}\n"
+                         + plain_text(window.last))
+        return "\n\n".join(parts)
 
     def run(self) -> None:
         if self.tk is None:
