@@ -58,9 +58,11 @@ class GridWindow:
         self.height = height
         self._tags: set[str] = set()
 
-        self.root = tk.Toplevel(app.tk) if app.tk is not None else tk.Tk()
-        if app.tk is None:
-            app.tk = self.root
+        # Always a Toplevel, never the interpreter's root. The App holds a
+        # withdrawn root of its own, so that closing *any* window -- including
+        # the hall -- is an ordinary event the controller decides about, rather
+        # than a destruction of the toolkit that happens to end the process.
+        self.root = tk.Toplevel(app.root())
         self.root.title(title)
         self.root.configure(bg=_hex(0), padx=8, pady=6)
 
@@ -123,14 +125,29 @@ class GridWindow:
 class App:
     """Owns the Tk main loop and the windows open on it.
 
-    The hall is the first window created and owns the session: closing it ends
-    the game. Every other window is opened and closed freely, and must always
-    be reachable again from the hall by keyboard (D33).
+    No window is structurally special: they are all Toplevels of a withdrawn
+    root. That the hall ends the session when closed is a policy the controller
+    states by passing `on_close=quit`, not a consequence of it having been
+    created first. Every other window closes freely and must always be
+    reachable again from the hall by keyboard (D33).
     """
 
     def __init__(self) -> None:
         self.tk = None
         self.windows: dict[str, GridWindow] = {}
+
+    def root(self):
+        """The hidden interpreter root every window hangs off.
+
+        It is withdrawn and never shown: it exists so that no player-visible
+        window is structurally special, and so the game can close its last
+        window without taking Tk down with it.
+        """
+        if self.tk is None:
+            import tkinter as tk
+            self.tk = tk.Tk()
+            self.tk.withdraw()
+        return self.tk
 
     def window(self, key: str, title: str, width: int, height: int,
                **kwargs) -> GridWindow:
@@ -151,6 +168,11 @@ class App:
     def run(self) -> None:
         if self.tk is not None:
             self.tk.mainloop()
+
+    def stop(self) -> None:
+        """End the session. Only the hall calls this (D33)."""
+        if self.tk is not None:
+            self.tk.quit()
 
 
 def available() -> bool:
