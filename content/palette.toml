@@ -1,5 +1,16 @@
 # The palette (spec 9.6, M11). Sixteen entries, and no more.
 #
+# The look is 1993: a DOS text-mode program on a CRT. Saturated, high-contrast,
+# unashamed of its own hues -- the amber of a monochrome terminal, the blue of a
+# Turbo Vision panel, the hot red of an EGA alarm. Sixteen colours was a
+# constraint then and is a discipline now: everything on screen must earn one of
+# these, and a screen that needs a seventeenth is a screen doing too much.
+#
+# What it is NOT is the grey-on-slightly-different-grey of a dashboard. This is a
+# clay tablet lit by a lamp, rendered on hardware that could only shout. The
+# ground is warm and dark, the ink is bright, and the accents are pigments --
+# ochre, madder, malachite, lapis -- not tints of a brand colour.
+#
 # Colour NEVER carries meaning on its own. Every distinction made with a colour
 # here is also made with a glyph or a word somewhere on the same screen, because
 # the game is about cross-checking and a hue cannot be cross-checked. The
@@ -12,96 +23,96 @@
 
 [ink]
 index = 0
-rgb = "16110d"
-ansi = 233
+rgb = "120e09"
+ansi = 232
 role = "the ground everything sits on; lamplit dark, never pure black"
 
 [clay]
 index = 1
-rgb = "d8c4a0"
-ansi = 187
-role = "body text, the default; the colour of a fresh tablet"
+rgb = "e6cf9e"
+ansi = 223
+role = "body text, the default; the colour of a fresh tablet under a lamp"
 
 [dim]
 index = 2
-rgb = "9a8674"
+rgb = "ab8c60"
 ansi = 137
 role = "secondary text: labels, units, things already known"
 
 [faint]
 index = 3
-rgb = "5c4f42"
-ansi = 240
+rgb = "584634"
+ansi = 238
 role = "rules, borders, separators; structure that must not compete"
 
 [flame]
 index = 4
-rgb = "e8a33d"
+rgb = "ffa022"
 ansi = 214
 role = "the lamp, the hour, what has the player's attention now"
 
 [blood]
 index = 5
-rgb = "b4432e"
-ansi = 167
+rgb = "e33c26"
+ansi = 196
 role = "arrears, breach, the overdue; always paired with a word"
 
 [barley]
 index = 6
-rgb = "8fa356"
-ansi = 107
+rgb = "a8c93c"
+ansi = 148
 role = "grain, growth, a thing in good order"
 
 [gold]
 index = 7
-rgb = "d4a72c"
-ansi = 178
+rgb = "ffc82e"
+ansi = 220
 role = "value, tribute, the metals when they are counted"
 
 [lapis]
 index = 8
-rgb = "4a6d94"
-ansi = 67
-role = "the sea and its season; cold, distant, out of reach"
+rgb = "2b4d96"
+ansi = 25
+role = "the sea, and the ground of a title bar; the one colour used as a field"
 
 [verdigris]
 index = 9
-rgb = "5f9a86"
-ansi = 72
+rgb = "34c6a4"
+ansi = 43
 role = "bronze as a material rather than a price"
 
 [bone]
 index = 10
-rgb = "f2e8d5"
+rgb = "fff4dc"
 ansi = 230
 role = "emphasis; the brightest thing on any screen, used sparingly"
 
 [shadow]
 index = 11
-rgb = "231b15"
-ansi = 235
-role = "panel ground, one step off the ink; the inside of a window"
+rgb = "1c1610"
+ansi = 234
+role = "panel ground and the drop shadow under a window; one step off the ink"
 
 [ash]
 index = 12
-rgb = "6e6259"
-ansi = 243
+rgb = "726350"
+ansi = 242
 role = "the spent, the closed, the dead; anything no longer in play"
 
 [wine]
 index = 13
-rgb = "7a3b52"
-ansi = 95
+rgb = "c04478"
+ansi = 168
 role = "the cult, the vow, the god; obligations that do not lapse"
 
 [sand]
 index = 14
-rgb = "bfa77f"
-ansi = 180
+rgb = "d2a75c"
+ansi = 179
 role = "the land and its estates"
 
 [sky]
 index = 15
-rgb = "7d9cb8"
-ansi = 110
+rgb = "56b6dc"
+ansi = 74
 role = "the calendar, the season, time passing"

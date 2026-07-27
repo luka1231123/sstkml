@@ -32,7 +32,7 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import new_seed
-from tui import document, hall
+from tui import document, hall, help as help_page, render
 from tui.grid import Screen
 
 READ_COST = 2
@@ -47,7 +47,18 @@ TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
     "t": ("stores", "The Stores", (62, 22), document.stores),
     "r": ("roll", "The Roll", (78, 22), document.roll),
     "m": ("muster", "The Muster", (62, 18), document.muster),
+    "o": ("oaths", "The Oaths", (76, 28), document.oaths),
+    "l": ("land", "The Land", (70, 24), document.land),
+    "h": ("house", "The House", (70, 26), document.house),
+    "?": ("help", "Help", (74, 34),
+          lambda b, w=74, h=34: help_page.compose(w, h)),
 }
+
+# The hall advertises every door and marks the ones that are not built (D33:
+# never strand the player). The two lists must not drift, so the controller
+# reads the hall's rather than keeping a second one.
+assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == {
+    window_key for window_key, _t, _s, _how in TABLETS.values()}
 
 
 class Game:
@@ -64,6 +75,7 @@ class Game:
         self.log: list[dict] = []
         self.app = App()
         self.open_letters: dict[str, dict] = {}
+        self.events: list[str] = []
         # The pile's display order, held steady across the fortnight so the
         # numbers do not move under the player's finger (see document.order_of).
         self.stack_order: list[str] = document.order_of(project(self.world))
@@ -95,13 +107,22 @@ class Game:
         return True
 
     def end_fortnight(self) -> None:
-        self.world, _ = advance(self.world)
+        self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
         self.stack_order = document.order_of(self.belief, self.stack_order)
         self.open_letters.clear()
         for key in [k for k in self.app.windows if k.startswith("letter:")]:
             self.app.close(key)
+        # The fortnight gets its own window rather than a silent redraw. It is
+        # the only moment in the game the player does not control, and it
+        # should feel like one.
+        self.events = render.events_lines(events, self.world.court)
+        window = self.app.window(
+            "fortnight", "The fortnight turns", 66, 18,
+            on_key=lambda e: self.on_tablet_key(e, "fortnight"),
+            on_close=lambda: self.app.close("fortnight"))
         self.repaint()
+        window.focus()
 
     # --- windows -------------------------------------------------------------
 
@@ -111,6 +132,8 @@ class Game:
             return hall.compose(b, 92, 30, hours_left=self.hours)
         if key == "stack":
             return document.stack(b, 80, 24, order=self.stack_order)
+        if key == "fortnight":
+            return document.fortnight(b, self.events, 66, 18)
         for _, (window_key, _title, (w, h), how) in TABLETS.items():
             if key == window_key:
                 return how(b, w, h)
@@ -191,6 +214,11 @@ class Game:
         """
         if event.keysym == "Escape":
             self.app.close(key)
+            return
+        if key == "fortnight" and event.keysym == "space":
+            # Space in this window means "I have read it", not "again".
+            self.app.close(key)
+            self.hall_window.focus()
             return
         char = (event.char or "").lower()
         if key == "stack" and char.isdigit() and char != "0":

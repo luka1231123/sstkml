@@ -14,7 +14,7 @@ Reads Belief and nothing else.
 """
 from __future__ import annotations
 
-from tui import render
+from tui import render, style
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -35,6 +35,13 @@ DOORS = (
     ("c", "counsel", "counsel"),
     ("?", "help", "help"),
 )
+
+# Which of them open. A door that is not built is drawn in ash and marked with
+# a dot, never removed: a player who can see the shape of the game and be told
+# "not yet" has been told the truth, and a menu that quietly shrinks has not.
+# The controller reads this rather than keeping its own list.
+BUILT = frozenset({"stack", "roll", "stores", "muster",
+                   "oaths", "land", "house", "help"})
 
 
 def _trunc(text: str, width: int) -> str:
@@ -119,35 +126,35 @@ def compose(b: dict, width: int = 92, height: int = 30,
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     inner = width - 4
 
-    # --- the frame and who you are -----------------------------------------
-    surface.box(0, 0, width, 3, style="double", fg=C["faint"])
-    title = f"{render.actor_name(b['actor'], b.get('house')).upper()} OF {b['scenario'].upper()}"
-    surface.text(3, 1, title, C["bone"], C["ink"])
+    # --- the title bar and who you are -------------------------------------
+    # A filled field across the whole top row, which is how a text-mode program
+    # said "this is the application" and is still the fastest way to say it.
+    title = (f" {render.actor_name(b['actor'], b.get('house')).upper()} "
+             f"OF {b['scenario'].upper()}")
+    style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
     date = b["date"]
-    surface.text(width - 3 - len(date), 1, date, C["sky"], C["ink"])
+    surface.text(width - 2 - len(date), 0, date, C["sky"], C["lapis"])
 
-    y = 4
+    y = 2
 
     # --- the lamp, which is the fortnight ----------------------------------
     base = b["attention_base"]
     hours = b["attention"] if hours_left is None else max(0, hours_left)
     lit = 0 if base <= 0 else min(12, hours * 12 // base)
     surface.text(3, y, "the lamp", C["dim"], C["ink"])
-    surface.text(13, y, "▓" * lit, C["flame"], C["ink"])
-    surface.text(13 + lit, y, "░" * (12 - lit), C["ash"], C["ink"])
+    style.meter(surface, 13, y, 12, lit)
     surface.text(27, y, f"{hours} of {base} hours", C["clay"], C["ink"])
     sea = "the sea is open" if b["sea_open"] else "the sea is shut"
     surface.text(width - 3 - len(sea), y,
-                 sea, C["lapis"] if b["sea_open"] else C["ash"], C["ink"])
+                 sea, C["sky"] if b["sea_open"] else C["ash"], C["ink"])
     y += 2
 
     # --- who is waiting ----------------------------------------------------
     people = waiting(b)
-    surface.text(3, y, "WAITING ON YOU", C["bone"], C["ink"])
-    count = f"{len(people)} in the hall" if people else ""
-    surface.text(width - 3 - len(count), y, count, C["dim"], C["ink"])
-    y += 1
-    surface.text(3, y, "─" * inner, C["faint"], C["ink"])
+    style.bar(surface, 2, y, inner, " WAITING ON YOU", fg=C["bone"],
+              bg=C["faint"])
+    count = f"{len(people)} in the hall " if people else ""
+    surface.text(width - 2 - len(count), y, count, C["clay"], C["faint"])
     y += 1
 
     room = max(0, height - y - 11)
@@ -192,19 +199,28 @@ def compose(b: dict, width: int = 92, height: int = 30,
     # --- the ways out ------------------------------------------------------
     # Anchored to the bottom edge and given exactly the rows it has, so the
     # last line is never pushed off the surface by a long door list.
-    surface.text(3, height - 6, "─" * inner, C["faint"], C["ink"])
-    surface.text(3, height - 5, "WHERE YOU MAY GO", C["bone"], C["ink"])
-    door_rows = (height - 4, height - 3, height - 2)
+    style.bar(surface, 2, height - 6, inner, " WHERE YOU MAY GO",
+              fg=C["bone"], bg=C["faint"])
+    door_rows = (height - 5, height - 4, height - 3)
     row, column = 0, 3
-    for key, label, _target in DOORS:
-        entry = f"[{key}] {label}"
+    for key, label, target in DOORS:
+        entry = f"[{key}] {label}" + ("" if target in BUILT else " ·")
         if column + len(entry) > width - 3:
             row, column = row + 1, 3
         if row >= len(door_rows):
             break
-        surface.text(column, door_rows[row], f"[{key}]", C["flame"], C["ink"])
-        surface.text(column + 4, door_rows[row], label, C["clay"], C["ink"])
-        column += len(entry) + 3
-    surface.text(3, height - 1, "[space] end the fortnight", C["dim"], C["ink"])
+        column += style.keycap(surface, column, door_rows[row], key, label,
+                               enabled=target in BUILT) + 3
+
+    # The status bar. Text mode put the keys along the bottom and never made
+    # you remember them; there is no reason to be cleverer than that.
+    style.bar(surface, 0, height - 1, width,
+              " [SPACE] end the fortnight   [\\] read out   [Q] leave the hall",
+              fg=C["clay"], bg=C["lapis"])
+    unbuilt = sum(1 for _k, _l, target in DOORS if target not in BUILT)
+    if unbuilt:
+        mark = f"· {unbuilt} not yet built "
+        surface.text(width - 1 - len(mark), height - 1, mark,
+                     C["dim"], C["lapis"])
 
     return surface.freeze()

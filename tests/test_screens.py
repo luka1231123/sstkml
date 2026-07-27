@@ -75,8 +75,8 @@ def test_nothing_is_written_over_the_frame() -> None:
     b = project(world)
     item = next(i for i in b["stack"] if i["id"] == letter_id)
     for row in document.tablet(item, house=b.get("house"), width=62):
-        assert row[0][0] in "┌│└", "the left border was overwritten"
-        assert row[-1][0] in "┐│┘", "the right border was overwritten"
+        assert row[0][0] in "╔║╚", "the left border was overwritten"
+        assert row[-1][0] in "╗║╝", "the right border was overwritten"
 
 
 def test_the_ascii_fold_leaves_no_box_drawing() -> None:

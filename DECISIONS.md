@@ -694,3 +694,49 @@ model at load. Same rule as protocol grades (D9).
 **Target:** a run in which the grain arrives late because the man sent to buy it
 did what he was told rather than what was meant, and the letter saying so is
 perfectly polite.
+
+---
+
+## D36. The look is 1993, and the furniture is one module
+
+**The palette is sixteen saturated colours, not a spectrum of taupe.** The
+brief was "tasteful but retro" and the failure mode of that brief is a beige
+dashboard: six greys, a muted accent, and the visual personality of a settings
+page. So the reference is fixed and specific — a DOS text-mode program of about
+1993, on a CRT. Turbo Vision, Norton Commander, the shareware menu you booted
+from a floppy. Amber that is actually amber, a red that alarms, lapis used as a
+*field* and not as a tint.
+
+Sixteen was a hardware limit then and is a discipline now. A screen that needs a
+seventeenth colour is a screen doing too much, and the cap is enforced by a test.
+
+**The furniture lives in `tui/style.py` and nowhere else.** Four pieces do all
+the work:
+
+* a **title bar** — a filled field over the top border, so a window announces
+  itself the way text mode did, by inverting
+* a **drop shadow** in `░`, one cell down and right, which says *these windows
+  stack* without a compositor
+* **key caps** — `[s] the stack`, the letter hot, the word plain
+* a **status bar** along the bottom naming the keys that work here
+
+Consequences taken deliberately:
+
+* The title field covers only the title, not the whole top edge. A filled edge
+  is handsome in colour and a hole in monochrome, where the rule would simply
+  vanish; the border has to survive `plain_text`.
+* A **door that is not built is drawn in ash and marked with a dot**, never
+  removed. A player who can see the shape of the game and be told "not yet" has
+  been told the truth; a menu that quietly shrinks has not. `hall.BUILT` is the
+  single list, and the controller reads it rather than keeping a second one.
+* The turn boundary is a **window**, not a redraw. A fortnight passing is the
+  only moment the player does not control and it should feel like one. It
+  reports what occurred and never what it means — D19 holds here as everywhere,
+  and an empty fortnight is shown as an empty fortnight, because quiet is
+  information.
+
+**HELP is the free advisor, and it is a written page.** It knows the game —
+which key opens what, what an hour costs — and it is never wrong, because
+nothing in it is generated. COUNSEL will know the *world*, cost an hour, and be
+able to be mistaken, because he is a person. That is the whole distinction, and
+it is why HELP can ship without a model.

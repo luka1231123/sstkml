@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import document, hall                  # noqa: E402
+from tui import document, hall, help as help_page                  # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
 from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
 
@@ -47,6 +47,10 @@ SCREENS = {
     "stores": ("THE STORES", lambda b: document.stores(b, 62, 22)),
     "roll": ("THE ROLL", lambda b: document.roll(b, 78, 22)),
     "muster": ("THE MUSTER", lambda b: document.muster(b, 62, 18)),
+    "oaths": ("THE OATHS", lambda b: document.oaths(b, 76, 28)),
+    "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
+    "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
+    "help": ("HELP", lambda b: help_page.compose(74, 34)),
 }
 
 

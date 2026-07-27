@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import render
+from tui import render, style
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -23,12 +23,13 @@ Row = tuple[tuple[str, str], ...]        # ((text, colour name), ...)
 
 
 def _frame(surface: Surface, title: str, note: str = "") -> None:
-    """The shared furniture. Every tablet gets exactly this and no more."""
-    width, height = surface.width, surface.height
-    surface.box(0, 0, width, height, style="single", fg=C["faint"],
-                title=title, title_fg=C["bone"])
-    if note and width > len(note) + 6:
-        surface.text(width - 3 - len(note), height - 1, note, C["ash"], C["ink"])
+    """The shared furniture. Every tablet gets exactly this and no more.
+
+    One call, so that every window in the game is dressed identically and the
+    eye goes to the figures rather than to the frame (`tui/style.py`).
+    """
+    style.panel(surface, 0, 0, surface.width, surface.height,
+                title=title, note=note, drop=False)
 
 
 def _trunc(text: str, width: int) -> str:
@@ -50,20 +51,24 @@ def ledger(title: str, headers: tuple[str, ...], rows: list[Row],
 
     def columns(y: int, cells, header: bool = False) -> None:
         x = 3
+        bg = C["faint"] if header else C["ink"]
         for index, width_spec in enumerate(widths):
             if index >= len(cells) or x >= right:
                 break
-            text, tone = cells[index] if not header else (cells[index], "dim")
+            text, tone = cells[index] if not header else (cells[index], "bone")
             span = min(abs(width_spec), right - x)
             if span <= 0:
                 break
             text = _trunc(str(text), span)
             at = x + (span - len(text)) if width_spec < 0 else x
-            surface.text(at, y, text, C[tone], C["ink"])
+            surface.text(at, y, text, C[tone], bg)
             x += span + 2
 
+    # The column heads sit in a band rather than above a rule: text mode made a
+    # heading by inverting it, and a band survives `plain_text` because the
+    # words are still there.
+    style.bar(surface, 2, 2, width - 4, " ", fg=C["bone"], bg=C["faint"])
     columns(2, headers, header=True)
-    surface.text(3, 3, "─" * (width - 6), C["faint"], C["ink"])
     room = height - 5
     for offset, row in enumerate(rows[:room]):
         columns(4 + offset, row)
@@ -197,6 +202,207 @@ def roll(b: dict, width: int = 78, height: int = 22) -> Screen:
     return ledger("THE ROLL — what is owed and what was paid",
                   ("group", "heads", "allocated qa", "unpaid", "they are"),
                   rows, (30, -5, -13, -6, 12), width, height)
+
+
+def page(title: str, lines: list[tuple[int, str, str]], width: int = 70,
+         height: int = 26, note: str = "[esc] close") -> Screen:
+    """A framed page of written lines: `(indent, text, colour)`.
+
+    For the windows that are a document rather than a table — an oath with its
+    clauses under it, a family tree. Same furniture as `ledger`, so the two read
+    as the same kind of object on the desk.
+    """
+    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
+    _frame(surface, title, note)
+    y = 2
+    for indent, text, tone in lines:
+        if y >= height - 1:
+            surface.text(3, height - 2, "…and more below", C["ash"], C["ink"])
+            break
+        if text == "─":
+            surface.text(3, y, "─" * (width - 6), C["faint"], C["ink"])
+        else:
+            surface.text(3 + indent, y, _trunc(text, width - 6 - indent),
+                         C[tone], C["ink"])
+        y += 1
+    return surface.freeze()
+
+
+def _clause(clause: dict) -> str:
+    """A clause as the tablet has it: the kind, then its terms, unrounded.
+
+    Deliberately close to the machine — `provide_troops  200 men, within 2` and
+    not "you owe Hatti two hundred men". The clause is evidence, and evidence
+    that has been paraphrased for the player is evidence he cannot check a
+    viceroy's letter against.
+    """
+    args = dict(clause["args"])
+    parts = []
+    for key, value in sorted(args.items()):
+        if value is True:
+            parts.append(key.replace("_", " "))
+        elif value is False:
+            continue
+        elif isinstance(value, int):
+            parts.append(f"{key.replace('_', ' ')} {value:,}")
+        else:
+            parts.append(f"{key.replace('_', ' ')} {value}")
+    return f"{clause['kind'].replace('_', ' ')}   " + ", ".join(parts)
+
+
+def fortnight(b: dict, lines: list[str], width: int = 66,
+              height: int = 18) -> Screen:
+    """The turn boundary: what happened while you were not looking.
+
+    A fortnight passing is the heaviest thing that happens in this game and it
+    used to be a redraw. It gets its own window, in the middle of the desk, and
+    it says only what occurred — a courier came, a rite was not kept. It never
+    says what it means, and it never says what to do about it, which is what
+    keeps it a report and not an advisor (D19).
+
+    An empty fortnight is shown as an empty fortnight. Quiet is information.
+    """
+    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
+    style.panel(surface, 0, 0, width, height,
+                title="THE FORTNIGHT TURNS", note="[space] on  ·  [esc] close",
+                focus=True, drop=False)
+    surface.text(3, 2, b["date"], C["sky"], C["ink"])
+    surface.text(3, 3, "─" * (width - 6), C["faint"], C["ink"])
+    y = 5
+    if not lines:
+        surface.text(3, y, "Nothing was reported. That is not the same as",
+                     C["ash"], C["ink"])
+        surface.text(3, y + 1, "nothing having happened.", C["ash"], C["ink"])
+    for line in lines:
+        for wrapped in textwrap.wrap(line.strip(), width - 8) or [""]:
+            if y >= height - 2:
+                break
+            surface.text(4, y, wrapped, C["clay"], C["ink"])
+            y += 1
+    return surface.freeze()
+
+
+def oaths(b: dict, width: int = 76, height: int = 28) -> Screen:
+    """The oath tablets. The clauses are readable; the liability is not (D26).
+
+    Every figure a superior will later claim is already here, in the clause, in
+    the player's own archive. Nothing on this page says which oath a god is
+    angry about, and nothing ever will.
+    """
+    lines: list[tuple[int, str, str]] = []
+    for oath in b["oaths"]:
+        state = ("dissolved" if oath["dissolved"]
+                 else "LAPSED — nobody is bound" if oath["lapsed"] else "sworn")
+        tone = ("ash" if oath["dissolved"]
+                else "wine" if oath["lapsed"] else "clay")
+        lines.append((0, f"{oath['id']}   ({state})", tone))
+        lines.append((2, "before " + ", ".join(oath["gods"]), "wine"))
+        lines.append((2, "between " + ", ".join(
+            render.actor_name(p, b.get("house")) for p in oath["parties"]),
+            "dim"))
+        if oath["lapsed"]:
+            lines.append((2, "sworn by " + render.actor_name(
+                oath["sworn_by"], b.get("house")) + ", who is dead", "wine"))
+        for clause in oath["clauses"]:
+            lines.append((2, f"· {_clause(clause)}", "bone"))
+        lines.append((0, "─", "faint"))
+    if not lines:
+        lines = [(0, "no oath tablet is held in this archive.", "ash")]
+    return page("THE OATHS", lines, width, height)
+
+
+def land(b: dict, width: int = 70, height: int = 24) -> Screen:
+    """The gauge, the floor, the seed, the hands. No yield and no forecast."""
+    data = b.get("land")
+    if not data:
+        return page("THE LAND", [(0, "this house holds no estates.", "ash")],
+                    width, height)
+    seed, ground = data["seed_in_store"], data["seed_in_ground"]
+    lines: list[tuple[int, str, str]] = [
+        (0, f"the river gauge stands at {data['gauge']}", "sky"),
+        (0, "─", "faint"),
+        (0, f"last year's threshing floor   "
+            f"{render.fmt_good('grain', data['last_harvest'])}", "barley"),
+        (0, f"the year before               "
+            f"{render.fmt_good('grain', data['previous_harvest'])}", "dim"),
+        (0, "", "clay"),
+        (0, f"seed in store                 "
+            f"{render.fmt_good('grain', seed)}", "sand"),
+        (0, f"seed in the ground            "
+            f"{render.fmt_good('grain', ground)}", "sand"),
+        (0, f"the sowing asks for           "
+            f"{render.fmt_good('grain', data['seed_recommended'])}", "dim"),
+        (0, "─", "faint"),
+        (0, f"hands on the land this fortnight   "
+            f"{data['labour_days_this_turn']:,} days", "clay"),
+        (0, f"the work asks for                  "
+            f"{data['labour_days_needed']:,} days", "dim"),
+        (0, f"corvee days called                 {data['corvee_days']:,}",
+         "dim"),
+        (0, "", "clay"),
+    ]
+    for estate in data["estates"]:
+        canal = estate.get("canal_condition")
+        state = (f"canal {canal}" if estate["irrigated"] and canal is not None
+                 else "rain-fed")
+        # No area and no yield: Belief does not carry them, because a king who
+        # wants to know what a field gave has to ask the man who worked it.
+        name = _trunc(estate["name"], 30).ljust(31)
+        lines.append((0, f"{name}{estate['place']:<12}{state}", "sand"))
+    return page("THE LAND", lines, width, height)
+
+
+def house(b: dict, width: int = 70, height: int = 26) -> Screen:
+    """The family as a tree. Whose claim is better is never stated (D19)."""
+    data = b.get("house")
+    if not data:
+        return page("THE HOUSE", [(0, "no house is recorded.", "ash")],
+                    width, height)
+    members = {person["id"]: person for person in data["members"]}
+    ruler = members.get(data["ruler"])
+
+    def person(p: dict, indent: int, branch: str = "") -> tuple[int, str, str]:
+        # The branch is part of the name column, not a prefix to it: padding the
+        # name alone shears every indented row two cells to the right.
+        name = f"{branch}{p['name']}"[:26].ljust(26)
+        if not p["alive"]:
+            return (indent, f"{name} died in turn {p['died_turn']}", "ash")
+        marks = []
+        if p["heir_rank"]:
+            marks.append(f"heir {p['heir_rank']}")
+        if p["expecting"]:
+            marks.append("with child")
+        if p["married_to_court"]:
+            marks.append("at the court of " + render.actor_name(
+                p["married_to_court"], data))
+        if p["is_queen_mother"]:
+            marks.append("the queen mother")
+        tail = ("  " + ", ".join(marks)) if marks else ""
+        return (indent, f"{name}{p['age_years']:>3}  "
+                        f"{p['health']:<12}{tail}", "clay")
+
+    lines: list[tuple[int, str, str]] = [
+        (0, f"regnal year {b['regnal_year']}, reign {data['reigns']} of this run",
+         "sky"),
+        (0, "─", "faint"),
+    ]
+    if ruler:
+        lines.append(person(ruler, 0))
+        spouse = members.get(ruler["spouse"] or "")
+        if spouse:
+            lines.append(person(spouse, 0, "├─ "))
+        children = [p for p in data["members"] if p["father"] == ruler["id"]]
+        for index, child in enumerate(children):
+            branch = "└─ " if index == len(children) - 1 else "├─ "
+            lines.append(person(child, 0, branch))
+    others = [p for p in data["members"]
+              if p is not ruler and p["id"] != (ruler or {}).get("spouse")
+              and p["father"] != (ruler or {}).get("id")]
+    if others:
+        lines.append((0, "─", "faint"))
+        for p in others:
+            lines.append(person(p, 0))
+    return page("THE HOUSE", lines, width, height)
 
 
 def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
