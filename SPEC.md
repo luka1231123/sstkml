@@ -1109,6 +1109,8 @@ should sit beside the thing it changes.
 | Immediate prose execution | Exact semantic preview; delegated Order | Replace in M13.4 |
 | Hall prescribes response | Sourced exceptions and attributed advice | Refine in M13.0 |
 | Archive grows with cadence spam | Event-driven reports, bundles, retained causal records | Replace by M13.4 |
+| Global `letter_seq`/`omen_seq`/`gift_seq` counters | Runtime IDs derived from parent, turn, domain, and local ordinal | Replace in M13.1 |
+| Detailed player `Court` as source of truth | `legacy_court` adapter over kernel entities | Delete at the M13.2 exit |
 
 Migration rules:
 
@@ -1199,6 +1201,168 @@ These are initial budgets, not permission to discard state. If hardware makes
 an absolute CI threshold unreliable, CI compares against a checked-in baseline
 on the same runner while the release machine records the absolute values.
 
+### 10.7 Kernel identity and IDs
+
+Section 5 says IDs are stable strings and that runtime IDs never depend on
+global creation order. That rule is binding, and the present game breaks it:
+`letter_seq`, `omen_seq`, and `gift_seq` are global monotonic counters, so
+inserting one letter renumbers every later document and changes the state
+hash. The kernel replaces them.
+
+Authored entities carry a namespaced stable ID from content:
+
+```text
+region:north_levant
+polity:ugarit
+settlement:ugarit
+site:mahadu_harbour
+org:palace_ugarit
+person:niqmaddu
+```
+
+Runtime entities derive their ID from a stable parent, the turn, a registered
+domain, and an ordinal local to that triple:
+
+```text
+<parent>/<turn>/<domain>/<ordinal>
+site:mahadu_harbour/57/shipment/0
+```
+
+The ordinal counts within one `(parent, turn, domain)` only, and is assigned in
+the deterministic sorted order of the loop that creates the entities. No kernel
+ID may come from a world-wide counter, insertion order, or `id()`. Two runs of
+the same seed and the same confirmed actions must produce byte-identical IDs.
+
+Entities live in flat registries on `World`, one mapping per kind, keyed by ID.
+Every iteration over a registry is over `sorted(...)` keys. Nothing in the
+kernel may depend on mapping order.
+
+### 10.8 Ownership, custody, and lots
+
+`GoodsLot` is the only place a quantity of a good exists. Fields: good, integer
+quantity in that good's declared unit, quality band, `owner`, `holder`,
+location, provenance, and reservations.
+
+`owner` and `holder` are separate and may differ for as long as the world
+requires — cargo under sail belongs to a merchant house and is held by a ship's
+master; grain on deposit belongs to a household and is held by a temple. A
+contract moves ownership; loading moves custody. Neither moves the other by
+implication.
+
+Rules:
+
+- quantity is never negative; a lot reaching zero is removed at the end of the
+  phase that emptied it, and its provenance is folded into the lot that
+  received the goods;
+- reserved quantity never exceeds quantity;
+- owner, holder, and location must each name an entity that exists this turn;
+- lots split by conserving quantity and copying provenance; two lots merge only
+  when good, quality, owner, holder, and location all match;
+- every change passes through the transfer functions in `engine/ownership.py`
+  and emits a `Transfer` record — turn, phase, lot, quantity, previous and new
+  owner, previous and new holder, reason, and the authority relied on. No
+  system constructs or edits a lot directly.
+
+The `Transfer` record is what conservation checking and the causal inspector
+read. A system that moves goods without one is a defect even when its
+arithmetic balances.
+
+`Asset` uses the same owner/holder/location grammar, adding condition,
+capacity, operators, upkeep, and liens.
+
+### 10.9 Obligation clauses
+
+An `Obligation` is authored or generated from an enumerated clause kind. The
+kinds are closed; adding one is a specification change:
+
+```text
+fixed_quantity     so many units of a good, by a date
+share_of_yield     a scaled share of a measured production event
+per_head           a quantity scaled by counted people or animals
+service_days       labour or military service, in person-days
+on_demand          rendered when the holder of the right calls for it
+```
+
+A due rule is `(kind, parameters)` over: a named season span, every N
+fortnights from a start turn, an absolute date, or a named trigger event.
+Status runs `pending -> due -> part_paid -> discharged | defaulted | remitted
+| disputed`.
+
+Consequences are recorded as what the parties *believe* follows from default,
+as Claims with a holder — not as effects the engine applies automatically. A
+creditor acts because it believes it may, and it may be wrong about that.
+
+### 10.10 Tick decomposition
+
+Section 6.1 fixes the causal order of seventeen phases. The kernel implements
+it as snapshot, intents, resolution:
+
+`engine/kernel/snapshot.py`
+: Produces the read-only opening World for the turn. Phases 3 and 4 read the
+  snapshot and nothing else. No settlement may observe another settlement's
+  same-turn result.
+
+`engine/kernel/intent.py`
+: An `Intent` is a frozen record of actor, kind, payload, the authority relied
+  on, and the belief basis it was chosen from. Phase 4 produces intents only.
+  Producing an intent changes nothing.
+
+`engine/kernel/resolve.py`
+: Phase 5 allocates every exclusive resource — person-days, asset capacity,
+  route capacity, transport tonnage — across all claimants at once. The
+  allocation rule is stable and documented: claimants sort by obligation
+  priority, then authority rank, then entity ID, and are served greedily to
+  their stated need. Ties are broken by ID and never by iteration order. A
+  settlement's position in any list may not affect what it receives.
+
+Phases 6 onward apply already-chosen intents against granted allocations. Each
+phase returns a new immutable World plus events. No phase may read state
+written by a later phase in the same turn; a phase needing a later phase's
+result is mis-ordered, and the fix is to move it, not to peek.
+
+The existing single-city systems become phase implementations rather than a
+parallel path: `land` and `works` under production, `house` under consumption,
+`revenue` and `justice` under settlement, `plague` under disease, `relations`
+and `appointments` under politics, `institution` under degradation, `mail` and
+`archive` under report generation. They keep their arithmetic; they lose the
+right to mutate the world in place.
+
+### 10.11 Actor Belief boundary
+
+`belief/` remains the only World-to-player boundary and gains no new job here.
+Actor Belief is engine-internal and separate:
+
+`engine/observe.py`
+: Turns location, presence, and method into `Observation` records for an
+  actor. Observation is bounded by where the actor is and what it can reach.
+
+`engine/believe.py`
+: Folds observations, received claims, memory, and interest into that actor's
+  Belief. Conflicting claims are retained side by side. A deduction records
+  its inputs and never overwrites them.
+
+Actor policy functions take `(actor, actor_belief)` and return intents. They do
+not take `World`. This is enforced by signature inspection in the test suite,
+not by convention, because it is the one boundary whose accidental crossing
+would be invisible in output and fatal to the premise. The physical resolution
+functions that apply already-chosen intents are the sole exception, and they
+choose nothing.
+
+### 10.12 Save version 14 and the legacy court
+
+The kernel changes what world state means, so the save version becomes 14.
+Saves below 14 are refused with a message naming the version found and the
+version required. Two world ontologies are not maintained (migration rule 5).
+
+Ugarit's detailed `Court` survives M13.1 as the adapter `legacy_court` under
+migration rule 2. It is a converted view over kernel entities, not a second
+source of truth: settlement, institutions, and stores are kernel-owned, and
+the adapter presents them in the shape the current UI and systems expect. Its
+deletion gate is the M13.2 exit — the grain vertical slice is what removes it.
+Foreign settlements never touch it. If a foreign settlement needs a mechanism
+that only `legacy_court` provides, that mechanism is promoted to the kernel
+rather than copied.
+
 ---
 
 ## 11. Verification
@@ -1222,6 +1386,20 @@ Assert in tests and debug builds:
 - deterministic replay and stable hashes;
 - no float in canonical World;
 - no hidden World field in player or model projections.
+
+From the kernel contract (section 10.7-10.12):
+
+- no runtime ID derives from a world-wide counter or from iteration order, and
+  the same seed and confirmed actions reproduce every ID byte for byte;
+- every quantity change to a lot has a matching `Transfer` record, and the
+  records alone reconstruct each lot's history;
+- lot reservations never exceed quantity, and owner, holder, and location all
+  name entities that exist;
+- no phase reads state written by a later phase of the same turn;
+- exclusive allocation is unchanged by the order settlements appear in any
+  registry — permuting the registries must not change the result;
+- actor policy functions do not accept `World`, verified by signature;
+- the `legacy_court` adapter holds no state the kernel does not own.
 
 ### 11.2 Required causal scenarios
 
