@@ -27,7 +27,6 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from belief.project import project              # noqa: E402
-from ai import help_agent                       # noqa: E402
 from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
@@ -54,7 +53,7 @@ SCREENS = {
     "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
     "house": ("THE HOUSE", lambda b: household.compose(
         b, width=86, height=34)),
-    "help": ("THE PALACE TUTOR · HELP", lambda b: _help(b)),
+    "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
     "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
     "justice": ("THE COURT OF JUSTICE", lambda b: justice.compose(
@@ -77,16 +76,6 @@ def _talk(b: dict) -> list[tuple[str, str]]:
     key, question, topic = counsel.QUESTIONS[1]
     return [("king", question),
             ("scribe", counsel.answer(b, topic, SEED, 8))]
-
-
-def _help(b: dict):
-    """A grounded sample exchange, including the retrieved-source sidecar."""
-    question = "How do I send the chariotry on campaign?"
-    answer, _source, hits = help_agent.speak(
-        question, [], b, SEED, 8, client=None)
-    return help_page.compose(
-        100, 38, [("player", question), ("tutor", answer)],
-        sources=tuple(hit.doc.id for hit in hits))
 
 
 def _desk(b: dict):

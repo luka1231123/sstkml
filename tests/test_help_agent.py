@@ -18,6 +18,15 @@ def _world(turns: int = 8):
     return world
 
 
+class _Key:
+    """The small Tk-event-shaped value the key handlers expect."""
+
+    def __init__(self, char: str = "", keysym: str = "", state: int = 0):
+        self.char = char
+        self.keysym = keysym or char
+        self.state = state
+
+
 def _belief() -> dict:
     return project(_world())
 
@@ -94,14 +103,14 @@ def test_the_optional_model_phrases_the_retrieved_answer() -> None:
 
 
 def test_the_help_window_is_clickable_and_always_ready() -> None:
-    view = help_page.compose(
-        said=[("player", "How do I repair a building?"),
-              ("tutor", "Tell Counsel to repair the named institution.")],
-        typed="repair")
+    view = help_page.compose(query="repair")
     text = plain_text(view)
-    assert "Tutor:" in text and "repair█" in text
+    assert "repair\u2588" in text
+    assert "REPAIR" in text
     commands = {hit.command for hit in view.hits if hit.enabled}
-    assert {"Return", "Control-u", "Escape", "F1", "F2", "F3"} <= commands
+    assert "Escape" in commands
+    # Every listed topic is a mouse target.
+    assert any(command.startswith("topic:") for command in commands)
 
 
 def test_asking_help_changes_neither_hours_nor_the_action_log() -> None:
@@ -112,17 +121,19 @@ def test_asking_help_changes_neither_hours_nor_the_action_log() -> None:
     game.world = _world()
     game.hours = project(game.world)["attention"]
     game.log = []
-    game.help_said = []
-    game.help_typed = ""
-    game.help_typing = True
-    game.help_sources = ()
+    game.help_query = ""
+    game.help_pick = ""
+    game.help_screen = "city"
     game.client = None
     game.repaint = lambda: None
     before_hours = game.hours
 
-    game.submit_help("How do I repair the tablet house?")
+    # Searching the manual is turning a page: it spends nothing and logs
+    # nothing, and it never reaches a model (UI/UX spec 11).
+    for letter in "repair":
+        game.on_help_key(_Key(letter))
 
     assert game.hours == before_hours
     assert game.log == []
-    assert game.help_said[-1][0] == "tutor"
-    assert game.help_sources[0] == "repair"
+    assert game.help_query == "repair"
+    assert game.help_pick == "action:begin_repair"

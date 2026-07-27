@@ -52,7 +52,7 @@ def _screens(world, b):
         "altar": lambda w, h: altar.compose(b, [], "harvest", None, w, h),
         "counsel": lambda w, h: counsel.compose(
             b, [], 10, "", False, w, h, [], None),
-        "help": lambda w, h: help_page.compose(w, h, [], "", True, ()),
+        "help": lambda w, h: help_page.compose(w, h, "repair", "", "city"),
         "fortnight": lambda w, h: document.fortnight(b, [], w, h),
     }
 

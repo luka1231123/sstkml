@@ -44,6 +44,7 @@ from tui import relations as relations_page
 from tui import works as works_page
 from tui import (altar, archive, city, composer, counsel, desktop, document,
                  hall, help as help_page, render, switcher, worldmap)
+import manual
 from tui.grid import Screen
 
 # Costs are the registry's, never this file's. These two names survive only
@@ -176,10 +177,11 @@ class Game:
         self.counsel_typed = ""
         self.counsel_typing = False
         self.counsel_pending: dict | None = None
-        self.help_said: list[tuple[str, str]] = []
-        self.help_typed = ""
-        self.help_typing = True
-        self.help_sources: tuple[str, ...] = ()
+        # Help is a book, not a conversation: a search line, a chosen topic,
+        # and the screen it was opened from (UI/UX spec 11).
+        self.help_query = ""
+        self.help_pick = ""
+        self.help_screen = "hall"
         self.altar_readings: list[str] = []
         self.altar_question = "harvest"
         self.altar_offering: tuple[str, int] | None = None
@@ -459,8 +461,8 @@ class Game:
                                     if self.counsel_pending else None))
         if key == "help":
             return help_page.compose(
-                width, height, self.help_said, self.help_typed,
-                self.help_typing, self.help_sources)
+                width, height, self.help_query, self.help_pick,
+                self.help_screen)
         if key == "altar":
             return altar.compose(b, self.altar_readings, self.altar_question,
                                  self.altar_offering, width, height,
@@ -509,6 +511,7 @@ class Game:
             return wrapped
 
         bindings = {
+            "<F1>": bind(self.open_help),
             "<F2>": bind(self.raise_hall),
             "<F6>": bind(self.open_switcher),
             "<F8>": bind(self.tile_windows),
@@ -862,59 +865,71 @@ class Game:
 
     # --- Help, counsel, the altar, and the tablet house ----------------------
 
-    def submit_help(self, text: str) -> None:
-        """Ask the rules tutor. Retrieval and conversation cost no attention."""
-        text = text.strip()
-        if not text:
-            return
-        said = list(self.help_said)
-        self.help_said.append(("player", text))
-        self.repaint()
-        belief = self.belief
-        turn = self.world.date.absolute
+    # --- the field manual ----------------------------------------------------
 
-        def work():
-            return help_agent.speak(
-                text, said, belief, self.seed, turn, self.client)
+    def help_topics(self) -> tuple:
+        """The topics Help is currently showing, in order."""
+        return manual.search(self.help_query, self.help_screen)
 
-        def done(result, error) -> None:
-            if error is not None or result is None:
-                hits = help_agent.retrieve(text)
-                answer = help_agent.fallback_answer(text, hits)
-            else:
-                answer, _source, hits = result
-            self.help_sources = tuple(hit.doc.id for hit in hits)
-            self.help_said.append(("tutor", answer))
-            self.repaint()
+    def open_help(self, screen: str = "") -> None:
+        """Raise the manual, set to the screen the player came from (spec 11).
 
-        if self.client is None:
-            done(work(), None)
-        else:
-            self._run_model(work, done)
+        Free, immediate, and deterministic: no model, no attention, no waiting.
+        """
+        self.help_screen = screen or self._focused_screen()
+        topics = self.help_topics()
+        if topics and self.help_pick not in {t.id for t in topics}:
+            self.help_pick = topics[0].id
+        self.open_room("?")
+
+    def _focused_screen(self) -> str:
+        """Whichever window the player was last in, for Help's context."""
+        for key in self.app.live():
+            if key not in ("help", "switcher"):
+                return key
+        return "hall"
 
     def on_help_key(self, event) -> None:
-        if event.keysym == "Escape":
+        """Arrows walk the topics, printable keys search, Escape closes.
+
+        Every keystroke re-scans the corpus. There is no submit step because
+        there is no question being asked of anyone -- the manual is a book, and
+        typing into it is turning to a page.
+        """
+        keysym = event.keysym
+        char = event.char or ""
+        topics = self.help_topics()
+        ids = [topic.id for topic in topics]
+
+        if keysym == "Escape":
             self.app.close("help")
             return
-        if getattr(event, "state", 0) & 4 and event.keysym.lower() == "u":
-            self.help_typed = ""
-            self.help_typing = True
-            self.repaint()
-            return
-        if event.keysym in ("BackSpace", "Delete"):
-            self.help_typed = self.help_typed[:-1]
-        elif event.keysym == "Return":
-            words, self.help_typed = self.help_typed, ""
-            self.submit_help(words)
-            return
-        elif event.keysym in ("F1", "F2", "F3"):
-            index = int(event.keysym[1:]) - 1
-            self.help_typed = help_page.SUGGESTIONS[index]
-        elif (event.char or "").isprintable():
-            self.help_typed += event.char
+        command = getattr(event, "command", "")
+        if command.startswith("topic:"):
+            self.help_pick = command.split(":", 1)[1]
+        elif getattr(event, "state", 0) & 4 and keysym.lower() == "u":
+            self.help_query = ""
+            self.help_pick = ""
+        elif keysym in ("Down", "Up") and ids:
+            index = ids.index(self.help_pick) if self.help_pick in ids else 0
+            index = (index + (1 if keysym == "Down" else -1)) % len(ids)
+            self.help_pick = ids[index]
+        elif keysym in ("Next", "Prior") and ids:
+            index = ids.index(self.help_pick) if self.help_pick in ids else 0
+            step = 8 if keysym == "Next" else -8
+            self.help_pick = ids[max(0, min(len(ids) - 1, index + step))]
+        elif keysym in ("BackSpace", "Delete"):
+            self.help_query = self.help_query[:-1]
+            self.help_pick = ""
+        elif char.isprintable() and char:
+            self.help_query += char
+            self.help_pick = ""
         else:
             return
-        self.help_typing = True
+
+        topics = self.help_topics()
+        if topics and self.help_pick not in {t.id for t in topics}:
+            self.help_pick = topics[0].id
         self.repaint()
 
     def ask_counsel(self, question: str, topic: str = "") -> None:
@@ -1955,6 +1970,8 @@ class Game:
             self.end_fortnight()
         elif char.isdigit() and char != "0":
             self.activate_concern(int(char) - 1)
+        elif char == "?":
+            self.open_help()
         elif char in TABLETS:
             self.open_tablet(char)
         elif char in ROOMS:

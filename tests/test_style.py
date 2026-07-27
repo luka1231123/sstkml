@@ -133,19 +133,22 @@ def test_a_fortnight_reports_what_happened_and_not_what_it_means() -> None:
     assert "should" not in text.lower()
 
 
-def test_help_is_an_always_ready_grounded_agent() -> None:
+def test_help_is_a_field_manual_not_a_conversation() -> None:
+    """UI/UX spec 11: documentation, free and immediate, with no model."""
     text = plain_text(help_page.compose())
-    assert "ASK HOW TO DO ANYTHING" in text
-    assert "current command tablets" in text
+    assert "FIELD MANUAL" in text
+    assert "Search:" in text
     assert "costs no hours" in text
-    assert "[enter] ask" in text
+    assert "[esc] close" in text
+    # Nothing is being asked of anybody.
+    assert "Tutor:" not in text and "ASK HOW TO DO ANYTHING" not in text
 
 
-def test_help_keeps_the_newest_answer_visible() -> None:
-    said = [("player", f"old question {index}") for index in range(20)]
-    said.append(("tutor", "THIS IS THE NEWEST GROUNDED ANSWER"))
-    text = plain_text(help_page.compose(said=said))
-    assert "THIS IS THE NEWEST GROUNDED ANSWER" in text
+def test_help_shows_the_control_the_cost_and_the_command() -> None:
+    text = plain_text(help_page.compose(query="repair"))
+    assert "[r] Repair" in text
+    assert "Cost: 1 hour." in text
+    assert "Command: repair <institution>" in text
 
 
 def test_the_palette_is_sixteen_and_no_more() -> None:

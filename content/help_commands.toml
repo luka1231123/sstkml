@@ -411,3 +411,31 @@ examples = ["end the fortnight"]
 keywords = ["end", "turn", "fortnight", "advance", "next", "space", "finish"]
 keys = []
 verbs = ["END_TURN"]
+
+# File and Delegate had no entry of their own until the field manual was
+# generated from the action registry and the gap became visible: both are
+# offered on every tablet, and neither could be looked up. They carry no
+# `verbs` because the parser reaches them through the Inbox rather than
+# through a spoken verb of its own.
+
+[[command]]
+id = "file_letter"
+category = "correspondence"
+title = "File or restore a tablet"
+syntax = "[f] File; [f] again to restore | file <tablet>, restore <tablet>"
+answer = "Filing moves a tablet out of the pile and into the tablet house, where the Archive can still find it. It costs no hours and nothing is lost: restoring brings the tablet back to the pile with its answered and delegated marks intact. File the routine reports so the pile shows the matters still wanting a decision."
+examples = ["file the Carchemish report", "restore the grain tablet"]
+keywords = ["file", "archive", "restore", "put", "away", "tidy", "pile", "tablet", "keep", "store"]
+keys = ["f", "x"]
+verbs = []
+
+[[command]]
+id = "delegate_letter"
+category = "correspondence"
+title = "Delegate a tablet"
+syntax = "[g] Delegate; choose a courtier | delegate <tablet> to <person>"
+answer = "Delegating hands the matter a tablet raises to a courtier who is at the seat, and costs one hour. The tablet is marked with the name of whoever took it, so the pile records who is answerable. A tablet must be read before it can be delegated, and it cannot be delegated twice."
+examples = ["delegate the harbour complaint to Ehli-Nikkalu", "who has this matter?"]
+keywords = ["delegate", "hand", "give", "courtier", "assign", "someone", "else", "answerable", "tablet"]
+keys = ["g"]
+verbs = []
