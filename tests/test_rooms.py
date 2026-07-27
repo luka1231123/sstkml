@@ -137,18 +137,39 @@ def test_counsel_is_wrong_sometimes_and_always_the_same_times() -> None:
     assert any(first), "he is never right, which makes him noise"
 
 
-def test_counsel_never_says_what_to_do() -> None:
+def test_the_room_is_a_conversation_and_not_a_menu() -> None:
+    """You type at him. The six keys are shortcuts, not the whole of it."""
     b = _belief()
     text = plain_text(counsel.compose(b, [
         ("king", counsel.QUESTIONS[0][1]),
         ("scribe", counsel.answer(b, "grain", SEED, 8))], 6))
-    assert "you should" not in text.lower()
-    assert "he is not always right" in text
+    assert "YOU SAY" in text
+    assert "[/] speak" in text
+    assert "Yabninu:" in text
+
+
+def test_what_he_is_handed_is_what_he_can_say() -> None:
+    """His wrongness is settled before any prompt exists, so it replays."""
+    b = _belief()
+    first = counsel.recall(b, "grain", SEED, 8)
+    assert first == counsel.recall(b, "grain", SEED, 8)
+    assert first, "he was handed nothing to say"
+
+
+def test_the_digest_carries_the_house_and_not_the_answers() -> None:
+    """He can speak about anything the king could see; no more than that."""
+    from ai import counsel as ai_counsel
+
+    text = ai_counsel.digest(_belief(), {})
+    assert "the roll:" in text and "the stores:" in text
+    assert "oath oath_hatti_grain" in text
+    # The puzzles are not in his head either (D31, spec 8.9).
+    assert "cause_oath" not in text and "will_die" not in text
 
 
 def test_the_room_says_what_a_question_costs() -> None:
     text = plain_text(counsel.compose(_belief(), [], 6))
-    assert "costs an hour" in text
+    assert "an hour a question" in text
 
 
 # --- the map ------------------------------------------------------------------

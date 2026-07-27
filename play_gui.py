@@ -32,7 +32,7 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import new_seed
-from ai import librarian
+from ai import counsel as ai_counsel, librarian
 from tui import (altar, archive, composer, counsel, document, hall,
                  help as help_page, render, worldmap)
 from tui.grid import Screen
@@ -91,6 +91,17 @@ class Game:
         self.hours = project(self.world)["attention"]
         self.log: list[dict] = []
         self.app = App()
+        # Yabninu speaks through a model when one is running (D38). Built once
+        # and shared; if there is no Ollama the calls fall back to authored
+        # lines and nothing on screen says which the player got.
+        self.client = None
+        if os.environ.get("STK_NO_AI") != "1":
+            try:
+                from ai.client import OllamaClient
+                self.client = OllamaClient(
+                    None, f"saves/{scenario}/ai_cache")
+            except Exception:
+                self.client = None
         self.open_letters: dict[str, dict] = {}
         self.events: list[str] = []
         # The windows that hold a conversation rather than a record. All of it
@@ -98,6 +109,8 @@ class Game:
         # it is logged and a replay is unaffected.
         self.desk: dict | None = None
         self.counsel_said: list[tuple[str, str]] = []
+        self.counsel_typed = ""
+        self.counsel_typing = False
         self.altar_readings: list[str] = []
         self.altar_question = "harvest"
         self.altar_offering: tuple[str, int] | None = None
@@ -166,7 +179,9 @@ class Game:
         if key == "world":
             return worldmap.compose(b, 86, 30)
         if key == "counsel":
-            return counsel.compose(b, self.counsel_said, self.hours, 80, 32)
+            return counsel.compose(b, self.counsel_said, self.hours,
+                                   self.counsel_typed, self.counsel_typing,
+                                   80, 32)
         if key == "altar":
             return altar.compose(b, self.altar_readings, self.altar_question,
                                  self.altar_offering, 78, 32)
@@ -350,29 +365,59 @@ class Game:
 
     # --- counsel, the altar, the tablet house --------------------------------
 
-    def ask_counsel(self, topic: str, question: str) -> None:
-        """An hour for an answer he gives from memory.
+    def ask_counsel(self, question: str, topic: str = "") -> None:
+        """An hour for an answer. He talks; the model does the talking (D38).
 
         No engine action: a conversation changes nothing in the world, and the
         hours are session state (attention is derived — see `hall.compose`). So
         nothing goes in the log and a replay is unaffected.
         """
-        if self.hours < counsel.ASK_COST:
+        if self.hours < counsel.ASK_COST or not question.strip():
             return
         self.hours -= counsel.ASK_COST
+        b = self.belief
+        turn = self.world.date.absolute
+        # What he is wrong about is settled here, before any prompt exists.
+        remembered = counsel.recall(b, topic, self.seed, turn) if topic else {}
+        authored = (counsel.answer(b, topic, self.seed, turn) if topic else
+                    "I could not tell you, my lord. Not this morning.")
+        said = list(self.counsel_said)
         self.counsel_said.append(("king", question))
-        self.counsel_said.append(("scribe", counsel.answer(
-            self.belief, topic, self.seed, self.world.date.absolute)))
+        self.repaint()          # his question lands before the answer does
+        text, _source = ai_counsel.speak(
+            question, said, ai_counsel.digest(b, remembered), authored,
+            self.seed, turn, self.client)
+        self.counsel_said.append(("scribe", text))
         self.repaint()
 
     def on_counsel_key(self, event) -> None:
+        if self.counsel_typing:
+            if event.keysym == "Escape":
+                self.counsel_typing = False
+            elif event.keysym in ("BackSpace", "Delete"):
+                self.counsel_typed = self.counsel_typed[:-1]
+            elif event.keysym == "Return":
+                question, self.counsel_typed = self.counsel_typed, ""
+                self.counsel_typing = False
+                self.ask_counsel(question)
+                return
+            elif event.char and event.char.isprintable():
+                self.counsel_typed += event.char
+            else:
+                return
+            self.repaint()
+            return
         if event.keysym == "Escape":
             self.app.close("counsel")
             return
         char = event.char or ""
+        if char == "/":
+            self.counsel_typing = True
+            self.repaint()
+            return
         for key, question, topic in counsel.QUESTIONS:
             if char == key:
-                self.ask_counsel(topic, question)
+                self.ask_counsel(question, topic)
                 return
 
     def on_altar_key(self, event) -> None:

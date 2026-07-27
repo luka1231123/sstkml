@@ -13,9 +13,13 @@ right one from last fortnight. That is the same lie the scribes tell in
 `belief/distortion.py` and the diviner tells in M9, and it is the house rule —
 **a wrong answer is always a plausible neighbour, never noise.**
 
-Ships with no model, which is the whole reason he is written this way (D33). His
-answers are authored sentences filled with figures from Belief, chosen by
-arithmetic on the seed. Nothing here calls out.
+**He speaks through a model** (D38, `ai/counsel.py`). What he is wrong about is
+settled here, by arithmetic, before any prompt exists — `recall()` hands him a
+stale figure or the wrong man's name one time in five — and the model is asked
+only to put that into his mouth. So the lie is deterministic and replayable, and
+the model cannot invent a different one: the numeric guard rejects any figure he
+was not handed. The authored sentences below are what a machine with no Ollama
+hears instead, and nothing marks which of the two the player got.
 """
 from __future__ import annotations
 
@@ -28,8 +32,8 @@ C = INDEX
 
 ASK_COST = 1        # an hour of the fortnight, every time
 
-# What may be asked, and by which key. Short, because a list of thirty questions
-# is a menu and a menu is not a conversation.
+# Shortcuts, not the menu. You can type anything; these are the six things a
+# king asks most mornings, on a key so he does not have to.
 QUESTIONS = (
     ("1", "how do we stand for grain?", "grain"),
     ("2", "who is owed, and how badly?", "arrears"),
@@ -51,8 +55,65 @@ def _reliable(seed: int, turn: int, topic: str) -> bool:
     return (seed // 7 + turn * 3 + salt) % 5 != 0
 
 
+def recall(b: dict, topic: str, seed: int, turn: int) -> dict:
+    """The figures he has in his head — which are not always the true ones.
+
+    This is where he is wrong, and it is the only place. Everything downstream,
+    the model included, is handed these and can do nothing but repeat them.
+    """
+    right = _reliable(seed, turn, topic)
+    if topic == "grain":
+        series = b.get("store_history", {}).get("grain", [])
+        grain = b["stores"].get("grain", 0)
+        stale = series[-2] if len(series) > 1 else grain
+        return {"the granary holds":
+                render.fmt_good("grain", grain if right else stale)}
+    if topic == "arrears":
+        owed = [group for group in b["groups"] if group["arrears_weeks"] >= 1]
+        if not owed:
+            return {"groups behind on the roll": 0}
+        named = max(owed, key=lambda g: g["arrears_weeks"]) if right else owed[0]
+        return {"the loudest group": named["name"],
+                "fortnights they are unpaid": named["arrears_weeks"],
+                "groups behind on the roll": len(owed)}
+    if topic == "unanswered":
+        waiting = sorted((r for r in b["relations"] if r["unanswered"]),
+                         key=lambda r: -r["unanswered"])
+        if not waiting:
+            return {"men waiting on an answer": 0}
+        first = waiting[0] if right else waiting[-1]
+        return {"who has written and had nothing back":
+                render.actor_name(first["other"], b.get("house")),
+                "times he has written": first["unanswered"]}
+    if topic == "oaths":
+        live = [o for o in b["oaths"] if not o["dissolved"] and not o["lapsed"]]
+        lapsed = [o for o in b["oaths"] if o["lapsed"]]
+        facts = {"standing oath tablets": len(live)}
+        if right:
+            facts["tablets that lapsed at the succession"] = len(lapsed)
+        return facts
+    if topic == "troops":
+        troops = b.get("troops", {})
+        facts = {f["name"]: f"{f['strength']} men at {f['place']}, {f['task']}"
+                 for f in troops.get("formations", [])[:3]}
+        summons = troops.get("summons", [])
+        if summons and right:
+            facts["a summons stands"] = (
+                f"{summons[0]['required']} men wanted at "
+                f"{summons[0]['place']}, {summons[0]['mustered']} have gone")
+        return facts
+    if topic == "unrest":
+        return {"the town, out of a hundred":
+                b["unrest"] if right else max(0, b["unrest"] - 8)}
+    return {}
+
+
 def answer(b: dict, topic: str, seed: int, turn: int) -> str:
-    """What Yabninu says. One paragraph, in his own voice, possibly wrong."""
+    """What Yabninu says with no model to say it for him (D38).
+
+    Authored, and deliberately in the same voice, so that a player without
+    Ollama is playing the same game and not a lesser one.
+    """
     right = _reliable(seed, turn, topic)
 
     if topic == "grain":
@@ -121,6 +182,7 @@ def answer(b: dict, topic: str, seed: int, turn: int) -> str:
 
 
 def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
+            typed: str = "", typing: bool = False,
             width: int = 80, height: int = 32) -> Screen:
     """The room: his face, what has been said, and what may be asked.
 
@@ -163,19 +225,27 @@ def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
             y += 1
         y += 1
 
-    # --- what may be asked ---------------------------------------------------
+    # --- what you say back ---------------------------------------------------
     foot = height - 9
-    style.bar(surface, 2, foot, width - 4, " YOU MAY ASK", fg=C["bone"],
+    style.bar(surface, 2, foot, width - 4, " YOU SAY", fg=C["bone"],
               bg=C["faint"])
+    style.bar(surface, 3, foot + 1, width - 6, " " + typed[-(width - 9):],
+              fg=C["bone"], bg=C["faint"] if typing else C["shadow"])
+    if typing:
+        surface.put(4 + min(len(typed), width - 10), foot + 1, "█",
+                    C["flame"], C["faint"])
+    elif not typed:
+        surface.text(5, foot + 1, "[/] speak to him", C["ash"], C["shadow"])
+
     room = width // 2 - 8
     for offset, (key, text, _topic) in enumerate(QUESTIONS):
         column = 3 if offset % 2 == 0 else width // 2 + 2
-        style.keycap(surface, column, foot + 1 + offset // 2, key,
+        style.keycap(surface, column, foot + 3 + offset // 2, key,
                      text[:room], enabled=hours_left >= ASK_COST)
-    surface.text(3, height - 4,
-                 "every question costs an hour, and he answers from memory.",
+    surface.text(3, height - 3,
+                 "an hour a question, and he answers from memory.",
                  C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
-              " he is not always right. the ledgers are.",
+              " [/] speak   [enter] put it to him   [1-6] the usual questions",
               fg=C["clay"], bg=C["lapis"])
     return surface.freeze()

@@ -53,7 +53,7 @@ SCREENS = {
     "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
     "help": ("HELP", lambda b: help_page.compose(74, 44)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
-    "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, 80, 32)),
+    "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, "", False, 80, 32)),
     "altar": ("THE ALTAR", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
         "harvest", ("oil", 20), 78, 32)),
