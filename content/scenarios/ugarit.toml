@@ -208,6 +208,73 @@ name = "the palace forge"
 group_id = "smiths_palace"
 bronze_demand = 600             # shekels a fortnight, maintenance and replacement
 
+# ── The city as a machine (spec 6.18). Every one of these is staffed by a group
+# that is already on the payroll above: the institution and the ration line are
+# the same decision seen twice. `condition` is the fabric and it decays every
+# fortnight whether or not anyone is working. Nothing announces it.
+#
+# `head` is empty on purpose for the walls and the tablet house. A vacant post
+# costs 40 a fortnight, and filling it is what the house is *for* (6.22).
+[[institutions]]
+id = "harbour_mahadu"
+name = "the harbour of Ma'hadu"
+kind = "harbour"
+place = "ma_hadu"
+group = "garrison_mahadu"
+head = "harbourmaster"
+condition = 820
+capacity = 1000                 # cargoes clearable, per thousand
+upkeep = {oil = 6}
+
+[[institutions]]
+id = "granary_seat"
+name = "the great granary"
+kind = "granary"
+place = "seat"
+group = "household"
+head = "steward_granary"
+condition = 760
+capacity = 1000                 # storage, per thousand of the authored capacity
+
+[[institutions]]
+id = "forge_palace"
+name = "the palace forge"
+kind = "workshop"
+place = "seat"
+group = "smiths_palace"
+head = "master_smith"
+condition = 880
+capacity = 600                  # shekels of bronze a fortnight, whole and fed
+
+[[institutions]]
+id = "temple_baal"
+name = "the temple of Baal"
+kind = "temple"
+place = "seat"
+group = "cult_baal"
+head = "high_priest"
+condition = 900
+capacity = 1000                 # rites supportable, per thousand
+upkeep = {oil = 10}
+
+[[institutions]]
+id = "walls_seat"
+name = "the walls of Ugarit"
+kind = "walls"
+place = "seat"
+head = ""
+condition = 640                 # nobody has minded them in two reigns
+capacity = 1000                 # defence weight, per thousand
+
+[[institutions]]
+id = "tablet_house"
+name = "the tablet house"
+kind = "archive"
+place = "seat"
+head = ""
+condition = 700
+capacity = 1000                 # hits returned, per thousand
+
 # Spec 7.2: `troops` total under 400, and there is no military solution to
 # anything. 390 across three formations, which is the whole army: enough to hold
 # the seat OR to answer the muster at Carchemish OR to bring in a harvest, and

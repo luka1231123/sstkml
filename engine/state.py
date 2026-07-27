@@ -175,6 +175,27 @@ class MetalState:
 
 
 @dataclasses.dataclass(frozen=True)
+class Institution:
+    """Spec 6.18. A building with a head, a condition and an output.
+
+    `group` names the DependentGroup that staffs it, unchanged from 6.3, so the
+    payroll and this are the same decision seen twice. `head` is a PersonId and
+    may be empty, which costs the fabric 40 a fortnight because nobody is
+    minding it.
+    """
+    id: str
+    name: str
+    kind: str                 # harbour | granary | walls | workshop | temple
+                              # | archive | canal | road | household | garrison
+    place: PlaceId
+    group: GroupId = ""
+    head: str = ""            # PersonId, or empty: the post is vacant
+    condition: int = 1000     # 0..1000, the fabric; decays, nothing announces it
+    capacity: int = 0         # what it could do whole and fed
+    upkeep: tuple[tuple[GoodId, int], ...] = ()     # sorted good->qty per turn
+
+
+@dataclasses.dataclass(frozen=True)
 class Rite:
     id: str
     fortnight: int
@@ -223,6 +244,15 @@ class Court:
     formations: tuple[Formation, ...] = ()
     metals: MetalState = dataclasses.field(
         default_factory=lambda: MetalState(0, 0))
+    # --- M12: the city as a machine (6.18) ---
+    institutions: Mapping[str, Institution] = dataclasses.field(
+        default_factory=dict)
+    # 24 fortnights of what each head *reported*, for the CITY sparkline. What
+    # he wrote is a real historical fact -- the letters exist -- so this is
+    # World and not Belief, and it is the reported figure rather than the true
+    # one because a flat line of reassurance is the thing worth drawing.
+    institution_history: Mapping[str, tuple[int, ...]] = dataclasses.field(
+        default_factory=dict)
     # 24 fortnights of stock readings per good, for the STORES sparkline (9.4).
     store_history: Mapping[GoodId, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)

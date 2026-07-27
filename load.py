@@ -12,7 +12,7 @@ from pathlib import Path
 from engine.core import Date, in_range, stream
 from engine.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
-                          Document, Estate, Formation, HouseMember, MetalState,
+                          Document, Estate, Formation, HouseMember, Institution, MetalState,
                           MisfortuneCard, Oath, Place, PlagueState, Relation,
                           Rite, Route, Workshop, World)
 
@@ -238,6 +238,17 @@ def load_scenario(name: str, seed: int) -> World:
         estates=estates, workshops=workshops, formations=formations,
         last_harvest=int(cfg.get("last_harvest", 0)),
         previous_harvest=int(cfg.get("last_harvest", 0)),
+        institutions={
+            inst["id"]: Institution(
+                id=inst["id"], name=inst["name"], kind=inst["kind"],
+                place=inst["place"], group=inst.get("group", ""),
+                head=inst.get("head", ""),
+                condition=int(inst.get("condition", 1000)),
+                capacity=int(inst.get("capacity", 0)),
+                upkeep=tuple(sorted(
+                    (good, int(qty))
+                    for good, qty in (inst.get("upkeep") or {}).items())))
+            for inst in cfg.get("institutions", [])},
         metals=MetalState(
             bronze_in_circulation=int(
                 metal_cfg.get("bronze_in_circulation", 0)),

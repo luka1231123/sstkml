@@ -27,6 +27,7 @@ DOORS = (
     ("r", "the roll", "roll"),
     ("t", "the stores", "stores"),
     ("l", "the land", "land"),
+    ("y", "the city", "city"),
     ("m", "the muster", "muster"),
     ("o", "the oaths", "oaths"),
     ("a", "the tablet house", "archive"),
@@ -43,7 +44,7 @@ DOORS = (
 # The controller reads this rather than keeping its own list.
 BUILT = frozenset({"stack", "roll", "stores", "muster", "oaths", "land",
                    "house", "help", "desk", "archive", "altar", "world",
-                   "counsel"})
+                   "counsel", "city"})
 
 
 def _trunc(text: str, width: int) -> str:

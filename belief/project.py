@@ -150,6 +150,44 @@ def _land(world, perr: int) -> dict:
     }
 
 
+def _institutions(world) -> list[dict]:
+    """The CITY page (spec 6.18). What the *heads* say, not what is so.
+
+    `condition` here is the reported figure. A head whose men are in arrears
+    flatters it, and the flattery grows with what he owes them, so the number
+    is least reliable exactly when it matters most. `inspect <id>` spends an
+    hour and puts the true figure in its place for this turn only (6.1).
+
+    `effective` is derived from the *reported* condition too, for the same
+    reason: the player is being shown what his officials believe the machine can
+    do. What it can actually do he finds out when a ship does not clear.
+    """
+    from engine import institution as I
+
+    court = world.court
+    out = []
+    for key in sorted(court.institutions):
+        inst = court.institutions[key]
+        seen = f"institution:{inst.id}" in court.inspected
+        condition = (inst.condition if seen else I.reported_condition(
+            court, inst, world.seed, world.date.absolute))
+        group = court.dependents.get(inst.group)
+        staff = group.output_modifier if group is not None else 1000
+        out.append({
+            "id": inst.id, "name": inst.name, "kind": inst.kind,
+            "place": inst.place, "head": inst.head,
+            "group": inst.group,
+            "group_name": group.name if group is not None else "",
+            "condition": condition,
+            "inspected": seen,
+            "capacity": inst.capacity,
+            "effective": inst.capacity * condition // 1000 * staff // 1000,
+            "upkeep": {good: qty for good, qty in inst.upkeep},
+            "history": list(court.institution_history.get(key, ())),
+        })
+    return out
+
+
 def _metal(world) -> dict:
     """The metal page (spec 6.5, 9.3). The melt ledger sits here among the
     stocks with no emphasis, no warning, and no notification, because the
@@ -406,6 +444,7 @@ def project(world) -> dict:
         # and does (spec 6.5). The player finds out the first time he takes
         # casualties, which is several milestones away.
         "metal": _metal(world),
+        "institutions": _institutions(world),
         "troops": _troops(world),
         "store_history": {
             good: list(series)

@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import (altar, archive, composer, counsel, document, hall,   # noqa: E402
+from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
 from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
@@ -52,6 +52,7 @@ SCREENS = {
     "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
     "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
     "help": ("HELP", lambda b: help_page.compose(74, 44)),
+    "city": ("THE CITY", lambda b: city.compose(b, None, 88, 28)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, "", False, 80, 32)),
     "altar": ("THE ALTAR", lambda b: altar.compose(

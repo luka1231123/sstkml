@@ -81,6 +81,11 @@ def advance(world: World) -> tuple[World, list]:
     from engine import land, metal
     world, e = land.step(world); events += e
     world, e = metal.step(world); events += e
+    # A7b: the fabric of the city goes, a little, every fortnight. After the
+    # workshops, because what a forge could do this turn is what it could do
+    # before the roof leaked another fortnight's worth.
+    from engine import institution
+    world, e = institution.step(world); events += e
 
     court = world.court
     # A8 spoilage (stock sitting through the fortnight), then estate deliveries,

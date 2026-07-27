@@ -33,7 +33,7 @@ from engine.tick import advance
 from load import load_scenario
 from session import new_seed
 from ai import counsel as ai_counsel, librarian
-from tui import (altar, archive, composer, counsel, document, hall,
+from tui import (altar, archive, city, composer, counsel, document, hall,
                  help as help_page, render, worldmap)
 from tui.grid import Screen
 
@@ -41,6 +41,7 @@ READ_COST = 2
 REPLY_COST = 2
 OMEN_COST = 2
 SEARCH_COST = 1
+INSPECT_COST = 1
 
 # Where `STK_DUMP=1` writes what the windows are showing, for `tools/screens.py
 # live`. A running game is otherwise unreadable from outside without a camera.
@@ -67,6 +68,7 @@ ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
     "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
     "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
     "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
+    "y": ("city", "The City", (88, 28), "on_city_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -178,6 +180,13 @@ class Game:
             return document.fortnight(b, self.events, 66, 18)
         if key == "world":
             return worldmap.compose(b, 86, 30)
+        if key == "city":
+            return city.compose(b, None, 88, 28)
+        if key.startswith("institution:"):
+            inst = next((i for i in b.get("institutions", [])
+                         if i["id"] == key.split(":", 1)[1]), None)
+            if inst is not None:
+                return city.detail(b, inst, inst.get("history"), 62, 20)
         if key == "counsel":
             return counsel.compose(b, self.counsel_said, self.hours,
                                    self.counsel_typed, self.counsel_typing,
@@ -454,6 +463,33 @@ class Game:
                 self.altar_readings.append(
                     f"He reads the liver and says: {taken.reported}.")
             self.repaint()
+
+    def on_city_key(self, event) -> None:
+        """Numbers walk down to the thing and look at it. An hour, every time.
+
+        The head's figure is on the list; the true one is only ever bought.
+        Refusal is silent when there are no hours, as everywhere (D19).
+        """
+        if event.keysym == "Escape":
+            self.app.close("city")
+            return
+        char = event.char or ""
+        institutions = self.belief.get("institutions", [])
+        if char.isdigit() and char != "0":
+            index = int(char) - 1
+            if not 0 <= index < len(institutions):
+                return
+            inst = institutions[index]
+            if not inst["inspected"]:
+                self.do(A.InspectLedger(f"institution:{inst['id']}"),
+                        INSPECT_COST)
+            key = f"institution:{inst['id']}"
+            window = self.app.window(
+                key, inst["name"], 62, 20,
+                on_key=lambda e, k=key: self.on_tablet_key(e, k),
+                on_close=lambda k=key: self.app.close(k))
+            self.repaint()
+            window.focus()
 
     def on_archive_key(self, event) -> None:
         if event.keysym == "Escape":

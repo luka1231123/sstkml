@@ -378,6 +378,13 @@ class BronzeSmelted:
 
 
 @dataclasses.dataclass(frozen=True)
+class InstitutionDecayed:
+    """The fabric went a little. Nothing surfaces this (spec 6.18, D19)."""
+    institution_id: str
+    condition: int
+
+
+@dataclasses.dataclass(frozen=True)
 class BronzeMelted:
     """Recycled out of circulation to meet a shortfall. Nothing surfaces this
     to the player; it is the melt ledger's only input (spec 6.5)."""
@@ -517,7 +524,7 @@ _TYPES = {
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
-        BronzeSmelted, BronzeMelted, WorkshopDemandMet,
+        BronzeSmelted, BronzeMelted, WorkshopDemandMet, InstitutionDecayed,
         MarryAbroad, ConsultDiviner, SuppressOmen, DefyOmen, SwearOath,
         Conceived, ChildBorn, HouseMemberDied, RulerSucceeded,
         SuccessionFailed, MarriedAbroad, OmenTaken, OmenSuppressed,

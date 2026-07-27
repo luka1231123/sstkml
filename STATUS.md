@@ -2,7 +2,20 @@
 
 **Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian) · D25 (troops: task, place, garrison strength, troops on the harvest, the `provide_troops` clause and its summons). 247 tests green. Plays: `./run.sh` (windows) or `./run.sh --cli` (terminal).
 
-**Next:** M12 — **the city as a machine** (D39, D40; spec 6.18–6.22). Institutions layered over the existing dependent groups, heads who are people and who misreport, justice and precedent in the hall, the land due and the harbour due, `place` and the heir, and building as a long bet on which crisis is coming. Then M13 — **the world, the envoy, and the standing order** (D35, renumbered): foreign cities carrying the same institutions, seen only as far as the player has travelled. M14 Displacement, M15 scenarios, M16 epilogue.
+**In progress: M12.** The `Institution` entity is in (spec 6.18): six of them
+authored for Ugarit, layered over the existing dependent groups, which are
+untouched. Condition decays every fortnight — faster where the post is vacant,
+faster again where the upkeep goes unpaid — and **the head reports his own
+condition**, flattering it in proportion to what he owes his men and never above
+960, because a perfect thousand would become a tell. `inspect institution:<id>`
+buys the truth for one hour and lapses with the fortnight. The CITY screen (`y`)
+shows the reported figure **as a history**, so a level line of reassurance over
+a building that is quietly going is the thing the player learns to read.
+**Not yet wired: the outputs.** Condition multiplies nothing yet — the harbour
+does not gate cargoes, the granary does not gate spoilage. That is the next
+commit, and it needs a re-sweep because it touches the tuned economy.
+
+**Next:** the rest of M12 (D39, D40; spec 6.18–6.22). Institutions layered over the existing dependent groups, heads who are people and who misreport, justice and precedent in the hall, the land due and the harbour due, `place` and the heir, and building as a long bet on which crisis is coming. Then M13 — **the world, the envoy, and the standing order** (D35, renumbered): foreign cities carrying the same institutions, seen only as far as the player has travelled. M14 Displacement, M15 scenarios, M16 epilogue.
 
 **What has to be balanced in M12, and where it will fail.** These are the numbers to watch and the failure each one produces if it is wrong:
 

@@ -46,6 +46,18 @@ def apply(world: World, action) -> tuple[World, list]:
 
     if isinstance(action, A.InspectLedger):
         _LEDGERS = {"granary": "grain", "seed": "seed_grain"}
+        # An institution is a ledger too: walking down to the quay and looking
+        # at it costs the same hour as counting the grain, and returns the same
+        # thing -- the truth, in place of what the head wrote (6.18).
+        if action.ledger.startswith("institution:"):
+            key = action.ledger.split(":", 1)[1]
+            inst = world.court.institutions.get(key)
+            if inst is None:
+                raise ValueError(f"no such institution: {key}")
+            inspected = tuple(sorted(
+                set(world.court.inspected) | {action.ledger}))
+            return (replace_court(world, inspected=inspected),
+                    [A.LedgerInspected(action.ledger, inst.condition)])
         good = _LEDGERS.get(action.ledger)
         if good is None:
             raise ValueError(f"no such ledger: {action.ledger}")
