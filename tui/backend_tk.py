@@ -142,23 +142,47 @@ class GridWindow:
         self.root.focus_force()
 
     def present(self) -> None:
-        """Bring the window to the front, and mean it.
+        """Bring the window to the front, conservatively.
 
-        A Tk program started from a terminal on macOS opens behind the terminal
-        and does not take the keyboard, which reads exactly like nothing having
-        happened. Raising is therefore three separate things: lift it, hold it
-        on top for a moment so the window manager cannot bury it again, and ask
-        the operating system to make this process frontmost.
+        A Tk program started from a terminal on macOS opens behind the terminal,
+        which reads exactly like nothing having happened. `deiconify` + `lift` +
+        `focus_force` is the portable, boring way to fix that and is all this
+        does by default.
+
+        It used to also toggle `-topmost` and drive `osascript` at System Events
+        to make the process frontmost. Both are removed from the default path:
+        `-topmost` is a thin, platform-specific corner of Tk, and the osascript
+        route needs Accessibility permission for whichever terminal launched the
+        game, so it can block for seconds or raise a permission dialog on one
+        machine and do nothing on another. Neither is worth a crash on start-up,
+        and the game is not important enough to steal focus by force.
+
+        Set `STK_FORCE_FRONT=1` to opt back into the aggressive raise.
         """
         self.root.deiconify()
         self.root.lift()
-        self.root.attributes("-topmost", True)
-        self.root.after(300, lambda: self.root.attributes("-topmost", False))
         self.root.focus_force()
-        _activate_process()
+        if os.environ.get("STK_FORCE_FRONT") == "1":
+            try:
+                self.root.attributes("-topmost", True)
+                self.root.after(
+                    300, lambda: self.root.winfo_exists()
+                    and self.root.attributes("-topmost", False))
+            except Exception:
+                pass
+            _activate_process()
 
     def close(self) -> None:
-        self.root.destroy()
+        """Destroy the window, but never from inside its own event handler.
+
+        Escape is bound on this window and closing is what it does, so the
+        naive `destroy()` tears the widget down while Tcl is still dispatching
+        an event on it -- undefined behaviour, and on macOS an occasional
+        segfault rather than an exception. `after_idle` lets the current event
+        finish first.
+        """
+        if self.root.winfo_exists():
+            self.root.after_idle(self.root.destroy)
 
 
 class App:
@@ -201,17 +225,48 @@ class App:
 
     def close(self, key: str) -> None:
         window = self.windows.pop(key, None)
-        if window is not None and window.root.winfo_exists():
+        if window is not None:
             window.close()
 
     def run(self) -> None:
-        if self.tk is not None:
+        if self.tk is None:
+            return
+        try:
             self.tk.mainloop()
+        finally:
+            self.shutdown()
 
     def stop(self) -> None:
-        """End the session. Only the hall calls this (D33)."""
+        """End the session. Only the hall calls this (D33).
+
+        `quit` and not `destroy`: this is called from inside an event handler,
+        and tearing the interpreter down mid-dispatch is how a clean exit turns
+        into a segfault. It leaves the main loop; `run` does the destroying
+        afterwards, when nothing is on the stack.
+        """
         if self.tk is not None:
             self.tk.quit()
+
+    def shutdown(self) -> None:
+        """Take Tk down deliberately, once the main loop has returned.
+
+        Letting the interpreter exit with a live Tk still holding windows means
+        Tcl is finalised from whatever state the garbage collector happens to
+        reach it in, which on macOS is an intermittent crash *after* the game
+        has apparently ended normally.
+        """
+        if self.tk is None:
+            return
+        try:
+            for window in list(self.windows.values()):
+                if window.root.winfo_exists():
+                    window.root.destroy()
+            self.tk.destroy()
+        except Exception:
+            pass
+        finally:
+            self.windows.clear()
+            self.tk = None
 
 
 def diagnose() -> dict:
