@@ -8,11 +8,12 @@ without a display is the whole reason `available()` exists.
 from __future__ import annotations
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from belief.project import project
 from engine.tick import advance
 from load import load_scenario
-from tui import document, hall
+from tui import document, hall, inbox
 from tui.backend_tk import App, available
 from tui.grid import Surface, plain_text
 
@@ -110,7 +111,7 @@ def test_the_hall_and_the_tablets_all_paint_at_their_real_sizes():
     app = _hidden_app()
     screens = {
         "hall": hall.compose(b, 92, 30),
-        "stack": document.stack(b, 80, 24),
+        "stack": inbox.compose(b, 108, 36),
         "stores": document.stores(b, 62, 22),
         "roll": document.roll(b, 78, 22),
         "muster": document.muster(b, 62, 18),
@@ -195,8 +196,8 @@ def test_a_door_key_opens_a_window_and_pressing_it_again_does_not_open_a_second(
     game.app.stop()
 
 
-def test_reading_from_the_stack_costs_hours_and_opens_the_tablet():
-    """The stack is where attention is actually spent."""
+def test_reading_from_the_inbox_costs_hours_and_keeps_the_tablet_selected():
+    """The integrated Inbox is where attention is spent and text remains."""
     if not available():
         return
     import play_gui
@@ -204,29 +205,30 @@ def test_reading_from_the_stack_costs_hours_and_opens_the_tablet():
     game.on_key(_Key("s"))
     before = game.hours
     first = game.stack_order[0]
-    game.on_tablet_key(_Key("1"), "stack")
+    game.on_inbox_key(_Key(keysym="Return"))
     assert game.hours == before - play_gui.READ_COST
-    assert f"letter:{first}" in game.app.windows
+    assert game.inbox_pick == first
     assert next(i for i in game.belief["stack"] if i["id"] == first)["read"]
-    # Opening it a second time is free, and it is still the same tablet: the
-    # pile does not reshuffle because one was read.
+    # Reading it a second time is free, and selection does not disappear merely
+    # because the Unread filter no longer contains the tablet.
     again = game.hours
-    game.on_tablet_key(_Key("1"), "stack")
+    game.on_inbox_key(_Key(keysym="Return"))
     assert game.hours == again
     assert game.stack_order[0] == first
     game.app.stop()
 
 
-def test_an_hourless_king_simply_cannot_open_another_tablet():
-    """The refusal is silent, and nothing explains why (D19)."""
+def test_an_hourless_king_gets_a_visible_refusal_for_an_unread_tablet():
     if not available():
         return
     game = _game()
     game.hours = 1
     game.on_key(_Key("s"))
-    game.on_tablet_key(_Key("1"), "stack")
+    first = game.stack_order[0]
+    game.on_inbox_key(_Key(keysym="Return"))
     assert game.hours == 1
-    assert not any(k.startswith("letter:") for k in game.app.windows)
+    assert not next(i for i in game.belief["stack"] if i["id"] == first)["read"]
+    assert "requires" in game.session_notice
     game.app.stop()
 
 
@@ -248,14 +250,27 @@ def test_ending_the_fortnight_refills_the_hours_and_clears_the_desk():
         return
     game = _game()
     game.on_key(_Key("s"))
-    game.on_tablet_key(_Key("1"), "stack")
-    assert any(k.startswith("letter:") for k in game.app.windows)
+    game.on_inbox_key(_Key(keysym="Return"))
+    assert game.inbox_pick
     turn = game.world.date.absolute
     game.on_key(_Key(keysym="space"))
     assert game.world.date.absolute == turn + 1
     assert game.hours == game.belief["attention"]
-    assert not any(k.startswith("letter:") for k in game.app.windows)
     assert "stack" in game.app.windows      # a ledger stays open across turns
+    game.app.stop()
+
+
+def test_save_and_reload_preserve_spent_attention() -> None:
+    if not available():
+        return
+    game = _game()
+    with TemporaryDirectory() as directory:
+        game.save_path = Path(directory) / "campaign.json"
+        game.hours = 3
+        assert game.save_current()
+        game.hours = game.belief["attention"]
+        assert game.load_current()
+        assert game.hours == 3
     game.app.stop()
 
 
@@ -266,7 +281,7 @@ def test_what_the_window_game_does_is_logged_the_way_the_headless_one_logs_it():
     from engine.actions import from_dict
     game = _game()
     game.on_key(_Key("s"))
-    game.on_tablet_key(_Key("1"), "stack")
+    game.on_inbox_key(_Key(keysym="Return"))
     assert game.log
     entry = game.log[-1]
     assert entry["turn"] == game.world.date.absolute
@@ -284,7 +299,7 @@ def test_reading_one_tablet_does_not_move_the_numbers_of_the_others():
     assert len(before) >= 3
     third = before[2]
     game.on_key(_Key("s"))
-    game.on_tablet_key(_Key("1"), "stack")
+    game.on_inbox_key(_Key(keysym="Return"))
     assert game.stack_order == before
     assert game.stack_order[2] == third
     # And the projection really did reorder underneath it, so this is not a

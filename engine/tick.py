@@ -33,13 +33,17 @@ def advance(world: World) -> tuple[World, list]:
     world = dataclasses.replace(world, date=world.date.advance())
     world = dataclasses.replace(
         world, court=dataclasses.replace(
-            world.court, inspected=(), searched=(), misfortune_weight=0))
+            world.court, inspected=(), searched=()))
     events.append(_turn_advanced(world))
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)
     from engine import relations
     world, fired = relations.resolve_scheduled(world, fired)
+    from engine import justice
+    world, fired = justice.resolve_scheduled(world, fired)
+    from engine import revenue
+    world, fired = revenue.resolve_scheduled(world, fired)
     # Births are scheduled 20 fortnights out at conception (spec 6.10); the
     # child's sex and health are drawn on arrival, not before.
     from engine import actions as A
@@ -54,7 +58,7 @@ def advance(world: World) -> tuple[World, list]:
     events += remaining
 
     # Letters already in transit arrive in A3. Delivery-time protocol effects
-    # must therefore exist before the A10 oath audit and A12 deck draw.
+    # must therefore exist before the A10 oath audit.
     from engine import mail
     world, e = mail.step_letters(world); events += e
     world = relations.update_unanswered(world)
@@ -86,6 +90,10 @@ def advance(world: World) -> tuple[World, list]:
     # before the roof leaked another fortnight's worth.
     from engine import institution
     world, e = institution.step(world); events += e
+    # Cargo is assessed against what the harbour can actually clear after this
+    # fortnight's decay. Merchant withdrawals arrived in A3 and already reduce
+    # the traffic presented to it.
+    world, e = revenue.collect_harbour(world); events += e
 
     # A7c: the men on the building site work, or the season is wrong, or the
     # storehouse cannot feed them, and nothing distinguishes the three (6.21).
@@ -95,20 +103,24 @@ def advance(world: World) -> tuple[World, list]:
     world, e = works.step(world); events += e
 
     court = world.court
-    # A8 spoilage (stock sitting through the fortnight), then estate deliveries,
-    # then rites take their cut, then A8 rations pay from the remainder.
+    # A8 spoilage (stock sitting through the fortnight), then rites take their
+    # cut, then rations pay from the remainder. Grain enters only at threshing.
     court, e = systems.spoilage(court); events += e
-    court, e = systems.add_income(court); events += e
     court, e = systems.do_rites(court, world.date.fortnight); events += e
     court, e = systems.pay_rations(court); events += e
     # A9 unrest
     court, e = systems.recompute_unrest(court); events += e
     world = dataclasses.replace(world, court=court)
+    # High land dues are an additional pressure, not part of ration arrears,
+    # and flight is permanent even if the next order lowers the rate.
+    world, e = revenue.pressure(world); events += e
+    # A9b: the queue in the hall ages after ordinary unrest is recomputed.
+    # Cases arriving today start at zero; old cases add their own pressure once
+    # they have stood six fortnights.
+    world, e = justice.step(world); events += e
 
-    # A10/A12: audit explicit oath clauses, then let hidden liability weight
-    # misfortune. Neither the liability total nor the causing oath enters Belief.
+    # A10: audit explicit oath clauses for the human/archive record.
     world, e = relations.audit_oaths(world); events += e
-    world, e = relations.draw_misfortune(world); events += e
 
     # A15: generate new intents after arrivals, so each new travelling letter
     # still carries at least one full turn of latency.
@@ -122,8 +134,7 @@ def advance(world: World) -> tuple[World, list]:
     # otherwise leave a hole exactly where the player's first correspondence
     # belongs. `file_letter` dedupes on ref, so this is idempotent and replay-safe.
     from engine import archive
-    for letter in world.inbox:
-        world = archive.file_letter(world, letter)
+    world = archive.file_letters(world, world.inbox)
 
     # D4-adjacent: the stock readings the STORES sparkline draws from (9.4).
     world = _record_stores(world)

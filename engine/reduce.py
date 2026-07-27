@@ -38,11 +38,62 @@ def apply(world: World, action) -> tuple[World, list]:
         return replace_court(world, stores=stores), [A.SeedEaten(moved)]
 
     if isinstance(action, A.ReadLetter):
+        letter = next(
+            (item for item in world.inbox if item.id == action.letter_id),
+            None)
+        if letter is None:
+            raise ValueError(f"no such letter: {action.letter_id}")
         inbox = tuple(
             dataclasses.replace(L, read=True) if L.id == action.letter_id else L
             for L in world.inbox
         )
         return dataclasses.replace(world, inbox=inbox), [A.LetterRead(action.letter_id)]
+
+    if isinstance(action, A.ArchiveLetter):
+        letter = next(
+            (item for item in world.inbox if item.id == action.letter_id),
+            None)
+        if letter is None:
+            raise ValueError(f"no such letter: {action.letter_id}")
+        if not letter.read:
+            raise ValueError("read the tablet before filing it")
+        inbox = tuple(
+            dataclasses.replace(item, archived=action.archived)
+            if item.id == action.letter_id else item
+            for item in world.inbox
+        )
+        return (
+            dataclasses.replace(world, inbox=inbox),
+            [A.LetterArchived(action.letter_id, action.archived)],
+        )
+
+    if isinstance(action, A.DelegateLetter):
+        letter = next(
+            (item for item in world.inbox if item.id == action.letter_id),
+            None)
+        if letter is None:
+            raise ValueError(f"no such letter: {action.letter_id}")
+        if not letter.read:
+            raise ValueError("read the tablet before delegating it")
+        person = world.court.house.get(action.person_id)
+        if person is None or not person.alive:
+            raise ValueError(f"no living courtier: {action.person_id}")
+        if person.id == world.court.ruler:
+            raise ValueError("the ruler cannot delegate a tablet to himself")
+        if person.location != world.court.seat:
+            raise ValueError(f"{person.name} is not at court")
+        inbox = tuple(
+            dataclasses.replace(
+                item, delegated_to=person.id,
+                delegated_turn=world.date.absolute)
+            if item.id == action.letter_id else item
+            for item in world.inbox
+        )
+        return (
+            dataclasses.replace(world, inbox=inbox),
+            [A.LetterDelegated(
+                action.letter_id, person.id, world.date.absolute)],
+        )
 
     if isinstance(action, A.InspectLedger):
         _LEDGERS = {"granary": "grain", "seed": "seed_grain"}
@@ -85,18 +136,26 @@ def apply(world: World, action) -> tuple[World, list]:
         return assign(world, action)
 
     if isinstance(action, A.RaiseCorvee):
+        from engine.land import source_corvee
+
         rules = world.land_rules
         cap = rules.get("corvee_max_days", 6000)
-        days = max(0, min(action.days, cap - world.court.corvee_days))
+        wanted = max(0, min(action.days, cap - world.court.corvee_days))
+        days, sources, incremental = source_corvee(world, wanted)
         if days <= 0:
-            raise ValueError("no more corvee can be raised this season")
-        # Levied labour is paid for in unrest, immediately and visibly. This is
-        # the one lever in the game that converts legitimacy straight into grain.
+            raise ValueError("no field-labour days remain to levy this season")
         delta = days * rules.get("corvee_unrest_per_1000_days", 40) // 1000
         unrest = min(1000, world.court.unrest + delta)
-        return (replace_court(world, corvee_days=world.court.corvee_days + days,
-                              unrest=unrest),
-                [A.CorveeRaised(days, unrest - world.court.unrest)])
+        return (
+            replace_court(
+                world,
+                corvee_days=world.court.corvee_days + days,
+                corvee_sources=sources,
+                unrest=unrest,
+            ),
+            [A.CorveeRaised(
+                days, unrest - world.court.unrest, incremental)],
+        )
 
     if isinstance(action, (A.BeginBuild, A.BeginRepair, A.AbandonWork)):
         from engine import works
@@ -117,12 +176,18 @@ def apply(world: World, action) -> tuple[World, list]:
         if not span or not in_range(world.date.fortnight, tuple(span)):
             raise ValueError("the water is too high to dredge")
         days = max(0, action.days)
+        available = world.court.corvee_days - world.court.works_days
+        if days <= 0 or days > available:
+            raise ValueError(
+                f"only {max(0, available)} sourced corvee days remain")
         gain = days * world.land_rules.get("canal_dredge_per_1000_days", 90) // 1000
         condition = min(1000, estate.canal_condition + gain)
         estates = dict(world.court.estates)
         estates[action.estate_id] = dataclasses.replace(
             estate, canal_condition=condition)
-        return (replace_court(world, estates=estates),
+        return (replace_court(
+                    world, estates=estates,
+                    works_days=world.court.works_days + days),
                 [A.CanalDredged(action.estate_id, days, condition)])
 
     if isinstance(action, A.MarryAbroad):
@@ -142,7 +207,11 @@ def apply(world: World, action) -> tuple[World, list]:
             stores[action.offering_good] = have - quantity
             value = quantity * world.gift_values.get(action.offering_good, 0)
             world = replace_court(world, stores=stores)
-        return consult(world, action.question, action.subject, value)
+        world, events = consult(world, action.question, action.subject, value)
+        if action.offering_good and quantity:
+            events.insert(0, A.OfferingConsumed(
+                "divination", action.offering_good, quantity))
+        return world, events
 
     if isinstance(action, A.SuppressOmen):
         from engine.divine import suppress
@@ -213,6 +282,30 @@ def apply(world: World, action) -> tuple[World, list]:
         return (replace_court(world, searched=searched),
                 [A.ArchiveSearched(action.query, len(hits))])
 
+    if isinstance(action, A.HearPetition):
+        from engine import justice
+        return justice.hear(world, action.petition_id)
+
+    if isinstance(action, A.RulePetition):
+        from engine import justice
+        return justice.rule(world, action.petition_id, action.verdict)
+
+    if isinstance(action, A.SetLandDue):
+        from engine import revenue
+        return revenue.set_land_due(world, action.rate)
+
+    if isinstance(action, A.SetHarbourDue):
+        from engine import revenue
+        return revenue.set_harbour_due(world, action.rate)
+
+    if isinstance(action, (A.PlacePerson, A.DismissPerson, A.NameHeir)):
+        from engine import appointments
+        if isinstance(action, A.PlacePerson):
+            return appointments.place(world, action.person_id, action.post)
+        if isinstance(action, A.DismissPerson):
+            return appointments.dismiss(world, action.post)
+        return appointments.name_heir(world, action.person_id)
+
     if isinstance(action, A.DictateReply):
         from engine import mail
         if action.profile and not 0 <= action.protocol_total <= 1000:
@@ -235,9 +328,30 @@ def apply(world: World, action) -> tuple[World, list]:
                 and "my brother" in action.text.casefold()
                 and "kinship_overreach" not in violations):
             violations += ("kinship_overreach",)
-        return mail.dispatch_reply(world, letter.sender, target_place,
-                                   "reply", (),
-                                   action.profile, action.protocol_total,
-                                   violations)
+        world, events = mail.dispatch_reply(
+            world, letter.sender, target_place, "reply", (),
+            action.profile, action.protocol_total, violations)
+        # The court keeps its own dispatched tablet even when the courier is
+        # later lost. This permanent copy is also the canonical Outbox record;
+        # transit state can disappear, but a sent document must not.
+        sent = next(
+            (event for event in events if isinstance(event, A.LetterSent)),
+            None)
+        if sent is not None:
+            from engine import archive
+            from engine.state import Document
+            body = action.text.strip() or action.intent.strip() or "reply"
+            world = archive.add(world, Document(
+                ref=f"L-{sent.letter_id}",
+                kind="letter_out",
+                received_turn=world.date.absolute,
+                sender=world.court.actor,
+                recipient=letter.sender,
+                dated_as=f"turn {world.date.absolute}",
+                body=body,
+                title=f"To {letter.sender}: reply",
+                tags=("reply", letter.sender, "letter_out"),
+            ))
+        return world, events
 
     raise TypeError(f"unhandled action: {type(action).__name__}")

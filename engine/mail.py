@@ -5,6 +5,11 @@ in transit. A letter only *enters* a seasonal sea leg when the sea is open at th
 node; caught by winter, it sits in the harbour and lands in the spring flood,
 still dated the previous autumn. This one rule produces most of the game's best
 moments for free, so it is modelled honestly, leg by leg.
+
+Quarantine uses the same boundary rule.  A tablet is not disembodied
+information: its courier waits outside a closed place (or inside one) until the
+closure lifts.  Couriers also provide the first concrete journey/contact path
+for disease; wider cargo and population journeys belong to M13.1.
 """
 from __future__ import annotations
 
@@ -90,28 +95,49 @@ def route_latency(routes, src: str, dst: str, season,
 # --- transit -----------------------------------------------------------------
 def step_letters(world: World) -> tuple[World, list]:
     """Advance every in-transit letter one fortnight. Deliver those that finish."""
+    from engine.plague import route_is_quarantined
+
     fn = world.date.fortnight
     now = world.date.absolute
     still: list[Letter] = []
     delivered: list[Letter] = []
     events: list = []
+    infectious_arrivals = list(world.plague.infectious_arrivals)
 
     for L in world.letters_in_transit:
+        # The courier party shares the settlement it is leaving.  Once exposed
+        # it remains a possible contact for this short journey; whether contact
+        # actually establishes an outbreak is decided in engine.plague.
+        current = world.places.get(L.at_node)
+        if (not L.disease_exposed and current is not None
+                and current.infected > 0):
+            L = dataclasses.replace(L, disease_exposed=True)
+
         edges = list(zip(L.path, L.path[1:]))
         if L.edge_index >= len(edges):            # already at destination
             delivered.append(dataclasses.replace(L, arrive_turn=now))
             continue
         a, b = edges[L.edge_index]
         r = _route_between(world.routes, a, b)
-        blocked = (L.legs_into_edge == 0 and r is not None
-                   and r.seasonal and r.mode == "sea"
-                   and not sea_open(world.season, fn))
+        at_boundary = L.legs_into_edge == 0
+        seasonal_block = (
+            at_boundary and r is not None
+            and r.seasonal and r.mode == "sea"
+            and not sea_open(world.season, fn)
+        )
+        quarantine_block = (
+            at_boundary
+            and route_is_quarantined(world.court, a, b)
+        )
+        blocked = seasonal_block or quarantine_block
         if blocked:
-            still.append(L)                        # waits at the harbour
+            still.append(L)                        # waits at the boundary
             continue
         legs = r.legs if r else 1
         lie = L.legs_into_edge + 1
         if lie >= legs:                            # reached node b
+            if L.disease_exposed:
+                infectious_arrivals.append((L.id, b))
             if L.edge_index + 1 >= len(edges):
                 delivered.append(dataclasses.replace(
                     L, at_node=b, edge_index=L.edge_index + 1,
@@ -130,8 +156,11 @@ def step_letters(world: World) -> tuple[World, list]:
             inbox = inbox + (L,)                    # into the Stack
             events.append(A.LetterArrived(L.id, L.sender, L.topic))
 
+    plague = dataclasses.replace(
+        world.plague,
+        infectious_arrivals=tuple(sorted(infectious_arrivals)))
     world = dataclasses.replace(
-        world, letters_in_transit=tuple(still), inbox=inbox)
+        world, letters_in_transit=tuple(still), inbox=inbox, plague=plague)
     from engine import relations
     for letter in delivered:
         if letter.outgoing:

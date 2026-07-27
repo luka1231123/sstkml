@@ -88,8 +88,53 @@ def file_letter(world: World, letter, dated_as: str = "") -> World:
         received_turn=(letter.arrive_turn if letter.arrive_turn is not None
                        else letter.sent_turn),
         sender=letter.sender,
+        recipient=letter.recipient,
         dated_as=dated_as,
         body=body,
         title=f"{letter.sender}: {letter.topic.replace('_', ' ')}",
         tags=(letter.topic, letter.sender, kind),
     ))
+
+
+def file_letters(world: World, letters) -> World:
+    """File a batch in one linear pass.
+
+    The old turn pipeline offered the entire permanent inbox to
+    :func:`file_letter` every fortnight.  ``add`` then scanned the whole
+    archive for every old letter, making an idle campaign progressively slower
+    even though almost every attempted filing was a duplicate.
+
+    A set of refs is transient implementation detail, not simulation state, so
+    using one here does not affect ordering, replay, or hashes.  New tablets
+    retain inbox order and are appended exactly once.
+    """
+    existing = {document.ref for document in world.documents}
+    documents = list(world.documents)
+    for letter in letters:
+        ref = f"L-{letter.id}"
+        if ref in existing:
+            continue
+        kind = "letter_out" if letter.outgoing else "letter_in"
+        facts = ", ".join(f"{key} {value}" for key, value in letter.facts)
+        body = (
+            f"{letter.topic.replace('_', ' ')}. {facts}"
+            if facts else letter.topic.replace("_", " ")
+        )
+        documents.append(Document(
+            ref=ref,
+            kind=kind,
+            received_turn=(
+                letter.arrive_turn
+                if letter.arrive_turn is not None else letter.sent_turn
+            ),
+            sender=letter.sender,
+            recipient=letter.recipient,
+            dated_as="",
+            body=body,
+            title=f"{letter.sender}: {letter.topic.replace('_', ' ')}",
+            tags=(letter.topic, letter.sender, kind),
+        ))
+        existing.add(ref)
+    if len(documents) == len(world.documents):
+        return world
+    return dataclasses.replace(world, documents=tuple(documents))

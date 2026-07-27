@@ -43,6 +43,7 @@ class DependentGroup:
     loyalty: int = 700        # 0..1000
     output_modifier: int = 1000  # 0..1000, derived + cached
     member_name: str = ""     # the face of a cut (spec 6.3); assigned at load
+    revolting: bool = False   # withdraws all labour until arrears leave the revolt band
 
 
 @dataclasses.dataclass(frozen=True)
@@ -74,15 +75,21 @@ class HouseMember:
     # Absolute turn a scheduled birth is due, or None. Without this a woman
     # already carrying a child conceives again every fortnight.
     pregnant_until: int | None = None
+    # 6.22: a placement is power, not a label. Competence affects the thing
+    # entrusted to this person; loyalty affects what he reports about it.
+    competence: int = 500             # 0..1000
+    loyalty: int = 700                # 0..1000
+    post: str = ""                    # institution, governor:, command:, court:
+    interests: tuple[str, ...] = ()   # offices leave permanent local interests
 
 
 @dataclasses.dataclass(frozen=True)
 class Omen:
-    """A divination that was taken and is now on the record (spec 6.11).
+    """A divination that was taken and is now on the record.
 
-    `reported` is what the diviner said. Whether it was true is not stored --
-    it is recomputed from the same precomputed future the engine read, so
-    replay cannot drift and the player is never one field away from the answer.
+    `reported` is the diviner's forecast from the evidence available at the
+    time.  There is deliberately no truth or correctness field: later history
+    may vindicate the reading, contradict it, or remain ambiguous.
     """
     id: str
     turn: int
@@ -117,6 +124,9 @@ class Estate:
     climate_turns: int = 0        # ...and its divisor, for the mean
     standing_yield: int = 0       # cut and standing in the field, awaiting threshing
     pest: int = 1000              # event-driven modifier, 1000 = untouched
+    # Flight caused by high land dues never springs back when the rate falls.
+    # 1000 is the opening body of hands; revenue.step only moves this downward.
+    hands: int = 1000
 
 
 @dataclasses.dataclass(frozen=True)
@@ -130,21 +140,23 @@ class Workshop:
 
 @dataclasses.dataclass(frozen=True)
 class Formation:
-    """A body of troops. Its strength does not fall when bronze runs out --
-    its ability to replace losses does, which is the entire point (spec 6.5).
+    """A body of troops with distinct personnel and current capability.
 
     `task` and `place` are the whole military entity (spec 11's ASSIGN_TROOPS,
     D25). A formation is in exactly one place doing exactly one thing, and a
     king with four hundred men has four hundred men for all of it: the walls,
-    the harvest, and the muster his overlord has summoned him to. There is no
-    combat resolution behind any of this and there is not meant to be."""
+    the harvest, and the muster his overlord has summoned him to. `strength`
+    counts those people; `ready` counts how many can currently perform the task
+    with the equipment the replacement system can support."""
     id: str
     name: str
     strength: int
     equipment_floor: int          # bronze in circulation below which re-equipping fails
     replacement_rate: int         # 0..1000, derived each turn from the floor
+    ready: int                    # 0..strength, actual capability consumed by systems
     task: str = "garrison"        # garrison | harvest | campaign | watch
     place: PlaceId = ""           # where they stand; the seat unless ordered elsewhere
+    commander: str = ""           # PersonId; 6.22 makes a command a placement
 
 
 @dataclasses.dataclass(frozen=True)
@@ -172,6 +184,16 @@ class MetalState:
     melt_ledger: int = 0          # CUMULATIVE shekels recycled out of circulation
     in_service_ceiling: int = 0   # what the court has hands and uses for; a fed
                                   # forge holds the stock here and never above it
+
+
+@dataclasses.dataclass(frozen=True)
+class HarbourCargoLot:
+    """Finite, owned cargo physically present for the harbour to clear."""
+    id: str
+    owner: ActorId
+    place: PlaceId
+    good: GoodId
+    quantity: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -222,6 +244,46 @@ class Project:
 
 
 @dataclasses.dataclass(frozen=True)
+class Petition:
+    """One dispute waiting in the hall (spec 6.19).
+
+    The two claims are what the litigants say; `truth` is what was actually so
+    and never crosses the Belief boundary.  The prose is authored because the
+    figures alone do not say whether sixty cubits are a boundary or a debt.
+    """
+    id: str
+    petitioner: str
+    against: str
+    kind: str
+    claim: tuple[tuple[str, int], ...]
+    counterclaim: tuple[tuple[str, int], ...]
+    truth: tuple[tuple[str, int], ...]
+    unit: str
+    claim_text: str
+    counter_text: str
+    correction: str
+    witness: str
+    faction: str
+    against_faction: str
+    arrived_turn: int
+    waiting: int = 0
+    heard: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class Precedent:
+    """A ruling the king made and can be quoted back at him."""
+    id: str
+    petition_id: str
+    kind: str
+    verdict: str
+    turn: int
+    petitioner: str
+    against: str
+    document_ref: str
+
+
+@dataclasses.dataclass(frozen=True)
 class Rite:
     id: str
     fortnight: int
@@ -229,7 +291,6 @@ class Rite:
     requires: tuple[tuple[GoodId, int], ...]     # sorted good->qty
     skip_legitimacy: int
     skip_unrest: int
-    skip_deck_weight: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -238,7 +299,6 @@ class Court:
     seat: PlaceId
     attention_base: int                          # hours per fortnight
     stores: Mapping[GoodId, int]                 # includes "grain" and "seed_grain"
-    grain_income: int                            # estate deliveries per turn (agriculture replaces in M8)
     dependents: Mapping[GroupId, DependentGroup]
     allocations: Mapping[GroupId, int]           # target qa to pay each group this turn
     priority: tuple[GroupId, ...]                # pay-down order when grain is short
@@ -253,15 +313,14 @@ class Court:
     # Ledgers inspected THIS turn: the ruler spent an hour and saw the true
     # count, bypassing the scribe. Cleared every turn (spec 6.1).
     inspected: tuple[str, ...] = ()
-    liability: Mapping[str, int] = dataclasses.field(default_factory=dict)
     treasury_gifts_sent: tuple[GiftRecord, ...] = ()
-    misfortune_weight: int = 0
     # --- M8: land and metal ---
     estates: Mapping[str, Estate] = dataclasses.field(default_factory=dict)
     # Groups ordered to the fields instead of their own function. The garrison
     # on the harvest is the classic Bronze Age dilemma and is one action.
     at_harvest: tuple[GroupId, ...] = ()
-    corvee_days: int = 0                 # raised this season, paid for in unrest
+    corvee_days: int = 0                 # sourced field-labour days called this season
+    corvee_sources: tuple[tuple[GroupId, int], ...] = ()
     # The only hard datum the player gets about the land (spec 6.4). True, and
     # a year stale.
     last_harvest: int = 0
@@ -285,6 +344,21 @@ class Court:
     projects: Mapping[str, "Project"] = dataclasses.field(default_factory=dict)
     works_days: int = 0
     project_seq: int = 0
+    # --- M12: justice (6.19) ---
+    petitions: Mapping[str, Petition] = dataclasses.field(default_factory=dict)
+    precedents: tuple[Precedent, ...] = ()
+    # Mood is the court's memory of which interest the king has favoured. It is
+    # intentionally not advice and does not say which side was truthful.
+    faction_mood: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # --- M12: revenue and placement (6.20, 6.22) ---
+    land_due_rate: int = 300
+    land_due_base: int = 300
+    last_land_due: int = 0
+    harbour_due_rate: int = 100
+    harbour_due_customary: int = 100
+    harbour_traffic: int = 1000
+    last_harbour_due: int = 0
+    named_heir: str = ""
     # 24 fortnights of stock readings per good, for the STORES sparkline (9.4).
     store_history: Mapping[GoodId, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
@@ -333,27 +407,29 @@ class Place:
 
 @dataclasses.dataclass(frozen=True)
 class PlagueState:
-    """Spec 6.12: integer SIR, and a theological puzzle bolted on top.
+    """Integer SIR parameters and explicit material introduction state.
 
-    `cause_oath_id` is the whole design. When an epidemic begins the engine
-    designates a genuinely violated oath — often one the player's PREDECESSOR
-    swore, sitting in the archive since before turn 1 — and the player has to
-    find it by reading. It is in `FORBIDDEN_KEYS`, never projected, and there is
-    no field anywhere that tells the player whether an expiation was the right
-    one. The epidemic curve is the only feedback, which is the point.
+    An authored import is a scenario boundary condition: infected travellers
+    arrive at a named place on a named turn.  Thereafter the disease can reach
+    another settlement only through modeled contact.  At present the moving
+    people represented in World are couriers, whose arrivals are recorded here
+    for consumption by the disease phase.
     """
     beta: int = 0                  # transmission, per mille
     gamma: int = 0                 # recovery, per mille
     mortality: int = 0             # deaths among the infected, per mille
-    exposure: int = 0              # chance in 1000 that an arrival seeds a place
-    cause_oath_id: str = ""        # HIDDEN. The oath the gods are angry about.
+    exposure: int = 0              # chance in 1000 that an exposed arrival seeds
+    import_place: PlaceId = ""     # authored external arrival boundary
+    import_turn: int = -1
+    import_cases: int = 0
     began_turn: int | None = None
     # Oaths the player has spent an offering on, in the order he tried them.
-    # Projected — he remembers what he did — but with no verdict attached.
+    # Projected because he remembers the rites, with no divine verdict.
     expiated: tuple[str, ...] = ()
-    # Set when the correct oath is expiated. HIDDEN: the drop in beta is the
-    # only way to find out, and it is slow enough to be deniable.
-    expiated_correctly_turn: int | None = None
+    # (courier id, settlement reached) pairs accumulated by the movement phase
+    # and cleared by the disease phase.  Sorting by both ids makes results
+    # independent of container iteration order.
+    infectious_arrivals: tuple[tuple[str, PlaceId], ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -374,6 +450,7 @@ class Document:
     body: str
     title: str = ""
     tags: tuple[str, ...] = ()
+    recipient: ActorId | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -422,6 +499,9 @@ class Letter:
     arrive_turn: int | None = None
     read: bool = False
     answered_turn: int | None = None
+    archived: bool = False
+    delegated_to: ActorId | None = None
+    delegated_turn: int | None = None
     outgoing: bool = False       # True = the player's own reply
     # What was actually the case when he wrote (spec 6.8). Never projected into
     # Belief and never shown to the model: the ruler learns it, if at all, from a
@@ -435,6 +515,10 @@ class Letter:
     # because the summons begins when the demand reaches the court, not when the
     # correspondent sat down to dictate it a month's sailing away.
     summons_oath: str = ""
+    # The courier party has been co-located with an infected settlement during
+    # this journey.  This is physical journey state, never projected as a fact
+    # written on the tablet.
+    disease_exposed: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -480,28 +564,14 @@ class Oath:
     dissolved: bool = False
     # Spec 6.9: oaths are personal and non-transitive. When either sworn party
     # dies, the oath lapses -- it is not broken, it simply no longer binds
-    # anyone, and it accrues no liability until a living man swears it again.
+    # anyone until a living man swears it again.
     # There is never a province that is loyal; there is a named man who is.
     lapsed: bool = False
     # ...with one exception, and M10 turns on it. An oath sworn to a KING is a
     # personal bond and dies with either man. A vow sworn to a GOD is a
-    # dedication of the house and the city, and the god does not accept that the
-    # man who promised is dead as an argument. So a vow does not lapse, and the
-    # liability for a great-grandfather's neglected festival is still accruing
-    # against a king who has never heard of it. That is the archive puzzle
-    # (spec 6.12), and it is what Mursili II's plague prayers are actually about.
+    # dedication of the house and the city. So a vow does not lapse when the
+    # man who made it dies; its tablet remains a human and institutional fact.
     binds_house: bool = False
-
-
-@dataclasses.dataclass(frozen=True)
-class MisfortuneCard:
-    id: str
-    weight: int
-    liability_weight: int
-    good: GoodId
-    loss: int
-    legitimacy_delta: int
-    unrest_delta: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -545,11 +615,9 @@ class World:
     god_ranks: Mapping[str, int] = dataclasses.field(default_factory=dict)
     protocol_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
     gift_seq: int = 0
-    misfortune_deck: tuple[MisfortuneCard, ...] = ()
-    # The whole climate series, precomputed at scenario start (spec 6.4) so that
-    # the future is fixed the moment the game begins -- which is what lets
-    # divination (6.11) read a true future value. Indexed by absolute turn,
-    # 0..200 with 100 normal. Never projected into Belief, never prompted.
+    # The whole climate series, precomputed at scenario start for deterministic
+    # agriculture. Indexed by absolute turn, 0..200 with 100 normal. Never
+    # projected into Belief or read ahead by divination.
     climate: tuple[int, ...] = ()
     # Response tables (spec 6.4), authored in content/land.toml.
     land_tables: Mapping[str, tuple[tuple[int, int], ...]] = dataclasses.field(
@@ -564,6 +632,15 @@ class World:
     works_materials: Mapping[GoodId, int] = dataclasses.field(
         default_factory=dict)
     works_plans: Mapping[str, Mapping[str, int]] = dataclasses.field(
+        default_factory=dict)
+    # Authored disputes, including their hidden truth, fixed at load. A case
+    # enters the hall when its `arrived_turn` comes.
+    justice_cases: tuple[Petition, ...] = ()
+    justice_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    revenue_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    revenue_good: GoodId = "oil"
+    revenue_merchants: tuple[ActorId, ...] = ()
+    harbour_cargo: Mapping[str, HarbourCargoLot] = dataclasses.field(
         default_factory=dict)
     # Name pools for children born in play, so a new person is still an
     # authored name rather than a generated identifier.

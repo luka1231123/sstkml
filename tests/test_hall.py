@@ -102,6 +102,7 @@ def test_nobody_waiting_is_a_sentence_not_a_blank():
     world, _ = _belief(1)
     court = dataclasses.replace(
         world.court,
+        petitions={},
         dependents={k: dataclasses.replace(g, arrears=0)
                     for k, g in world.court.dependents.items()})
     b = project(dataclasses.replace(world, court=court, inbox=()))

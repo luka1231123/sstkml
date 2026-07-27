@@ -26,9 +26,10 @@ class PromptLeak(AssertionError):
     """Something that must never reach the model was put in a prompt."""
 
 
-# Named in spec 8.9. These are the keys whose values decide outcomes the ruler
-# is supposed to have to *find out*; a model that has seen one can leak it in a
-# sentence no guard would catch, because it is prose, not a number.
+# These keys are either hidden physical state, private actor state, or names
+# used by superseded save formats. Keeping removed M10 divine-cause keys on the
+# deny-list is deliberate defence in depth: stale content must not become a
+# prompt merely because the runtime no longer defines the field.
 FORBIDDEN_KEYS = frozenset({
     "liability", "collapse", "collapse_index", "cause_oath_id",
     "climate", "climate_series", "coalition", "knowledge",
@@ -46,11 +47,8 @@ FORBIDDEN_KEYS = frozenset({
     "divination_accuracy", "diviner_competence", "diviner_loyalty",
     "diviner_bias", "fertility", "mortality_by_age", "will_die_on",
     "pregnant_until", "true_answer",
-    # M10. `cause_oath_id` is named in spec 8.9 outright and is the answer to
-    # the entire archive puzzle -- a librarian that has seen it will nudge, and
-    # a nudged puzzle is no puzzle. The compartment counts go with it: nobody at
-    # court has an infection count, so a correspondent who quotes one is
-    # speaking from outside the world.
+    # Disease compartments remain physical World truth. The two removed
+    # divine-cause names stay forbidden so an old cache/save cannot leak them.
     "cause_oath_id", "expiated_correctly_turn", "beta", "gamma", "mortality",
     "exposure", "susceptible", "infected", "recovered", "plague_load",
 })

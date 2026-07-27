@@ -17,6 +17,9 @@ the glyphs, and the glyphs are all one column wide (`tui/grid.py`).
 """
 from __future__ import annotations
 
+import dataclasses
+import re
+
 from tui.grid import INDEX, Surface
 
 C = INDEX
@@ -24,6 +27,41 @@ C = INDEX
 # Shading blocks, lightest to heaviest. The shadow uses the lightest; the lamp
 # in the hall uses the heaviest. Ordinary text never uses them.
 LIGHT, MEDIUM, HEAVY, FULL = "░", "▒", "▓", "█"
+
+
+@dataclasses.dataclass(frozen=True)
+class FooterAction:
+    key: str
+    label: str
+    enabled: bool = True
+    command: str = ""
+
+
+def key_command(key: str) -> str:
+    """Turn a printed key name into the event name used by the Tk backend."""
+    return {
+        "esc": "Escape",
+        "enter": "Return",
+        "space": "space",
+        "tab": "Tab",
+        "backspace": "BackSpace",
+        "ctrl-d": "Control-d",
+        "ctrl-o": "Control-o",
+        "ctrl-s": "Control-s",
+        "ctrl-u": "Control-u",
+    }.get(key.lower(), key)
+
+
+def _link_tokens(surface: Surface, x: int, y: int, text: str) -> None:
+    """Make ordinary `[key] label` text obey the same mouse contract."""
+    matches = list(re.finditer(r"\[([^\]]+)\]", text))
+    for index, match in enumerate(matches):
+        key = match.group(1)
+        if "-" in key or ("/" in key and key != "/"):
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        surface.link(x + match.start(), y, max(1, end - match.start()), 1,
+                     key_command(key))
 
 
 def shadow(surface: Surface, x: int, y: int, width: int, height: int) -> None:
@@ -65,6 +103,8 @@ def panel(surface: Surface, x: int, y: int, width: int, height: int,
         note = note[:room]
         surface.text(x + width - 2 - len(note), y + height - 1, note,
                      C["dim"], C["ink"])
+        _link_tokens(surface, x + width - 2 - len(note),
+                     y + height - 1, note)
 
 
 def bar(surface: Surface, x: int, y: int, width: int, text: str,
@@ -76,10 +116,12 @@ def bar(surface: Surface, x: int, y: int, width: int, text: str,
     """
     surface.fill(x, y, width, 1, " ", fg, bg)
     surface.text(x, y, text[:width], fg, bg)
+    _link_tokens(surface, x, y, text[:width])
 
 
 def keycap(surface: Surface, x: int, y: int, key: str, label: str,
-           enabled: bool = True) -> int:
+           enabled: bool = True, command: str = "",
+           bg: int | None = None) -> int:
     """`[S] the stack`, with the key hot and the label plain.
 
     Returns the width written, so a row of them can be laid out by walking.
@@ -90,16 +132,39 @@ def keycap(surface: Surface, x: int, y: int, key: str, label: str,
     bracket = C["dim"] if enabled else C["ash"]
     letter = C["flame"] if enabled else C["ash"]
     word = C["clay"] if enabled else C["ash"]
-    surface.text(x, y, "[", bracket, C["ink"])
-    surface.text(x + 1, y, key, letter, C["ink"])
-    surface.text(x + 1 + len(key), y, "]", bracket, C["ink"])
+    field = C["ink"] if bg is None else bg
+    surface.text(x, y, "[", bracket, field)
+    surface.text(x + 1, y, key, letter, field)
+    surface.text(x + 1 + len(key), y, "]", bracket, field)
     gap = x + len(key) + 3
-    surface.text(gap, y, label, word, C["ink"])
+    surface.text(gap, y, label, word, field)
     width = len(key) + 3 + len(label)
     if not enabled:
-        surface.text(x + width + 1, y, "·", C["ash"], C["ink"])
+        surface.text(x + width + 1, y, "·", C["ash"], field)
         width += 2
+    surface.link(x, y, width, 1, command or key_command(key), enabled)
     return width
+
+
+def footer(surface: Surface,
+           actions: tuple[FooterAction, ...] | list[FooterAction],
+           y: int | None = None, x: int = 0,
+           width: int | None = None) -> None:
+    """A pinned status bar whose printed controls are also mouse targets."""
+    y = surface.height - 1 if y is None else y
+    width = surface.width - x if width is None else width
+    bar(surface, x, y, width, "", fg=C["clay"], bg=C["lapis"])
+    column = x + 1
+    right = x + width - 1
+    for action in actions:
+        needed = len(action.key) + len(action.label) + 4
+        if not action.enabled:
+            needed += 2
+        if column + needed > right:
+            break
+        column += keycap(
+            surface, column, y, action.key, action.label, action.enabled,
+            action.command, bg=C["lapis"]) + 3
 
 
 def rule(surface: Surface, x: int, y: int, width: int,

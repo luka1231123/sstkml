@@ -15,7 +15,9 @@ than dying with a traceback about a display name.
 from __future__ import annotations
 
 import os
+import queue
 import sys
+import threading
 from pathlib import Path
 
 if sys.version_info < (3, 12):
@@ -31,8 +33,13 @@ from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
-from session import new_seed
-from ai import counsel as ai_counsel, librarian
+from session import load_session, new_seed, save as save_session
+from ai import counsel as ai_counsel, help_agent, librarian, parser as ai_parser
+from tui import advice, justice as justice_page
+from tui import inbox as inbox_page
+from tui import household as household_page
+from tui import plague as plague_page
+from tui import relations as relations_page
 from tui import works as works_page
 from tui import (altar, archive, city, composer, counsel, document, hall,
                  help as help_page, render, worldmap)
@@ -51,26 +58,28 @@ DUMP = Path(__file__).parent / "saves" / "screens.txt"
 
 # key -> (window key, title, size, how to compose it from Belief)
 TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
-    "s": ("stack", "The Stack", (80, 24), document.stack),
+    "s": ("stack", "The Inbox", (108, 36), inbox_page.compose),
     "t": ("stores", "The Stores", (62, 22), document.stores),
     "r": ("roll", "The Roll", (78, 22), document.roll),
     "m": ("muster", "The Muster", (62, 18), document.muster),
     "o": ("oaths", "The Oaths", (76, 28), document.oaths),
     "l": ("land", "The Land", (70, 24), document.land),
-    "h": ("house", "The House", (70, 26), document.house),
-    "?": ("help", "Help", (74, 44),
-          lambda b, w=74, h=44: help_page.compose(w, h)),
 }
 
 # The windows that hold a conversation: they own their own keys, because most
 # of them take typing and none of them can afford to fall through to the hall's
 # door list. key -> (window key, title, size, which handler)
 ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
-    "w": ("world", "The Known World", (86, 30), "on_tablet_key"),
-    "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
+    "w": ("world", "The Known World", (86, 30), "on_world_key"),
+    "c": ("counsel", "Counsel", (92, 36), "on_counsel_key"),
     "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
     "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
     "y": ("city", "The City", (96, 36), "on_city_key"),
+    "j": ("justice", "The Court of Justice", (90, 34), "on_justice_key"),
+    "h": ("house", "The House", (86, 34), "on_house_key"),
+    "f": ("relations", "Relations", (92, 32), "on_relations_key"),
+    "p": ("plague", "Sickness and Closures", (78, 28), "on_plague_key"),
+    "?": ("help", "The Palace Tutor — Help", (100, 38), "on_help_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -90,6 +99,10 @@ class Game:
 
         self.seed = new_seed() if seed is None else seed
         seed = self.seed
+        self.scenario = scenario
+        self.save_path = Path(__file__).parent / "saves" / scenario / "autosave.json"
+        self.session_notice = ""
+        self.load_armed = False
         self.world = load_scenario(scenario, seed)
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
@@ -106,6 +119,8 @@ class Game:
                     None, f"saves/{scenario}/ai_cache")
             except Exception:
                 self.client = None
+        self._model_results: queue.SimpleQueue = queue.SimpleQueue()
+        self._model_jobs = 0
         self.open_letters: dict[str, dict] = {}
         self.events: list[str] = []
         # The windows that hold a conversation rather than a record. All of it
@@ -113,22 +128,72 @@ class Game:
         # it is logged and a replay is unaffected.
         self.desk: dict | None = None
         self.works_pick = ""          # a work in hand, awaiting [x]
+        self.inbox_pick = ""
+        self.inbox_filter = "unread"
+        self.inbox_scroll = 0
+        self.inbox_notice = ""
+        delegate_people = [
+            person for person in project(self.world).get(
+                "house", {}).get("members", [])
+            if person["alive"] and person["id"] != self.world.court.ruler
+            and person["location"] == self.world.court.seat
+        ]
+        self.inbox_delegate_pick = (
+            delegate_people[0]["id"] if delegate_people else "")
+        first_petition = project(self.world).get("justice", {}).get(
+            "petitions", [])
+        self.justice_pick = (
+            first_petition[0]["id"] if first_petition else "")
+        house_people = [
+            person for person in project(self.world).get(
+                "house", {}).get("members", [])
+            if person["alive"] and person["id"] != self.world.court.ruler]
+        house_people.sort(key=lambda p: (-p["age_years"], p["id"]))
+        self.house_pick = house_people[0]["id"] if house_people else ""
+        relations = project(self.world).get("relations", [])
+        self.relation_pick = relations[0]["other"] if relations else ""
+        self.relation_scroll = 0
+        plague_places = sorted({
+            relation["place"] for relation in relations
+            if relation.get("place") and relation["place"] != self.world.court.seat
+        })
+        self.plague_pick = plague_places[0] if plague_places else ""
+        self.plague_scroll = 0
+        self.plague_notice = ""
+        self.city_notice = ""
+        self.world_place_pick = self.world.court.seat
+        self.world_place_scroll = 0
+        self.world_route_scroll = 0
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
         self.counsel_typing = False
+        self.counsel_pending: dict | None = None
+        self.help_said: list[tuple[str, str]] = []
+        self.help_typed = ""
+        self.help_typing = True
+        self.help_sources: tuple[str, ...] = ()
         self.altar_readings: list[str] = []
         self.altar_question = "harvest"
         self.altar_offering: tuple[str, int] | None = None
+        altar_people = [
+            person for person in project(self.world).get(
+                "house", {}).get("members", [])
+            if person["alive"]
+        ]
+        self.altar_subject = altar_people[0]["id"] if altar_people else ""
+        self.altar_notice = ""
         self.archive_query = ""
         self.archive_hits: list[dict] = []
         self.archive_summary = ""
         self.archive_typing = False
+        self.archive_documents: dict[str, dict] = {}
+        self.archive_document_scroll: dict[str, int] = {}
         # The pile's display order, held steady across the fortnight so the
         # numbers do not move under the player's finger (see document.order_of).
         self.stack_order: list[str] = document.order_of(project(self.world))
 
         self.hall_window = self.app.window(
-            "hall", f"Say to the King, my lord — seed {seed}", 92, 30,
+            "hall", f"Say to the King, my lord — seed {seed}", 104, 36,
             on_key=self.on_key, on_close=self.quit)
         self.repaint()
         # A Tk program launched from a terminal opens *behind* the terminal on
@@ -136,6 +201,34 @@ class Game:
         self.hall_window.present()
 
     # --- state ---------------------------------------------------------------
+
+    def _run_model(self, work, done) -> None:
+        """Run optional model work away from Tk and return on its event loop."""
+        self._model_jobs += 1
+        if self._model_jobs == 1:
+            self.app.root().after(20, self._poll_model_results)
+
+        def worker() -> None:
+            try:
+                result = work()
+                error = None
+            except Exception as caught:  # model failure is a UI result, not a crash
+                result, error = None, caught
+            self._model_results.put((done, result, error))
+
+        threading.Thread(
+            target=worker, name="stk-model", daemon=True).start()
+
+    def _poll_model_results(self) -> None:
+        while True:
+            try:
+                done, result, error = self._model_results.get_nowait()
+            except queue.Empty:
+                break
+            self._model_jobs = max(0, self._model_jobs - 1)
+            done(result, error)
+        if self._model_jobs:
+            self.app.root().after(20, self._poll_model_results)
 
     @property
     def belief(self) -> dict:
@@ -145,17 +238,114 @@ class Game:
         """Apply an action if the hours are there. Logged the same way the
         headless driver logs it, so a session here saves and replays."""
         if cost > self.hours:
+            unit = "hour" if cost == 1 else "hours"
+            self.session_notice = (
+                f"That requires {cost} {unit}; {self.hours} remain.")
+            self.repaint()
             return False
-        self.world, _ = apply(self.world, action)
+        try:
+            self.world, _ = apply(self.world, action)
+        except (ValueError, TypeError, KeyError) as error:
+            self.session_notice = f"That order was refused: {error}."
+            self.repaint()
+            return False
         self.hours -= cost
         self.log.append({"turn": self.world.date.absolute,
                          "action": A.to_dict(action)})
+        self.load_armed = False
+        self.session_notice = "Entered: " + self._describe_order(action) + "."
+        self.repaint()
+        return True
+
+    def save_current(self, automatic: bool = False) -> bool:
+        """Atomically save the replayable campaign at its current turn."""
+        try:
+            save_session(
+                self.save_path, self.seed, self.scenario,
+                self.world.date.absolute, self.log, self.world,
+                hours_left=self.hours)
+        except (OSError, ValueError, TypeError) as error:
+            self.session_notice = f"The campaign could not be saved: {error}."
+            self.repaint()
+            return False
+        self.load_armed = False
+        try:
+            shown_path = self.save_path.relative_to(Path(__file__).parent)
+        except ValueError:
+            shown_path = self.save_path
+        self.session_notice = (
+            "Autosaved." if automatic else
+            f"Saved to {shown_path}.")
+        self.repaint()
+        return True
+
+    def load_current(self) -> bool:
+        """Reload the autosave only after the caller has confirmed the choice."""
+        try:
+            world, data = load_session(self.save_path)
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            self.load_armed = False
+            self.session_notice = f"The campaign could not be loaded: {error}."
+            self.repaint()
+            return False
+        self.world = world
+        self.seed = int(data["seed"])
+        self.scenario = str(data["scenario"])
+        self.log = list(data["log"])
+        saved_hours = data.get("hours_left")
+        attention = self.belief["attention"]
+        if saved_hours is None:
+            self.hours = attention
+        elif not isinstance(saved_hours, int) or not 0 <= saved_hours <= attention:
+            self.load_armed = False
+            self.session_notice = (
+                "The campaign could not be loaded: invalid saved attention.")
+            self.repaint()
+            return False
+        else:
+            self.hours = saved_hours
+        self.events = []
+        self.desk = None
+        self.counsel_pending = None
+        self.open_letters.clear()
+        self.archive_documents.clear()
+        self.archive_document_scroll.clear()
+        self.stack_order = document.order_of(self.belief)
+        self.inbox_pick = ""
+        self.inbox_scroll = 0
+        self.inbox_notice = ""
+        self.city_notice = ""
+        self.plague_notice = ""
+        self.plague_scroll = 0
+        delegate_people = [
+            person for person in self.belief.get("house", {}).get(
+                "members", [])
+            if person["alive"] and person["id"] != self.world.court.ruler
+            and person["location"] == self.world.court.seat
+        ]
+        self.inbox_delegate_pick = (
+            delegate_people[0]["id"] if delegate_people else "")
+        self.load_armed = False
+        for key in [
+                key for key in self.app.windows
+                if key.startswith(("letter:", "archive:")) or key == "desk"]:
+            self.app.close(key)
+        self.session_notice = (
+            f"Loaded turn {self.world.date.absolute} from the verified autosave.")
         self.repaint()
         return True
 
     def end_fortnight(self) -> None:
+        if self.counsel_pending is not None:
+            self.counsel_pending = None
+            self.counsel_said.append((
+                "scribe",
+                "The unconfirmed draft lapsed when the fortnight ended."))
         self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
+        self.inbox_notice = ""
+        self.city_notice = ""
+        self.plague_notice = ""
         self.stack_order = document.order_of(self.belief, self.stack_order)
         self.open_letters.clear()
         for key in [k for k in self.app.windows if k.startswith("letter:")]:
@@ -164,6 +354,7 @@ class Game:
         # the only moment in the game the player does not control, and it
         # should feel like one.
         self.events = render.events_lines(events, self.world.court)
+        self.save_current(automatic=True)
         window = self.app.window(
             "fortnight", "The fortnight turns", 66, 18,
             on_key=lambda e: self.on_tablet_key(e, "fortnight"),
@@ -176,35 +367,75 @@ class Game:
     def compose(self, key: str) -> Screen | None:
         b = self.belief
         if key == "hall":
-            return hall.compose(b, 92, 30, hours_left=self.hours)
+            return hall.compose(
+                b, 104, 36, hours_left=self.hours,
+                notice=getattr(self, "session_notice", ""))
         if key == "stack":
-            return document.stack(b, 80, 24, order=self.stack_order)
+            return inbox_page.compose(
+                b, 108, 36, self.stack_order, self.inbox_pick,
+                self.inbox_filter, self.inbox_scroll, self.hours,
+                self.inbox_delegate_pick,
+                notice=getattr(self, "inbox_notice", ""))
         if key == "fortnight":
             return document.fortnight(b, self.events, 66, 18)
         if key == "world":
-            return worldmap.compose(b, 86, 30)
+            return worldmap.compose(
+                b, 86, 30, self.world_place_scroll,
+                self.world_route_scroll, self.world_place_pick)
         if key == "city":
-            return city.compose(b, None, 96, 36)
+            return city.compose(
+                b, None, 96, 36, notice=getattr(self, "city_notice", ""))
         if key == "works":
             return works_page.compose(b, self.works_pick, 82, 32)
+        if key == "justice":
+            return justice_page.compose(b, self.justice_pick, 90, 34)
+        if key == "house":
+            return household_page.compose(b, self.house_pick, 86, 34)
+        if key == "relations":
+            return relations_page.compose(
+                b, self.relation_pick, self.relation_scroll, 92, 32)
+        if key == "plague":
+            return plague_page.compose(
+                b, self.plague_pick, 78, 28,
+                scroll=getattr(self, "plague_scroll", 0),
+                notice=getattr(self, "plague_notice", ""))
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
             if inst is not None:
                 return city.detail(b, inst, inst.get("history"), 68, 22)
         if key == "counsel":
+            suggestions = [
+                concern.order_prompt or concern.suggestion
+                for concern in advice.concerns(b, 3)
+                if concern.destination == "counsel"
+            ]
             return counsel.compose(b, self.counsel_said, self.hours,
                                    self.counsel_typed, self.counsel_typing,
-                                   80, 32)
+                                   92, 36, suggestions,
+                                   (self.counsel_pending["descriptions"]
+                                    if self.counsel_pending else None))
+        if key == "help":
+            return help_page.compose(
+                100, 38, self.help_said, self.help_typed,
+                self.help_typing, self.help_sources)
         if key == "altar":
             return altar.compose(b, self.altar_readings, self.altar_question,
-                                 self.altar_offering, 78, 32)
+                                 self.altar_offering, 78, 32,
+                                 subject=self.altar_subject,
+                                 notice=self.altar_notice)
         if key == "archive":
             return archive.compose(b, self.archive_query, self.archive_hits,
                                    self.archive_summary, self.archive_typing,
                                    84, 32)
+        if key.startswith("archive:"):
+            item = self.archive_documents.get(key)
+            return None if item is None else archive.tablet(
+                item, b, scroll=self.archive_document_scroll.get(key, 0))
         if key == "desk" and self.desk is not None:
-            item = next((i for i in b["stack"]
+            correspondence = (
+                list(b["stack"]) + list(b.get("correspondence_archive", [])))
+            item = next((i for i in correspondence
                          if i["id"] == self.desk["letter_id"]), None)
             if item is not None:
                 return composer.compose(
@@ -248,9 +479,11 @@ class Game:
 
     def open_tablet(self, char: str) -> None:
         window_key, title, (w, h), _how = TABLETS[char]
+        handler = (self.on_inbox_key if window_key == "stack"
+                   else lambda e, k=window_key: self.on_tablet_key(e, k))
         window = self.app.window(
             window_key, title, w, h,
-            on_key=lambda e, k=window_key: self.on_tablet_key(e, k),
+            on_key=handler,
             on_close=lambda k=window_key: self.app.close(k))
         self.repaint()
         window.focus()
@@ -276,14 +509,43 @@ class Game:
         self.repaint()
         window.focus()
 
+    def open_archive_document(self, item: dict) -> None:
+        """Open a search result without reaching behind the Belief boundary."""
+        ref = str(item.get("ref", "unmarked"))
+        key = f"archive:{ref}"
+        self.archive_documents[key] = item
+        self.archive_document_scroll[key] = 0
+        window = self.app.window(
+            key, f"Tablet House — {ref}", 72, 24,
+            on_key=lambda e, k=key: self.on_tablet_key(e, k),
+            on_close=lambda k=key: self.app.close(k))
+        self.repaint()
+        window.focus()
+
     # --- the desk ------------------------------------------------------------
 
     def open_desk(self, letter_id: str) -> None:
         """Answer a letter. The tablet is not committed until it is sealed."""
-        item = next((i for i in self.belief["stack"] if i["id"] == letter_id),
-                    None)
-        if item is None or self.hours < REPLY_COST:
-            return                       # silently, as everywhere (D19)
+        b = self.belief
+        correspondence = (
+            list(b["stack"]) + list(b.get("correspondence_archive", [])))
+        item = next(
+            (candidate for candidate in correspondence
+             if candidate["id"] == letter_id),
+            None)
+        if item is None:
+            self.inbox_notice = "That tablet is no longer in correspondence."
+            self.session_notice = self.inbox_notice
+            self.repaint()
+            return
+        if self.hours < REPLY_COST:
+            self.inbox_notice = (
+                f"Answering requires {REPLY_COST} hours; "
+                f"{self.hours} remain.")
+            self.session_notice = self.inbox_notice
+            self.repaint()
+            return
+        self.inbox_notice = ""
         self.desk = {
             "letter_id": letter_id,
             "intent": composer.INTENTS[0],
@@ -304,7 +566,10 @@ class Game:
 
     def _regrade(self) -> None:
         """Recompose the draft from whatever the desk is currently holding."""
-        item = next(i for i in self.belief["stack"]
+        b = self.belief
+        correspondence = (
+            list(b["stack"]) + list(b.get("correspondence_archive", [])))
+        item = next(i for i in correspondence
                     if i["id"] == self.desk["letter_id"])
         # Once the king has taken the stylus the tablet is his. Finishing
         # dictation used to fall back to the formulary, which silently threw
@@ -326,6 +591,15 @@ class Game:
         """
         desk = self.desk
         if desk is None:
+            return
+        command = getattr(event, "command", "")
+        if command.startswith("intent:") and not desk["dictating"]:
+            chosen = command.split(":", 1)[1]
+            if chosen in composer.INTENTS:
+                desk["intent"] = chosen
+                desk["dictated"] = False
+                self._regrade()
+                self.repaint()
             return
         if event.keysym == "Escape":
             self.desk = None
@@ -365,19 +639,76 @@ class Game:
             self._regrade()
         elif event.keysym == "Return":
             draft = desk["draft"]
+            letter_id = desk["letter_id"]
             sealed = self.do(A.DictateReply(
-                desk["letter_id"], desk["intent"], draft.text, draft.profile,
+                letter_id, desk["intent"], draft.text, draft.profile,
                 draft.score.total, draft.score.violations), REPLY_COST)
             if sealed:
                 self.desk = None
                 self.app.close("desk")
+                self.repaint()
                 self.hall_window.focus()
             return
         else:
             return
         self.repaint()
 
-    # --- counsel, the altar, the tablet house --------------------------------
+    # --- Help, counsel, the altar, and the tablet house ----------------------
+
+    def submit_help(self, text: str) -> None:
+        """Ask the rules tutor. Retrieval and conversation cost no attention."""
+        text = text.strip()
+        if not text:
+            return
+        said = list(self.help_said)
+        self.help_said.append(("player", text))
+        self.repaint()
+        belief = self.belief
+        turn = self.world.date.absolute
+
+        def work():
+            return help_agent.speak(
+                text, said, belief, self.seed, turn, self.client)
+
+        def done(result, error) -> None:
+            if error is not None or result is None:
+                hits = help_agent.retrieve(text)
+                answer = help_agent.fallback_answer(text, hits)
+            else:
+                answer, _source, hits = result
+            self.help_sources = tuple(hit.doc.id for hit in hits)
+            self.help_said.append(("tutor", answer))
+            self.repaint()
+
+        if self.client is None:
+            done(work(), None)
+        else:
+            self._run_model(work, done)
+
+    def on_help_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("help")
+            return
+        if getattr(event, "state", 0) & 4 and event.keysym.lower() == "u":
+            self.help_typed = ""
+            self.help_typing = True
+            self.repaint()
+            return
+        if event.keysym in ("BackSpace", "Delete"):
+            self.help_typed = self.help_typed[:-1]
+        elif event.keysym == "Return":
+            words, self.help_typed = self.help_typed, ""
+            self.submit_help(words)
+            return
+        elif event.keysym in ("F1", "F2", "F3"):
+            index = int(event.keysym[1:]) - 1
+            self.help_typed = help_page.SUGGESTIONS[index]
+        elif (event.char or "").isprintable():
+            self.help_typed += event.char
+        else:
+            return
+        self.help_typing = True
+        self.repaint()
 
     def ask_counsel(self, question: str, topic: str = "") -> None:
         """An hour for an answer. He talks; the model does the talking (D38).
@@ -386,87 +717,478 @@ class Game:
         hours are session state (attention is derived — see `hall.compose`). So
         nothing goes in the log and a replay is unaffected.
         """
-        if self.hours < counsel.ASK_COST or not question.strip():
+        question = question.strip()
+        if not question:
+            self.counsel_said.append((
+                "scribe", "Ask me a question, my lord."))
+            self.repaint()
+            return
+        if self.hours < counsel.ASK_COST:
+            self.counsel_said.append((
+                "scribe",
+                f"That question takes {counsel.ASK_COST} hour; "
+                f"{self.hours} remain."))
+            self.repaint()
             return
         self.hours -= counsel.ASK_COST
         b = self.belief
         turn = self.world.date.absolute
         # What he is wrong about is settled here, before any prompt exists.
         remembered = counsel.recall(b, topic, self.seed, turn) if topic else {}
-        authored = (counsel.answer(b, topic, self.seed, turn) if topic else
-                    "I could not tell you, my lord. Not this morning.")
+        asks_advice = any(phrase in question.casefold() for phrase in (
+            "should", "what do you", "would you", "recommend", "advise"))
+        authored = (
+            counsel.recommend(b, topic) if asks_advice else
+            counsel.answer(b, topic, self.seed, turn) if topic else
+            counsel.recommend(b, ""))
         said = list(self.counsel_said)
         self.counsel_said.append(("king", question))
         self.repaint()          # his question lands before the answer does
-        text, _source = ai_counsel.speak(
-            question, said, ai_counsel.digest(b, remembered), authored,
-            self.seed, turn, self.client)
-        self.counsel_said.append(("scribe", text))
-        self.repaint()
+        knowledge = ai_counsel.digest(b, remembered)
 
-    def on_counsel_key(self, event) -> None:
-        if self.counsel_typing:
-            if event.keysym == "Escape":
-                self.counsel_typing = False
-            elif event.keysym in ("BackSpace", "Delete"):
-                self.counsel_typed = self.counsel_typed[:-1]
-            elif event.keysym == "Return":
-                question, self.counsel_typed = self.counsel_typed, ""
-                self.counsel_typing = False
-                self.ask_counsel(question)
-                return
-            elif event.char and event.char.isprintable():
-                self.counsel_typed += event.char
-            else:
-                return
+        def work():
+            return ai_counsel.speak(
+                question, said, knowledge, authored,
+                self.seed, turn, self.client)
+
+        def done(result, error) -> None:
+            text = authored if error is not None or result is None else result[0]
+            self.counsel_said.append(("scribe", text))
+            self.repaint()
+
+        if self.client is None:
+            done(work(), None)
+        else:
+            self._run_model(work, done)
+
+    @staticmethod
+    def _question_topic(question: str) -> str:
+        lowered = question.casefold()
+        for topic, words in {
+            "grain": ("grain", "granary", "food", "ration"),
+            "arrears": ("owed", "unpaid", "arrears", "allocation"),
+            "unanswered": ("unanswered", "written", "reply", "letter"),
+            "oaths": ("oath", "bound", "sworn"),
+            "troops": ("troop", "men", "army", "muster"),
+            "unrest": ("town", "unrest", "people", "mood"),
+        }.items():
+            if any(word in lowered for word in words):
+                return topic
+        return ""
+
+    @staticmethod
+    def _looks_like_question(text: str) -> bool:
+        lowered = text.casefold().strip()
+        starts = ("who ", "what ", "where ", "when ", "why ", "how ",
+                  "which ", "tell me ", "do we ", "are we ", "is there ")
+        return text.rstrip().endswith("?") or lowered.startswith(starts)
+
+    def _describe_order(self, action) -> str:
+        b = self.belief
+        if isinstance(action, A.Allocate):
+            group = next((g["name"] for g in b["groups"]
+                          if g["id"] == action.group_id), action.group_id)
+            return f"{group} will be allocated {render.fmt_good('grain', action.qa)}"
+        if isinstance(action, A.SetPriority):
+            return "the pay-down order has been changed"
+        if isinstance(action, A.EatSeed):
+            return f"{render.fmt_good('grain', action.qa)} of seed has been opened for food"
+        if isinstance(action, A.ReadLetter):
+            return f"tablet {action.letter_id} has been read and placed in the Inbox"
+        if isinstance(action, A.ArchiveLetter):
+            return (
+                f"tablet {action.letter_id} has been "
+                f"{'filed' if action.archived else 'restored to the Inbox'}")
+        if isinstance(action, A.DelegateLetter):
+            person = next((p["name"] for p in b.get("house", {}).get(
+                "members", []) if p["id"] == action.person_id),
+                action.person_id)
+            return f"tablet {action.letter_id} has been entrusted to {person}"
+        if isinstance(action, A.InspectLedger):
+            return f"the {action.ledger.replace('_', ' ')} has been inspected"
+        if isinstance(action, A.SendGift):
+            return (
+                f"{action.quantity:,} {action.good} will be sent to "
+                f"{render.actor_name(action.recipient, b.get('house'))}")
+        if isinstance(action, A.SendToHarvest):
+            group = next((g["name"] for g in b["groups"]
+                          if g["id"] == action.group_id), action.group_id)
+            return f"{group} will {'go to the fields' if action.to_fields else 'return from the fields'}"
+        if isinstance(action, A.AssignTroops):
+            formation = next((f["name"] for f in b.get("troops", {}).get(
+                "formations", []) if f["id"] == action.formation_id),
+                action.formation_id)
+            place = f" at {action.place}" if action.place else ""
+            return f"{formation} will {action.task}{place}"
+        if isinstance(action, A.RaiseCorvee):
+            return f"{action.days:,} days of corvée have been called"
+        if isinstance(action, A.DredgeCanal):
+            return f"{action.days:,} days will dredge the canal at {action.estate_id.replace('_', ' ')}"
+        if isinstance(action, A.BeginBuild):
+            return f"a {action.kind.replace('_', ' ')} has been put in hand"
+        if isinstance(action, A.BeginRepair):
+            return f"repairs to {action.institution.replace('_', ' ')} have begun"
+        if isinstance(action, A.AbandonWork):
+            return f"work on {action.project.replace('_', ' ')} has been called off"
+        if isinstance(action, A.Quarantine):
+            verb = "reopened" if action.lift else "closed"
+            return f"the routes to {action.place_id.replace('_', ' ')} have been {verb}"
+        if isinstance(action, A.ConsultDiviner):
+            return f"the diviner has been asked of {action.question}"
+        if isinstance(action, A.MarryAbroad):
+            person = next((p["name"] for p in b.get("house", {}).get(
+                "members", []) if p["id"] == action.person_id), action.person_id)
+            return (
+                f"{person} will be sent to the court of "
+                f"{render.actor_name(action.actor, b.get('house'))}")
+        if isinstance(action, A.SwearOath):
+            return f"{action.oath_id.replace('_', ' ')} has been re-sworn"
+        if isinstance(action, A.SuppressOmen):
+            return f"omen {action.omen_id} has been kept from the record"
+        if isinstance(action, A.DefyOmen):
+            return f"the court will act against omen {action.omen_id}"
+        if isinstance(action, A.Expiate):
+            return (
+                f"{action.offering:,} grain has been offered against "
+                f"{action.oath_id.replace('_', ' ')}")
+        if isinstance(action, A.HearPetition):
+            return f"both sides of {action.petition_id.replace('_', ' ')} have been heard"
+        if isinstance(action, A.RulePetition):
+            return f"judgement in {action.petition_id.replace('_', ' ')} is {action.verdict}"
+        if isinstance(action, A.SetLandDue):
+            return f"the land due is now {action.rate} in one thousand"
+        if isinstance(action, A.SetHarbourDue):
+            return f"the harbour due is now {action.rate} in one thousand"
+        if isinstance(action, A.PlacePerson):
+            person = next((p["name"] for p in b.get("house", {}).get(
+                "members", []) if p["id"] == action.person_id), action.person_id)
+            return f"{person} has been placed at {action.post.replace('_', ' ')}"
+        if isinstance(action, A.DismissPerson):
+            return f"the holder of {action.post.replace('_', ' ')} has been dismissed"
+        if isinstance(action, A.NameHeir):
+            person = next((p["name"] for p in b.get("house", {}).get(
+                "members", []) if p["id"] == action.person_id), action.person_id)
+            return f"{person} has been named heir"
+        if isinstance(action, A.SearchArchive):
+            return f"the tablet house has searched for {action.query!r}"
+        name = type(action).__name__
+        return name.replace("_", " ").lower()
+
+    def execute_counsel_actions(self, actions: tuple[object, ...]) -> None:
+        """Preflight the whole instruction, then commit it as one audience."""
+        self.counsel_pending = None
+        if not actions:
+            self.counsel_said.append((
+                "scribe", "There is no order on the tablet, my lord."))
             self.repaint()
             return
+        if any(isinstance(action, A.DictateReply) for action in actions):
+            self.counsel_said.append((
+                "scribe",
+                "I will not put words in your mouth, my lord. The form of "
+                "letters is being reconsidered; for now, write at the Desk."))
+            self.repaint()
+            return
+        if any(isinstance(action, A.EndTurn) for action in actions):
+            if len(actions) != 1:
+                self.counsel_said.append((
+                    "scribe", "End the fortnight as a separate order, my lord."))
+                self.repaint()
+                return
+            self.counsel_said.append(("scribe", "The audience is ended."))
+            self.end_fortnight()
+            return
+
+        costs = [ai_parser.action_cost(action) for action in actions]
+        total = sum(costs)
+        if total > self.hours:
+            self.counsel_said.append((
+                "scribe",
+                f"That requires {total} hours, my lord, and {self.hours} remain."))
+            self.repaint()
+            return
+
+        trial = self.world
+        try:
+            for action in actions:
+                trial, _events = apply(trial, action)
+        except (ValueError, TypeError, KeyError, ModuleNotFoundError) as error:
+            self.counsel_said.append(("scribe", f"I cannot do that: {error}."))
+            self.repaint()
+            return
+
+        descriptions = [self._describe_order(action) for action in actions]
+        for action, cost in zip(actions, costs):
+            self.world, _events = apply(self.world, action)
+            self.hours -= cost
+            self.log.append({"turn": self.world.date.absolute,
+                             "action": A.to_dict(action)})
+        self.counsel_said.append((
+            "scribe", "It is done: " + "; ".join(descriptions) + "."))
+        self.repaint()
+
+    def preview_counsel_actions(self, actions: tuple[object, ...]) -> None:
+        """Resolve an instruction, but do not let parsing itself issue it.
+
+        The parser is interface machinery and must be exact.  Yabninu therefore
+        reads back the closed Action objects in player-facing language, and a
+        second Enter is the explicit commit.
+        """
+        if not actions:
+            self.counsel_said.append((
+                "scribe", "I found no order in those words, my lord."))
+            self.repaint()
+            return
+        if any(isinstance(action, A.DictateReply) for action in actions):
+            self.counsel_said.append((
+                "scribe",
+                "I will not put words in your mouth, my lord. Write that "
+                "answer at the Desk, where you can see the tablet it answers."))
+            self.repaint()
+            return
+        if any(isinstance(action, A.EndTurn) for action in actions):
+            if len(actions) != 1:
+                self.counsel_said.append((
+                    "scribe", "End the fortnight as a separate order, my lord."))
+                self.repaint()
+                return
+            descriptions = ["end this fortnight"]
+            total = 0
+        else:
+            costs = [ai_parser.action_cost(action) for action in actions]
+            total = sum(costs)
+            if total > self.hours:
+                self.counsel_said.append((
+                    "scribe",
+                    f"That requires {total} hours, my lord, and "
+                    f"{self.hours} remain."))
+                self.repaint()
+                return
+            trial = self.world
+            try:
+                for action in actions:
+                    trial, _events = apply(trial, action)
+            except (ValueError, TypeError, KeyError,
+                    ModuleNotFoundError) as error:
+                self.counsel_said.append((
+                    "scribe", f"I cannot make that order: {error}."))
+                self.repaint()
+                return
+            descriptions = [self._describe_order(action) for action in actions]
+
+        self.counsel_pending = {
+            "actions": tuple(actions),
+            "descriptions": descriptions,
+        }
+        cost_words = (
+            "It costs no audience hours"
+            if total == 0 else
+            f"It will use {total} hour{'s' if total != 1 else ''}")
+        self.counsel_said.append((
+            "scribe",
+            "I understand the order as: "
+            + "; ".join(descriptions)
+            + f". {cost_words}. Press Enter again to confirm it."))
+        self.repaint()
+
+    def confirm_counsel_order(self) -> None:
+        pending = self.counsel_pending
+        if pending is None:
+            return
+        actions = pending["actions"]
+        self.counsel_pending = None
+        self.execute_counsel_actions(actions)
+
+    def cancel_counsel_order(self) -> None:
+        if self.counsel_pending is None:
+            return
+        self.counsel_pending = None
+        self.counsel_said.append(("scribe", "The draft order is struck out."))
+        self.repaint()
+
+    def submit_counsel(self, text: str) -> None:
+        text = text.strip()
+        if not text:
+            self.counsel_said.append((
+                "scribe", "Say what is to be done, my lord."))
+            self.repaint()
+            return
+        self.counsel_said.append(("king", text))
+        if self._looks_like_question(text):
+            # `ask_counsel` appends the king's words itself.
+            self.counsel_said.pop()
+            self.ask_counsel(text, self._question_topic(text))
+            return
+        belief = self.belief
+        turn = self.world.date.absolute
+        immediate = ai_parser.preparse(text, belief)
+        if immediate is not None:
+            self._accept_counsel_result(immediate)
+            return
+
+        def work():
+            return ai_parser.parse(
+                text, belief, self.hours, self.seed, turn, self.client)
+
+        def done(result, error) -> None:
+            if error is not None:
+                self.counsel_said.append((
+                    "scribe", f"I could not read that order: {error}."))
+                self.repaint()
+                return
+            self._accept_counsel_result(result)
+
+        if self.client is not None:
+            self._run_model(work, done)
+            return
+        done(work(), None)
+
+    def _accept_counsel_result(self, result) -> None:
+        """Surface one parsed result; parsing itself never mutates the world."""
+        if result is None:
+            self.counsel_said.append((
+                "scribe", "I found neither a question nor an order in those "
+                "words, my lord."))
+            self.repaint()
+            return
+        if result.actions:
+            self.preview_counsel_actions(result.actions)
+        elif result.question:
+            self.counsel_said.append(("scribe", result.question))
+            self.repaint()
+        elif result.unavailable:
+            self.counsel_said.append((
+                "scribe",
+                "I could not make a precise order of that. Name the men, "
+                "place, and quantity another way, my lord."))
+            self.repaint()
+        else:
+            self.counsel_said.append((
+                "scribe",
+                "I found neither a question nor an order in those words, "
+                "my lord."))
+            self.repaint()
+
+    def on_counsel_key(self, event) -> None:
         if event.keysym == "Escape":
+            if self.counsel_pending is not None:
+                self.cancel_counsel_order()
+                return
             self.app.close("counsel")
             return
-        char = event.char or ""
-        if char == "/":
+        if getattr(event, "state", 0) & 4 and event.keysym.lower() == "u":
+            self.counsel_typed = ""
+            if self.counsel_pending is not None:
+                self.cancel_counsel_order()
+                return
             self.counsel_typing = True
             self.repaint()
             return
-        for key, question, topic in counsel.QUESTIONS:
-            if char == key:
-                self.ask_counsel(question, topic)
-                return
+        if self.counsel_pending is not None:
+            if event.keysym == "Return":
+                self.confirm_counsel_order()
+            return
+        if event.keysym in ("BackSpace", "Delete"):
+            self.counsel_typed = self.counsel_typed[:-1]
+        elif event.keysym == "Return":
+            words, self.counsel_typed = self.counsel_typed, ""
+            self.submit_counsel(words)
+            return
+        elif event.keysym in ("F1", "F2"):
+            suggestions = [
+                concern.order_prompt or concern.suggestion
+                for concern in advice.concerns(self.belief, 3)
+                if concern.destination == "counsel"
+            ]
+            index = int(event.keysym[1:]) - 1
+            if index < len(suggestions):
+                self.counsel_typed = suggestions[index]
+        elif (event.char or "") == "/" and not self.counsel_typed:
+            pass
+        elif (event.char or "").isprintable():
+            self.counsel_typed += event.char
+        else:
+            return
+        self.counsel_typing = True
+        self.repaint()
 
     def on_altar_key(self, event) -> None:
         if event.keysym == "Escape":
             self.app.close("altar")
             return
         char = (event.char or "").lower()
+        people = [
+            person for person in self.belief.get(
+                "house", {}).get("members", [])
+            if person["alive"]
+        ]
+        people_ids = [person["id"] for person in people]
+        if char in {"[", "]"} and self.altar_question == "death":
+            if not people_ids:
+                self.altar_subject = ""
+                self.altar_notice = (
+                    "There is no living member of the house to name.")
+            else:
+                try:
+                    index = people_ids.index(self.altar_subject)
+                except ValueError:
+                    index = 0
+                step = -1 if char == "[" else 1
+                self.altar_subject = people_ids[
+                    (index + step) % len(people_ids)]
+                self.altar_notice = ""
+            self.repaint()
+            return
         for key, _label, topic in altar.QUESTIONS:
             if char == key:
                 self.altar_question = topic
+                if topic == "death" and self.altar_subject not in people_ids:
+                    self.altar_subject = people_ids[0] if people_ids else ""
+                self.altar_notice = ""
                 self.repaint()
                 return
         for key, good, quantity in altar.OFFERINGS:
             if char == key:
                 self.altar_offering = (good, quantity)
+                self.altar_notice = ""
                 self.repaint()
                 return
         if event.keysym == "Return":
+            if self.hours < OMEN_COST:
+                self.altar_notice = (
+                    f"The rite requires {OMEN_COST} hours; "
+                    f"{self.hours} remain.")
+                self.repaint()
+                return
+            if (self.altar_question == "death"
+                    and self.altar_subject not in people_ids):
+                self.altar_notice = (
+                    "Name a living member of the house before asking.")
+                self.repaint()
+                return
             good, quantity = self.altar_offering or ("", 0)
-            events = []
-            if self.hours >= OMEN_COST:
-                before = self.world
-                self.world, events = apply(self.world, A.ConsultDiviner(
-                    self.altar_question, "", good, quantity))
-                if self.world is not before:
-                    self.hours -= OMEN_COST
-                    self.log.append(
-                        {"turn": self.world.date.absolute,
-                         "action": A.to_dict(A.ConsultDiviner(
-                             self.altar_question, "", good, quantity))})
+            subject = (
+                self.altar_subject if self.altar_question == "death" else "")
+            action = A.ConsultDiviner(
+                self.altar_question, subject, good, quantity)
+            try:
+                self.world, events = apply(self.world, action)
+            except ValueError as error:
+                self.altar_notice = f"The diviner refuses: {error}."
+                self.repaint()
+                return
+            self.hours -= OMEN_COST
+            self.log.append(
+                {"turn": self.world.date.absolute,
+                 "action": A.to_dict(action)})
             taken = next((e for e in events
                           if isinstance(e, A.OmenTaken)), None)
             if taken is not None:
                 self.altar_readings.append(
                     f"He reads the liver and says: {taken.reported}.")
+                self.altar_notice = ""
+            else:
+                self.altar_notice = "No reading was entered on the tablet."
             self.repaint()
 
     def open_works(self) -> None:
@@ -523,19 +1245,15 @@ class Game:
             self.order(A.BeginRepair(institution))
 
     def order(self, action) -> None:
-        """An order the engine may refuse. A refusal is silent, as everywhere:
-        the men do not appear and the player works out why (D19)."""
-        try:
-            self.do(action, ORDER_COST)
-        except ValueError:
-            pass
+        """Issue one direct order and leave a visible receipt or refusal."""
+        self.do(action, ORDER_COST)
         self.repaint()
 
     def on_city_key(self, event) -> None:
         """Numbers walk down to the thing and look at it. An hour, every time.
 
-        The head's figure is on the list; the true one is only ever bought.
-        Refusal is silent when there are no hours, as everywhere (D19).
+        The head's figure is on the list; the true one is only ever bought. A
+        failed inspection stays on this screen with its reason visible.
         """
         if event.keysym == "Escape":
             self.app.close("city")
@@ -551,8 +1269,13 @@ class Game:
                 return
             inst = institutions[index]
             if not inst["inspected"]:
-                self.do(A.InspectLedger(f"institution:{inst['id']}"),
-                        INSPECT_COST)
+                if not self.do(
+                        A.InspectLedger(f"institution:{inst['id']}"),
+                        INSPECT_COST):
+                    self.city_notice = self.session_notice
+                    self.repaint()
+                    return
+            self.city_notice = ""
             key = f"institution:{inst['id']}"
             window = self.app.window(
                 key, inst["name"], 68, 22,
@@ -570,6 +1293,16 @@ class Game:
                 return
             self.app.close("archive")
             return
+        command = getattr(event, "command", "")
+        if command.startswith("open:"):
+            ref = command.split(":", 1)[1]
+            item = next(
+                (hit for hit in self.archive_hits
+                 if str(hit.get("ref", "")) == ref),
+                None)
+            if item is not None:
+                self.open_archive_document(item)
+            return
         if self.archive_typing:
             if event.keysym in ("BackSpace", "Delete"):
                 self.archive_query = self.archive_query[:-1]
@@ -583,12 +1316,214 @@ class Game:
                 return
             self.repaint()
             return
-        if (event.char or "") == "/":
+        char = event.char or ""
+        if char.isdigit() and char != "0":
+            index = int(char) - 1
+            if index < len(self.archive_hits):
+                self.open_archive_document(self.archive_hits[index])
+            return
+        if char == "/":
             self.archive_typing = True
             self.archive_query = ""
             self.repaint()
         elif event.keysym == "Return":
             self.search_archive()
+
+    def on_justice_key(self, event) -> None:
+        """Hear the two men, or rule from what was already known (6.19)."""
+        if event.keysym == "Escape":
+            self.app.close("justice")
+            return
+        petitions = self.belief.get("justice", {}).get("petitions", [])
+        char = (event.char or "").lower()
+        if char.isdigit() and char != "0":
+            index = int(char) - 1
+            if 0 <= index < len(petitions):
+                self.justice_pick = petitions[index]["id"]
+                self.repaint()
+            return
+        petition = next(
+            (item for item in petitions if item["id"] == self.justice_pick),
+            petitions[0] if petitions else None)
+        if petition is None:
+            return
+        self.justice_pick = petition["id"]
+        try:
+            if char == "h" and not petition["heard"]:
+                self.do(A.HearPetition(petition["id"]), INSPECT_COST)
+                return
+            verdict = {"f": "for", "a": "against", "s": "split",
+                       "d": "defer"}.get(char)
+            if verdict is None:
+                return
+            self.do(A.RulePetition(petition["id"], verdict))
+            remaining = self.belief.get("justice", {}).get("petitions", [])
+            if verdict != "defer":
+                self.justice_pick = remaining[0]["id"] if remaining else ""
+            self.repaint()
+        except ValueError:
+            # As in the other rooms, a refused act simply does not occur.
+            self.repaint()
+
+    def on_house_key(self, event) -> None:
+        """Choose a person, place or dismiss them, or settle the succession."""
+        if event.keysym == "Escape":
+            self.app.close("house")
+            return
+        char = event.char or ""
+        people = [
+            person for person in self.belief.get("house", {}).get("members", [])
+            if person["alive"] and person["id"] != self.world.court.ruler]
+        people.sort(key=lambda p: (-p["age_years"], p["id"]))
+        if char.isdigit() and char != "0":
+            index = int(char) - 1
+            if index < len(people):
+                self.house_pick = people[index]["id"]
+                self.repaint()
+            return
+        person = next(
+            (p for p in people if p["id"] == self.house_pick), None)
+        revenue = self.belief.get("revenue", {})
+        try:
+            if char == "[":
+                self.do(A.SetLandDue(max(
+                    0, revenue.get("land_rate", 300) - 50)))
+            elif char == "]":
+                self.do(A.SetLandDue(min(
+                    1000, revenue.get("land_rate", 300) + 50)))
+            elif char == "<":
+                self.do(A.SetHarbourDue(max(
+                    0, revenue.get("harbour_rate", 100) - 50)))
+            elif char == ">":
+                self.do(A.SetHarbourDue(min(
+                    1000, revenue.get("harbour_rate", 100) + 50)))
+            elif person is not None and char.lower() == "n":
+                self.do(A.NameHeir(person["id"]))
+            elif person is not None and char.lower() == "d" and person["post"]:
+                self.do(A.DismissPerson(person["post"]))
+            elif person is not None and char.lower() in household_page.POST_KEYS:
+                index = household_page.POST_KEYS.index(char.lower())
+                institutions = self.belief.get("institutions", [])
+                if index < len(institutions):
+                    self.do(A.PlacePerson(
+                        person["id"], institutions[index]["id"]))
+        except ValueError:
+            pass
+        self.repaint()
+
+    def on_relations_key(self, event) -> None:
+        """Navigate foreign claims without pretending they are live truth."""
+        if event.keysym == "Escape":
+            self.app.close("relations")
+            return
+        relations = list(self.belief.get("relations", []))
+        if not relations:
+            return
+        command = getattr(event, "command", "")
+        if command.startswith("select:"):
+            self.relation_pick = command.split(":", 1)[1]
+            self.repaint()
+            return
+        index = next(
+            (i for i, relation in enumerate(relations)
+             if relation["other"] == self.relation_pick), 0)
+        if event.keysym in {"Up", "Down"}:
+            index = max(
+                0, min(len(relations) - 1,
+                       index + (-1 if event.keysym == "Up" else 1)))
+            self.relation_pick = relations[index]["other"]
+            room = 26
+            if index < self.relation_scroll:
+                self.relation_scroll = index
+            elif index >= self.relation_scroll + room:
+                self.relation_scroll = index - room + 1
+            self.repaint()
+
+    def on_world_key(self, event) -> None:
+        """Navigate both collections on the projected route tablet."""
+        if event.keysym == "Escape":
+            self.app.close("world")
+            return
+        command = getattr(event, "command", "")
+        graph = self.belief.get("world_graph", {})
+        place_count = len(graph.get("places", []))
+        route_count = len(graph.get("routes", []))
+        place_page = 19
+        route_page = 9
+        if command.startswith("world:place:"):
+            self.world_place_pick = command.split(":", 2)[2]
+        elif command == "world:places:previous" or event.keysym == "Up":
+            self.world_place_scroll = max(
+                0, self.world_place_scroll - place_page)
+        elif command == "world:places:next" or event.keysym == "Down":
+            self.world_place_scroll = min(
+                max(0, place_count - place_page),
+                self.world_place_scroll + place_page)
+        elif command == "world:routes:previous" or (
+                getattr(event, "state", 0) & 4
+                and event.keysym.lower() == "u"):
+            self.world_route_scroll = max(
+                0, self.world_route_scroll - route_page)
+        elif command == "world:routes:next" or (
+                getattr(event, "state", 0) & 4
+                and event.keysym.lower() == "d"):
+            self.world_route_scroll = min(
+                max(0, route_count - route_page),
+                self.world_route_scroll + route_page)
+        else:
+            return
+        self.repaint()
+
+    def on_plague_key(self, event) -> None:
+        """Navigate every known place and issue or lift a physical closure."""
+        if event.keysym == "Escape":
+            self.app.close("plague")
+            return
+        dossiers = plague_page.place_dossiers(self.belief)
+        places = [item["id"] for item in dossiers]
+        if not places:
+            return
+        try:
+            index = places.index(self.plague_pick)
+        except ValueError:
+            index = 0
+        command = getattr(event, "command", "")
+        if command.startswith("plague:select:"):
+            picked = command.split(":", 2)[2]
+            if picked in places:
+                index = places.index(picked)
+        elif command == "plague:previous" or event.keysym == "Up":
+            index = max(0, index - 1)
+        elif command == "plague:next" or event.keysym == "Down":
+            index = min(len(places) - 1, index + 1)
+        elif event.keysym == "Prior":
+            index = max(0, index - plague_page.page_size(28))
+        elif event.keysym == "Next":
+            index = min(
+                len(places) - 1, index + plague_page.page_size(28))
+        else:
+            index = places.index(self.plague_pick) \
+                if self.plague_pick in places else 0
+        char = (event.char or "").lower()
+        self.plague_pick = places[index]
+        self.plague_scroll = plague_page.reveal_scroll(
+            len(places), index, getattr(self, "plague_scroll", 0),
+            plague_page.page_size(28))
+        if command.startswith("plague:") or event.keysym in {
+                "Up", "Down", "Prior", "Next"}:
+            self.plague_notice = ""
+            self.repaint()
+            return
+        if char == "q" and self.plague_pick:
+            closed = set(self.belief.get("plague", {}).get("quarantined", []))
+            if not self.do(
+                    A.Quarantine(
+                        self.plague_pick, lift=self.plague_pick in closed),
+                    ORDER_COST):
+                self.plague_notice = self.session_notice
+            else:
+                self.plague_notice = ""
+            self.repaint()
 
     def search_archive(self) -> None:
         """One hour per query (spec 6.17), and the hour is the mechanic."""
@@ -603,10 +1538,216 @@ class Game:
 
     # --- keys ----------------------------------------------------------------
 
+    def on_inbox_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("stack")
+            return
+        self.inbox_notice = ""
+        command = getattr(event, "command", "")
+        if command.startswith("select:"):
+            self.inbox_pick = command.split(":", 1)[1]
+            self.repaint()
+            return
+        if command.startswith("view:"):
+            chosen = command.split(":", 1)[1]
+            if chosen in {"unread", "all", "archived", "outbox"}:
+                self.inbox_filter = chosen
+                self.inbox_scroll = 0
+                items = inbox_page.ordered_items(
+                    self.belief, self.stack_order, chosen)
+                self.inbox_pick = items[0]["id"] if items else ""
+                self.repaint()
+            return
+
+        b = self.belief
+        inbound = (
+            inbox_page.ordered_items(b, self.stack_order, "all")
+            + inbox_page.ordered_items(b, self.stack_order, "archived"))
+        outbox = inbox_page.ordered_items(b, self.stack_order, "outbox")
+        selectable = outbox if self.inbox_filter == "outbox" else inbound
+        selected_item = next(
+            (item for item in selectable if item["id"] == self.inbox_pick),
+            selectable[0] if selectable else None)
+
+        if command.startswith("reply:"):
+            letter_id = command.split(":", 1)[1]
+            item = next(
+                (candidate for candidate in inbound
+                 if candidate["id"] == letter_id),
+                None)
+            if (item is not None and item["read"]
+                    and item.get("answered_turn") is None):
+                self.open_desk(letter_id)
+            return
+        if command.startswith("compare:"):
+            letter_id = command.split(":", 1)[1]
+            item = next(
+                (candidate for candidate in inbound
+                 if candidate["id"] == letter_id),
+                None)
+            if item is not None and item["read"]:
+                self.open_letter(item)
+            return
+        if command.startswith(("archive:", "restore:")):
+            mode, letter_id = command.split(":", 1)
+            item = next(
+                (candidate for candidate in inbound
+                 if candidate["id"] == letter_id),
+                None)
+            if item is not None and item["read"]:
+                archived = mode == "archive"
+                if self.do(A.ArchiveLetter(letter_id, archived)):
+                    self.stack_order = document.order_of(
+                        self.belief, self.stack_order)
+                    self.inbox_filter = "archived" if archived else "all"
+                    self.inbox_pick = letter_id
+                    self.inbox_scroll = 0
+                    self.repaint()
+            return
+        if command.startswith("delegate:"):
+            _, letter_id, person_id = command.split(":", 2)
+            item = next(
+                (candidate for candidate in inbound
+                 if candidate["id"] == letter_id),
+                None)
+            if item is not None and item["read"]:
+                self.do(
+                    A.DelegateLetter(letter_id, person_id), ORDER_COST)
+            return
+
+        char = (event.char or "").lower()
+        views = {
+            "u": "unread", "a": "all", "v": "archived", "o": "outbox"}
+        if char in views:
+            self.inbox_filter = views[char]
+            self.inbox_scroll = 0
+            items = inbox_page.ordered_items(
+                self.belief, self.stack_order, self.inbox_filter)
+            self.inbox_pick = items[0]["id"] if items else ""
+            self.repaint()
+            return
+        if event.keysym == "Tab":
+            people = [
+                person for person in b.get("house", {}).get("members", [])
+                if person["alive"] and person["id"] != self.world.court.ruler
+                and person["location"] == self.world.court.seat
+            ]
+            ids = [person["id"] for person in people]
+            if ids:
+                try:
+                    index = (ids.index(self.inbox_delegate_pick) + 1) % len(ids)
+                except ValueError:
+                    index = 0
+                self.inbox_delegate_pick = ids[index]
+                self.repaint()
+            return
+
+        items = inbox_page.ordered_items(
+            self.belief, self.stack_order, self.inbox_filter)
+        if (char == "r" and selected_item is not None
+                and self.inbox_filter != "outbox"
+                and selected_item["read"]):
+            if selected_item.get("answered_turn") is None:
+                self.open_desk(selected_item["id"])
+            return
+        if (char == "c" and selected_item is not None
+                and self.inbox_filter != "outbox"
+                and selected_item["read"]):
+            self.open_letter(selected_item)
+            return
+        if (char == "d" and selected_item is not None
+                and self.inbox_filter != "outbox"
+                and selected_item["read"] and self.inbox_delegate_pick):
+            self.do(A.DelegateLetter(
+                selected_item["id"], self.inbox_delegate_pick), ORDER_COST)
+            return
+        if (char == "x" and selected_item is not None
+                and self.inbox_filter != "outbox"
+                and selected_item["read"]):
+            archived = not bool(selected_item.get("archived"))
+            if self.do(A.ArchiveLetter(selected_item["id"], archived)):
+                self.stack_order = document.order_of(
+                    self.belief, self.stack_order)
+                self.inbox_filter = "archived" if archived else "all"
+                self.inbox_pick = selected_item["id"]
+                self.inbox_scroll = 0
+                self.repaint()
+            return
+        if not items:
+            return
+        current_index = next(
+            (i for i, item in enumerate(items)
+             if item["id"] == self.inbox_pick),
+            None)
+        if event.keysym in {"Up", "Down"}:
+            if current_index is None:
+                # The just-read tablet has left the Unread filter.  The first
+                # navigation key moves to the first remaining row rather than
+                # skipping it because the vanished row had no list index.
+                index = 0
+            else:
+                index = max(
+                    0, min(
+                        len(items) - 1,
+                        current_index
+                        + (-1 if event.keysym == "Up" else 1)))
+            self.inbox_pick = items[index]["id"]
+            room = 30
+            if index < self.inbox_scroll:
+                self.inbox_scroll = index
+            elif index >= self.inbox_scroll + room:
+                self.inbox_scroll = index - room + 1
+            self.repaint()
+            return
+        if event.keysym == "Return":
+            if self.inbox_filter == "outbox":
+                return
+            item = (
+                selected_item if selected_item is not None
+                and selected_item["id"] == self.inbox_pick
+                else items[current_index or 0])
+            self.inbox_pick = item["id"]
+            if not item["read"]:
+                self.do(A.ReadLetter(item["id"]), READ_COST)
+            else:
+                self.repaint()
+
+    def activate_concern(self, index: int) -> None:
+        """Open the evidence or put Yabninu's suggested order on his tablet."""
+        matters = advice.concerns(self.belief)
+        if not 0 <= index < len(matters):
+            return
+        concern = matters[index]
+        if concern.destination == "counsel":
+            self.counsel_typed = concern.order_prompt
+            self.counsel_typing = bool(concern.order_prompt)
+            self.open_room("c")
+            return
+        door = next((key for key, _label, target in hall.DOORS
+                     if target == concern.destination), "")
+        if door in TABLETS:
+            self.open_tablet(door)
+        elif door in ROOMS:
+            self.open_room(door)
+
     def on_key(self, event) -> None:
         char = (event.char or "").lower()
-        if event.keysym == "space":
+        control = bool(getattr(event, "state", 0) & 4)
+        if control and event.keysym.lower() == "s":
+            self.save_current()
+        elif control and event.keysym.lower() == "o":
+            if not self.load_armed:
+                self.load_armed = True
+                self.session_notice = (
+                    "Reload discards unsaved orders from this fortnight. "
+                    "Press Ctrl-O again to confirm.")
+                self.repaint()
+            else:
+                self.load_current()
+        elif event.keysym == "space":
             self.end_fortnight()
+        elif char.isdigit() and char != "0":
+            self.activate_concern(int(char) - 1)
         elif char in TABLETS:
             self.open_tablet(char)
         elif char in ROOMS:
@@ -614,7 +1755,11 @@ class Game:
         elif char == "d":
             # The desk without a letter chosen answers the oldest thing on the
             # pile, which is what a king with a stack in front of him does.
-            read = [item for item in self.belief["stack"] if item["read"]]
+            read = [
+                item for item in self.belief["stack"]
+                if item["read"]
+                and item.get("answered_turn") is None
+            ]
             if read:
                 self.open_desk(read[0]["id"])
         elif char == "\\":
@@ -641,30 +1786,26 @@ class Game:
             self.app.close(key)
             self.hall_window.focus()
             return
+        if key.startswith("archive:") and event.keysym in {
+                "Up", "Down", "Prior", "Next"}:
+            step = {
+                "Up": -1, "Down": 1, "Prior": -8, "Next": 8,
+            }[event.keysym]
+            self.archive_document_scroll[key] = max(
+                0, self.archive_document_scroll.get(key, 0) + step)
+            self.repaint()
+            return
         char = (event.char or "").lower()
         if key.startswith("letter:") and char == "a":
             # Answer the tablet you are looking at. The desk opens beside it,
             # so the claim being answered stays on screen while it is answered.
             self.open_desk(key.split(":", 1)[1])
             return
-        if key == "stack" and char.isdigit() and char != "0":
-            index = int(char) - 1
-            if not 0 <= index < len(self.stack_order):
-                return
-            letter_id = self.stack_order[index]
-            item = next((i for i in self.belief["stack"] if i["id"] == letter_id),
-                        None)
-            if item is None:
-                return
-            if not item["read"] and not self.do(A.ReadLetter(letter_id), READ_COST):
-                return                  # no hours; silently, and D19 says so
-            self.open_letter(
-                next(i for i in self.belief["stack"] if i["id"] == letter_id))
-        else:
-            self.on_key(event)
+        self.on_key(event)
 
     def quit(self) -> None:
         """The hall owns the session; every other window closes freely (D33)."""
+        self.save_current(automatic=True)
         self.app.stop()
 
     def run(self) -> None:

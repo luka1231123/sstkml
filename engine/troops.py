@@ -28,6 +28,12 @@ TASKS = ("garrison", "harvest", "campaign", "watch")
 # garrison, so it counts half. Spec 7.2's four men in a tower are the whole
 # joke, and they should not read as a defence.
 _WATCH_SHARE = 500
+_UNFORTIFIED_SHARE = 500
+
+
+def capable(formation) -> int:
+    """People who can perform the formation's task with serviceable kit."""
+    return max(0, min(formation.strength, formation.ready))
 
 
 def garrison_strength(court, place: str) -> int:
@@ -37,17 +43,24 @@ def garrison_strength(court, place: str) -> int:
     the harvest or to a muster in the north are not defending anything, and
     that is the point of being able to order them there.
     """
-    return sum(
-        formation.strength * (_WATCH_SHARE if formation.task == "watch" else 1000)
+    raw = sum(
+        capable(formation)
+        * (_WATCH_SHARE if formation.task == "watch" else 1000)
         // 1000
         for formation in court.formations
         if formation.place == place and formation.task in ("garrison", "watch")
     )
+    from engine.institution import factor_at
+
+    walls = factor_at(court, "walls", place)
+    fortification = _UNFORTIFIED_SHARE + walls * (
+        1000 - _UNFORTIFIED_SHARE) // 1000
+    return raw * fortification // 1000
 
 
 def mustered_for(court, place: str) -> int:
     """Strength on campaign at `place` -- what answers a summons."""
-    return sum(f.strength for f in court.formations
+    return sum(capable(f) for f in court.formations
                if f.task == "campaign" and f.place == place)
 
 
@@ -59,7 +72,7 @@ def harvest_hands(court, per_head: int) -> int:
     payroll group he belongs to, and starving him shows up as unrest long
     before it shows up as a short harvest.
     """
-    return sum(f.strength * per_head for f in court.formations
+    return sum(capable(f) * per_head for f in court.formations
                if f.task == "harvest")
 
 
@@ -124,7 +137,13 @@ def assign(world: World, action) -> tuple[World, list]:
         formations.append(formation)
     if not found:
         raise ValueError(f"unknown formation: {action.formation_id}")
+    people = dict(world.court.house)
+    commander = next((f.commander for f in formations
+                      if f.id == action.formation_id), "")
+    if commander in people:
+        people[commander] = dataclasses.replace(
+            people[commander], location=place)
     return (dataclasses.replace(
         world, court=dataclasses.replace(
-            world.court, formations=tuple(formations))),
+            world.court, formations=tuple(formations), house=people)),
         [A.TroopsAssigned(action.formation_id, action.task, place)])

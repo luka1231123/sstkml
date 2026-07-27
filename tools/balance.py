@@ -54,7 +54,7 @@ def run(policy: str = "prudent", turns: int = 72,
         if policy == "prudent":
             # Spend against what the land actually returned last year, not
             # against the entitlement. One-turn lag applies (D3).
-            annual = court.last_harvest + court.grain_income * 24
+            annual = court.last_land_due
             budget = annual // 24
             # A cushion: never spend the granary below one year of seed.
             for action in _prudent_allocations(world, budget):

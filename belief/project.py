@@ -62,6 +62,10 @@ def _inbox_items(world, perr: int) -> list[dict]:
             "id": L.id, "sender": L.sender, "topic": L.topic,
             "received_turn": arr, "age": age,
             "freshness": _freshness(age), "read": L.read, "facts": facts,
+            "answered_turn": L.answered_turn,
+            "archived": L.archived,
+            "delegated_to": L.delegated_to,
+            "delegated_turn": L.delegated_turn,
             "sender_esteem": (
                 _esteem_word(relation.esteem) if relation else "formal"),
             "sender_status": relation.status_claim if relation else "servant",
@@ -69,6 +73,90 @@ def _inbox_items(world, perr: int) -> list[dict]:
             "unanswered": relation.unanswered_letters_from_them if relation else 0,
         })
     return items
+
+
+def _outbox(world) -> list[dict]:
+    """The ruler's own permanent sent copies, annotated with known transit.
+
+    A courier can be intercepted without the sender learning it. Consequently
+    an item that has left ``letters_in_transit`` is only labelled "sent — no
+    receipt", whether it arrived or vanished. The UI never turns engine truth
+    into a delivery confirmation the court did not receive.
+    """
+    travelling = {
+        letter.id: letter
+        for letter in world.letters_in_transit
+        if letter.outgoing
+    }
+    records: dict[str, dict] = {}
+    for doc in world.documents:
+        if doc.kind != "letter_out":
+            continue
+        letter_id = (
+            doc.ref[2:] if doc.ref.startswith("L-") else doc.ref)
+        letter = travelling.get(letter_id)
+        recipient = (
+            doc.recipient
+            or (letter.recipient if letter is not None else None)
+            or "unknown court"
+        )
+        topic = (
+            letter.topic if letter is not None else
+            next((tag for tag in doc.tags
+                  if tag not in {"letter_out", str(recipient)}), "reply")
+        )
+        records[letter_id] = {
+            "id": letter_id,
+            "sender": world.court.actor,
+            "recipient": recipient,
+            "topic": topic,
+            "sent_turn": doc.received_turn,
+            "received_turn": doc.received_turn,
+            "body": doc.body,
+            "facts": (
+                {key: value for key, value in letter.facts}
+                if letter is not None else {}),
+            "in_transit": letter is not None,
+            "status": (
+                "courier away — no receipt"
+                if letter is not None else "sent — no receipt"),
+            "read": True,
+            "answered_turn": None,
+            "archived": False,
+            "delegated_to": None,
+            "delegated_turn": None,
+        }
+
+    # Compatibility for worlds produced by direct engine.mail calls rather
+    # than player actions: an in-transit tablet should still be visible even
+    # when no permanent sent copy was made through reduce.apply.
+    for letter_id, letter in travelling.items():
+        if letter_id in records:
+            continue
+        facts = {key: value for key, value in letter.facts}
+        body_facts = ", ".join(f"{key} {value}" for key, value in letter.facts)
+        body = letter.topic.replace("_", " ")
+        if body_facts:
+            body += ". " + body_facts
+        records[letter_id] = {
+            "id": letter_id,
+            "sender": world.court.actor,
+            "recipient": letter.recipient,
+            "topic": letter.topic,
+            "sent_turn": letter.sent_turn,
+            "received_turn": letter.sent_turn,
+            "body": body,
+            "facts": facts,
+            "in_transit": True,
+            "status": "courier away — no receipt",
+            "read": True,
+            "answered_turn": None,
+            "archived": False,
+            "delegated_to": None,
+            "delegated_turn": None,
+        }
+    return sorted(
+        records.values(), key=lambda item: (-item["sent_turn"], item["id"]))
 
 
 def _stores(world, perr: int) -> dict:
@@ -130,6 +218,9 @@ def _land(world, perr: int) -> dict:
                             f"gauge:{now}", perr),
         "last_harvest": court.last_harvest,
         "previous_harvest": court.previous_harvest,
+        "land_due_rate": court.land_due_rate,
+        "land_due_base": court.land_due_base,
+        "last_land_due": court.last_land_due,
         "seed_in_store": _stores(world, perr).get("seed_grain", 0),
         # He watched it go into the ground, so he knows this one exactly. For
         # most of the year it is where all the seed is, and the store reads nought.
@@ -146,6 +237,7 @@ def _land(world, perr: int) -> dict:
         "estates": [
             {"id": e.id, "name": e.name, "place": e.place,
              "irrigated": e.irrigated,
+             "hands": e.hands,
              # A canal is a thing you can walk along and look at.
              "canal_condition": e.canal_condition if e.irrigated else None}
             for e in sorted(court.estates.values(), key=lambda e: e.id)
@@ -184,7 +276,8 @@ def _institutions(world) -> list[dict]:
             "condition": condition,
             "inspected": seen,
             "capacity": inst.capacity,
-            "effective": inst.capacity * condition // 1000 * staff // 1000,
+            "effective": (inst.capacity * condition // 1000 * staff // 1000
+                          * I._head_factor(court, inst) // 1000),
             "upkeep": {good: qty for good, qty in inst.upkeep},
             "history": list(court.institution_history.get(key, ())),
         })
@@ -232,6 +325,58 @@ def _plans(world) -> list[dict]:
     return out
 
 
+def _justice(world) -> dict:
+    """What is knowable in the hall (spec 6.19), with truth kept out.
+
+    Before an audience the king knows who came and what sort of matter it is.
+    `hear` reveals the claim and counter-claim.  It never adds `truth`, a
+    correctness flag, or the legitimacy consequence waiting in the schedule.
+    """
+    from engine import justice
+
+    petitions = []
+    ordered = sorted(
+        world.court.petitions.values(),
+        key=lambda petition: (-petition.waiting, petition.arrived_turn,
+                              petition.id))
+    for petition in ordered:
+        cited = justice.latest_precedent(world, petition.kind)
+        item = {
+            "id": petition.id,
+            "petitioner": petition.petitioner,
+            "against": petition.against,
+            "kind": petition.kind,
+            "waiting": petition.waiting,
+            "heard": petition.heard,
+            "faction": petition.faction,
+            "against_faction": petition.against_faction,
+            "unit": petition.unit if petition.heard else "",
+            "claim": dict(petition.claim) if petition.heard else {},
+            "counterclaim": (
+                dict(petition.counterclaim) if petition.heard else {}),
+            "claim_text": petition.claim_text if petition.heard else "",
+            "counter_text": petition.counter_text if petition.heard else "",
+            "precedent": None,
+        }
+        if cited is not None:
+            item["precedent"] = {
+                "id": cited.id, "kind": cited.kind, "verdict": cited.verdict,
+                "turn": cited.turn, "document_ref": cited.document_ref,
+                "petitioner": cited.petitioner, "against": cited.against,
+            }
+        petitions.append(item)
+    return {
+        "petitions": petitions,
+        "precedents": [
+            {"id": record.id, "petition_id": record.petition_id,
+             "kind": record.kind, "verdict": record.verdict,
+             "turn": record.turn, "document_ref": record.document_ref,
+             "petitioner": record.petitioner, "against": record.against}
+            for record in world.court.precedents
+        ],
+    }
+
+
 def _metal(world) -> dict:
     """The metal page (spec 6.5, 9.3). The melt ledger sits here among the
     stocks with no emphasis, no warning, and no notification, because the
@@ -276,7 +421,7 @@ def _troops(world) -> dict:
     return {
         "formations": [
             {"id": f.id, "name": f.name, "strength": f.strength,
-             "task": f.task, "place": f.place}
+             "task": f.task, "place": f.place, "commander": f.commander}
             for f in sorted(court.formations, key=lambda f: f.id)
         ],
         "garrisons": {p: garrison_strength(court, p) for p in places},
@@ -300,12 +445,10 @@ def _plague(world, perr: int) -> dict:
     which oaths he has made offerings against, because he gave those orders.
 
     He does not know S, I, R, beta, gamma, or mortality -- nobody in 1190 BC has
-    those concepts, let alone those numbers. He does not know which oath the
-    gods are angry about; that is `cause_oath_id`, it is in the archive if it is
-    anywhere, and finding it is the game. And there is deliberately no field
-    here that says whether an offering worked. `offerings_made` is a list of
-    what he did, in the order he did it, with no verdict attached, because the
-    court has no way to form one. The curve is the only answer he gets.
+    those concepts, let alone those numbers.  Priests and factions may argue
+    that a vow caused the sickness, but World contains no divine answer for
+    Belief to hide.  `offerings_made` is simply what the ruler did, in order,
+    with no verdict attached.
     """
     court = world.court
     seat = world.places.get(court.seat)
@@ -338,8 +481,10 @@ def _archive(world) -> dict:
         hits[query] = [
             {"ref": doc.ref, "kind": doc.kind, "title": doc.title,
              "dated_as": doc.dated_as, "sender": doc.sender,
+             "recipient": doc.recipient,
              "received_turn": doc.received_turn,
-             "snippet": arch.snippet(doc), "tags": list(doc.tags)}
+             "snippet": arch.snippet(doc), "body": doc.body,
+             "tags": list(doc.tags)}
             for doc in arch.search(world, query)
         ]
     return {
@@ -386,10 +531,20 @@ def _house(world) -> dict:
             "expecting": person.pregnant_until is not None,
             "faction": person.faction,
             "agenda": person.own_agenda,
+            "competence": _health_word(person.competence).replace(
+                "in rude health", "exceptionally able").replace(
+                "well", "capable").replace(
+                "ailing", "ordinary").replace(
+                "gravely ill", "poor").replace("sinking", "unfit"),
+            "loyalty": _esteem_word(person.loyalty),
+            "post": person.post,
+            "interests": list(person.interests),
+            "named_heir": court.named_heir == person.id,
         })
     return {
         "ruler": court.ruler,
         "reigns": court.reigns,
+        "named_heir": court.named_heir,
         "members": people,
         # Everything the diviner has said, and nothing about whether he was
         # right. There is no field here that could answer that (spec 6.11).
@@ -402,6 +557,63 @@ def _house(world) -> dict:
     }
 
 
+def _world_graph(world) -> dict:
+    """The inherited route tablet, not live knowledge of foreign places.
+
+    Place names and courier legs are authored court knowledge.  Projecting them
+    lets the World view draw the scenario it was handed instead of carrying a
+    second, hardcoded Ugarit inside the UI.  Nothing material or epidemiological
+    crosses this boundary: population, route risk, infection, and every other
+    live property remain in World.
+
+    The tablet itself is dated to the opening of play.  Seasonal availability is
+    different: the court knows its own calendar, so that observation is dated to
+    the current turn and does not make the rest of the route record fresh.
+    """
+    now = world.date.absolute
+    source = "court map"
+    sailing = sea_open(world.season, world.date.fortnight)
+    return {
+        "source": source,
+        "as_of_turn": 0,
+        "age_turns": max(0, now),
+        "places": [
+            {
+                "id": place.id,
+                "name": place.name,
+                "source": source,
+                "as_of_turn": 0,
+                "age_turns": max(0, now),
+                "certainty": "charted",
+            }
+            for place in sorted(world.places.values(), key=lambda item: item.id)
+        ],
+        "routes": [
+            {
+                "a": route.a,
+                "b": route.b,
+                "mode": route.mode,
+                "seasonal": route.seasonal,
+                "legs": route.legs,
+                "source": source,
+                "as_of_turn": 0,
+                "age_turns": max(0, now),
+                "certainty": "charted",
+                "availability": (
+                    "closed" if route.seasonal and not sailing else "open"),
+                "availability_source": "court calendar",
+                "availability_as_of_turn": now,
+            }
+            for route in sorted(
+                world.routes,
+                key=lambda item: (
+                    min(item.a, item.b), max(item.a, item.b),
+                    item.mode, item.legs),
+            )
+        ],
+    }
+
+
 def project(world) -> dict:
     c = world.court
     d = world.date
@@ -410,8 +622,14 @@ def project(world) -> dict:
     # The Stack: unread first, then freshest (the scribe's importance-bias
     # ordering lands in M6). The Archive: the permanent record, by received turn
     # only -- it cannot sort by the senders' own dates (spec 6.17).
-    stack = sorted(items, key=lambda it: (it["read"], -it["received_turn"]))
+    stack = sorted(
+        (item for item in items if not item["archived"]),
+        key=lambda it: (it["read"], -it["received_turn"]))
+    correspondence_archive = sorted(
+        (item for item in items if item["archived"]),
+        key=lambda it: -it["received_turn"])
     archive = sorted(items, key=lambda it: it["received_turn"])
+    outbox = _outbox(world)
     groups = []
     for gid in sorted(c.dependents):
         g = c.dependents[gid]
@@ -469,6 +687,8 @@ def project(world) -> dict:
         "attention_base": c.attention_base,
         "sea_open": sea_open(world.season, d.fortnight),
         "stack": stack,
+        "correspondence_archive": correspondence_archive,
+        "outbox": outbox,
         "archive": archive,
         "inspected": list(c.inspected),
         "unrest": c.unrest,
@@ -480,6 +700,7 @@ def project(world) -> dict:
         "oaths": oaths,
         "regnal_year": d.year,
         "house": _house(world),
+        "world_graph": _world_graph(world),
         "land": _land(world, perr),
         "plague": _plague(world, perr),
         "archive_index": _archive(world),
@@ -492,6 +713,17 @@ def project(world) -> dict:
         "institutions": _institutions(world),
         "projects": _projects(world),
         "plans": _plans(world),
+        "justice": _justice(world),
+        "revenue": {
+            "land_rate": c.land_due_rate,
+            "land_base": c.land_due_base,
+            "last_land_due": c.last_land_due,
+            "harbour_rate": c.harbour_due_rate,
+            "harbour_customary": c.harbour_due_customary,
+            "harbour_traffic": c.harbour_traffic,
+            "last_harbour_due": c.last_harbour_due,
+            "harbour_good": world.revenue_good,
+        },
         "works_season": _works_season(world),
         "works_materials": dict(world.works_materials),
         "repair_days_per_point": world.works_rules.get(

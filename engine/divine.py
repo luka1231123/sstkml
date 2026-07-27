@@ -1,25 +1,13 @@
-"""Divination (spec 6.11). The only legitimate way to reduce uncertainty.
+"""Divination as a situated, fallible human forecast.
 
-The engine reads a fact that is *already true* out of the precomputed future --
-the climate series fixed at load (6.4), a mortality roll that is a pure function
-of (seed, turn, person) -- and then decides how faithfully the diviner reports
-it. Nothing is decided here and then retro-fitted as fate. That distinction is
-the whole reason this system is honest, and it is why M8 had to precompute the
-climate before M9 could ask about it.
+The diviner reads observations, court records, seasonal tradition, and visible
+health.  He never reads ahead in the climate series or asks the mortality RNG
+what will happen.  Competence controls how faithfully he interprets evidence;
+loyalty controls how often his institutional interest shades the report.
 
-Three things degrade the answer, in this order:
-
-  1. accuracy, from the diviner's competence plus what was offered
-  2. on failure, a *plausible neighbouring* value -- one band off, or a negated
-     boolean. Never noise. A wrong omen must look exactly like a right one.
-  3. faction bias, which shades a correct answer toward what the temple already
-     wanted, with a probability set by how loyal the diviner is to YOU
-
-The player is never told the accuracy, and there is no field anywhere that says
-whether an omen was right. Acting against a published omen costs legitimacy
-whether or not it was correct, which is the political part: you are not being
-punished for being wrong, you are being punished for being seen to defy the
-gods, and those are different things.
+The result remains politically real.  It can be published, suppressed, leaked,
+or defied, but later history is not forced to obey it and World stores no
+privileged correctness verdict.
 """
 from __future__ import annotations
 
@@ -29,8 +17,7 @@ from engine import actions as A
 from engine.core import lerp_table, stream
 from engine.state import Omen, World
 
-# Harvest bands, worst to best. Neighbouring means adjacent in this list, which
-# is what makes a wrong answer plausible rather than absurd.
+# Harvest bands, worst to best. Neighbouring means adjacent in this list.
 HARVEST_BANDS = ("failure", "poor", "middling", "good", "abundant")
 QUESTIONS = ("harvest", "death", "route")
 
@@ -40,51 +27,87 @@ def _table(world: World, name: str, x: int, default: int = 0) -> int:
     return default if not points else lerp_table(points, x)
 
 
-# --- the true future ---------------------------------------------------------
-def _true_harvest_band(world: World) -> str:
-    """What the coming harvest will actually be, read from the fixed series.
-
-    A band, not a number: the gods do not do arithmetic, and a figure would
-    make the omen worth more than the whole information economy around it.
-    """
-    from engine.land import climate_at
-    season = world.season.get("growing", ())
-    if not season:
-        return "middling"
-    from engine.core import in_range
-    now = world.date.absolute
-    values = [climate_at(world, now + ahead) for ahead in range(1, 25)
-              if in_range((world.date.fortnight + ahead - 1) % 24 + 1,
-                          tuple(season))]
-    if not values:
-        return "middling"
-    mean = sum(values) // len(values)
-    for ceiling, band in ((70, "failure"), (88, "poor"),
-                          (105, "middling"), (125, "good")):
-        if mean < ceiling:
-            return band
-    return "abundant"
+# --- evidence available at the time -----------------------------------------
+def _band(value: int, ceilings: tuple[int, ...]) -> int:
+    for index, ceiling in enumerate(ceilings):
+        if value < ceiling:
+            return index
+    return len(ceilings)
 
 
-def _true_death(world: World, subject: str) -> str:
-    from engine import house
-    return "yes" if house.dies_within(world, subject, 8) else "no"
+def _harvest_evidence(world: World) -> str:
+    """A coarse reading of today's gauge and completed harvest records only."""
+    from engine.land import gauge_reading
+
+    # The well/gauge is a present observation.  These coarse bands deliberately
+    # throw away the exact climate index from which the proxy was produced.
+    water = _band(gauge_reading(world), (18, 24, 33, 39))
+
+    normal = sum(
+        estate.area_iku * estate.base_yield_per_iku
+        for estate in world.court.estates.values())
+    if normal <= 0 or world.court.last_harvest <= 0:
+        record = 2
+    else:
+        ratio = 1000 * world.court.last_harvest // normal
+        record = _band(ratio, (350, 650, 900, 1100))
+
+    # Recent water carries twice the weight of a year-old floor record.  Both
+    # are available evidence; neither says what next fortnight's weather is.
+    index = max(0, min(4, (water * 2 + record) // 3))
+    return HARVEST_BANDS[index]
 
 
-def _true_route(world: World, place: str) -> str:
-    """Whether the sea to a place will be shut when it next matters."""
+def _death_evidence(world: World, subject: str) -> str:
+    """Traditional risk applied to age and visible health, never a death roll."""
+    person = world.court.house[subject]
+    annual = _table(world, "mortality_by_age", person.age_turns)
+    annual = annual * _table(
+        world, "mortality_by_health", person.health, 1000) // 1000
+    # A forecast of death in the coming season should be rare but not reserved
+    # for knowledge of an already-drawn outcome.
+    return "yes" if annual >= 120 else "no"
+
+
+def _route_evidence(world: World, place: str) -> str:
+    """Known route topology plus the court's seasonal sailing tradition."""
+    from engine.mail import shortest_path
     from engine.systems import sea_open
-    ahead = (world.date.fortnight + 3 - 1) % 24 + 1
-    return "open" if sea_open(world.season, ahead) else "shut"
+
+    path = shortest_path(world.routes, world.court.seat, place) if place else ()
+    if place and not path:
+        return "shut"
+
+    edges = set(zip(path, path[1:])) | set(
+        (b, a) for a, b in zip(path, path[1:]))
+    seasonal_sea = (
+        not place
+        or any((route.a, route.b) in edges
+               and route.seasonal and route.mode == "sea"
+               for route in world.routes)
+    )
+    if not seasonal_sea:
+        return "open"
+
+    # Three fortnights is the traditional planning horizon used by the old
+    # consultation.  Calendar knowledge is not a privileged future value.
+    for ahead in range(4):
+        fortnight = (world.date.fortnight + ahead - 1) % 24 + 1
+        if not sea_open(world.season, fortnight):
+            return "shut"
+    return "open"
 
 
-def true_answer(world: World, question: str, subject: str) -> str:
+def evidence_forecast(world: World, question: str, subject: str) -> str:
+    """The forecast implied by present/past evidence before human distortion."""
     if question == "harvest":
-        return _true_harvest_band(world)
+        return _harvest_evidence(world)
     if question == "death":
-        return _true_death(world, subject)
+        if subject not in world.court.house:
+            raise ValueError(f"no such person in the house: {subject}")
+        return _death_evidence(world, subject)
     if question == "route":
-        return _true_route(world, subject)
+        return _route_evidence(world, subject)
     raise ValueError(f"the diviner does not read that: {question!r}")
 
 
@@ -101,24 +124,28 @@ def _neighbour(question: str, value: str, rng) -> str:
 
 
 def _faction_shift(world: World, question: str, value: str, rng) -> str:
-    """The temple would rather the king stayed home and kept the rites, so it
-    shades toward the answer that argues for caution: a worse harvest, a death
-    to prepare for, a sea that is shut. A loyal diviner does this less. He is
-    not more honest; he is loyal to you rather than to them."""
+    """Shade evidence toward the diviner's institutional interest."""
     bias = _table(world, "diviner_bias", world.court.diviner_loyalty)
     if not rng.chance(bias, 1000):
         return value
-    if question == "harvest":
-        index = max(0, HARVEST_BANDS.index(value) - 1)
-        return HARVEST_BANDS[index]
-    return "yes" if question == "death" else "shut"
+    faction = world.court.diviner_faction
+    if faction == "temple":
+        if question == "harvest":
+            index = max(0, HARVEST_BANDS.index(value) - 1)
+            return HARVEST_BANDS[index]
+        return "yes" if question == "death" else "shut"
+    if faction in ("harbour", "merchant"):
+        if question == "harvest":
+            index = min(len(HARVEST_BANDS) - 1,
+                        HARVEST_BANDS.index(value) + 1)
+            return HARVEST_BANDS[index]
+        return "no" if question == "death" else "open"
+    return value
 
 
 def consult(world: World, question: str, subject: str,
             offering_value: int = 0) -> tuple[World, list]:
-    """Take an omen. Returns the world with the omen recorded and the event
-    carrying what the diviner said -- which may be wrong, and the player will
-    never be told which."""
+    """Take and record a fallible forecast from available evidence."""
     if question not in QUESTIONS:
         raise ValueError(f"the diviner does not read that: {question!r}")
     if question == "death" and subject not in world.court.house:
@@ -126,17 +153,19 @@ def consult(world: World, question: str, subject: str,
 
     seq = world.omen_seq + 1
     omen_id = f"O{seq}"
-    truth = true_answer(world, question, subject)
+    evidence = evidence_forecast(world, question, subject)
 
-    accuracy = _table(world, "divination_accuracy",
-                      world.court.diviner_competence, 500)
-    accuracy += _table(world, "offering_bonus", offering_value)
-    accuracy = max(0, min(1000, accuracy))
+    competence = _table(
+        world, "divination_accuracy", world.court.diviner_competence, 500)
 
     rng = stream(world.seed, world.date.absolute, "divination", omen_id)
-    reported = truth if rng.chance(accuracy, 1000) else _neighbour(
-        question, truth, rng)
+    reported = evidence if rng.chance(competence, 1000) else _neighbour(
+        question, evidence, rng)
     reported = _faction_shift(world, question, reported, rng)
+
+    # The material offering was already removed by reduce.apply.  It purchases
+    # the rite and its public meaning, not access to tomorrow's state.
+    _ = offering_value
 
     omen = Omen(id=omen_id, turn=world.date.absolute, question=question,
                 subject=subject, reported=reported, published=True)

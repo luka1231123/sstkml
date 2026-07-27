@@ -1,84 +1,102 @@
-"""HELP: the advisor that is free, always right, and never calls a model (D33).
-
-The distinction that makes two advisors worth having: HELP knows the *game* --
-which key opens what, what a fortnight costs, what a word on a screen means --
-and it is never wrong, because it is a written page. COUNSEL knows the *world*,
-costs an hour, and can be mistaken, because he is a person.
-
-So nothing here is generated and nothing here is judgement. It will tell you
-that reading a tablet costs two hours; it will not tell you which tablet to
-read. That line is D19's, and HELP is on the safe side of it.
-"""
+"""The Palace Tutor: conversational, retrieval-grounded game help."""
 from __future__ import annotations
 
-from tui import style
+import textwrap
+
+from tui import art, style
 from tui.grid import INDEX, Screen, Surface
 
 C = INDEX
 
-# (heading, [(key or "", text)]). A key makes the row a key cap; a row without
-# one is a sentence.
-PAGES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
-    ("THE FORTNIGHT", (
-        ("", "A turn is a fortnight. You have a lamp's worth of hours in it,"),
-        ("", "and every hour spent reading is an hour not spent elsewhere."),
-        ("", "Reading a tablet costs two. The lamp shows what is left."),
-        ("space", "end the fortnight and let the world move"),
-    )),
-    ("THE WINDOWS", (
-        ("s", "the stack — what arrived; press 1-9 to read one"),
-        ("t", "the stores — what is counted, and how it has moved"),
-        ("r", "the roll — who is owed and who was paid"),
-        ("m", "the muster — where the men are and what they are doing"),
-        ("o", "the oaths — the clauses you are bound by, in full"),
-        ("l", "the land — the gauge, the floor, the seed, the hands"),
-        ("h", "the house — your family, and who stands to inherit"),
-        ("w", "the known world — who is where, and what is reachable"),
-        ("esc", "close a window. the hall never closes but to leave"),
-    )),
-    ("THE ROOMS", (
-        ("d", "the desk — answer a letter. two hours, whatever it says"),
-        ("c", "counsel — Yabninu. an hour a question, and he can be wrong"),
-        ("v", "the altar — put a question to the diviner"),
-        ("a", "the tablet house — search the archive. an hour a query"),
-        ("", "In the stack press 1-9 to read; in an open letter press [a]"),
-        ("", "to answer it, and the desk opens beside the claim it answers."),
-    )),
-    ("THE WHOLE POINT", (
-        ("", "Every window is a real window. Drag two apart and read them"),
-        ("", "together: the letter beside the ledger it makes a claim about."),
-        ("", "Nothing in this game will tell you that a figure is wrong."),
-        ("", "A man reporting his own affairs reports them as he would like"),
-        ("", "them read, and the scribe who copied him made his own errors."),
-        ("", "The only correction is a second source."),
-    )),
-    ("WHAT IT WILL NOT DO", (
-        ("", "It will not warn you. It will not rank what is urgent."),
-        ("", "It will not confirm that an offering was accepted, or that a"),
-        ("", "letter was well received. If you want to know, look, and if"),
-        ("", "looking costs an hour then that is what knowing costs."),
-    )),
+SUGGESTIONS = (
+    "How do I send troops on campaign?",
+    "How do I repair a building?",
+    "List every kind of order you know.",
 )
 
 
-def compose(width: int = 74, height: int = 44) -> Screen:
+def _conversation_rows(
+        said: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+        room: int) -> list[tuple[str, int]]:
+    rows: list[tuple[str, int]] = []
+    if not said:
+        intro = (
+            "Ask me how to operate the palace, where to find a report, what "
+            "an action costs, or the exact words for any order."
+        )
+        rows.extend((line, C["ash"]) for line in textwrap.wrap(intro, room))
+        rows.append(("", C["clay"]))
+        rows.extend((line, C["dim"]) for line in textwrap.wrap(
+            "I search the current command tablets before answering. I know "
+            "the rules and controls; I do not choose policy for you.", room))
+        return rows
+    for who, what in said:
+        speaker = "you:" if who == "player" else "Tutor:"
+        rows.append((speaker, C["flame"] if who == "player" else C["sky"]))
+        colour = C["clay"] if who == "player" else C["bone"]
+        rows.extend((f"  {line}", colour)
+                    for line in textwrap.wrap(what, max(8, room - 2)))
+        rows.append(("", colour))
+    return rows
+
+
+def compose(width: int = 100, height: int = 38,
+            said: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+            typed: str = "", typing: bool = True,
+            sources: tuple[str, ...] = ()) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
-    style.panel(surface, 0, 0, width, height, title="HELP",
-                note="[esc] close", drop=False)
-    y = 2
-    for title, rows in PAGES:
-        if y >= height - 2:
-            break
-        style.bar(surface, 2, y, width - 4, " " + title,
-                  fg=C["bone"], bg=C["faint"])
-        y += 1
-        for key, text in rows:
-            if y >= height - 2:
-                break
-            if key:
-                style.keycap(surface, 3, y, key, text[: width - 9 - len(key)])
-            else:
-                surface.text(5, y, text[: width - 7], C["clay"], C["ink"])
-            y += 1
-        y += 1
-    return surface.freeze()
+    style.panel(surface, 0, 0, width, height,
+                title="THE PALACE TUTOR · HELP", drop=False)
+
+    art.draw(surface, 3, 2, art.SCRIBE, lit=C["bone"], mid=C["dim"],
+             dark=C["faint"])
+    surface.text(3, 12, "the Tutor", C["clay"], C["ink"])
+    surface.text(3, 13, "keeper of rules", C["ash"], C["ink"])
+    surface.text(3, 15, "costs no hours", C["sky"], C["ink"])
+    surface.text(3, 17, "knows controls", C["dim"], C["ink"])
+    surface.text(3, 18, "and all orders", C["dim"], C["ink"])
+    for row in range(2, height - 9):
+        surface.put(19, row, "│", C["faint"], C["ink"])
+
+    left = 22
+    room = width - left - 3
+    foot = height - 9
+    available = foot - 3
+    rows = _conversation_rows(said, room)
+    # Help is a conversation, so the newest exchange must remain visible.
+    for offset, (line, colour) in enumerate(rows[-available:]):
+        surface.text(left, 2 + offset, line[:room], colour, C["ink"])
+    if sources:
+        source_text = "command tablets: " + ", ".join(
+            source.replace("_", " ") for source in sources[:4])
+        surface.text(left, foot - 1, source_text[:room], C["faint"], C["ink"])
+
+    style.bar(surface, 2, foot, width - 4, " ASK HOW TO DO ANYTHING",
+              fg=C["bone"], bg=C["faint"])
+    field_width = width - 8
+    visible = typed[-(field_width - 2):]
+    style.bar(surface, 3, foot + 1, width - 6, " " + visible,
+              fg=C["bone"], bg=C["faint"])
+    if typed:
+        surface.put(4 + min(len(visible), field_width - 2), foot + 1,
+                    "█", C["flame"], C["faint"])
+    else:
+        surface.text(5, foot + 1,
+                     "type a question about any screen, key, cost, or order",
+                     C["ash"], C["faint"])
+    surface.link(3, foot + 1, width - 6, 1, "focus")
+    surface.text(3, foot + 2,
+                 "answers retrieve from the current command tablets · no hours",
+                 C["ash"], C["ink"])
+
+    surface.text(3, foot + 3, "QUESTIONS READY", C["dim"], C["ink"])
+    for index, suggestion in enumerate(SUGGESTIONS):
+        style.keycap(surface, 3, foot + 4 + index, f"F{index + 1}",
+                     suggestion[:width - 13], command=f"F{index + 1}")
+
+    style.footer(surface, [
+        style.FooterAction("enter", "ask"),
+        style.FooterAction("ctrl-u", "clear"),
+        style.FooterAction("esc", "return to Hall"),
+    ], y=height - 2, x=2, width=width - 4)
+    return surface.interactive()

@@ -151,8 +151,8 @@ def test_safe_fields_is_a_type_boundary_not_a_convention():
 def test_no_prompt_any_role_builds_ever_contains_a_forbidden_key():
     """Spec 8.9, stated as a test: the model must never see these."""
     world = _run(14)
-    world = dataclasses.replace(world, court=dataclasses.replace(
-        world.court, liability={"oath_hatti_grain": 4242}))
+    assert "liability" not in {
+        field.name for field in dataclasses.fields(type(world.court))}
     belief = project(world)
     prompts: list[str] = []
 
@@ -185,7 +185,7 @@ def test_no_prompt_any_role_builds_ever_contains_a_forbidden_key():
     for key in FORBIDDEN_KEYS - ALSO_GAME_WORDS:
         assert not re.search(rf"(?<!\w){re.escape(key)}(?!\w)", blob), (
             f"forbidden key {key!r} reached a prompt")
-    assert "4242" not in blob, "hidden liability reached a prompt"
+    assert "liability" not in blob
 
 
 def test_the_voicer_is_told_the_lie_and_never_the_truth():

@@ -40,15 +40,14 @@ def test_grain_is_conserved():
         before = world.court.stores["grain"]
         world, events = advance(world)
         after = world.court.stores["grain"]
-        income = sum(e.amount for e in events if isinstance(e, A.GrainReceived))
-        threshed = sum(e.qa - e.held_back_as_seed for e in events
-                       if isinstance(e, A.Threshed))
+        threshed = sum(e.taken for e in events
+                       if isinstance(e, A.LandDueTaken))
         paid = sum(e.paid for e in events if isinstance(e, A.RationsPaid))
         spoiled = sum(e.amount for e in events
                       if isinstance(e, A.Spoiled) and e.good == "grain")
         rite = sum(_rite_grain(world.court, e.rite_id) for e in events
                    if isinstance(e, A.RitePerformed))
-        assert after == before - spoiled + income + threshed - rite - paid
+        assert after == before - spoiled + threshed - rite - paid
 
 
 def test_arrears_monotone_under_zero_allocation():

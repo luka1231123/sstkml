@@ -107,4 +107,4 @@ def compose(b: dict, selected: str = "", width: int = 82,
             " [1-9] set it in hand   [a-h] a work already out   [esc] close")
     style.bar(surface, 2, height - 2, width - 4, note,
               fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    return surface.interactive()

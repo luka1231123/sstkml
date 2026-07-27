@@ -928,3 +928,58 @@ announced, because the opening of a granary is a day the city keeps.
 A repair is priced when the order is given and never revised. The fabric decays
 while the men work, so a repair commissioned at 400 lands near 950 rather than
 at 1000. That gap is not a rounding error, it is the interest on having left it.
+
+## D43 — the Hall advises, and Counsel carries the order
+
+The palace is no longer a flat collection of reports. **The Hall is home:** it
+holds the complete realm header, the people physically waiting, the Inbox, the
+routes through the palace, and a short ordered list of matters before the king.
+Every concern is derived from Belief, never World, so advice may be mistaken for
+the same reasons every other report may be mistaken. Clicking a recommendation
+navigates or prepares an order; it never spends attention by surprise.
+
+**Counsel is the command line in the fiction.** The player speaks normally to
+Yabninu. Questions receive his fallible reading of the visible evidence. Clear
+orders are parsed into the same engine actions as every other controller,
+preflighted together, and then carried out together or not at all. There is no
+second confirmation ritual for an unambiguous instruction: Yabninu reports
+what was actually done, and an impossible or ambiguous instruction remains a
+conversation rather than a silent failure.
+
+The Stack becomes a single long **Inbox**: selection, unread state, tablet body,
+and the attention price of breaking a seal remain in one place. Outgoing
+letters are explicitly not redesigned here; their replacement is parked in
+`docs/LETTERS_REDESIGN.md`.
+
+Mouse interaction is metadata beside the glyph grid, not a second interface.
+An interactive screen wraps the immutable cells with rectangular commands;
+Tk dispatches those commands through the keyboard handlers, while terminal and
+ASCII readers unwrap the same cells. The Hall alone owns the realm header.
+Every other place owns its title and a shared contextual footer, and every
+selected state has a glyph rather than depending on colour.
+
+## D44 — Help speaks, but the command tablets own the answer
+
+D36's distinction survives but its implementation changes: **Help is still
+free and authoritative, but it is no longer a written page.** The Palace Tutor
+is a conversation. The player may ask how to do a thing in ordinary language,
+ask a short follow-up, or ask for the full territory of orders without hunting
+through a manual.
+
+The model does not know commands from its training. Retrieval chooses records
+from `content/help_commands.toml`, adds only currently valid projected names,
+and hands those passages to the optional Help role. The model may phrase the
+answer; it may not supply an un-retrieved key, cost, identifier, or rule.
+Invented numerals fail the same numeric guard used at the other model
+boundaries. With no model, the retrieved record itself is the answer, including
+its exact syntax and example.
+
+Every command record names the closed parser verbs it explains. A test requires
+their union to equal `ai.parser.VERBS`, and another requires every built Hall
+door to have a known key. Thus “Help knows every command” is an invariant rather
+than a promise in a prompt: adding an order or destination without teaching the
+Tutor makes the suite fail.
+
+Help knows operation, not policy and not World. It costs no hours and does not
+touch the action log. Counsel remains the fallible adviser about the kingdom
+and the only conversational place that carries orders into the engine.

@@ -10,9 +10,9 @@ question he can answer.
 
 Two things are held back and both are game design, not caution: figures he was
 handed stale stay stale (he is wrong about one thing in five, decided in
-`tui/counsel.py` before any prompt exists), and the answers to the game's
-puzzles are not in his digest — he does not know which oath the gods are angry
-about any more than the king does.
+`tui/counsel.py` before any prompt exists), and hidden physical state is not in
+his digest. He can argue that an oath caused a sickness because a person may
+believe that; he cannot receive a secret engine verdict.
 
 With no Ollama running he falls back to authored lines. Nothing tells the player
 which he got.

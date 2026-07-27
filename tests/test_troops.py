@@ -100,9 +100,9 @@ def test_a_watch_counts_half_because_a_watch_is_not_a_defence():
     world = load_scenario("ugarit", SEED)
     watch = next(f for f in world.court.formations if f.id == "coast_watch")
     assert watch.task == "watch"
-    assert troops.garrison_strength(world.court, watch.place) == watch.strength // 2
+    assert troops.garrison_strength(world.court, watch.place) == watch.ready // 4
     world, _ = apply(world, A.AssignTroops("coast_watch", "garrison", watch.place))
-    assert troops.garrison_strength(world.court, watch.place) == watch.strength
+    assert troops.garrison_strength(world.court, watch.place) == watch.ready // 2
 
 
 # --- troops as labour (D25 item 2, spec 6.4 line 566) ------------------------
@@ -198,13 +198,12 @@ def _due_now(world, mustered_at=None):
 def test_a_muster_that_never_marched_is_a_violation():
     world = _run(3)
     assert world.date.fortnight != 24          # keep the grain clause out of it
-    before = dict(world.court.liability)
-    audited, events = audit_oaths(_due_now(world))
+    due = _due_now(world)
+    audited, events = audit_oaths(due)
     violated = [e for e in events if isinstance(e, A.OathViolated)
                 and e.clause_kind == "provide_troops"]
     assert len(violated) == 1
-    assert (audited.court.liability["oath_hatti_grain"]
-            > before.get("oath_hatti_grain", 0))
+    assert audited == due
 
 
 def test_men_standing_at_the_muster_place_answer_it():
@@ -224,13 +223,12 @@ def test_it_is_judged_once_and_not_every_turn_after():
     world = _run(3)
     world = _due_now(world)
     audited, _ = audit_oaths(world)
-    owed = audited.court.liability["oath_hatti_grain"]
     later = dataclasses.replace(
         audited, date=audited.date.advance())
-    later, events = audit_oaths(later)
+    unchanged, events = audit_oaths(later)
     assert not [e for e in events if isinstance(e, A.OathViolated)
                 and e.clause_kind == "provide_troops"]
-    assert later.court.liability["oath_hatti_grain"] == owed
+    assert unchanged == later
 
 
 def test_a_lapsed_oath_summons_nobody():

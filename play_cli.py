@@ -37,10 +37,11 @@ SEARCH_COST = 1       # spec 6.17: one hour per query, and it is a real hour
 EXPIATE_COST = 2
 QUARANTINE_COST = 1
 SUPPRESS_COST = 2
+HEAR_COST = 1
 
 HELP = """  commands (a leading ':' is optional)
     stack | lists | stores | archive | relations | oaths | land | house
-    plague | tablets | troops
+    plague | tablets | troops | justice
     read <i>                 read a letter in full            (2 hours)
     reply <i> <intent>       answer it with a free-text intent        (2 hours)
     dictate <i>              write the reply yourself, ending with '.' (2 hours)
@@ -59,6 +60,14 @@ HELP = """  commands (a leading ':' is optional)
     build <kind> [place]     put something up; it eats corvee and grain (1 hour)
     repair <institution>     make a thing whole; cheaper than building (1 hour)
     abandon <work>           call the men off; what they ate is gone (1 hour)
+    hear <case>              hear claim and counter-claim             (1 hour)
+    rule <case> <verdict>    for | against | split | defer
+    landdue <rate>           set the land due per thousand
+    harbourdue <rate>        set the harbour due per thousand
+    place <person> <post>    institution, governor:<place>,
+                             command:<formation>, or court:<actor>
+    dismiss <post>           leave that office vacant
+    heir <person>            name one living son as heir
     omen harvest|route       ask the diviner about the year       (2 hours)
     omen death <person>      ask whether a man has long           (2 hours)
     hush <omen>              keep an omen off the record; it may leak (2 hours)
@@ -92,6 +101,17 @@ def _resolve(token: str, stack: list) -> str | None:
         if it["id"].lower() == token:
             return it["id"]
     return None
+
+
+def _resolve_petition(token: str, petitions: list[dict]) -> str | None:
+    token = token.lower()
+    if token.isdigit():
+        index = int(token) - 1
+        return petitions[index]["id"] if 0 <= index < len(petitions) else None
+    return next(
+        (petition["id"] for petition in petitions
+         if petition["id"].lower() == token),
+        None)
 
 
 def _raw_tablet() -> str:
@@ -223,6 +243,8 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                 print(render.plague_screen(b))
             elif screen == "troops":
                 print(render.troops_screen(b))
+            elif screen == "justice":
+                print(render.justice_screen(b))
             elif screen == "tablets":
                 print(render.tablets_screen(b, tablet_query))
             else:
@@ -243,7 +265,7 @@ def run(scenario: str = "ugarit", seed: int | None = None,
 
             if verb in ("stack", "lists", "stores", "archive", "relations",
                         "oaths", "land", "house", "plague", "tablets",
-                        "troops"):
+                        "troops", "justice"):
                 screen = verb
                 if verb != "archive":
                     search_results = None
@@ -389,6 +411,69 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                                   f"and what they ate stay spent.")
                     except ValueError as ex:
                         print(f"  {ex}")
+            elif verb == "hear" and len(args) == 1:
+                petitions = b.get("justice", {}).get("petitions", [])
+                petition_id = _resolve_petition(args[0], petitions)
+                if petition_id is None:
+                    print("  no such petition waits in the hall.")
+                elif left < HEAR_COST:
+                    print("  no hour remains to hear both men.")
+                else:
+                    try:
+                        commit(A.HearPetition(petition_id))
+                        spent += HEAR_COST
+                        screen = "justice"
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "rule" and len(args) == 2:
+                petitions = b.get("justice", {}).get("petitions", [])
+                petition_id = _resolve_petition(args[0], petitions)
+                if petition_id is None:
+                    print("  no such petition waits in the hall.")
+                else:
+                    try:
+                        commit(A.RulePetition(petition_id, args[1].lower()))
+                        screen = "justice"
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb in ("landdue", "harbourdue") and len(args) == 1:
+                try:
+                    rate = int(args[0])
+                    action = (A.SetLandDue(rate) if verb == "landdue"
+                              else A.SetHarbourDue(rate))
+                    commit(action)
+                    name = "land" if verb == "landdue" else "harbour"
+                    print(f"  the {name} due is proclaimed at {rate} "
+                          "in a thousand.")
+                except ValueError as ex:
+                    print(f"  {ex}")
+            elif verb == "place" and len(args) == 2:
+                try:
+                    evs = commit(A.PlacePerson(args[0], args[1]))
+                    placed = next(e for e in evs
+                                  if isinstance(e, A.PersonPlaced))
+                    note = (f"; {placed.displaced} is put out"
+                            if placed.displaced else "")
+                    print(f"  {placed.person_id} is given {placed.post}{note}.")
+                    screen = "house"
+                except ValueError as ex:
+                    print(f"  {ex}")
+            elif verb == "dismiss" and len(args) == 1:
+                try:
+                    evs = commit(A.DismissPerson(args[0]))
+                    gone = next(e for e in evs
+                                if isinstance(e, A.PersonDismissed))
+                    print(f"  {gone.person_id} is dismissed from {gone.post}.")
+                    screen = "house"
+                except ValueError as ex:
+                    print(f"  {ex}")
+            elif verb in ("heir", "name_heir") and len(args) == 1:
+                try:
+                    commit(A.NameHeir(args[0]))
+                    print(f"  {args[0]} is named before the house.")
+                    screen = "house"
+                except ValueError as ex:
+                    print(f"  {ex}")
             elif verb == "dredge" and len(args) == 2:
                 if left < DREDGE_COST:
                     print("  no hour remains for the canal.")

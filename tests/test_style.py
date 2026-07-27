@@ -114,11 +114,10 @@ def test_the_land_reports_no_yield_and_no_forecast() -> None:
 
 
 def test_the_house_draws_a_tree_without_shearing_the_columns() -> None:
-    text = plain_text(document.house(_belief(40), 70, 26))
-    rows = [line for line in text.split("\n") if "├─" in line or "└─" in line]
-    assert rows, "the ruler has no family drawn under him"
-    for row in rows:
-        assert row.index("─") < 8, "the branch is not in the name column"
+    from tui import household
+    text = plain_text(household.compose(_belief(40), width=86, height=34))
+    assert "THE HOUSE" in text
+    assert "PEOPLE" in text and "POSTS" in text
 
 
 def test_a_quiet_fortnight_says_so_without_reassuring() -> None:
@@ -134,19 +133,19 @@ def test_a_fortnight_reports_what_happened_and_not_what_it_means() -> None:
     assert "should" not in text.lower()
 
 
-def test_help_is_a_written_page_and_never_advice() -> None:
+def test_help_is_an_always_ready_grounded_agent() -> None:
     text = plain_text(help_page.compose())
-    assert "Reading a tablet costs two" in text
-    assert "[s] the stack" in text
-    assert "It will not warn you" in text
+    assert "ASK HOW TO DO ANYTHING" in text
+    assert "current command tablets" in text
+    assert "costs no hours" in text
+    assert "[enter] ask" in text
 
 
-def test_help_fits_every_line_it_promises() -> None:
-    """A truncated instruction is worse than no instruction."""
-    text = plain_text(help_page.compose())
-    for _title, rows in help_page.PAGES:
-        for _key, sentence in rows:
-            assert sentence in text, f"cut off: {sentence!r}"
+def test_help_keeps_the_newest_answer_visible() -> None:
+    said = [("player", f"old question {index}") for index in range(20)]
+    said.append(("tutor", "THIS IS THE NEWEST GROUNDED ANSWER"))
+    text = plain_text(help_page.compose(said=said))
+    assert "THIS IS THE NEWEST GROUNDED ANSWER" in text
 
 
 def test_the_palette_is_sixteen_and_no_more() -> None:

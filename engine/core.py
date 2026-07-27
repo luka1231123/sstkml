@@ -25,10 +25,8 @@ DOMAINS: frozenset[str] = frozenset({
     "scribe.error",
     "letters.interception",
     "plague.transmission",
-    "plague.cause",
     "house.conception",
     "divination",
-    "deck",
     "rivals",
     "displacement",
     "relations.patron_notice",
@@ -36,6 +34,8 @@ DOMAINS: frozenset[str] = frozenset({
     "house.mortality",
     "house.sex",
     "succession",
+    "justice.correction",
+    "revenue.merchant",
 })
 
 

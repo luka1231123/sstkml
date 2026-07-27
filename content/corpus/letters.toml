@@ -147,3 +147,14 @@ would choose."""
 court = "the court you now live in"
 regard = "how highly you are held there, as you would like it understood"
 their_debt = "hundreds that court owes your father's house"
+
+[justice_correction]
+summary = "A witness to a case you judged. Something was found afterward."
+template = """To the king, my lord: I am {sender}, and I stood among the men
+when the matter of {case} was examined after the judgement. I write only what
+was found. {finding} Let the tablet stand with the verdict in the house of
+records."""
+
+[justice_correction.labels]
+case = "the petition whose judgement was examined"
+finding = "what the later examination found"

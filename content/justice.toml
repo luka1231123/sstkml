@@ -1,0 +1,120 @@
+# Justice (spec 6.19). Cases are authored because a dispute is social history,
+# not a random number. Their arrival is fixed; only the delay before a witness
+# writes back is drawn from the justice substream.
+
+[rules]
+waiting_unrest_after = 6
+waiting_unrest = 8
+correct_legitimacy = 20
+wrong_legitimacy = -35
+favoured_mood = 60
+refused_mood = -60
+split_mood = -20
+defer_mood = -30
+correction_min = 2
+correction_max = 6
+
+[[cases]]
+id = "boundary_ashiranu"
+arrived_turn = 1
+petitioner = "ashiranu_vintner"
+against = "ili_rapihu_shepherd"
+kind = "boundary"
+unit = "cubits from the old fig tree"
+claim = 60
+counterclaim = 20
+truth = 60
+claim_text = "The stone stood sixty cubits from the old fig tree until Ili-rapihu moved it in the night."
+counter_text = "The stone has always stood twenty cubits out; Ashiranu ploughed past it after the winter rain."
+correction = "We lifted the fallen wall. Beneath it the old dressed stone lay at sixty cubits from the fig tree."
+witness = "yarim_addu_witness"
+faction = "vineyards"
+against_faction = "pastoralists"
+
+[[cases]]
+id = "debt_shipwright"
+arrived_turn = 4
+petitioner = "abdi_anu_shipwright"
+against = "kuppiya_factor"
+kind = "debt"
+unit = "shekels of copper"
+claim = 90
+counterclaim = 30
+truth = 30
+claim_text = "Kuppiya took a steering oar and keel timber and still owes ninety shekels of copper."
+counter_text = "Thirty shekels remained after the timber split; the rest was paid before the harbour witnesses."
+correction = "The harbour account was found under the weights. It marks thirty shekels unpaid, and no more."
+witness = "yarim_addu_witness"
+faction = "craftsmen"
+against_faction = "merchants"
+
+[[cases]]
+id = "inheritance_maryannu"
+arrived_turn = 7
+petitioner = "mutbaal_younger"
+against = "yaqaru_elder"
+kind = "inheritance"
+unit = "iku of their father's field"
+claim = 80
+counterclaim = 0
+truth = 40
+claim_text = "Their father named both sons before the household; Mutbaal asks half of the eighty-iku field."
+counter_text = "The field followed the chariot equipment and belongs whole to the elder son."
+correction = "Three men who poured the burial beer remember both sons named. The field was divided in the spoken bequest."
+witness = "yarim_addu_witness"
+faction = "younger_sons"
+against_faction = "maryannu"
+
+[[cases]]
+id = "exemption_oilpress"
+arrived_turn = 10
+petitioner = "talmi_oilman"
+against = "zakarbaal_collector"
+kind = "exemption"
+unit = "jars owed at the gate"
+claim = 0
+counterclaim = 40
+truth = 0
+claim_text = "Talmi says the king's father freed his press from the gate levy for as long as its oil lit the palace."
+counter_text = "Zakarbaal finds no current tablet and claims forty jars under the customary due."
+correction = "A broken docket was joined in the tablet house. It frees Talmi's press while its oil is taken for the palace lamps."
+witness = "yarim_addu_witness"
+faction = "oilmen"
+against_faction = "collectors"
+
+# The second boundary case is the first deliberate precedent test. It arrives
+# within the playable opening year so the player actually sees his own words
+# quoted back rather than waiting nine simulated years for the mechanic.
+[[cases]]
+id = "boundary_siyannu"
+arrived_turn = 13
+petitioner = "rapanu_farmer"
+against = "shubammu_herdsman"
+kind = "boundary"
+unit = "cubits from the boundary oak"
+claim = 70
+counterclaim = 30
+truth = 30
+claim_text = "Rapanu says the furrow ran seventy cubits from the oak before Shubammu's herd trampled the marker."
+counter_text = "Shubammu says the old grazing line begins thirty cubits from the oak and the new furrow crossed it."
+correction = "The roots held a seal-stone where the herdsmen said: thirty cubits from the oak."
+witness = "yarim_addu_witness"
+faction = "farmers"
+against_faction = "pastoralists"
+
+[[cases]]
+id = "injury_quarry"
+arrived_turn = 17
+petitioner = "arwanu_stonemason"
+against = "biriyawaza_foreman"
+kind = "injury"
+unit = "days of grain owed"
+claim = 60
+counterclaim = 20
+truth = 40
+claim_text = "Arwanu's hand was crushed under a palace block. He asks sixty days of grain from the quarry gang."
+counter_text = "The foreman says Arwanu loosed the rope himself and offers twenty days, as for an ordinary wound."
+correction = "The rope was rotten where it parted, though Arwanu tied it. The elders assessed forty days of grain."
+witness = "yarim_addu_witness"
+faction = "craftsmen"
+against_faction = "overseers"

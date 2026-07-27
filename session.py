@@ -28,7 +28,7 @@ def new_seed() -> int:
     return secrets.randbits(48)
 
 
-SAVE_VERSION = 11     # D25: troops have a task, a place, and a summons to answer
+SAVE_VERSION = 13     # M13.0: causal-foundation and GUI workflow boundary
 
 
 def _verify_protocol(world, action):
@@ -71,20 +71,31 @@ def play(seed: int, scenario: str, script: list[list]) -> tuple[object, list, li
 
 
 def save(path: str | Path, seed: int, scenario: str, turns: int,
-         log: list, world, ai_log: list | None = None) -> None:
-    Path(path).write_text(json.dumps({
+         log: list, world, ai_log: list | None = None,
+         hours_left: int | None = None) -> None:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({
         "version": SAVE_VERSION,
         "seed": seed,
         "scenario": scenario,
         "turns": turns,
         "log": log,
         "ai_log": ai_log or [],
+        # Questions and other information work can spend attention without
+        # changing World, so a GUI save must carry the remainder explicitly.
+        "hours_left": hours_left,
         "state_hash_at_save": state_hash(world),
-    }, indent=2))
+    }, indent=2)
+    # A campaign save should never be a half-written JSON file after an
+    # interrupted process.  Replace a sibling temporary file atomically.
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(payload)
+    temporary.replace(destination)
 
 
-def replay(path: str | Path):
-    """Rebuild from seed + scenario, replay the log, verify the hash.
+def load_session(path: str | Path):
+    """Rebuild and verify a save, returning both world and session metadata.
 
     Never invokes the model. Raises on divergence, naming the turn.
     """
@@ -110,4 +121,10 @@ def replay(path: str | Path):
     want = data["state_hash_at_save"]
     if got != want:
         raise ValueError(f"replay divergence: got {got}, saved {want}")
+    return world, data
+
+
+def replay(path: str | Path):
+    """Compatibility entry point returning only the verified world."""
+    world, _data = load_session(path)
     return world

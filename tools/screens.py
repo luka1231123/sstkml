@@ -27,11 +27,12 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from belief.project import project              # noqa: E402
+from ai import help_agent                       # noqa: E402
 from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import works
+from tui import household, inbox, justice, works
 from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
@@ -44,19 +45,23 @@ DUMP = ROOT / "saves" / "screens.txt"
 # `play_gui.TABLETS` opens the real windows at, so the wrapping read here is
 # the wrapping the player gets.
 SCREENS = {
-    "hall": ("THE HALL", lambda b: hall.compose(b, 92, 30)),
-    "stack": ("THE STACK", lambda b: document.stack(b, 80, 24)),
+    "hall": ("THE HALL", lambda b: hall.compose(b, 104, 36)),
+    "stack": ("THE INBOX", lambda b: inbox.compose(b, 108, 36)),
     "stores": ("THE STORES", lambda b: document.stores(b, 62, 22)),
     "roll": ("THE ROLL", lambda b: document.roll(b, 78, 22)),
     "muster": ("THE MUSTER", lambda b: document.muster(b, 62, 18)),
     "oaths": ("THE OATHS", lambda b: document.oaths(b, 76, 28)),
     "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
-    "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
-    "help": ("HELP", lambda b: help_page.compose(74, 44)),
+    "house": ("THE HOUSE", lambda b: household.compose(
+        b, width=86, height=34)),
+    "help": ("THE PALACE TUTOR · HELP", lambda b: _help(b)),
     "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
+    "justice": ("THE COURT OF JUSTICE", lambda b: justice.compose(
+        b, "", 90, 34)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
-    "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, "", False, 80, 32)),
+    "counsel": ("COUNSEL", lambda b: counsel.compose(
+        b, _talk(b), 6, "", False, 92, 36)),
     "altar": ("THE ALTAR", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
         "harvest", ("oil", 20), 78, 32)),
@@ -72,6 +77,16 @@ def _talk(b: dict) -> list[tuple[str, str]]:
     key, question, topic = counsel.QUESTIONS[1]
     return [("king", question),
             ("scribe", counsel.answer(b, topic, SEED, 8))]
+
+
+def _help(b: dict):
+    """A grounded sample exchange, including the retrieved-source sidecar."""
+    question = "How do I send the chariotry on campaign?"
+    answer, _source, hits = help_agent.speak(
+        question, [], b, SEED, 8, client=None)
+    return help_page.compose(
+        100, 38, [("player", question), ("tutor", answer)],
+        sources=tuple(hit.doc.id for hit in hits))
 
 
 def _desk(b: dict):

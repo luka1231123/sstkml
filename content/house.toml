@@ -44,17 +44,11 @@ conception = [
 ]
 
 # ── Divination (spec 6.11) ────────────────────────────────────────────────────
-# x = diviner competence 0..1000, y = accuracy in permille. Note the floor: a
-# bad diviner is worse than a coin, because he is confident. And note the
-# ceiling: nobody reads the liver at better than four in five.
+# x = diviner competence 0..1000, y = chance in permille of interpreting the
+# available evidence without shifting it one plausible band.  This is forecast
+# craft, not supernatural accuracy; nobody reads tomorrow's engine state.
 divination_accuracy = [
   [0, 300], [300, 430], [600, 620], [800, 730], [1000, 800],
-]
-
-# x = offering value (see relations.toml gift values), y = permille added.
-# Capped, because the gods are not for sale, only for hire.
-offering_bonus = [
-  [0, 0], [200, 30], [600, 70], [1500, 110], [4000, 140], [10000, 150],
 ]
 
 # x = the diviner's loyalty to you 0..1000, y = the chance in permille that he

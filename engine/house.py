@@ -2,8 +2,8 @@
 
 Not a stat block. A cast. Everyone in `Court.house` is a named person who ages,
 sickens, marries, bears children, and dies on a schedule that was fixed the
-moment the seed was chosen -- which is what lets divination (6.11) read a true
-future value about them without the engine cheating.
+moment the seed was chosen for deterministic replay. Divination forecasts from
+visible age and health; it never calls the future mortality helpers below.
 
 Two rules here carry most of the weight.
 
@@ -54,10 +54,8 @@ def fertility(world: World, person: HouseMember) -> int:
 def will_die_on(world: World, person: HouseMember, turn: int) -> bool:
     """Would this person's yearly mortality check kill them on `turn`?
 
-    Pure in (seed, turn, person), so it can be asked about the FUTURE without
-    advancing anything. That is the whole reason divination can be honest: the
-    engine reads a fact that is already true rather than deciding one and then
-    pretending it was fated.
+    Pure in (seed, turn, person) for replay and tests. This is an engine outcome
+    helper, not knowledge available to the diviner or any simulated actor.
     """
     if not person.alive or turn % YEAR != _rule(world, "mortality_fortnight", 6):
         return False
@@ -161,7 +159,12 @@ def _mortality(world: World) -> tuple[World, list]:
     if not events:
         return world, []
     world = dataclasses.replace(
-        world, court=dataclasses.replace(world.court, house=people))
+        world, court=dataclasses.replace(
+            world.court, house=people,
+            named_heir=("" if world.court.named_heir in {
+                event.person_id for event in events
+                if isinstance(event, A.HouseMemberDied)}
+                         else world.court.named_heir)))
     # The ruler among them is a different kind of event entirely.
     if not people[world.court.ruler].alive:
         world, succession = succeed(world)
@@ -244,6 +247,8 @@ def succession_score(world: World, person: HouseMember) -> int:
     if mother is not None and person.mother == mother.id:
         score += 180
     score += world.court.legitimacy // 10
+    if world.court.named_heir == person.id:
+        score += 300
     return score
 
 
@@ -271,8 +276,7 @@ def succeed(world: World) -> tuple[World, list]:
     # Spec 6.9: every oath lapses. Not broken -- lapsed. The man who swore is
     # dead, and nobody owes anybody anything until somebody swears again.
     # ...except a vow to a god, which binds the house and not the man (M10).
-    # The new king inherits his predecessor's debts to heaven and none of his
-    # debts to other kings, which is exactly the wrong way round for him.
+    # This is a continuing recorded obligation, not a hidden physical force.
     oaths = tuple(
         dataclasses.replace(o, lapsed=True)
         if not o.dissolved and not o.binds_house else o
@@ -281,13 +285,7 @@ def succeed(world: World) -> tuple[World, list]:
     court = dataclasses.replace(
         court, ruler=heir.id, legitimacy=legitimacy,
         reigns=court.reigns + 1,
-        # A new man's own liability starts at nothing. He did not swear it --
-        # except where the debt is to a god, which is owed by the house and not
-        # by the man, and which he therefore inherits in full without ever being
-        # told it exists (M10, D26). It is the oldest thing he owns.
-        liability={oath.id: (court.liability.get(oath.id, 0)
-                             if oath.binds_house else 0)
-                   for oath in oaths},
+        named_heir="",
         actor=heir.id)
     # A NEW regnal year 1. Every date correlation the player built is now void,
     # which is the historical condition and not a punishment.

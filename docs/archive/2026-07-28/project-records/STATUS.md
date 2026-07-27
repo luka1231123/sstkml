@@ -1,8 +1,24 @@
 # STATUS
 
-**Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian) · D25 (troops: task, place, garrison strength, troops on the harvest, the `provide_troops` clause and its summons). 247 tests green. Plays: `./run.sh` (windows) or `./run.sh --cli` (terminal).
+**Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian) · D25 (troops: task, place, garrison strength, troops on the harvest, the `provide_troops` clause and its summons) · M12 (institutions, works, justice and precedent, revenue, appointments, placement, named heir) · TUI dashboard rework (Hall, Counsel, Inbox, clickable controls, retrieval-grounded Help). 338 tests green. Plays: `./run.sh` (windows) or `./run.sh --cli` (terminal).
 
-**In progress: M12.** The `Institution` entity is in (spec 6.18): six of them
+**TUI dashboard rework complete.** The Hall is now the 104-column home
+dashboard: realm state, Belief-only concerns and recommendations, people
+waiting, Inbox summary, and grouped destinations. Counsel is the main
+ordinary-language ordering interface and commits compound orders atomically
+after preflight. The 108-column Inbox keeps triage and tablet reading in one
+window. Clickable hit regions sit beside the same glyph grid used by keyboard,
+terminal, and ASCII modes; shared contextual footers expose the live actions.
+Outgoing correspondence remains parked in `docs/LETTERS_REDESIGN.md`.
+
+**The Palace Tutor is live.** Help is now an always-ready conversation instead
+of a static manual. Each question retrieves from `content/help_commands.toml`;
+an optional model phrases only those passages and the current projected names,
+while offline play answers directly from the same records. The corpus is
+required to cover every legal parser verb and every built Hall door. Help and
+follow-ups cost no hours and never enter the action log.
+
+**M12 complete.** The `Institution` entity is in (spec 6.18): six of them
 authored for Ugarit, layered over the existing dependent groups, which are
 untouched. Condition decays every fortnight — faster where the post is vacant,
 faster again where the upkeep goes unpaid — and **the head reports his own
@@ -34,7 +50,7 @@ thousand is **424 / 490 / 976** — there is no longer any seed where the melt
 ledger stays at zero. 6.5 now fires on every seed rather than three quarters of
 them. Granary and unrest are unmoved: 59 / 80 / 83, never maxed.
 
-**Next:** the rest of M12 (D39, D40; spec 6.18–6.22). Institutions layered over the existing dependent groups, heads who are people and who misreport, justice and precedent in the hall, the land due and the harbour due, `place` and the heir, and building as a long bet on which crisis is coming. Then M13 — **the world, the envoy, and the standing order** (D35, renumbered): foreign cities carrying the same institutions, seen only as far as the player has travelled. M14 Displacement, M15 scenarios, M16 epilogue.
+**Next:** M13 — **the world, the envoy, and the standing order** (D35, renumbered): foreign cities carrying the same institutions, seen only as far as the player has travelled. M14 Displacement, M15 scenarios, M16 epilogue.
 
 **What has to be balanced in M12, and where it will fail.** These are the numbers to watch and the failure each one produces if it is wrong:
 
@@ -55,9 +71,9 @@ them. Granary and unrest are unmoved: 59 / 80 / 83, never maxed.
 **Known gap, now measured and one inversion fixed (`tools/sweep.py`).** 32 seeds
 x 96 turns, both policies. The deficit is sound: **passive empties the granary
 and maxes unrest on all 32 seeds**, so no seed has no game in it, and **prudent
-never maxes unrest on any seed**, so competence is never punished by weather
-alone. Granary first empty under prudent: 59 / 80 / 83 (min / median / max), and
-4 seeds never — one year of runway, which is the right shape.
+never empties the granary or maxes unrest on any seed**, so competence is never
+punished by weather alone. Under prudent play grain ends at 378,019 / 575,813 /
+773,375 qa and unrest peaks at 338 / 401 / 547 (min / median / max).
 
 **The bronze chain was inverted and one seed could never have shown it.** Demand
 is scaled by the smiths' `output_modifier`, so starving the forge — the obvious
@@ -108,10 +124,67 @@ trade (M13), so every long run reached a fortnight where the project stopped
 dead for want of a lamp and never restarted. A material cost the player cannot
 resolve is not difficulty, it is a wall in the road. Grain and copper only now.
 
-**Not fixed, and not mine to fix here: oil trends to zero in every long run.**
-The temple's upkeep is 10 oil a fortnight and nothing anywhere produces any. By
-about the fourth regnal year the stock is nought, the temple's upkeep is
-permanently unmet, and it takes the +2 unpaid-upkeep decay for the rest of the
-run with no way for the player to stop it. This is the same shape as the tin
-problem and it wants the same answer — **M13 trade** — so it is written down
-here rather than papered over with a production term that does not exist.
+**Partly closed by 6.20: oil still trends down in a long run.** The customary
+harbour due now brings a small in-kind oil stream from cleared cargo, but it
+does not cover the harbour and temple's combined upkeep. The permanent answer
+is still **M13 trade**; M12 only makes the customs house a real lever.
+
+## M12 #11 — justice and precedent (6.19), done
+
+Six authored disputes now enter the hall over the opening year. `Petition` keeps
+the claim, counter-claim and truth in World; Belief gets only the names and kind
+until `hear` buys both stories for an hour, and it never gets the truth. The king
+may rule without hearing: `for`, `against`, `split`, or `defer`. Deferral keeps
+the men waiting and compounds; a case still standing after six fortnights adds
+eight unrest each turn.
+
+Every substantive verdict becomes a `J-…` tablet in the archive. A later case of
+the same kind cites the latest one, and a wrong contradiction costs twice the
+ordinary legitimacy loss. There is no result on the judgement screen. A
+deterministic correction is scheduled two to six fortnights later, when a local
+witness's unread tablet reaches the Stack and the legitimacy change lands with
+it. The tablet reports what was found, never “right” or “wrong.”
+
+THE COURT OF JUSTICE (`[j]`) is a drawn room: two full standing litigants on the
+king's floor, given equal visual weight. Number keys select a petition; `[h]`
+hears it; `[f]`, `[a]`, `[s]`, and `[d]` give the four verdicts. The same system
+is playable in command mode with `justice`, `hear`, and `rule`.
+
+At the justice checkpoint, the 32-seed economic tails had not inverted. The
+final post-revenue sweep is recorded below.
+
+## M12 #12 — land and harbour dues (6.20), done
+
+The land due opens at the customary 300 per thousand. Harvests are now recorded
+as gross produce and `LandDueTaken` moves exactly `gross * rate // 1000` into
+the crown granary. A rate above custom adds unrest every fortnight and drives a
+cumulative share of the estate hands away; lowering the rate stops further
+flight and does not restore those households.
+
+The harbour due opens at 100 per thousand and collects a small oil render from
+the cargo the harbour actually clears, so condition, staffing and traffic all
+matter. Raising it schedules each merchant's response three to six fortnights
+later. Until that decision arrives the higher due pays immediately; when it
+does, esteem and persistent harbour traffic fall. Both rates are free orders in
+THE HOUSE and are available as `landdue` / `harbourdue` in command mode.
+
+## M12 #13 — appointments, placement, and the named heir (6.22), done
+
+THE HOUSE is now an operating screen rather than only a genealogy. It exposes
+the adult cast, their qualitative competence and loyalty, every institution
+headship, and the succession. A placement can fill an institution, govern a
+town, command a formation, or stand at a foreign court. The person moves,
+retains the interests accumulated in every office, and an incumbent is visibly
+displaced. Dismissal leaves the post vacant and therefore restores headless
+decay.
+
+Competence affects output and decay; loyalty affects the report. Commands move
+their commander with the formation, and foreign placements become
+correspondents with their own report bias. `NameHeir` favours the named son in
+the deterministic succession score. Naming the younger over the elder costs 60
+legitimacy and raises the elder prince's faction; naming the first son costs
+nothing. The same system is available through `place`, `dismiss`, and `heir`.
+
+Final M12 sweep: 32 seeds × 96 turns. Passive empties and maxes unrest on all
+32. Prudent empties and maxes unrest on none; end grain is 378,019 / 575,813 /
+773,375 and peak unrest 338 / 401 / 547. 338 tests are green.

@@ -1,9 +1,9 @@
 """Agriculture and the climate series (spec 6.4). Graduated from systems.py (D1).
 
-Deterministic and opaque. The whole climate series is fixed at scenario start,
-before the player has made a single decision, which is what makes divination
-able to read a true future value later (6.11) and what makes a bad year a thing
-that was always going to happen rather than a thing the dice did to you.
+Deterministic and opaque. The whole climate series is fixed at scenario start
+so replay never depends on draw order. Agriculture reads the current value;
+divination may read current observations and completed records, never ahead in
+this series.
 
 The player never sees any input to the yield formula. He sees a gauge reading
 that a tired official copied, letters from overseers who inflate need and
@@ -63,10 +63,9 @@ def climate_at(world: World, turn: int) -> int:
 def labour_supplied(court: Court, per_head: int) -> int:
     """Labour-days available to the fields this turn (spec 6.4).
 
-    Four sources: groups whose standing function is field labour, groups the
+    Three sources: groups whose standing function is field labour, groups the
     ruler has *ordered* to the harvest at the cost of whatever they normally do,
-    formations tasked to `harvest` (spec 6.4 line 566, D25), and corvee raised
-    outside the lists entirely and paid for in unrest.
+    and formations tasked to `harvest` (spec 6.4 line 566, D25).
 
     A group deep in arrears supplies less, through `output_modifier`. Starving
     the people who bring in the harvest is a slow way to lose the harvest, and
@@ -77,19 +76,69 @@ def labour_supplied(court: Court, per_head: int) -> int:
     total = 0
     for gid in sorted(court.dependents):
         group = court.dependents[gid]
-        if group.function == "field_labour" or gid in court.at_harvest:
+        if (not group.revolting
+                and (group.function == "field_labour"
+                     or gid in court.at_harvest)):
             total += group.size * per_head * group.output_modifier // 1000
-    # The corvée the building site already took is not in the fields. This
-    # subtraction is the entire cost of building (6.21): not the goods, the
-    # hands, billed a year later at the harvest with nothing to connect it to.
-    left = max(0, court.corvee_days - court.works_days)
-    return total + harvest_hands(court, per_head) + left
+    return total + harvest_hands(court, per_head)
+
+
+def corvee_source_capacity(world: World) -> dict[str, int]:
+    """Seasonal days the crown can call from named field-labour cohorts."""
+    span = world.season.get("growing")
+    turns = sum(
+        1 for fortnight in range(1, 25)
+        if span and in_range(fortnight, tuple(span)))
+    turns = max(1, turns)
+    per_head = world.land_rules.get("labour_days_per_head", 12)
+    return {
+        group.id: (
+            group.size * per_head * turns * group.output_modifier // 1000)
+        for group in sorted(
+            world.court.dependents.values(), key=lambda item: item.id)
+        if group.function == "field_labour" and not group.revolting
+    }
+
+
+def source_corvee(world: World, requested: int
+                  ) -> tuple[int, tuple[tuple[str, int], ...],
+                             tuple[tuple[str, int], ...]]:
+    """Allocate requested days to real cohorts.
+
+    Returns ``(raised, aggregate_sources, incremental_sources)``.
+    """
+    existing = dict(world.court.corvee_sources)
+    incremental: dict[str, int] = {}
+    remaining = max(0, requested)
+    for group_id, capacity in sorted(corvee_source_capacity(world).items()):
+        available = max(0, capacity - existing.get(group_id, 0))
+        take = min(remaining, available)
+        if take:
+            existing[group_id] = existing.get(group_id, 0) + take
+            incremental[group_id] = take
+            remaining -= take
+        if remaining <= 0:
+            break
+    raised = requested - remaining
+    return (
+        raised,
+        tuple(sorted(existing.items())),
+        tuple(sorted(incremental.items())),
+    )
 
 
 # --- the yield formula -------------------------------------------------------
 def _response(world: World, table: str, x: int) -> int:
     points = world.land_tables.get(table)
     return 1000 if not points else lerp_table(points, x)
+
+
+def effective_labour_days(world: World, estate: Estate) -> int:
+    """Seasonal field days remaining after realized public works."""
+    total_area = sum(
+        item.area_iku for item in world.court.estates.values()) or 1
+    works_share = world.court.works_days * estate.area_iku // total_area
+    return max(0, estate.labour_days_supplied - works_share)
 
 
 def estate_yield(world: World, estate: Estate) -> int:
@@ -109,9 +158,12 @@ def estate_yield(world: World, estate: Estate) -> int:
                     if estate.climate_turns else 100)
     water = _response(world, "water_response", mean_climate)
 
+    # Public works consume the same seasonal field-labour days. Distribute the
+    # realized (not merely called-up) days by estate area exactly once here.
+    supplied = effective_labour_days(world, estate)
     needed = estate.area_iku * estate.labour_days_per_iku
     labour = _response(world, "labour_response",
-                       1000 * estate.labour_days_supplied // max(1, needed))
+                       1000 * supplied // max(1, needed))
 
     recommended = estate.area_iku * estate.seed_per_iku
     seed = _response(world, "seed_response",
@@ -181,9 +233,16 @@ def step(world: World) -> tuple[World, list]:
             world.land_rules.get("labour_days_per_head", 12))
         # Labour is shared out by area, so a big estate takes the bigger share.
         total_area = sum(estates[e].area_iku for e in estates) or 1
+        weighted_area = sum(
+            estates[e].area_iku * estates[e].hands for e in estates)
+        # Tax flight removes hands from the countryside, not merely from one
+        # line in a ledger. Lowering the due stops further flight but cannot
+        # conjure the departed households back.
+        days = days * weighted_area // max(1, total_area * 1000)
         for eid in sorted(estates):
             estate = estates[eid]
-            share = days * estate.area_iku // total_area
+            share = (days * estate.area_iku * estate.hands
+                     // max(1, weighted_area))
             estates[eid] = dataclasses.replace(
                 estate,
                 climate_sum=estate.climate_sum + index,
@@ -203,13 +262,23 @@ def step(world: World) -> tuple[World, list]:
 
     if phase("threshing"):
         # The window is more than one fortnight wide, so everything here must be
-        # guarded on there actually being a crop on the floor. Closing the season
-        # unconditionally zeroed `last_harvest` on the window's second turn, and
-        # since that is the player's one hard datum about the land, every
-        # decision downstream of it was being made against a nought.
+        # guarded on there being an *active season*, not on a positive crop.
+        # Guarding on `standing_yield` stranded every seasonal accumulator when
+        # drought, seed, or labour produced a genuine zero harvest. Closing
+        # unconditionally instead zeroed `last_harvest` again on the window's
+        # second turn. The working fields are the one-shot marker for both cases.
+        active_season = any(
+            estate.seed_sown
+            or estate.labour_days_supplied
+            or estate.climate_turns
+            or estate.standing_yield
+            or estate.pest != 1000
+            for estate in estates.values()
+        )
         total = sum(estates[e].standing_yield for e in estates)
-        if total:
-            stores["grain"] = stores.get("grain", 0) + total
+        if active_season:
+            from engine.revenue import land_take
+            taken = land_take(world, total)
             # Hold next year's seed back before anyone eats a grain of it, but
             # only enough to reach the recommendation -- a court that still has
             # seed does not need to set aside a second year's worth. A player
@@ -218,10 +287,12 @@ def step(world: World) -> tuple[World, list]:
             seed_target = sum(estates[e].area_iku * estates[e].seed_per_iku
                               for e in estates)
             want = max(0, seed_target - stores.get("seed_grain", 0))
-            held = min(total, want)
-            stores["grain"] -= held
+            held = min(max(0, total - taken), want)
+            stores["grain"] = stores.get("grain", 0) + taken
             stores["seed_grain"] = stores.get("seed_grain", 0) + held
             events.append(A.Threshed(total, held))
+            events.append(A.LandDueTaken(
+                total, court.land_due_rate, taken))
             # The season closes: the fields are reset and this year's number
             # becomes the hard datum the player reasons from for 24 turns.
             for eid in sorted(estates):
@@ -230,7 +301,15 @@ def step(world: World) -> tuple[World, list]:
                     climate_sum=0, climate_turns=0, standing_yield=0, pest=1000)
             court = dataclasses.replace(
                 court, previous_harvest=court.last_harvest, last_harvest=total,
-                at_harvest=(), corvee_days=0, works_days=0)
+                last_land_due=taken,
+                at_harvest=(), corvee_days=0, corvee_sources=(), works_days=0)
+        elif court.at_harvest or court.corvee_days or court.works_days:
+            # The field accumulators were already closed on the first fortnight
+            # of the threshing window. Do not record a second zero harvest, but
+            # do not let a newly raised seasonal assignment leak into next year.
+            court = dataclasses.replace(
+                court, at_harvest=(), corvee_days=0,
+                corvee_sources=(), works_days=0)
 
     court = dataclasses.replace(court, estates=estates, stores=stores)
     return dataclasses.replace(world, court=court), events

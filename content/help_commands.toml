@@ -1,0 +1,413 @@
+# The Palace Tutor's retrieval corpus.
+#
+# `verbs` bind an entry to ai.parser.VERBS. Tests require exact coverage, so a
+# new order cannot enter the game without entering the tutor's knowledge.
+# `keys` do the same job for visible controls. Wording here is player-facing;
+# internal action names never need to enter a prompt.
+
+[[command]]
+id = "help"
+category = "interface"
+title = "Ask the Palace Tutor"
+syntax = "[?] Help; type a question; [Enter] ask"
+answer = "Press ? in the Hall to open Help. Type any question about controls, orders, costs, or where to find something, then press Enter. Help costs no hours; Ctrl-U clears the question and Escape returns to the Hall."
+examples = ["How do I send troops on campaign?", "Where can I inspect the granary?"]
+keywords = ["help", "ask", "question", "instructions", "tutorial", "clear", "close"]
+keys = ["?", "enter", "ctrl-u", "esc", "F1", "F2", "F3"]
+verbs = []
+
+[[command]]
+id = "hall"
+category = "interface"
+title = "Hall and navigation"
+syntax = "[s] Inbox [d] Desk [t] Stores [r] Roll [c] Counsel [m] Muster [o] Oaths [l] Land [y] City [v] Altar [a] Archive [j] Justice [h] House [w] World [f] Relations [p] Sickness"
+answer = "The Hall is home. Numbered matters open their evidence or prepare an order. Its letter keys open every place; D opens the Desk when a read letter is available, Space ends the fortnight, backslash reads the open windows to the terminal, and Q leaves the game. Printed controls can also be clicked."
+examples = ["Press c for Counsel.", "Click a numbered concern to follow it."]
+keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit"]
+keys = ["s", "d", "t", "r", "c", "m", "o", "l", "y", "v", "a", "j", "h", "w", "f", "p", "space", "\\", "q"]
+verbs = []
+
+[[command]]
+id = "inbox"
+category = "interface"
+title = "Inbox and tablets"
+syntax = "[s] Inbox; [Up/Down] choose; [Enter] read; [u] unread; [a] all"
+answer = "Open the Inbox with S. Choose a tablet with Up and Down or click its row. Enter breaks an unread seal for two hours and keeps the tablet in the same window; U shows unread tablets and A shows the whole pile."
+examples = ["How do I read a letter?", "Show all tablets in the Inbox."]
+keywords = ["inbox", "stack", "letter", "tablet", "mail", "unread", "read", "sender", "filter", "correspondence"]
+keys = ["up", "down", "u"]
+verbs = []
+
+[[command]]
+id = "counsel"
+category = "interface"
+title = "Counsel and ordinary-language orders"
+syntax = "[c] Counsel; type an order or question; [Enter] tell Yabninu"
+answer = "Open Counsel with C and say what you want in ordinary language. Clear valid orders are carried out immediately; compound orders all succeed or none do. Questions cost one hour, while orders cost whatever their acts cost. Ctrl-U clears the line."
+examples = ["Give the palace smiths 7000 qa.", "Send the household troops to campaign at Carchemish."]
+keywords = ["counsel", "yabninu", "order", "command", "ordinary", "language", "type", "question", "compound", "atomic"]
+keys = []
+verbs = []
+
+[[command]]
+id = "reports"
+category = "interface"
+title = "Kingdom reports"
+syntax = "[t] Stores [r] Roll [l] Land [m] Muster [o] Oaths [y] City [w] World [f] Relations [p] Sickness"
+answer = "Stores shows counted goods, Roll shows allocations and arrears, Land shows farming and labour, Muster shows formations, Oaths shows clauses, City shows institutions and works, World shows known routes and courts, Relations shows diplomatic dossiers, and Sickness shows known disease and quarantine state. Escape closes any of them."
+examples = ["Where do I see arrears?", "Where are my troops shown?"]
+keywords = ["report", "stores", "roll", "land", "muster", "oaths", "city", "world", "relations", "sickness", "plague", "quarantine", "arrears", "grain", "troops", "institution"]
+keys = []
+verbs = []
+
+[[command]]
+id = "city_works"
+category = "interface"
+title = "City, institutions, and works"
+syntax = "[y] City; choose a building; [i] inspect; [r] repair; [w] Works"
+answer = "The City draws every institution from its reported condition. Select or click a building for its detail. Inspecting buys the true condition for one hour; repairing starts work, and the Works view shows projects already in hand."
+examples = ["How do I inspect the tablet house?", "Where can I see building progress?"]
+keywords = ["city", "institution", "building", "condition", "inspect", "repair", "works", "project", "progress"]
+keys = ["i"]
+verbs = []
+
+[[command]]
+id = "archive_room"
+category = "interface"
+title = "Tablet House search"
+syntax = "[a] Tablet House; type words; [Enter] search"
+answer = "Open the Tablet House with A, type words from the record you seek, and press Enter. A search costs one hour. Up and Down move among findings; Escape returns to the Hall."
+examples = ["Search the archive for the grain oath.", "How do I find an old tablet?"]
+keywords = ["archive", "tablet house", "librarian", "record", "find", "search", "predecessor"]
+keys = []
+verbs = []
+
+[[command]]
+id = "altar_room"
+category = "interface"
+title = "Altar and divination"
+syntax = "[v] Altar; choose harvest, route, or death; choose an offering"
+answer = "Open the Altar with V. Choose what the diviner should read and an offering, then consult him. A reading costs two hours. A larger offering does not buy a truer answer."
+examples = ["How do I ask about the harvest?", "Can the diviner ask about a death?"]
+keywords = ["altar", "diviner", "omen", "harvest", "route", "death", "offering", "liver"]
+keys = []
+verbs = []
+
+[[command]]
+id = "justice_room"
+category = "interface"
+title = "Court of Justice"
+syntax = "[j] Justice; number chooses a case; [h] hear; [f/a/s/d] rule"
+answer = "Open Justice with J and choose a petition. H spends one hour to hear claim and counter-claim. F rules for the claimant, A against, S splits the judgement, and D defers it. The truth is never shown at judgement."
+examples = ["How do I hear a petition?", "How do I defer a ruling?"]
+keywords = ["justice", "petition", "case", "claim", "hear", "rule", "verdict", "defer", "split", "claimant"]
+keys = ["f", "d"]
+verbs = []
+
+[[command]]
+id = "house_room"
+category = "interface"
+title = "House, offices, and succession"
+syntax = "[h] House; choose a person; appoint, dismiss, or name the heir"
+answer = "The House shows living members, their qualities, appointments, and succession. Choose a person to place them in an office, command, governorship, or foreign court. You can also dismiss an office-holder or name an heir."
+examples = ["How do I appoint someone?", "Where do I name an heir?"]
+keywords = ["house", "family", "person", "office", "appoint", "dismiss", "heir", "succession", "governor", "commander"]
+keys = []
+verbs = []
+
+[[command]]
+id = "terminal"
+category = "interface"
+title = "Terminal-only command mode"
+syntax = "stack | lists | stores | archive | relations | oaths | land | house | plague | tablets | troops | justice | save <path> | help | quit"
+answer = "In terminal play, a leading colon is optional. The named report commands print their ledgers; save writes a save file, help prints the compact command list, and quit leaves. The same ordinary-language orders accepted by Counsel are tried by the terminal parser."
+examples = [":stores", "save saves/my-reign.json"]
+keywords = ["terminal", "cli", "colon", "save", "load", "quit", "lists", "relations", "plague", "command mode"]
+keys = []
+verbs = []
+
+[[command]]
+id = "read"
+category = "orders"
+title = "Read a tablet"
+syntax = "read <tablet>"
+answer = "Ask Counsel to read a named tablet, or open the Inbox and press Enter on it. Breaking an unread seal costs two hours. Roman pile numbers and exact tablet IDs are accepted when they identify one tablet."
+examples = ["read ii", "open letter:ashiranu:4"]
+keywords = ["read", "open", "letter", "tablet", "seal", "inbox", "roman"]
+keys = []
+verbs = ["READ_FULL"]
+
+[[command]]
+id = "reply"
+category = "orders"
+title = "Answer a tablet"
+syntax = "reply <tablet> <intent>"
+answer = "Outgoing words still belong at the Desk: read a tablet, choose Answer, choose an intent or dictate the exact text, and seal it. Counsel will not put words in the king's mouth while the correspondence redesign is parked. A reply costs two hours."
+examples = ["reply ii refuse the demand", "Open a read tablet and choose Answer."]
+keywords = ["reply", "answer", "dictate", "letter", "tablet", "desk", "seal", "write", "correspondence"]
+keys = []
+verbs = ["DICTATE"]
+
+[[command]]
+id = "allocate"
+category = "orders"
+title = "Allocate grain"
+syntax = "allocate <group> <qa>"
+answer = "Tell Counsel how much grain a named group should receive. This changes its allocation; payment is resolved by the roll and the available stores."
+examples = ["allocate smiths_palace 7000", "Give the smiths of the palace quarter 7000 qa."]
+keywords = ["allocate", "allocation", "pay", "grain", "qa", "wages", "arrears", "group", "roll"]
+keys = []
+verbs = ["ALLOCATE"]
+
+[[command]]
+id = "priority"
+category = "orders"
+title = "Set payment priority"
+syntax = "set priority to <group> <group> ..."
+answer = "Tell Counsel the groups in the order the roll should pay them down. Use current group IDs when precision matters."
+examples = ["set priority to corvee_workers smiths_palace harbour_workers"]
+keywords = ["priority", "pay", "order", "roll", "arrears", "first", "group"]
+keys = []
+verbs = ["SET_PRIORITY"]
+
+[[command]]
+id = "inspect"
+category = "orders"
+title = "Inspect a ledger"
+syntax = "inspect granary | inspect seed"
+answer = "Tell Counsel to inspect the granary or seed ledger. Inspection costs one hour and replaces a reported count with the king's own count for the fortnight."
+examples = ["inspect granary", "count the seed"]
+keywords = ["inspect", "count", "ledger", "granary", "seed", "true", "stores"]
+keys = []
+verbs = ["INSPECT_LEDGER"]
+
+[[command]]
+id = "eat_seed"
+category = "orders"
+title = "Open seed grain for food"
+syntax = "eat <qa> of seed"
+answer = "Tell Counsel how much seed grain to open for food. It moves that amount into the granary now, leaving less to sow."
+examples = ["eat 5000 qa of seed", "Use 5000 seed grain."]
+keywords = ["eat", "seed", "food", "grain", "granary", "famine", "open"]
+keys = []
+verbs = ["EAT_SEED"]
+
+[[command]]
+id = "gift"
+category = "orders"
+title = "Send a foreign gift"
+syntax = "gift <actor> <good> <quantity>"
+answer = "Tell Counsel the correspondent, gift good, and quantity. Sending a gift costs one hour and can only use known correspondents and gift goods."
+examples = ["gift hatti_king oil 100", "Send 100 oil to the king of Hatti."]
+keywords = ["gift", "send", "foreign", "actor", "correspondent", "good", "oil", "diplomacy"]
+keys = []
+verbs = ["SEND_GIFT"]
+
+[[command]]
+id = "harvest_labour"
+category = "orders"
+title = "Send or recall workers from the harvest"
+syntax = "harvest <group> | recall <group>"
+answer = "Tell Counsel to send a named work group to the fields, or recall it to its own work. Either move costs one hour and changes the labour available to the harvest."
+examples = ["send the harbour workers to the fields", "recall corvee_workers from harvest"]
+keywords = ["harvest", "field", "labour", "workers", "send", "recall", "return", "hands", "group"]
+keys = []
+verbs = ["SEND_TO_HARVEST", "RECALL_FROM_HARVEST"]
+
+[[command]]
+id = "assign_troops"
+category = "orders"
+title = "Assign a formation"
+syntax = "assign <formation> to garrison | watch | harvest | campaign [at <place>]"
+answer = "Tell Counsel which formation, task, and—when relevant—place. The legal tasks are garrison, watch, harvest, and campaign. Reassigning a formation costs one hour."
+examples = ["assign chariotry to campaign at carchemish", "Send the household troops to harvest."]
+keywords = ["assign", "troops", "formation", "army", "men", "garrison", "watch", "harvest", "campaign", "muster", "carchemish"]
+keys = []
+verbs = ["ASSIGN_TROOPS"]
+
+[[command]]
+id = "corvee"
+category = "orders"
+title = "Raise corvée"
+syntax = "raise corvee <days>"
+answer = "Tell Counsel how many days of corvée to levy. The order costs one hour. Those hands can feed works but are taken from other labour and the levy raises unrest."
+examples = ["raise a corvee of 4000 days"]
+keywords = ["corvee", "levy", "labour", "days", "workers", "hands", "unrest"]
+keys = []
+verbs = ["RAISE_CORVEE"]
+
+[[command]]
+id = "dredge"
+category = "orders"
+title = "Dredge an estate canal"
+syntax = "dredge <estate> <days>"
+answer = "Tell Counsel the estate and labour days to put on its canal. Dredging costs one hour and useful work happens at low water."
+examples = ["dredge ashiranu 800 days", "Clear the canal at Ashiranu with 800 days."]
+keywords = ["dredge", "canal", "estate", "water", "irrigation", "days", "clear"]
+keys = []
+verbs = ["DREDGE_CANAL"]
+
+[[command]]
+id = "build"
+category = "orders"
+title = "Begin a building project"
+syntax = "build <kind> [at <place>]"
+answer = "Tell Counsel a known build kind and place. Beginning work costs one hour; progress then consumes corvée days and materials in the proper season."
+examples = ["build a granary at seat", "Build walls at Ugarit."]
+keywords = ["build", "building", "project", "granary", "walls", "construct", "works", "place"]
+keys = []
+verbs = ["BUILD"]
+
+[[command]]
+id = "repair"
+category = "orders"
+title = "Repair an institution"
+syntax = "repair <institution>"
+answer = "Tell Counsel which existing institution to repair. The order costs one hour and starts a works project whose price depends on the institution's condition when ordered."
+examples = ["repair the tablet house", "Mend the granary."]
+keywords = ["repair", "mend", "institution", "building", "condition", "works", "broken", "damaged"]
+keys = []
+verbs = ["REPAIR"]
+
+[[command]]
+id = "abandon"
+category = "orders"
+title = "Abandon work"
+syntax = "abandon <project>"
+answer = "Tell Counsel which current project to abandon. Calling the men off costs one hour. Unspent labour returns, but consumed grain and materials do not."
+examples = ["abandon walls:ugarit", "Call off work on the granary."]
+keywords = ["abandon", "cancel", "stop", "project", "work", "works", "call off"]
+keys = []
+verbs = ["ABANDON_WORK"]
+
+[[command]]
+id = "divination"
+category = "orders"
+title = "Consult the diviner"
+syntax = "omen harvest | omen route | omen death <person>"
+answer = "Ask through Counsel or use the Altar. The diviner can read the harvest, a route, or the possible death of a living member of the house. A consultation costs two hours."
+examples = ["consult the diviner about the harvest", "omen death niqmaddu"]
+keywords = ["omen", "divine", "diviner", "consult", "harvest", "route", "death", "altar"]
+keys = []
+verbs = ["CONSULT_DIVINER"]
+
+[[command]]
+id = "omen_response"
+category = "orders"
+title = "Suppress or defy an omen"
+syntax = "hush <omen> | defy <omen>"
+answer = "Tell Counsel to suppress a known omen or act against it. Suppression costs two hours and may leak; defiance spends legitimacy whether the omen proves sound or not."
+examples = ["hush omen:17", "defy omen:17"]
+keywords = ["hush", "suppress", "defy", "omen", "hide", "record", "legitimacy", "leak"]
+keys = []
+verbs = ["SUPPRESS_OMEN", "DEFY_OMEN"]
+
+[[command]]
+id = "marry"
+category = "orders"
+title = "Arrange a foreign marriage"
+syntax = "marry <person> to <actor>"
+answer = "Tell Counsel which eligible member of the house should go to which known foreign court. A foreign marriage costs two hours and moves that person abroad."
+examples = ["marry pidray to hatti_king"]
+keywords = ["marry", "marriage", "daughter", "person", "foreign", "court", "alliance", "house"]
+keys = []
+verbs = ["MARRY_ABROAD"]
+
+[[command]]
+id = "swear"
+category = "orders"
+title = "Re-swear an oath"
+syntax = "swear <oath>"
+answer = "Tell Counsel which known oath tablet to re-swear. This costs two hours and is chiefly used when a succession has left an oath lapsed."
+examples = ["swear oath_hatti_grain"]
+keywords = ["swear", "oath", "reswear", "lapsed", "succession", "bound", "tablet"]
+keys = []
+verbs = ["SWEAR_OATH"]
+
+[[command]]
+id = "quarantine"
+category = "orders"
+title = "Close or reopen routes"
+syntax = "close <place> | open <place>"
+answer = "Tell Counsel to quarantine a known place to close its routes, or lift quarantine to reopen them. Either change costs one hour."
+examples = ["close the routes to ma_hadu", "lift quarantine on ma_hadu"]
+keywords = ["close", "open", "quarantine", "route", "road", "harbour", "plague", "reopen", "place"]
+keys = []
+verbs = ["QUARANTINE", "LIFT_QUARANTINE"]
+
+[[command]]
+id = "expiate"
+category = "orders"
+title = "Expiate against an oath"
+syntax = "expiate <oath> [offering in qa]"
+answer = "Tell Counsel the named oath and grain offering to make against it. Expiation costs two hours. Naming the wrong oath still spends the offering."
+examples = ["expiate oath_hatti_grain with 1000 qa"]
+keywords = ["expiate", "atonement", "oath", "offering", "grain", "gods", "plague"]
+keys = []
+verbs = ["EXPIATE"]
+
+[[command]]
+id = "search"
+category = "orders"
+title = "Search the archive"
+syntax = "search the archive for <words>"
+answer = "Tell Counsel what words to search for, or type them in the Tablet House. Searching costs one hour and returns only records matching the archive index."
+examples = ["search the archive for oath", "look in the tablet house for Carchemish"]
+keywords = ["search", "archive", "tablet house", "record", "find", "query", "librarian"]
+keys = []
+verbs = ["SEARCH_ARCHIVE"]
+
+[[command]]
+id = "justice_orders"
+category = "orders"
+title = "Hear and rule on a petition"
+syntax = "hear <case> | rule <case> for | against | split | defer"
+answer = "Hearing a known case costs one hour and reveals both arguments, never the hidden truth. Rule for or against the claimant, split the judgement, or defer it. Giving the verdict itself costs no hour."
+examples = ["hear boundary_ashiranu", "rule boundary_ashiranu split"]
+keywords = ["hear", "rule", "judge", "petition", "case", "justice", "verdict", "for", "against", "split", "defer"]
+keys = []
+verbs = ["HEAR_PETITION", "RULE_PETITION"]
+
+[[command]]
+id = "dues"
+category = "orders"
+title = "Set land and harbour dues"
+syntax = "set land due to <rate> | set harbour due to <rate>"
+answer = "Tell Counsel the rate per thousand for the land or harbour due. Setting a due costs no hour. Land pressure drives hands away; harbour merchants respond after a delay."
+examples = ["set the land due to 250", "raise the harbour due to 150"]
+keywords = ["due", "tax", "rate", "land", "harbour", "revenue", "per thousand", "merchant", "estate"]
+keys = []
+verbs = ["SET_LAND_DUE", "SET_HARBOUR_DUE"]
+
+[[command]]
+id = "appointments"
+category = "orders"
+title = "Appoint or dismiss a person"
+syntax = "place <person> at <post> | dismiss <post>"
+answer = "Tell Counsel to place a living member of the house at an institution, governor post, formation command, or foreign court. Dismiss names the post to leave vacant. These orders cost no hour."
+examples = ["appoint talmi_teshub to the tablet house", "dismiss institution:tablet_house"]
+keywords = ["appoint", "place", "dismiss", "person", "post", "office", "institution", "governor", "command", "court", "vacant"]
+keys = []
+verbs = ["PLACE_PERSON", "DISMISS_PERSON"]
+
+[[command]]
+id = "heir"
+category = "orders"
+title = "Name an heir"
+syntax = "name <person> heir"
+answer = "Tell Counsel which living son to name as heir, or choose him in the House. Naming an heir costs no hour, though passing over the elder may cost standing and strengthen his faction."
+examples = ["name niqmaddu heir"]
+keywords = ["name", "heir", "succession", "son", "prince", "house", "elder", "faction"]
+keys = []
+verbs = ["NAME_HEIR"]
+
+[[command]]
+id = "end_turn"
+category = "orders"
+title = "End the fortnight"
+syntax = "end the fortnight | [Space] in the Hall"
+answer = "Press Space in the Hall or tell Counsel to end the fortnight. It advances the world and restores the next fortnight's attention. If spoken as part of a compound order, it must be given separately."
+examples = ["end the fortnight"]
+keywords = ["end", "turn", "fortnight", "advance", "next", "space", "finish"]
+keys = []
+verbs = ["END_TURN"]

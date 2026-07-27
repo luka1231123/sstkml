@@ -7,7 +7,8 @@ from ai import librarian
 from ai.client import FORBIDDEN_KEYS, PromptLeak, safe_fields
 from belief.project import project
 from engine import actions as A
-from engine import archive, plague
+from engine import archive, plague, relations
+from engine.core import Date
 from engine.reduce import apply
 from engine.state import Place
 from engine.tick import advance
@@ -18,6 +19,17 @@ SEED = 8814402919
 
 def _run(turns: int, seed: int = SEED):
     world = load_scenario("ugarit", seed)
+    for _ in range(turns):
+        world, _ = advance(world)
+    return world
+
+
+def _isolated(turns: int = 0, seed: int = SEED):
+    """A unit-test world with the authored campaign import disabled."""
+    world = load_scenario("ugarit", seed)
+    world = dataclasses.replace(
+        world, plague=dataclasses.replace(
+            world.plague, import_place="", import_turn=-1, import_cases=0))
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -39,7 +51,7 @@ def test_a_single_case_cannot_start_an_epidemic_so_we_do_not_seed_one():
 
 
 def test_the_epidemic_grows_burns_out_and_leaves_the_dead_behind():
-    world, _ = plague.begin(_run(52), "seat")
+    world, _ = plague.begin(_isolated(52), "seat")
     peak = 0
     for _ in range(70):
         world, _ = advance(world)
@@ -53,7 +65,7 @@ def test_the_epidemic_grows_burns_out_and_leaves_the_dead_behind():
 
 
 def test_the_dead_come_off_the_ration_lists():
-    world = _run(52)
+    world = _isolated(52)
     before = sum(g.size for g in world.court.dependents.values()
                  if g.place == world.court.seat)
     world, _ = plague.begin(world, "seat")
@@ -90,11 +102,9 @@ def test_a_city_cannot_be_quarantined_against_itself():
     raise AssertionError("quarantining the seat must be refused")
 
 
-# --- the theological layer ----------------------------------------------------
+# --- ritual interpretation without supernatural physics ---------------------
 def test_the_vows_of_the_predecessors_do_not_lapse_and_two_of_them_are_broken():
-    """Spec 6.12 wants a cause that may have been sworn by a predecessor. Since
-    M9 every oath lapses when the man who swore it dies -- so the archive puzzle
-    only exists because a vow to a GOD binds the house, not the man (D26)."""
+    """The archive can preserve obligations without making them pathogens."""
     world = _run(52)
     vows = {o.id: o for o in world.oaths if o.binds_house}
     assert set(vows) == {"vow_first_rain", "vow_dead_at_the_gate",
@@ -102,88 +112,70 @@ def test_the_vows_of_the_predecessors_do_not_lapse_and_two_of_them_are_broken():
     assert not any(v.lapsed for v in vows.values())
     assert all(v.sworn_by != world.court.ruler for v in vows.values()), (
         "these were sworn by men Ammurapi never met")
-    liability = world.court.liability
-    # The two that name festivals no longer on the calendar are in violation,
-    # every year, silently, and have been since before turn 1.
-    assert liability["vow_first_rain"] > 0
-    assert liability["vow_dead_at_the_gate"] > 0
-    # The third names `first_fruits`, which IS kept -- so it can be eliminated
-    # by a reader who checks the rite list, and can never be the cause.
-    assert liability["vow_threshing_floor"] == 0
+    expected = {
+        4: A.OathViolated("vow_first_rain", "maintain_rite"),
+        13: A.OathViolated("vow_dead_at_the_gate", "maintain_rite"),
+    }
+    for fortnight, breach in expected.items():
+        dated = dataclasses.replace(
+            world, date=Date(world.date.year, fortnight, world.date.absolute))
+        unchanged, events = relations.audit_oaths(dated)
+        assert unchanged == dated and breach in events
+    dated = dataclasses.replace(
+        world, date=Date(world.date.year, 9, world.date.absolute))
+    _, events = relations.audit_oaths(dated)
+    assert A.OathViolated(
+        "vow_threshing_floor", "maintain_rite") not in events
     assert any(r.id == "first_fruits" for r in world.court.rites)
 
 
-def test_the_cause_is_a_genuinely_violated_oath_and_the_field_is_three():
-    world = _run(52)
-    cause = plague.designate_cause(world)
-    assert world.court.liability.get(cause, 0) > 0, (
-        "the gods are never angry about an oath that was kept")
-    candidates = sorted(k for k, v in world.court.liability.items() if v > 0)
-    assert len(candidates) == 3, (
-        "spec 6.12: a careful reader narrows the field to three, not to one")
-    assert cause in candidates
+def test_plague_state_has_no_objective_oath_cause_or_correct_ritual():
+    names = {field.name for field in dataclasses.fields(type(
+        load_scenario("ugarit", SEED).plague))}
+    assert "cause_oath_id" not in names
+    assert "expiated_correctly_turn" not in names
 
 
-def test_the_cause_draw_is_uniform_and_not_dominated_by_the_worst_breach():
-    """An earlier version weighted the draw by liability, which made Ugarit's
-    Hatti grain oath the answer in about three runs in four."""
-    world = _run(52)
-    liability = world.court.liability
-    worst = max(liability, key=lambda k: liability[k])
-    seen = set()
-    for n in range(40):
-        probe = dataclasses.replace(
-            world, seed=world.seed + n * 7919,
-            court=dataclasses.replace(world.court, liability=liability))
-        seen.add(plague.designate_cause(probe))
-    assert len(seen) == 3, f"every candidate must be reachable; got {seen}"
-    assert worst in seen
+def test_hidden_divine_liability_and_misfortune_state_are_gone():
+    world = load_scenario("ugarit", SEED)
+    court_fields = {
+        field.name for field in dataclasses.fields(type(world.court))}
+    world_fields = {
+        field.name for field in dataclasses.fields(type(world))}
+    assert "liability" not in court_fields
+    assert "misfortune_weight" not in court_fields
+    assert "misfortune_deck" not in world_fields
 
 
-def test_expiation_tells_the_player_nothing_either_way():
-    world, _ = plague.begin(_run(52), "seat")
-    cause = world.plague.cause_oath_id
-    wrong = next(o.id for o in world.oaths if o.id != cause)
+def test_different_expiations_are_equally_ritual_and_equally_nonmedical():
+    world, _ = plague.begin(_isolated(52), "seat")
+    first, second = (o.id for o in world.oaths[:2])
 
-    bad, bad_events = plague.expiate(world, wrong, offering=500)
-    good, good_events = plague.expiate(world, cause, offering=500)
+    a, a_events = plague.expiate(world, first, offering=500)
+    b, b_events = plague.expiate(world, second, offering=500)
     # The event carries the oath and the offering, and no verdict.
-    assert [type(e).__name__ for e in bad_events] == ["OathExpiated"]
-    assert bad_events[0].oath_id == wrong
+    assert [type(e).__name__ for e in a_events] == ["OathExpiated"]
+    assert a_events[0].oath_id == first
     assert not any(f.name == "correct" for f in dataclasses.fields(A.OathExpiated))
-    # Nor does Belief, on either branch. Note that Belief DOES name the oaths he
-    # made offerings against, including the right one -- he remembers what he
-    # did. What is absent is any word about how it was received.
-    assert project(bad)["plague"]["offerings_made"] == [wrong]
-    assert project(good)["plague"]["offerings_made"] == [cause]
-    for w in (bad, good):
+    assert project(a)["plague"]["offerings_made"] == [first]
+    assert project(b)["plague"]["offerings_made"] == [second]
+    for w in (a, b):
         text = repr(project(w))
         assert "correct" not in text and "expiated_correctly" not in text
-    # The only difference anywhere is the curve.
-    assert plague.effective_beta(bad) == world.plague.beta
-    assert plague.effective_beta(good) < world.plague.beta
+    assert a.court.stores == b.court.stores
+    assert a.court.legitimacy == b.court.legitimacy
+    assert plague.effective_beta(a) == plague.effective_beta(b) == \
+        world.plague.beta
+
+    for _ in range(40):
+        a, _ = advance(a)
+        b, _ = advance(b)
+    pa, pb = a.places["seat"], b.places["seat"]
+    assert (pa.susceptible, pa.infected, pa.recovered, pa.dead) == \
+        (pb.susceptible, pb.infected, pb.recovered, pb.dead)
 
 
-def test_the_right_offering_actually_bends_the_curve():
-    begun, _ = plague.begin(_run(52), "seat")
-    cause = begun.plague.cause_oath_id
-    wrong = next(o.id for o in begun.oaths if o.id != cause)
-
-    def dead_after(world, turns):
-        for _ in range(turns):
-            world, _ = advance(world)
-        return world.places["seat"].dead
-
-    right, _ = plague.expiate(begun, cause, 0)
-    other, _ = plague.expiate(begun, wrong, 0)
-    assert dead_after(right, 40) < dead_after(other, 40)
-    # ...and expiating the right oath twice does not compound.
-    twice, _ = plague.expiate(right, cause, 0)
-    assert twice.plague.expiated_correctly_turn == \
-        right.plague.expiated_correctly_turn
-
-
-def test_a_new_king_inherits_the_debts_to_heaven_and_none_of_the_others():
+def test_a_new_king_inherits_house_vows_but_not_personal_oaths():
     from engine import house
     world = _run(120)
     world = dataclasses.replace(world, court=dataclasses.replace(
@@ -192,9 +184,12 @@ def test_a_new_king_inherits_the_debts_to_heaven_and_none_of_the_others():
                 if k == world.court.ruler else v)
             for k, v in world.court.house.items()}))
     world, _ = house.succeed(world)
-    assert world.court.liability["oath_hatti_grain"] == 0
-    assert world.court.liability["vow_dead_at_the_gate"] > 0, (
-        "the oldest thing the new king owns is a debt he has not heard of")
+    hatti = next(oath for oath in world.oaths
+                 if oath.id == "oath_hatti_grain")
+    house_vow = next(oath for oath in world.oaths
+                     if oath.id == "vow_dead_at_the_gate")
+    assert hatti.lapsed
+    assert not house_vow.lapsed
 
 
 # --- the archive --------------------------------------------------------------
@@ -249,9 +244,7 @@ def test_letters_are_filed_as_they_arrive():
     assert len(world.documents) == before
 
 
-def test_the_reader_can_reach_the_puzzle_from_a_plain_search():
-    """The one deduction the archive fully rewards: two of the three vows name a
-    festival that is not on the calendar, and the third names one that is."""
+def test_the_reader_can_find_neglected_rites_without_finding_a_divine_answer():
     world = _run(30)
     hits = archive.search(world, "vow")
     bodies = " ".join(d.body for d in hits)
@@ -276,9 +269,10 @@ def test_the_librarian_prompt_carries_no_answer_and_no_world():
     hits = _hits(world, "vow")
     assert len(hits) >= librarian.MIN_HITS
     prompt = "\n".join(m["content"] for m in librarian.build_prompt("vow", hits))
-    assert world.plague.cause_oath_id not in prompt
     for key in ("cause_oath_id", "liability", "beta", "infected"):
         assert key not in prompt
+    assert "cause_oath_id" not in {
+        field.name for field in dataclasses.fields(type(world.plague))}
     assert "cause_oath_id" in FORBIDDEN_KEYS
 
 
@@ -324,7 +318,7 @@ def test_the_librarian_rejects_an_invented_citation():
 
 # --- belief boundary ----------------------------------------------------------
 def test_belief_gives_graves_and_never_the_compartments():
-    world, _ = plague.begin(_run(52), "seat")
+    world, _ = plague.begin(_isolated(52), "seat")
     for _ in range(24):
         world, _ = advance(world)
     b = project(world)["plague"]
@@ -341,25 +335,23 @@ def test_belief_gives_graves_and_never_the_compartments():
     assert "beta" not in text and "cause_oath_id" not in text
 
 
-def test_nothing_announces_whether_the_offering_was_right():
+def test_an_offering_is_reported_only_as_a_ritual_act():
     from tui import render
-    world, _ = plague.begin(_run(52), "seat")
-    cause = world.plague.cause_oath_id
-    world, events = plague.expiate(world, cause, 200)
+    world, _ = plague.begin(_isolated(52), "seat")
+    world, events = plague.expiate(world, world.oaths[0].id, 200)
     lines = " ".join(render.events_lines(events, world.court))
     assert "offering is made" in lines
     for word in ("correct", "right", "accepted", "worked", "heard"):
-        assert word not in lines.lower(), (
-            "the epidemic curve is the only feedback there is (spec 6.12)")
+        assert word not in lines.lower()
 
 
 def test_the_state_hash_still_covers_a_plague_run():
     from engine.core import state_hash
-    a, _ = plague.begin(_run(52), "seat")
-    b, _ = plague.begin(_run(52), "seat")
+    a, _ = plague.begin(_isolated(52), "seat")
+    b, _ = plague.begin(_isolated(52), "seat")
     for _ in range(10):
         a, _ = advance(a)
         b, _ = advance(b)
     assert state_hash(a) == state_hash(b)
-    c, _ = plague.expiate(a, a.plague.cause_oath_id, 100)
+    c, _ = plague.expiate(a, a.oaths[0].id, 100)
     assert state_hash(c) != state_hash(a)

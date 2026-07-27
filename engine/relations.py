@@ -1,4 +1,4 @@
-"""Relations, gifts, gossip, oaths, and hidden misfortune (spec 6.8-6.9)."""
+"""Relations, gifts, gossip, and the human consequences of oaths."""
 from __future__ import annotations
 
 import dataclasses
@@ -206,19 +206,8 @@ def deliver_protocol(world: World, letter) -> tuple[World, list]:
                 delta += known.get(
                     violation, rules.get("other_violation", -40))
 
-    court = world.court
     delay_until = relation.reply_delay_until
     if "wrong_oath_gods" in violations:
-        matching = [
-            oath for oath in world.oaths
-            if not oath.dissolved and letter.recipient in oath.parties
-        ]
-        if len(matching) == 1:
-            oath = matching[0]
-            liability = dict(court.liability)
-            liability[oath.id] = liability.get(oath.id, 0) + max(
-                1, sum(world.god_ranks.get(god, 1) for god in oath.gods))
-            court = dataclasses.replace(court, liability=liability)
         delay_until = max(
             delay_until, world.date.absolute
             + rules.get("wrong_god_reply_delay", 2))
@@ -239,7 +228,7 @@ def deliver_protocol(world: World, letter) -> tuple[World, list]:
         for record in world.protocol_log
     )
     return dataclasses.replace(
-        world, court=court, relations=relations,
+        world, relations=relations,
         protocol_log=records), [
             A.ProtocolApplied(letter.recipient, delta, violations)]
 
@@ -293,7 +282,7 @@ def _clause_violated(world: World, oath, clause) -> bool:
 
 
 def audit_oaths(world: World) -> tuple[World, list]:
-    liability = dict(world.court.liability)
+    """Emit factual clause breaches for records and human interpretation."""
     events = []
     for oath in sorted(world.oaths, key=lambda value: value.id):
         # A lapsed oath binds nobody (spec 6.9, M9): the man who swore it is
@@ -302,40 +291,7 @@ def audit_oaths(world: World) -> tuple[World, list]:
         # every succession anywhere is a diplomatic emergency.
         if oath.dissolved or oath.lapsed:
             continue
-        weight = max(
-            1, sum(world.god_ranks.get(god, 1) for god in oath.gods))
         for clause in oath.clauses:
             if _clause_violated(world, oath, clause):
-                liability[oath.id] = liability.get(oath.id, 0) + weight
                 events.append(A.OathViolated(oath.id, clause.kind))
-    return dataclasses.replace(
-        world, court=dataclasses.replace(
-            world.court, liability=liability)), events
-
-
-def draw_misfortune(world: World) -> tuple[World, list]:
-    total_liability = sum(world.court.liability.values())
-    pressure = total_liability + world.court.misfortune_weight
-    if pressure <= 0 or not world.misfortune_deck:
-        return world, []
-    rng = stream(world.seed, world.date.absolute, "deck", "misfortune")
-    if not rng.chance(min(900, pressure), 1000):
-        return world, []
-    card = rng.weighted(tuple(
-        (item, item.weight
-         + pressure * item.liability_weight // 100)
-        for item in world.misfortune_deck
-    ))
-    stores = dict(world.court.stores)
-    material_loss = 0
-    if card.good:
-        before = stores.get(card.good, 0)
-        stores[card.good] = max(0, before - card.loss)
-        material_loss = before - stores[card.good]
-    court = dataclasses.replace(
-        world.court, stores=stores,
-        legitimacy=_clamp(
-            world.court.legitimacy + card.legitimacy_delta),
-        unrest=_clamp(world.court.unrest + card.unrest_delta))
-    return dataclasses.replace(world, court=court), [
-        A.MisfortuneOccurred(card.id, card.good, material_loss)]
+    return world, events

@@ -16,14 +16,14 @@ from __future__ import annotations
 import textwrap
 
 from tui import art, render, style
-from tui.grid import INDEX, Screen, Surface
+from tui.grid import INDEX, InteractiveScreen, Screen, Surface
 
 C = INDEX
 
 
 def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             summary: str = "", typing: bool = False,
-            width: int = 84, height: int = 32) -> Screen:
+            width: int = 84, height: int = 32) -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE TABLET HOUSE",
                 focus=typing, drop=False)
@@ -65,19 +65,24 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
         surface.text(3, y, "nothing in this house answers to that.",
                      C["ash"], C["ink"])
         y += 1
-    for hit in hits[:10]:
+    for index, hit in enumerate(hits[:9], 1):
         if y >= height - 6:
             break
         # The sender, then his own dating, and never a conversion of it: the
         # courts share no epoch (spec 6.17) and a normalised date would hand the
         # player a synchronisation nobody had.
-        who = render.actor_name(hit.get("sender", ""), b.get("house"))
-        surface.text(3, y, who[: field - 2], C["clay"], C["ink"])
+        sender = hit.get("sender", "")
+        who = render.actor_name(sender, b.get("house"))
+        if who == sender:
+            who = sender.replace("_", " ")
+        surface.text(3, y, f"{index}."[:2], C["flame"], C["ink"])
+        surface.text(6, y, who[: field - 5], C["clay"], C["ink"])
         dated = str(hit.get("dated_as")
                     or f"turn {hit.get('received_turn', '?')}")
-        if len(who) + len(dated) + 4 < field:
+        if len(who) + len(dated) + 7 < field:
             surface.text(3 + field - len(dated) - 1, y, dated, C["sky"],
                          C["ink"])
+        surface.link(3, y, field, 2, f"open:{hit.get('ref', '')}")
         y += 1
         snippet = hit.get("snippet", "")
         if snippet:
@@ -85,7 +90,66 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
                          C["dim"], C["ink"])
             y += 1
 
-    style.bar(surface, 2, height - 2, width - 4,
-              " [/] ask for a word   [enter] search — one hour   [esc] leave",
-              fg=C["clay"], bg=C["lapis"])
+    style.footer(surface, [
+        style.FooterAction("/", "new search"),
+        style.FooterAction("enter", "search — one hour"),
+        style.FooterAction("1-9", "open result", enabled=bool(hits)),
+        style.FooterAction("esc", "leave"),
+    ], y=height - 2, x=2, width=width - 4)
+    return surface.interactive()
+
+
+def tablet(hit: dict, b: dict, width: int = 72,
+           height: int = 24, scroll: int = 0) -> Screen:
+    """Open one projected archive record.
+
+    The hit carries the complete projected body as well as its short finding
+    aid. Long records scroll here, without reaching around the Belief boundary
+    for a hidden engine document.
+    """
+    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
+    ref = str(hit.get("ref", "unmarked tablet"))
+    style.panel(surface, 0, 0, width, height,
+                title=f"TABLET {ref}", drop=False)
+
+    title = str(hit.get("title") or "untitled record")
+    sender = str(hit.get("sender") or "")
+    who = render.actor_name(sender, b.get("house")) if sender else "unknown hand"
+    if who == sender:
+        who = sender.replace("_", " ")
+    dated = str(hit.get("dated_as")
+                or f"received turn {hit.get('received_turn', '?')}")
+    kind = str(hit.get("kind") or "record").replace("_", " ")
+
+    surface.text(3, 2, title[:width - 6], C["bone"], C["ink"])
+    surface.text(3, 4, f"hand: {who}"[:width - 6], C["clay"], C["ink"])
+    surface.text(3, 5, f"date: {dated}"[:width - 6], C["sky"], C["ink"])
+    surface.text(3, 6, f"kind: {kind}"[:width - 6], C["dim"], C["ink"])
+    style.rule(surface, 3, 8, width - 6)
+
+    body = str(
+        hit.get("body") or hit.get("snippet") or
+        "No legible text was indexed.")
+    lines: list[str] = []
+    for paragraph in body.split("\n\n"):
+        if lines:
+            lines.append("")
+        lines.extend(textwrap.wrap(
+            " ".join(paragraph.split()), width - 8) or [""])
+    room = max(1, height - 15)
+    scroll = max(0, min(scroll, max(0, len(lines) - room)))
+    for offset, line in enumerate(lines[scroll:scroll + room]):
+        surface.text(4, 10 + offset, line, C["clay"], C["ink"])
+
+    tags = ", ".join(str(tag) for tag in hit.get("tags", []))
+    if tags:
+        surface.text(3, height - 4, ("marks: " + tags)[:width - 6],
+                     C["ash"], C["ink"])
+    position = ""
+    if len(lines) > room:
+        position = f" · lines {scroll + 1}–{min(len(lines), scroll + room)} of {len(lines)}"
+    style.bar(
+        surface, 2, height - 2, width - 4,
+        f" [↑/↓] read{position}  ·  [esc] return to the Tablet House",
+        fg=C["clay"], bg=C["lapis"])
     return surface.freeze()

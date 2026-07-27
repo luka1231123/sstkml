@@ -5,13 +5,17 @@ replaced and not touched -- arrears, loyalty, desertion and the named petitioner
 all keep working exactly as they did -- and an `Institution` is a thin layer over
 it: a building, a head, a condition, a capacity.
 
-Two multipliers, and neither is announced:
+Three multipliers, and none is announced:
 
-    effective = capacity * condition // 1000 * output_modifier // 1000
+    effective = capacity
+              * condition
+              * staff_available
+              * head_factor
 
-`output_modifier` is the staff, and it falls when they go unpaid (6.3, and that
-code is unchanged). `condition` is the fabric, and it falls when nobody minds
-it. Starving a group used to produce a grudge; starving the harbour stops
+`staff_available` combines headcount with the group's `output_modifier`, which
+falls when they go unpaid (6.3). A group sent to the harvest is unavailable to
+its ordinary institution. `condition` is the fabric, and it falls when nobody
+minds it. Starving a group used to produce a grudge; starving the harbour stops
 clearing ships, and the tin does not arrive, and no letter explains why.
 
 **The head reports his own condition.** That is where the three layers of number
@@ -49,43 +53,157 @@ DECAY = {
 UNPAID_UPKEEP_DECAY = 2      # the fabric goes first when the goods stop
 HEADLESS_DECAY = 3           # nobody is minding it
 
+# An Institution predates an authored `required_staff` field.  Until the world
+# schema can carry that number, these are the opening city's staffing norms:
+# (heads needed, capacity represented by those heads).  The important invariant
+# is not the exact norm; it is that losing ninety of a hundred workers can no
+# longer leave output unchanged.
+_STAFFING_NORMS = {
+    "harbour": (60, 1000),
+    "granary": (120, 1000),
+    "workshop": (140, 600),
+    "temple": (80, 1000),
+    "walls": (120, 1000),
+    "archive": (30, 1000),
+    "canal": (100, 1000),
+    "road": (100, 1000),
+    "household": (120, 1000),
+    "garrison": (60, 1000),
+}
 
-def _decay_for(court, inst) -> int:
+# An empty authored post/group represents the residual keepers and casual
+# labour that kept a neglected Bronze Age building limping along; it is not a
+# free perfect workforce. A named group that has actually fallen to zero still
+# contributes zero.
+HEADLESS_OUTPUT = 700
+UNASSIGNED_STAFF_OUTPUT = 700
+
+
+def head_person(court, inst):
+    return court.house.get(inst.head)
+
+
+def _head_factor(court, inst) -> int:
+    """A mediocre unknown incumbent preserves old scenario balance.
+
+    Bad appointments reduce output; very able ones instead earn their advantage
+    by slowing decay, because capacity is what the institution can do whole.
+    """
+    if not inst.head:
+        return HEADLESS_OUTPUT
+    person = head_person(court, inst)
+    competence = person.competence if person is not None else 500
+    return min(1000, 750 + competence // 2)
+
+
+def _staff_factor(court, inst) -> int:
+    """0..1000 labour available to this institution this fortnight.
+
+    A payroll modifier describes willingness and arrears, not how many workers
+    remain.  Both matter.  A group ordered to the fields is still present and
+    still owed rations, but supplies no labour to its ordinary institution.
+    """
+    if inst.capacity <= 0:
+        return 0
+    group = court.dependents.get(inst.group)
+    if not inst.group:
+        return UNASSIGNED_STAFF_OUTPUT
+    if (group is None or group.size <= 0 or group.revolting
+            or inst.group in court.at_harvest):
+        return 0
+    heads, reference_capacity = _STAFFING_NORMS.get(
+        inst.kind, (100, 1000))
+    required = max(
+        1,
+        (inst.capacity * heads + reference_capacity - 1)
+        // reference_capacity,
+    )
+    quantity = min(1000, group.size * 1000 // required)
+    willingness = max(0, min(1000, group.output_modifier))
+    return quantity * willingness // 1000
+
+
+def _decay_for(court, inst, *, upkeep_met: bool | None = None) -> int:
     decay = DECAY.get(inst.kind, 6)
     if not inst.head:
         decay += HEADLESS_DECAY
-    if inst.upkeep and not _upkeep_met(court, inst):
+    else:
+        person = head_person(court, inst)
+        competence = person.competence if person is not None else 500
+        if competence >= 800:
+            decay = max(1, decay // 2)
+        elif competence < 300:
+            decay *= 2
+    if upkeep_met is None:
+        upkeep_met = _upkeep_met(court, inst)
+    if inst.upkeep and not upkeep_met:
         decay += UNPAID_UPKEEP_DECAY
     return decay
 
 
+def _upkeep_required(inst) -> dict[str, int]:
+    required: dict[str, int] = {}
+    for good, qty in inst.upkeep:
+        if qty > 0:
+            required[good] = required.get(good, 0) + qty
+    return required
+
+
 def _upkeep_met(court, inst) -> bool:
-    return all(court.stores.get(good, 0) >= qty for good, qty in inst.upkeep)
+    return all(
+        court.stores.get(good, 0) >= qty
+        for good, qty in _upkeep_required(inst).items())
+
+
+def _consume_upkeep(stores: dict[str, int], inst) -> bool:
+    """Consume one institution's upkeep atomically.
+
+    Checking without deducting allowed every institution to spend the same jug
+    of oil.  Partial payment is no better: it destroys goods while still
+    producing the unpaid-upkeep result.  An institution therefore consumes its
+    complete requirement once, or consumes nothing.
+    """
+    required = _upkeep_required(inst)
+    if not all(stores.get(good, 0) >= qty
+               for good, qty in required.items()):
+        return not required
+    for good, qty in required.items():
+        stores[good] = stores.get(good, 0) - qty
+    return True
 
 
 def effective(court, inst) -> int:
     """What it can actually do this fortnight. Derived, never stored."""
-    group = court.dependents.get(inst.group)
-    staff = group.output_modifier if group is not None else 1000
-    return inst.capacity * inst.condition // 1000 * staff // 1000
+    staff = _staff_factor(court, inst)
+    return (inst.capacity * inst.condition // 1000 * staff // 1000
+            * _head_factor(court, inst) // 1000)
 
 
 def factor(court, kind: str) -> int:
     """0..1000: how well the city's institution of this kind is working.
 
-    The two multipliers folded into one number, for the systems that consume it.
-    A court with no institution of that kind is unaffected -- 1000 -- because
-    the absence of a building is not the same as a ruined one, and scenarios
-    that do not author a city must keep playing exactly as they did.
+    The multipliers folded into one number, for the systems that consume it.
+    No building or capacity means no output. Vacant posts and unassigned crews
+    limp along at an explicit degraded factor; they no longer default to a
+    perfect 1000. Absence used to make missing infrastructure strictly better
+    than a neglected building.
     """
-    matching = sorted((i for i in court.institutions.values() if i.kind == kind),
-                      key=lambda i: i.id)
+    return factor_at(court, kind)
+
+
+def factor_at(court, kind: str, place: str | None = None) -> int:
+    """Working factor for a kind, optionally at one physical place."""
+    matching = sorted((
+        inst for inst in court.institutions.values()
+        if inst.kind == kind and (place is None or inst.place == place)
+    ), key=lambda item: item.id)
     if not matching:
-        return 1000
+        return 0
     inst = matching[0]
-    group = court.dependents.get(inst.group)
-    staff = group.output_modifier if group is not None else 1000
-    return max(0, min(1000, inst.condition * staff // 1000))
+    staff = _staff_factor(court, inst)
+    return max(0, min(
+        1000, inst.condition * staff // 1000
+        * _head_factor(court, inst) // 1000))
 
 
 def reported_condition(court, inst, seed: int, turn: int) -> int:
@@ -98,11 +216,14 @@ def reported_condition(court, inst, seed: int, turn: int) -> int:
     spare one.
     """
     group = court.dependents.get(inst.group)
-    if group is None:
-        return inst.condition
-    owed_per_turn = max(1, group.size * group.entitlement)
-    weeks = group.arrears // owed_per_turn
-    if weeks < 1:
+    weeks = 0
+    if group is not None:
+        owed_per_turn = max(1, group.size * group.entitlement)
+        weeks = group.arrears // owed_per_turn
+    person = head_person(court, inst)
+    loyalty = person.loyalty if person is not None else 700
+    disloyal_flattery = max(0, 700 - loyalty) // 2
+    if weeks < 1 and not disloyal_flattery:
         return inst.condition
     # Capped: a head who claims a ruin is a palace is a head who gets found out
     # the same fortnight, and nobody in this world is that stupid.
@@ -110,7 +231,7 @@ def reported_condition(court, inst, seed: int, turn: int) -> int:
     # Capped below a perfect thousand as well: a head who reports his quay
     # flawless is a head reporting something nobody has ever seen, and the
     # player would learn to read 1000 as a lie. He reports it *nearly* sound.
-    flattery = min(300, weeks * 45)
+    flattery = min(300, weeks * 45 + disloyal_flattery)
     return min(960, inst.condition + flattery)
 
 
@@ -122,9 +243,20 @@ def step(world: World) -> tuple[World, list]:
     events: list = []
     institutions = {}
     history = dict(court.institution_history)
+    stores = dict(court.stores)
     for key in sorted(court.institutions):
         inst = court.institutions[key]
-        condition = max(0, min(1000, inst.condition - _decay_for(court, inst)))
+        upkeep_met = _consume_upkeep(stores, inst)
+        if upkeep_met:
+            events.extend(
+                A.InstitutionUpkeepConsumed(inst.id, good, qty)
+                for good, qty in sorted(_upkeep_required(inst).items())
+            )
+        condition = max(0, min(
+            1000,
+            inst.condition - _decay_for(
+                court, inst, upkeep_met=upkeep_met),
+        ))
         if condition != inst.condition:
             events.append(A.InstitutionDecayed(inst.id, condition))
         inst = dataclasses.replace(inst, condition=condition)
@@ -136,5 +268,5 @@ def step(world: World) -> tuple[World, list]:
         history[key] = (history.get(key, ()) + (said,))[-24:]
     return dataclasses.replace(
         world, court=dataclasses.replace(
-            court, institutions=institutions,
+            court, stores=stores, institutions=institutions,
             institution_history=history)), events

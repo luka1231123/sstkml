@@ -12,14 +12,15 @@ from pathlib import Path
 from engine.core import Date, in_range, stream
 from engine.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
-                          Document, Estate, Formation, HouseMember, Institution, MetalState,
-                          MisfortuneCard, Oath, Place, PlagueState, Relation,
-                          Rite, Route, Workshop, World)
+                          Document, Estate, Formation, HarbourCargoLot,
+                          HouseMember, Institution, MetalState, Oath, Petition,
+                          Place, PlagueState,
+                          Relation, Rite, Route, Workshop, World)
 
 CONTENT = Path(__file__).parent / "content"
 
-# How far ahead the climate is fixed (spec 6.4). Thirty years is far past any
-# run, and the whole series must exist before turn 1 so divination can read it.
+# How far ahead the deterministic climate series is fixed. Thirty years is
+# beyond any current run; only elapsed observations may reach divination.
 CLIMATE_YEARS = 30
 
 
@@ -54,8 +55,6 @@ def _requires(d: dict) -> tuple[tuple[str, int], ...]:
 def load_scenario(name: str, seed: int) -> World:
     cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
     relation_cfg = tomllib.loads((CONTENT / "relations.toml").read_text())
-    deck_cfg = tomllib.loads(
-        (CONTENT / "decks" / "misfortune.toml").read_text())
     names = cfg["names"]
 
     groups: dict[str, DependentGroup] = {}
@@ -74,7 +73,6 @@ def load_scenario(name: str, seed: int) -> World:
             requires=_requires(r["requires"]),
             skip_legitimacy=int(r["skip_legitimacy"]),
             skip_unrest=int(r["skip_unrest"]),
-            skip_deck_weight=int(r["skip_deck_weight"]),
         )
         for r in cfg.get("rites", [])
     )
@@ -144,16 +142,6 @@ def load_scenario(name: str, seed: int) -> World:
         )
         for o in cfg.get("oaths", [])
     )
-    deck = tuple(
-        MisfortuneCard(
-            id=c["id"], weight=int(c["weight"]),
-            liability_weight=int(c["liability_weight"]),
-            good=c["good"], loss=int(c["loss"]),
-            legitimacy_delta=int(c["legitimacy_delta"]),
-            unrest_delta=int(c["unrest_delta"]),
-        )
-        for c in deck_cfg.get("cards", [])
-    )
     season = {k: tuple(v) for k, v in cfg.get("season", {}).items()}
 
     land_cfg = tomllib.loads((CONTENT / "land.toml").read_text())
@@ -197,13 +185,32 @@ def load_scenario(name: str, seed: int) -> World:
                       "equipment_floor",
                       land_cfg["metal"]["default_equipment_floor"])),
                   replacement_rate=1000,
+                  ready=int(f["strength"]),
                   task=f.get("task", "garrison"),
-                  place=f.get("place", cfg["seat"]))
+                  place=f.get("place", cfg["seat"]),
+                  commander=f.get("commander", ""))
         for f in cfg.get("formations", []))
     metal_cfg = cfg.get("metals", {})
 
     house_cfg = tomllib.loads((CONTENT / "house.toml").read_text())
     works_cfg = tomllib.loads((CONTENT / "works.toml").read_text())
+    justice_cfg = tomllib.loads((CONTENT / "justice.toml").read_text())
+    revenue_cfg = tomllib.loads((CONTENT / "revenue.toml").read_text())
+    justice_cases = tuple(
+        Petition(
+            id=case["id"], petitioner=case["petitioner"],
+            against=case["against"], kind=case["kind"],
+            claim=(("amount", int(case["claim"])),),
+            counterclaim=(("amount", int(case["counterclaim"])),),
+            truth=(("amount", int(case["truth"])),),
+            unit=case["unit"], claim_text=case["claim_text"].strip(),
+            counter_text=case["counter_text"].strip(),
+            correction=case["correction"].strip(),
+            witness=case["witness"], faction=case["faction"],
+            against_faction=case["against_faction"],
+            arrived_turn=int(case["arrived_turn"]),
+        )
+        for case in justice_cfg.get("cases", []))
 
     # The cast (spec 6.10). Ages are authored in YEARS and stored in fortnights,
     # because the engine has one time unit and the content should read like a
@@ -221,6 +228,10 @@ def load_scenario(name: str, seed: int) -> World:
             own_agenda=person.get("own_agenda", ""),
             married_to_court=person.get("married_to_court"),
             is_queen_mother=bool(person.get("is_queen_mother", False)),
+            competence=int(person.get("competence", 500)),
+            loyalty=int(person.get("loyalty", 700)),
+            post=person.get("post", ""),
+            interests=tuple(person.get("interests", [])),
         )
     diviner = cfg.get("diviner", {})
 
@@ -228,14 +239,13 @@ def load_scenario(name: str, seed: int) -> World:
     court = Court(
         actor=cfg["actor"], seat=cfg["seat"],
         attention_base=int(cfg["attention_base"]),
-        stores=stores, grain_income=int(cfg["grain_income"]),
+        stores=stores,
         dependents=groups,
         allocations={},                       # default: pay full entitlement
         priority=tuple(cfg["priority"]),
         rites=rites,
         scribe_competence=int(scribe.get("competence", 850)),
         scribe_fatigue=int(scribe.get("fatigue", 300)),
-        liability={o.id: 0 for o in oaths},
         estates=estates, workshops=workshops, formations=formations,
         last_harvest=int(cfg.get("last_harvest", 0)),
         previous_harvest=int(cfg.get("last_harvest", 0)),
@@ -264,14 +274,37 @@ def load_scenario(name: str, seed: int) -> World:
         diviner_competence=int(diviner.get("competence", 600)),
         diviner_loyalty=int(diviner.get("loyalty", 700)),
         diviner_faction=diviner.get("faction", "temple"),
+        land_due_rate=int(revenue_cfg["land"]["initial_rate"]),
+        land_due_base=int(revenue_cfg["land"]["base_rate"]),
+        harbour_due_rate=int(revenue_cfg["harbour"]["initial_rate"]),
+        harbour_due_customary=int(revenue_cfg["harbour"]["customary_rate"]),
+        last_land_due=(int(cfg.get("last_harvest", 0))
+                       * int(revenue_cfg["land"]["initial_rate"]) // 1000),
     )
+    plague_cfg = cfg.get("plague", {})
+    plague_state = PlagueState(
+        beta=int(plague_cfg.get("beta", 0)),
+        gamma=int(plague_cfg.get("gamma", 0)),
+        mortality=int(plague_cfg.get("mortality", 0)),
+        exposure=int(plague_cfg.get("exposure", 0)),
+        import_place=str(plague_cfg.get("import_place", "")),
+        import_turn=int(plague_cfg.get("import_turn", -1)),
+        import_cases=int(plague_cfg.get("import_cases", 0)),
+    )
+    harbour_cargo = {
+        lot["id"]: HarbourCargoLot(
+            id=lot["id"], owner=lot["owner"], place=lot["place"],
+            good=lot["good"], quantity=int(lot["quantity"]))
+        for lot in cfg.get("harbour_cargo", [])
+    }
+
     return World(
         seed=seed, scenario=cfg["scenario"],
         date=Date(year=1, fortnight=0, absolute=0),   # turn 1 begins with an advance
         court=court,
         places=places, routes=routes, correspondents=correspondents, season=season,
         relations=relations, oaths=oaths,
-        plague=PlagueState(**{k: int(v) for k, v in cfg.get("plague", {}).items()}),
+        plague=plague_state,
         documents=load_predecessor_archive(cfg["scenario"]),
         gift_values={k: int(v) for k, v in relation_cfg["gifts"]["value_per_unit"].items()},
         gift_status_floors={
@@ -282,7 +315,6 @@ def load_scenario(name: str, seed: int) -> World:
         god_ranks={k: int(v) for k, v in relation_cfg["gods"]["rank"].items()},
         protocol_rules={
             k: int(v) for k, v in relation_cfg["protocol"].items()},
-        misfortune_deck=deck,
         climate=climate_series(
             seed, CLIMATE_YEARS * 24,
             tuple((int(point[0]), int(point[1]))
@@ -306,6 +338,22 @@ def load_scenario(name: str, seed: int) -> World:
                             "condition": int(plan["condition"]),
                             "capacity": int(plan["capacity"])}
                      for kind, plan in works_cfg.get("build", {}).items()},
+        justice_cases=justice_cases,
+        justice_rules={
+            key: int(value)
+            for key, value in justice_cfg.get("rules", {}).items()},
+        revenue_rules={
+            **{key: int(value)
+               for key, value in revenue_cfg.get("land", {}).items()
+               if key not in ("initial_rate", "base_rate")},
+            **{key: int(value)
+               for key, value in revenue_cfg.get("harbour", {}).items()
+               if key not in ("initial_rate", "customary_rate",
+                              "cargo_good", "merchants")},
+        },
+        revenue_good=revenue_cfg["harbour"]["cargo_good"],
+        revenue_merchants=tuple(revenue_cfg["harbour"]["merchants"]),
+        harbour_cargo=harbour_cargo,
         house_names_f=tuple(cfg.get("house_names_f", [])),
         house_names_m=tuple(cfg.get("house_names_m", [])),
     )

@@ -1,15 +1,15 @@
-"""COUNSEL: a man in a room, who costs an hour and can be wrong (D33, D36).
+"""COUNSEL: the prime minister, asked questions and given ordinary orders.
 
-The second advisor, and the opposite of HELP in every way that matters. HELP
-knows the game and is never wrong because it is a written page. Yabninu knows
+The palace has two conversational agents with separate authority. The Tutor in
+HELP knows controls and the closed command vocabulary: retrieval grounds him in
+the current command corpus, so he does not advise on the kingdom. Yabninu knows
 the *world*, and everything he says has passed through a person: he answers from
 the same Belief the player could read himself, but he answers from **memory**,
 and his memory is a fortnight stale and rounds in his own favour.
 
-He is not a hint system. He never says what to do — he says what he believes to
-be so, and the player decides. When he is wrong he is wrong plausibly: the
-figure he gives is a real figure from a real ledger, only the wrong one, or the
-right one from last fortnight. That is the same lie the scribes tell in
+He advises from what he believes to be so. When he is wrong he is wrong
+plausibly: the figure he gives is a real figure from a real ledger, only the
+wrong one, or the right one from last fortnight. That is the same lie scribes tell in
 `belief/distortion.py` and the diviner tells in M9, and it is the house rule —
 **a wrong answer is always a plausible neighbour, never noise.**
 
@@ -26,7 +26,7 @@ from __future__ import annotations
 import textwrap
 
 from tui import art, render, style
-from tui.grid import INDEX, Screen, Surface
+from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 
@@ -181,10 +181,69 @@ def answer(b: dict, topic: str, seed: int, turn: int) -> str:
     return "I do not understand the question, my lord."
 
 
+def recommend(b: dict, topic: str) -> str:
+    """A concrete fallback opinion when no model is available."""
+    if topic == "grain":
+        groups = b.get("groups", [])
+        if not groups:
+            return "There is no roll for me to alter, my lord."
+        largest = max(groups, key=lambda group: group["allocated"])
+        return (
+            f"The granary is falling. I would review the {largest['name']} "
+            "first, and keep the field hands supplied while the crop still "
+            "depends on them.")
+    if topic == "arrears":
+        owing = [group for group in b.get("groups", [])
+                 if group["arrears_weeks"]]
+        if not owing:
+            return "Nobody is in arrears. I would leave the allocations standing."
+        worst = max(owing, key=lambda group: group["arrears_weeks"])
+        due = worst["size"] * worst["entitlement"]
+        return (
+            f"Pay the {worst['name']} first, my lord. Restore their allocation "
+            f"to {due:,} qa; they have waited the longest.")
+    if topic == "unanswered":
+        unread = [item for item in b.get("stack", []) if not item["read"]]
+        if not unread:
+            return "The pile is read. I would spend the hour elsewhere."
+        oldest = max(unread, key=lambda item: item["age"])
+        return (
+            f"Read the tablet from {render.actor_name(oldest['sender'], b.get('house'))} "
+            "first. Its courier has stood here the longest.")
+    if topic == "oaths":
+        lapsed = [oath for oath in b.get("oaths", []) if oath["lapsed"]]
+        if lapsed:
+            return (
+                f"Read {lapsed[0]['id'].replace('_', ' ')} and re-swear it if "
+                "its bargain still serves you. At present nobody is bound.")
+        return "The standing oaths still bind. I would read their clauses before promising more."
+    if topic == "troops":
+        summons = b.get("troops", {}).get("summons", [])
+        formations = b.get("troops", {}).get("formations", [])
+        if summons and formations:
+            formation = max(formations, key=lambda item: item["strength"])
+            return (
+                f"I would send {formation['name']} to {summons[0]['place']} "
+                "before the herald comes again.")
+        return "No summons stands. I would leave each formation at its present work."
+    if topic == "unrest":
+        if b.get("unrest", 0) >= 45:
+            return "Pay the longest arrears and call no new corvée this fortnight."
+        return "The town is quiet enough. Do not purchase trouble merely because you can."
+
+    from tui import advice
+    matters = advice.concerns(b, 1)
+    if matters:
+        return matters[0].suggestion
+    return "I have no immediate order to urge on you, my lord."
+
+
 def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
             typed: str = "", typing: bool = False,
-            width: int = 80, height: int = 32) -> Screen:
-    """The room: his face, what has been said, and what may be asked.
+            width: int = 92, height: int = 36,
+            suggestions: list[str] | None = None,
+            pending: list[str] | None = None) -> InteractiveScreen:
+    """The prime minister's room: conversation and an always-ready order line.
 
     `said` is the conversation so far — `(who, what)`, oldest first. It is
     session state and not world state: a conversation is not a fact about the
@@ -198,11 +257,12 @@ def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
     surface.text(3, 12, "Yabninu", C["clay"], C["ink"])
     surface.text(3, 13, "your scribe", C["ash"], C["ink"])
     surface.text(3, 15, f"{hours_left} hours", C["flame"], C["ink"])
-    for row in range(2, height - 9):
+    for row in range(2, height - 8):
         surface.put(18, row, "│", C["faint"], C["ink"])
 
     left = 21
     room = width - left - 3
+    foot = height - 8
     y = 2
     if not said:
         for line in textwrap.wrap(
@@ -210,42 +270,73 @@ def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
                 "chair, with a tablet he has not been asked for.", room):
             surface.text(left, y, line, C["ash"], C["ink"])
             y += 1
+    dialogue: list[tuple[int, str, int]] = []
     for who, what in said:
-        if y >= height - 10:
-            break
         speaker = "you" if who == "king" else "Yabninu"
-        surface.text(left, y, f"{speaker}:",
-                     C["flame"] if who == "king" else C["sky"], C["ink"])
-        y += 1
+        dialogue.append((
+            0, f"{speaker}:",
+            C["flame"] if who == "king" else C["sky"]))
         for line in textwrap.wrap(what, room - 2):
-            if y >= height - 10:
-                break
-            surface.text(left + 2, y, line,
-                         C["clay"] if who == "king" else C["bone"], C["ink"])
-            y += 1
+            dialogue.append((
+                2, line, C["clay"] if who == "king" else C["bone"]))
+        dialogue.append((0, "", C["clay"]))
+
+    # The conversation used to stop rendering at the first screenful, hiding
+    # the order or answer the player had just submitted. Keep the tail: the
+    # latest exchange is the one that determines what Enter will do next.
+    available = max(0, foot - y - 1)
+    clipped = len(dialogue) > available
+    visible_dialogue = dialogue[-available:] if available else []
+    if clipped and visible_dialogue:
+        offset, line, colour = visible_dialogue[0]
+        visible_dialogue[0] = (
+            offset, ("… " + line)[:room - offset], colour)
+    for offset, line, colour in visible_dialogue:
+        surface.text(left + offset, y, line[:room - offset], colour, C["ink"])
         y += 1
 
-    # --- what you say back ---------------------------------------------------
-    foot = height - 9
-    style.bar(surface, 2, foot, width - 4, " YOU SAY", fg=C["bone"],
+    # --- what you tell him ---------------------------------------------------
+    title = (
+        " ORDER AWAITING CONFIRMATION" if pending
+        else " YOU SAY OR GIVE AN ORDER")
+    style.bar(surface, 2, foot, width - 4, title,
+              fg=C["bone"],
               bg=C["faint"])
-    style.bar(surface, 3, foot + 1, width - 6, " " + typed[-(width - 9):],
-              fg=C["bone"], bg=C["faint"] if typing else C["shadow"])
-    if typing:
-        surface.put(4 + min(len(typed), width - 10), foot + 1, "█",
-                    C["flame"], C["faint"])
-    elif not typed:
-        surface.text(5, foot + 1, "[/] speak to him", C["ash"], C["shadow"])
+    field_width = width - 8
+    visible = typed[-(field_width - 2):]
+    if pending:
+        visible = "; ".join(pending)
+    style.bar(surface, 3, foot + 1, width - 6, " " + visible,
+              fg=C["bone"], bg=C["faint"])
+    if pending:
+        surface.text(5, foot + 2,
+                     "Enter commits exactly this order; Ctrl-U cancels it.",
+                     C["flame"], C["ink"])
+    elif typed:
+        cursor = 4 + min(len(visible), field_width - 2)
+        surface.put(cursor, foot + 1, "█", C["flame"], C["faint"])
+    else:
+        surface.text(5, foot + 1, "[/] speak, or just type a question or an order",
+                     C["ash"], C["faint"])
+    surface.link(3, foot + 1, width - 6, 1, "focus")
+    if not pending:
+        surface.text(3, foot + 2,
+                     "orders cost what the act costs; an hour a question",
+                     C["ash"], C["ink"])
 
-    room = width // 2 - 8
-    for offset, (key, text, _topic) in enumerate(QUESTIONS):
-        column = 3 if offset % 2 == 0 else width // 2 + 2
-        style.keycap(surface, column, foot + 3 + offset // 2, key,
-                     text[:room], enabled=hours_left >= ASK_COST)
-    surface.text(3, height - 3,
-                 "an hour a question, and he answers from memory.",
-                 C["ash"], C["ink"])
-    style.bar(surface, 2, height - 2, width - 4,
-              " [/] speak   [enter] put it to him   [1-6] the usual questions",
-              fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    suggestions = suggestions or []
+    if not pending:
+        surface.text(3, foot + 3, "YABNINU HAS THESE WORDS READY",
+                     C["dim"], C["ink"])
+        for index, suggestion in enumerate(suggestions[:2]):
+            style.keycap(surface, 3, foot + 4 + index, f"F{index + 1}",
+                         suggestion[:width - 12], command=f"F{index + 1}")
+
+    style.footer(surface, [
+        style.FooterAction(
+            "enter", "confirm order" if pending else "tell him"),
+        style.FooterAction("ctrl-u", "cancel" if pending else "clear"),
+        style.FooterAction(
+            "esc", "cancel order" if pending else "return to Hall"),
+    ], y=height - 2, x=2, width=width - 4)
+    return surface.interactive()

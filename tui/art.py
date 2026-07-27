@@ -201,6 +201,35 @@ STRANGER = (
     "▐▒▒▒▒▒▒▒▒▒▒▒▌",
 )
 
+# Two full figures for the court of justice. They are deliberately plain ASCII
+# rather than portrait blocks: this is a confrontation on the king's floor,
+# and the silhouettes must survive even the strictest terminal degrade path.
+LITIGANT_LEFT = (
+    "     _____     ",
+    "    /_____\\    ",
+    "    | o o |    ",
+    "    |  ^  |    ",
+    "    | --- |    ",
+    "   /|=====|\\   ",
+    "  / |     | \\  ",
+    "    |-----|    ",
+    "    | | | |    ",
+    "   /_/   \\_\\   ",
+)
+
+LITIGANT_RIGHT = (
+    "     .---.     ",
+    "    /_____\\    ",
+    "    | . . |    ",
+    "    |  ^  |    ",
+    "    | === |    ",
+    "   /|-----|\\   ",
+    "  / |     | \\  ",
+    "    |=====|    ",
+    "    | | | |    ",
+    "   /_/   \\_\\   ",
+)
+
 FACES = {
     "king": KING, "viceroy": VICEROY, "merchant": MERCHANT,
     "overseer": OVERSEER, "priest": PRIEST, "scribe": SCRIBE,

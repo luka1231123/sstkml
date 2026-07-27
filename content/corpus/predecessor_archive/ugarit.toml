@@ -4,18 +4,10 @@
 # the player sits down: four generations of tablets, most of them worthless,
 # some of them not.
 #
-# THE PUZZLE. When an epidemic begins the engine designates a `cause_oath_id`
-# from the oaths that genuinely carry liability. Two of the three vows below
-# accrue liability from turn 1, because both name festivals that are no longer
-# on Ammurapi's calendar. A third names one that IS still kept, so it never
-# accrues and can never be the cause -- it is here to be eliminated by a reader
-# who checks the rite list, which is the one deduction the archive fully rewards.
-#
-# Spec 6.12: "Author them so that a careful reader can narrow the field to three
-# candidates but not to one." The three candidates are the vows below. Narrowing
-# to one is not possible from the archive, and is not supposed to be: the last
-# step is an offering made on an informed guess, which is what the historical
-# kings were also doing.
+# THE ARGUMENT. Two vows below name festivals no longer present on Ammurapi's
+# calendar; a third names one still kept. Priests, rivals, and the ruler may use
+# those records to interpret later sickness or misfortune. The archive contains
+# evidence for their reasoning, not an objective divine cause in engine state.
 #
 # `received_turn` is negative: these arrived before the game began, and the
 # archive sorts by received_turn only (6.17), so they sit at the top of every

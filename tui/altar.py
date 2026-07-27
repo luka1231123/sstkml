@@ -5,18 +5,18 @@ reason is specific. Divination in a list is a dropdown labelled "question type";
 divination at an altar is a man standing at a stone with a liver in his hands
 while the king waits. The mechanics are identical. The window is not.
 
-What is *not* dressed up: the answer. The diviner reads from a future that
-genuinely already exists (the climate series, `will_die_on`) and he lies about
-it by his competence and his loyalty — a wrong reading is always a plausible
-neighbour, never noise (M9). Nothing on this screen marks a reading as doubtful,
-because nothing in the world would.
+What is *not* dressed up: the answer. The diviner interprets the evidence
+available now, imperfectly and through his factional interests. A wrong reading
+is a plausible neighbouring interpretation, never privileged access to future
+engine state. Nothing on this screen marks a reading as correct, because nobody
+in the world can know that verdict when it is given.
 """
 from __future__ import annotations
 
 import textwrap
 
 from tui import art, style
-from tui.grid import INDEX, Screen, Surface
+from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 
@@ -32,7 +32,8 @@ OFFERINGS = (("1", "oil", 20), ("2", "wine", 20), ("3", "grain", 200))
 
 def compose(b: dict, readings: list[str], chosen: str = "harvest",
             offering: tuple[str, int] | None = None,
-            width: int = 78, height: int = 32) -> Screen:
+            width: int = 78, height: int = 32,
+            subject: str = "", notice: str = "") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALTAR", drop=False)
 
@@ -68,10 +69,28 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
     foot = height - 10
     style.bar(surface, 2, foot, width - 4, " WHAT YOU WOULD KNOW",
               fg=C["bone"], bg=C["faint"])
+    people = [
+        person for person in b.get("house", {}).get("members", [])
+        if person.get("alive")
+    ]
+    chosen_person = next(
+        (person for person in people if person["id"] == subject), None)
+    subject_name = (
+        chosen_person["name"] if chosen_person is not None
+        else "choose a living member of the house")
     for offset, (key, label, topic) in enumerate(QUESTIONS):
-        style.keycap(surface, 3, foot + 1 + offset, key, label)
+        shown = (
+            f"of the death of {subject_name}" if topic == "death" else label)
+        style.keycap(surface, 3, foot + 1 + offset, key, shown[:55])
         if topic == chosen:
-            surface.text(30, foot + 1 + offset, "◄ this", C["flame"], C["ink"])
+            surface.text(width - 10, foot + 1 + offset, "◄ this",
+                         C["flame"], C["ink"])
+
+    if chosen == "death":
+        style.keycap(surface, 37, foot + 4, "[", "previous",
+                     enabled=len(people) > 1)
+        style.keycap(surface, 53, foot + 4, "]", "next",
+                     enabled=len(people) > 1)
 
     style.bar(surface, 2, foot + 5, width - 4, " WHAT YOU WOULD GIVE",
               fg=C["bone"], bg=C["faint"])
@@ -84,10 +103,12 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             surface.text(column + len(key) + 4 + len(label), foot + 6, "◄",
                          C["flame"], C["ink"])
         column += len(key) + 8 + len(label)
-    surface.text(3, foot + 7,
-                 "a larger offering does not buy a truer answer. it buys a "
-                 "readier one.", C["ash"], C["ink"])
+    guidance = (
+        notice if notice else
+        "a larger offering does not buy a truer answer. it buys a readier one.")
+    surface.text(3, foot + 7, guidance[:width - 6],
+                 C["flame"] if notice else C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
-              " [enter] put the question   ·   an hour, and what you laid down",
+              " [enter] put the question   ·   two hours, and what you laid down",
               fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    return surface.interactive()

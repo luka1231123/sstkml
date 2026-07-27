@@ -194,13 +194,13 @@ def _with_condition(world, key: str, condition: int):
             world.court, institutions=institutions))
 
 
-def test_a_court_with_no_city_is_unaffected() -> None:
-    """Scenarios that author no institutions must play exactly as they did."""
+def test_a_court_with_no_city_has_no_institutional_output() -> None:
+    """Missing infrastructure cannot be more effective than a ruined building."""
     world = _world(1)
     bare = dataclasses.replace(
         world, court=dataclasses.replace(world.court, institutions={}))
-    assert I.factor(bare.court, "granary") == 1000
-    assert I.factor(bare.court, "workshop") == 1000
+    assert I.factor(bare.court, "granary") == 0
+    assert I.factor(bare.court, "workshop") == 0
 
 
 def test_a_ruined_granary_loses_more_grain_and_only_grain() -> None:
@@ -236,8 +236,20 @@ def test_a_ruined_forge_melts_faster_rather_than_slower() -> None:
 def test_a_neglected_tablet_house_returns_fewer_tablets() -> None:
     from engine import archive
 
-    sound = _with_condition(_world(1), "tablet_house", 1000)
-    neglected = _with_condition(_world(1), "tablet_house", 200)
+    def staffed(condition: int):
+        world = _with_condition(_world(1), "tablet_house", condition)
+        institutions = dict(world.court.institutions)
+        institutions["tablet_house"] = dataclasses.replace(
+            institutions["tablet_house"],
+            group="household",
+            head="steward_granary",
+        )
+        return dataclasses.replace(
+            world, court=dataclasses.replace(
+                world.court, institutions=institutions))
+
+    sound = staffed(1000)
+    neglected = staffed(200)
     many = archive.search(sound, "oath")
     few = archive.search(neglected, "oath")
     assert len(few) < len(many)
@@ -428,16 +440,18 @@ def _working_world(turns: int = 14, corvee: int = 6000):
 
 def test_a_building_site_takes_the_hands_the_fields_wanted() -> None:
     """The whole cost of building (6.21). Not the goods -- the hands."""
-    from engine.land import labour_supplied
+    from engine.land import effective_labour_days
 
     idle = _working_world()
     busy, _ = apply(idle, A.BeginRepair("walls_seat"))
     busy, _ = advance(busy)
-    per_head = busy.land_rules["labour_days_per_head"]
     assert busy.court.works_days > 0
     after, _ = advance(idle)
-    assert labour_supplied(busy.court, per_head) < labour_supplied(
-        after.court, per_head)
+    busy_days = sum(effective_labour_days(busy, estate)
+                    for estate in busy.court.estates.values())
+    idle_days = sum(effective_labour_days(after, estate)
+                    for estate in after.court.estates.values())
+    assert busy_days < idle_days
 
 
 def test_the_men_eat_as_they_work_and_calling_them_off_returns_nothing() -> None:

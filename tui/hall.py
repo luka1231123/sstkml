@@ -1,229 +1,235 @@
-"""The hall: the hub, and the one window given a setting (D33, D34).
-
-It answers the only two questions that are about a situation rather than about
-data — where am I, and how much of the fortnight is left — and it does the one
-thing that turns a management screen into a court: it shows **people waiting**
-rather than counters.
-
-The rules from D19 and D31 hold here as everywhere. A man waiting in the hall
-says what is true of him and never what it means. Nobody in this room advises,
-warns, ranks, or tells the king what to do about it. That Yadudanu has stood
-here four fortnights running is the whole message.
-
-Reads Belief and nothing else.
-"""
+"""The Hall / Home dashboard: what matters, who waits, and where to go."""
 from __future__ import annotations
 
-from tui import render, style
-from tui.grid import INDEX, Screen, Surface, sparkline
+from tui import advice, render, style
+from tui.grid import INDEX, InteractiveScreen, sparkline, Surface
 
 C = INDEX
 
-# The ways out of the hall. Every window is reachable from here by keyboard,
-# always, because a player who has closed one must never be stranded (D33).
 DOORS = (
-    ("s", "the stack", "stack"),
-    ("d", "the desk", "desk"),
-    ("r", "the roll", "roll"),
-    ("t", "the stores", "stores"),
-    ("l", "the land", "land"),
-    ("y", "the city", "city"),
-    ("m", "the muster", "muster"),
-    ("o", "the oaths", "oaths"),
-    ("a", "the tablet house", "archive"),
-    ("v", "the altar", "altar"),
-    ("h", "the house", "house"),
-    ("w", "the known world", "world"),
-    ("c", "counsel", "counsel"),
-    ("?", "help", "help"),
+    ("s", "Inbox", "stack"),
+    ("c", "Counsel", "counsel"),
+    ("t", "Stores", "stores"),
+    ("r", "Roll", "roll"),
+    ("l", "Land", "land"),
+    ("y", "City", "city"),
+    ("m", "Muster", "muster"),
+    ("o", "Oaths", "oaths"),
+    ("j", "Justice", "justice"),
+    ("h", "House", "house"),
+    ("v", "Altar", "altar"),
+    ("a", "Archive", "archive"),
+    ("w", "World", "world"),
+    ("f", "Relations", "relations"),
+    ("p", "Sickness", "plague"),
+    ("?", "Help", "help"),
+    ("d", "Desk", "desk"),
 )
 
-# Which of them open. A door that is not built is drawn in ash and marked with
-# a dot, never removed: a player who can see the shape of the game and be told
-# "not yet" has been told the truth, and a menu that quietly shrinks has not.
-# The controller reads this rather than keeping its own list.
-BUILT = frozenset({"stack", "roll", "stores", "muster", "oaths", "land",
-                   "house", "help", "desk", "archive", "altar", "world",
-                   "counsel", "city"})
+BUILT = frozenset({
+    "stack", "roll", "stores", "muster", "oaths", "land", "house", "help",
+    "desk", "archive", "altar", "world", "relations", "plague", "counsel",
+    "city", "justice",
+})
+
+GROUPS = (
+    ("CORRESPONDENCE", (("s", "Inbox"), ("c", "Counsel"), ("d", "Desk"))),
+    ("KINGDOM", (("t", "Stores"), ("r", "Roll"), ("l", "Land"),
+                 ("y", "City"))),
+    ("OBLIGATIONS", (("m", "Muster"), ("o", "Oaths"))),
+    ("COURT", (("j", "Justice"), ("h", "House"), ("v", "Altar"),
+               ("a", "Archive"))),
+    ("WORLD", (("w", "World"), ("f", "Relations"), ("p", "Sickness"),
+               ("?", "Help"))),
+)
 
 
 def _trunc(text: str, width: int) -> str:
-    return text if len(text) <= width else text[: max(0, width - 1)] + "…"
+    return text if len(text) <= width else text[:max(0, width - 1)] + "…"
 
 
 def waiting(b: dict) -> list[dict]:
-    """Who is standing in the hall, and the plain fact that put them there.
-
-    Ordered by how long they have been waiting, not by importance, because
-    ranking them would be advice.
-    """
+    """Who is physically waiting, ordered by time rather than hidden urgency."""
     people: list[dict] = []
-
-    for group in b["groups"]:
+    for group in b.get("groups", []):
         weeks = group["arrears_weeks"]
-        if weeks < 1:
-            continue
-        people.append({
-            "who": group["member_name"] or group["name"],
-            "for": group["name"],
-            "fact": f"{weeks} fortnight{'s' if weeks != 1 else ''} unpaid",
-            "weight": weeks,
-            "tone": "blood" if weeks >= 4 else "dim",
-        })
-
-    unread = [item for item in b["stack"] if not item["read"]]
-    for item in unread:
+        if weeks:
+            people.append({
+                "who": group["member_name"] or group["name"],
+                "for": group["name"],
+                "fact": f"{weeks} fortnight{'s' if weeks != 1 else ''} unpaid",
+                "weight": weeks,
+                "tone": "blood" if weeks >= 4 else "dim",
+            })
+    for item in (letter for letter in b.get("stack", []) if not letter["read"]):
         people.append({
             "who": f"a courier from {render.actor_name(item['sender'], b.get('house'))}",
             "for": render.letter_summary(item["topic"]),
-            "fact": "the tablet is unread" if item["age"] == 0
-                    else f"unread these {item['age']} fortnights",
+            "fact": ("unread, newly come" if item["age"] == 0 else
+                     f"unread {item['age']} fortnights"),
             "weight": item["age"],
             "tone": "flame" if item["age"] >= 2 else "dim",
         })
-
     for summons in b.get("troops", {}).get("summons", []):
         people.append({
-            "who": "the herald of the muster",
+            "who": "herald of the muster",
             "for": f"{summons['required']} men at {summons['place']}",
             "fact": f"{summons['mustered']} have gone",
             "weight": 6,
-            "tone": "blood" if summons["mustered"] < summons["required"] else "barley",
+            "tone": "blood" if summons["mustered"] < summons["required"]
+                    else "barley",
         })
-
-    if b.get("plague", {}).get("sickness_at_seat"):
-        burials = b["plague"]["burials_at_seat"]
+    for petition in b.get("justice", {}).get("petitions", []):
+        people.append({
+            "who": render.actor_name(petition["petitioner"], b.get("house")),
+            "for": f"{petition['kind']} claim",
+            "fact": f"{petition['waiting']} fortnights waiting",
+            "weight": petition["waiting"],
+            "tone": "blood" if petition["waiting"] >= 6 else "clay",
+        })
+    plague = b.get("plague", {})
+    if plague.get("sickness_at_seat"):
         people.append({
             "who": "the physician",
-            "for": "the sickness in the lower town",
-            "fact": f"{burials} buried" if burials else "he does not say how many",
+            "for": "sickness in the lower town",
+            "fact": (f"{plague['burials_at_seat']} buried"
+                     if plague["burials_at_seat"] else "he will not say how many"),
             "weight": 8,
             "tone": "blood",
         })
-
-    for oath in b["oaths"]:
+    for oath in b.get("oaths", []):
         if oath.get("lapsed"):
             people.append({
                 "who": "a messenger of " + render.actor_name(
                     oath.get("superior", ""), b.get("house")),
-                "for": "an oath that lapsed at the succession",
+                "for": "an oath lapsed at succession",
                 "fact": "nobody is bound",
                 "weight": 5,
                 "tone": "wine",
             })
-
     people.sort(key=lambda person: -person["weight"])
     return people
 
 
-def compose(b: dict, width: int = 92, height: int = 30,
-            hours_left: int | None = None) -> Screen:
-    """The hall as a `Screen`. No IO, no toolkit, testable by cell.
-
-    `hours_left` is the controller's remaining budget for the fortnight. It is
-    deliberately not in Belief: `attention` is *derived* from the base less the
-    rites and the unrest tax (`engine.systems.attention_available`), and what
-    the king has actually spent this morning is a fact about the session, not
-    about the world. Left out, the lamp shows the full allowance.
-    """
-    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
-    inner = width - 4
-
-    # --- the title bar and who you are -------------------------------------
-    # A filled field across the whole top row, which is how a text-mode program
-    # said "this is the application" and is still the fastest way to say it.
-    title = (f" {render.actor_name(b['actor'], b.get('house')).upper()} "
-             f"OF {b['scenario'].upper()}")
+def _header(surface: Surface, b: dict, hours_left: int) -> None:
+    width = surface.width
+    title = f" {render.actor_name(b['actor'], b.get('house')).upper()} OF {b['scenario'].upper()}"
     style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
-    date = b["date"]
-    surface.text(width - 2 - len(date), 0, date, C["sky"], C["lapis"])
+    surface.text(width - 2 - len(b["date"]), 0, b["date"], C["sky"], C["lapis"])
 
-    y = 2
-
-    # --- the lamp, which is the fortnight ----------------------------------
     base = b["attention_base"]
-    hours = b["attention"] if hours_left is None else max(0, hours_left)
-    lit = 0 if base <= 0 else min(12, hours * 12 // base)
-    surface.text(3, y, "the lamp", C["dim"], C["ink"])
-    style.meter(surface, 13, y, 12, lit)
-    surface.text(27, y, f"{hours} of {base} hours", C["clay"], C["ink"])
+    lit = 0 if base <= 0 else min(12, hours_left * 12 // base)
+    surface.text(3, 2, "the lamp", C["dim"], C["ink"])
+    style.meter(surface, 13, 2, 12, lit)
+    surface.text(27, 2, f"{hours_left} of {base} hours", C["clay"], C["ink"])
     sea = "the sea is open" if b["sea_open"] else "the sea is shut"
-    surface.text(width - 3 - len(sea), y,
-                 sea, C["sky"] if b["sea_open"] else C["ash"], C["ink"])
-    y += 2
+    surface.text(width - 3 - len(sea), 2, sea, C["sky"], C["ink"])
 
-    # --- who is waiting ----------------------------------------------------
-    people = waiting(b)
-    style.bar(surface, 2, y, inner, " WAITING ON YOU", fg=C["bone"],
-              bg=C["faint"])
-    count = f"{len(people)} in the hall " if people else ""
-    surface.text(width - 2 - len(count), y, count, C["clay"], C["faint"])
-    y += 1
-
-    room = max(0, height - y - 11)
-    if not people:
-        surface.text(5, y, "nobody. the hall is empty and it is not yet dark.",
-                     C["ash"], C["ink"])
-        y += 1
-    # Three columns, sized off the surface rather than guessed, so nothing
-    # collides at eighty columns or wastes the width at a hundred and twenty.
-    who_at, fact_width = 5, 22
-    for_at = who_at + 34
-    fact_at = width - 3 - fact_width
-    for_width = max(8, fact_at - for_at - 2)
-    for person in people[:room]:
-        surface.text(who_at, y, _trunc(person["who"], 32),
-                     C[person["tone"]], C["ink"])
-        surface.text(for_at, y, _trunc(person["for"], for_width),
-                     C["dim"], C["ink"])
-        fact = _trunc(person["fact"], fact_width)
-        surface.text(width - 3 - len(fact), y, fact, C[person["tone"]], C["ink"])
-        y += 1
-    if len(people) > room:
-        surface.text(5, y, f"and {len(people) - room} more, standing.",
-                     C["ash"], C["ink"])
-        y += 1
-
-    # --- the state of things, stated and not interpreted -------------------
-    y = height - 9
-    surface.text(3, y, "─" * inner, C["faint"], C["ink"])
-    y += 1
-    grain = b["stores"].get("grain", 0)
-    surface.text(3, y, f"granary  {render.fmt_good('grain', grain)}",
-                 C["barley"], C["ink"])
-    surface.text(38, y, f"unrest {b['unrest']}", C["clay"], C["ink"])
-    surface.text(54, y, f"legitimacy {b['legitimacy']}", C["clay"], C["ink"])
+    grain = render.fmt_good("grain", b["stores"].get("grain", 0))
+    surface.text(3, 3, f"granary {grain}", C["barley"], C["ink"])
+    surface.text(42, 3, f"unrest {b['unrest']}", C["clay"], C["ink"])
+    surface.text(57, 3, f"legitimacy {b['legitimacy']}", C["clay"], C["ink"])
     series = b.get("store_history", {}).get("grain", [])
     if series:
-        line = sparkline(series)
-        surface.text(width - 3 - len(line), y, line, C["barley"], C["ink"])
-    y += 2
+        line = sparkline(series, min(18, max(0, width - 80)))
+        surface.text(width - 3 - len(line), 3, line, C["barley"], C["ink"])
 
-    # --- the ways out ------------------------------------------------------
-    # Anchored to the bottom edge and given exactly the rows it has, so the
-    # last line is never pushed off the surface by a long door list.
-    style.bar(surface, 2, height - 6, inner, " WHERE YOU MAY GO",
+
+def compose(b: dict, width: int = 104, height: int = 36,
+            hours_left: int | None = None,
+            notice: str = "") -> InteractiveScreen:
+    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
+    hours = b["attention"] if hours_left is None else max(0, hours_left)
+    _header(surface, b, hours)
+    if notice:
+        surface.text(3, 4, _trunc(notice, width - 6),
+                     C["flame"], C["ink"])
+
+    right_width = 31 if width >= 90 else 27
+    divider = width - right_width - 2
+    left_width = divider - 5
+    for row in range(5, height - 2):
+        surface.put(divider, row, "│", C["faint"], C["ink"])
+
+    # Matters: conclusions and next steps, explicitly advisory.
+    style.bar(surface, 2, 5, left_width + 2, " MATTERS BEFORE THE KING",
               fg=C["bone"], bg=C["faint"])
-    door_rows = (height - 5, height - 4, height - 3)
-    row, column = 0, 3
-    for key, label, target in DOORS:
-        entry = f"[{key}] {label}" + ("" if target in BUILT else " ·")
-        if column + len(entry) > width - 3:
-            row, column = row + 1, 3
-        if row >= len(door_rows):
+    matters = advice.concerns(b, 4)
+    if not matters:
+        surface.text(4, 7, "Yabninu has put no immediate concern before you.",
+                     C["ash"], C["ink"])
+    for index, concern in enumerate(matters):
+        row = 7 + index * 3
+        if row + 1 >= height - 9:
             break
-        column += style.keycap(surface, column, door_rows[row], key, label,
-                               enabled=target in BUILT) + 3
+        style.keycap(surface, 4, row, str(index + 1),
+                     _trunc(concern.title, left_width - 10),
+                     command=str(index + 1))
+        surface.text(7, row + 1, _trunc(concern.reason, left_width - 6),
+                     C["ash"], C["ink"])
+        surface.text(7, row + 2,
+                     _trunc("Do: " + concern.suggestion, left_width - 6),
+                     C["bone"], C["ink"])
 
-    # The status bar. Text mode put the keys along the bottom and never made
-    # you remember them; there is no reason to be cleverer than that.
-    style.bar(surface, 0, height - 1, width,
-              " [SPACE] end the fortnight   [\\] read out   [Q] leave the hall",
-              fg=C["clay"], bg=C["lapis"])
-    unbuilt = sum(1 for _k, _l, target in DOORS if target not in BUILT)
-    if unbuilt:
-        mark = f"· {unbuilt} not yet built "
-        surface.text(width - 1 - len(mark), height - 1, mark,
-                     C["dim"], C["lapis"])
+    # The physical hall remains visible beneath the advice.
+    waiting_top = min(height - 9, 20)
+    people = waiting(b)
+    style.bar(surface, 2, waiting_top, left_width + 2,
+              f" WAITING ON YOU · IN THE HALL"
+              f"{'  ' + str(len(people)) if people else ''}",
+              fg=C["bone"], bg=C["faint"])
+    room = max(0, height - waiting_top - 3)
+    if not people:
+        surface.text(4, waiting_top + 2, "Nobody; the hall is empty.",
+                     C["ash"], C["ink"])
+    for offset, person in enumerate(people[:room]):
+        row = waiting_top + 1 + offset
+        who_width = max(14, left_width // 2 - 2)
+        surface.text(4, row, _trunc(person["who"], who_width),
+                     C["clay"], C["ink"])
+        fact = _trunc(person["fact"], max(10, left_width - who_width - 7))
+        surface.text(6 + who_width, row, fact, C["dim"], C["ink"])
 
-    return surface.freeze()
+    # Inbox and navigation rail.
+    rx = divider + 2
+    rw = width - rx - 2
+    unread = [item for item in b.get("stack", []) if not item["read"]]
+    style.bar(surface, rx, 5, rw, " INBOX", fg=C["bone"], bg=C["faint"])
+    surface.text(rx + 1, 7,
+                 f"{len(unread)} unread · {len(b.get('stack', []))} on the pile",
+                 C["clay"], C["ink"])
+    if unread:
+        oldest = max(unread, key=lambda item: item["age"])
+        surface.text(rx + 1, 8, _trunc(
+            "oldest: " + render.actor_name(oldest["sender"], b.get("house")), rw - 2),
+            C["ash"], C["ink"])
+    style.keycap(surface, rx + 1, 9, "s", "Open Inbox")
+
+    y = 11
+    for heading, entries in GROUPS:
+        if y >= height - 3:
+            break
+        surface.text(rx, y, heading, C["dim"], C["ink"])
+        y += 1
+        column = rx + 1
+        for key, label in entries:
+            if y >= height - 2:
+                break
+            target = next((target for door_key, _name, target in DOORS
+                           if door_key == key), "")
+            needed = len(key) + len(label) + 4
+            if column + needed > rx + rw:
+                y += 1
+                column = rx + 1
+            column += style.keycap(surface, column, y, key, label,
+                                   enabled=target in BUILT) + 2
+        y += 1
+
+    style.footer(surface, [
+        style.FooterAction("SPACE", "end the fortnight", command="space"),
+        style.FooterAction("ctrl-s", "save"),
+        style.FooterAction("ctrl-o", "reload"),
+        style.FooterAction("\\", "read out"),
+        style.FooterAction("Q", "leave the hall", command="q"),
+    ])
+    return surface.interactive()

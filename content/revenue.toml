@@ -1,0 +1,17 @@
+# M12, 6.20. Rates are per thousand. The land due is a share of gross produce;
+# the harbour due is assessed only on finite, owned cargo present in World.
+[land]
+base_rate = 300
+initial_rate = 300
+unrest_divisor = 4
+flight_per_100 = 20
+
+[harbour]
+customary_rate = 100
+initial_rate = 100
+cargo_good = "oil"
+clearance_units_per_1000 = 100
+response_min_turns = 3
+response_max_turns = 6
+traffic_loss_per_esteem = 3
+merchants = ["sinaranu", "ura_merchant"]

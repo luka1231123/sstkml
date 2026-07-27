@@ -10,16 +10,12 @@ scenario = "ugarit"
 actor = "ammurapi"
 seat = "seat"
 attention_base = 10
-# Small standing deliveries that are not the harvest: garden plots, fishponds,
-# olive and vine renders, the odd tribute in kind. The harvest itself now comes
-# once a year off the threshing floor (M8, superseding D4).
-grain_income = 4000
 
 # The predecessor's harvest, and the one datum about the land the player can
 # actually trust on turn one (spec 6.4). Everything else he learns about the
 # fields is a proxy: a gauge reading copied by a tired hand, or an overseer with
 # an interest in the answer.
-last_harvest = 1050000
+last_harvest = 3500000
 
 # Turn one falls at fortnight 1, two fortnights into a growing season the
 # predecessor began. Bank those two, so year one is a normal year and the
@@ -73,6 +69,22 @@ wine = 3000
 copper = 36000
 tin = 1800
 bronze = 900
+
+# Finite, owned oil cargo waiting at Ma'hadu on turn one. Harbour dues transfer
+# from these lots; no scalar traffic value creates goods.
+[[harbour_cargo]]
+id = "sinaranu_oil_1"
+owner = "sinaranu"
+place = "ma_hadu"
+good = "oil"
+quantity = 1200
+
+[[harbour_cargo]]
+id = "ura_oil_1"
+owner = "ura_merchant"
+place = "ma_hadu"
+good = "oil"
+quantity = 1200
 
 [[groups]]
 id = "household"
@@ -142,8 +154,8 @@ low_water    = [14, 18]
 
 # The twelfth-century downturn (spec 6.4). x = regnal year, y = the climate
 # baseline that year, 100 = normal. The whole series is drawn at scenario start
-# and nothing that happens later can perturb it: a bad year was always going to
-# be a bad year, and this is what lets divination read a true future value.
+# for deterministic agriculture. Divination may read current observations and
+# completed records, never values later in this series.
 # The curve is gentle and long. No single year announces a crisis.
 [climate]
 drought_curve = [
@@ -156,15 +168,15 @@ drought_curve = [
 # year's number. The game opens with the predecessor's crop already sown, so
 # year one is inherited and only year two answers to the player.
 #
-# Full inputs, normal year: 1,188,000 qa against 1,492,800 qa of ration
-# entitlement. The deficit is deliberate (D4) and structural: the game is the
-# order in which groups are let go, not whether everyone can be fed.
+# Full inputs, normal year: 3,960,000 qa gross. At the customary three-tenths
+# land due the crown receives 1,188,000 qa against 1,492,800 qa of ration
+# entitlement. The deficit is deliberate (D4) and structural.
 [[estates]]
 id = "royal_lands"
 name = "the royal lands about the city"
 place = "seat"
 area_iku = 2400
-base_yield_per_iku = 145
+base_yield_per_iku = 483
 seed_per_iku = 10
 labour_days_per_iku = 6
 
@@ -173,7 +185,7 @@ id = "siyannu"
 name = "the plain of Siyannu"
 place = "gibala"
 area_iku = 2200
-base_yield_per_iku = 140
+base_yield_per_iku = 467
 seed_per_iku = 10
 labour_days_per_iku = 6
 
@@ -182,7 +194,7 @@ id = "ilishtamai"
 name = "the fields of Ilishtamai"
 place = "seat"
 area_iku = 2000
-base_yield_per_iku = 140
+base_yield_per_iku = 467
 seed_per_iku = 10
 labour_days_per_iku = 6
 
@@ -191,7 +203,7 @@ id = "temple_lands"
 name = "the lands of the house of Baal"
 place = "ma_hadu"
 area_iku = 1800
-base_yield_per_iku = 140
+base_yield_per_iku = 467
 seed_per_iku = 10
 labour_days_per_iku = 6
 
@@ -348,6 +360,31 @@ faction = "queen_mother"
 is_queen_mother = true
 own_agenda = "protect her own estates and her favoured grandson"
 
+# Two adult kinsmen make the appointment system a choice rather than a promise.
+# Talmi is capable and already rooted at the harbour; Yarim is loyal and dull.
+# Either is safe in one sense and dangerous in another.
+[[house]]
+id = "talmi_teshub"
+name = "Talmi-Teshub, the king's brother"
+sex = "m"
+age_years = 31
+health = 740
+faction = "harbour_house"
+competence = 840
+loyalty = 560
+own_agenda = "make Ma'hadu answer first to him"
+
+[[house]]
+id = "yarim_limu"
+name = "Yarim-Limu, the king's cousin"
+sex = "m"
+age_years = 27
+health = 710
+faction = "palace_house"
+competence = 420
+loyalty = 880
+own_agenda = "remain indispensable without becoming conspicuous"
+
 [[house]]
 id = "niqmaddu"
 name = "Niqmaddu"
@@ -356,6 +393,7 @@ age_years = 11
 health = 700
 mother = "ehli_nikkalu"
 father = "ammurapi"
+faction = "elder_prince"
 own_agenda = "be seen to be the elder"
 
 [[house]]
@@ -366,6 +404,7 @@ age_years = 6
 health = 660
 mother = "ehli_nikkalu"
 father = "ammurapi"
+faction = "younger_prince"
 own_agenda = "be liked by his grandmother"
 
 # Old enough to be sent. Whoever receives her gains a permanent tie and you
@@ -1161,12 +1200,11 @@ within = 2
 # king dies with the man, a promise to a god does not. These three are still
 # binding on Ammurapi, who did not make any of them.
 #
-# Two of them name festivals that are NOT in the rite list below, so they are in
-# violation from turn 1 and accrue liability every year, silently. The third
-# names `first_fruits`, which IS kept, so it never accrues and can never be the
-# cause -- a reader who checks the calendar can eliminate it, and that is the
-# one clean deduction the puzzle offers. The tablets recording all three are in
-# content/corpus/predecessor_archive/ugarit.toml.
+# Two of them name festivals that are NOT in the rite list below, so the court
+# can read them as broken every year. The third names `first_fruits`, which IS
+# kept. These are historical and religious records, not hidden causes of
+# material events. The tablets recording all three are in the predecessor
+# archive.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[oaths]]
@@ -1212,8 +1250,10 @@ rite = "first_fruits"
 fortnight = 9
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PLAGUE (spec 6.12). Parameters only; no epidemic is scheduled. It arrives, if
-# it arrives, off a courier from somewhere that already has it.
+# PLAGUE. The import below is a design reconstruction, not a claim for a dated
+# historical outbreak: infected travellers from beyond the scenario boundary
+# reach the port of Ma'hadu in the sixth month.  From there disease can move
+# only with journeys represented in the simulation.
 # ─────────────────────────────────────────────────────────────────────────────
 [plague]
 # beta must exceed gamma + mortality or the epidemic cannot grow at all: the
@@ -1225,6 +1265,9 @@ beta = 520          # transmission per mille per fortnight
 gamma = 180         # recoveries per mille of the infected
 mortality = 90      # deaths per mille of the infected
 exposure = 45       # chance in 1000 that an arrival from a sick place seeds
+import_place = "ma_hadu"
+import_turn = 12
+import_cases = 8
 
 [[rites]]
 id = "new_year_baal"
@@ -1233,7 +1276,6 @@ hours = 3
 requires = { grain = 400, wine = 60, oil = 20 }
 skip_legitimacy = -180
 skip_unrest = 120
-skip_deck_weight = 200
 
 [[rites]]
 id = "first_fruits"
@@ -1242,4 +1284,3 @@ hours = 2
 requires = { grain = 300, oil = 10 }
 skip_legitimacy = -80
 skip_unrest = 40
-skip_deck_weight = 100

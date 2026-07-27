@@ -73,17 +73,21 @@ def compose(item: dict, draft: Draft, intent: str, dictating: bool = False,
 
     # --- the intent ----------------------------------------------------------
     surface.text(3, 2, "you mean to", C["dim"], C["ink"])
-    x = 15
+    x, intent_y = 15, 2
     for name in INTENTS:
         chosen = name == intent
-        surface.text(x, 2, name,
+        label = ("> " if chosen else "  ") + name
+        if x + len(label) >= right - 1:
+            x, intent_y = 15, 3
+        surface.text(x, intent_y, label,
                      C["bone"] if chosen else C["ash"],
                      C["lapis"] if chosen else C["ink"])
-        x += len(name) + 2
-    surface.text(3, 3, "─" * (right - 5), C["faint"], C["ink"])
+        surface.link(x, intent_y, len(label), 1, f"intent:{name}")
+        x += len(label) + 1
+    surface.text(3, 4, "─" * (right - 5), C["faint"], C["ink"])
 
     # --- the tablet ----------------------------------------------------------
-    y = 5
+    y = 6
     body = draft.text.split("\n")
     for line in body:
         for wrapped in textwrap.wrap(line, right - 8) or [""]:
@@ -139,4 +143,4 @@ def compose(item: dict, draft: Draft, intent: str, dictating: bool = False,
         style.bar(surface, 2, height - 2, width - 4,
                   " a tablet costs two hours, whatever it says",
                   fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    return surface.interactive()

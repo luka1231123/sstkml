@@ -184,6 +184,8 @@ def step(world: World) -> tuple[World, list]:
             if qty:
                 stores[good] = stores.get(good, 0) - qty
                 spent[good] = spent.get(good, 0) + qty
+                events.append(A.WorkMaterialConsumed(
+                    project.id, good, qty))
         project = dataclasses.replace(
             project, days_done=project.days_done + days,
             spent=tuple(sorted(spent.items())))

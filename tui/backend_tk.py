@@ -19,7 +19,7 @@ import os
 import platform
 import subprocess
 
-from tui.grid import RGB, Screen
+from tui.grid import InteractiveScreen, RGB, Screen, ScreenLike, cells
 
 # One monospace family per platform, first that exists wins. Tk silently
 # substitutes an unknown family, and a proportional substitution would shear
@@ -100,6 +100,8 @@ class GridWindow:
         self.width = width
         self.height = height
         self._tags: set[str] = set()
+        self.hits = ()
+        self.on_key = on_key
         # The last screen painted, kept so the window can be *read* rather than
         # screenshotted (`tools/screens.py live`). One rectangle of tuples per
         # window; it costs nothing and it is the only way to see what a running
@@ -129,6 +131,11 @@ class GridWindow:
         # the window keeps typing working.
         if on_key is not None:
             self.root.bind("<Key>", on_key)
+            self.text.bind("<Button-1>", self._click)
+            self.text.bind("<Motion>", self._motion)
+            self.text.bind(
+                "<Leave>",
+                lambda _event: self.text.configure(cursor="arrow"))
         self.root.protocol(
             "WM_DELETE_WINDOW", on_close or self.close)
 
@@ -139,16 +146,59 @@ class GridWindow:
             self._tags.add(name)
         return name
 
-    def paint(self, screen: Screen) -> None:
+    @staticmethod
+    def _event_for_command(command: str):
+        """Return the small Tk-event-shaped value all key handlers expect."""
+        state = 0
+        if command.startswith("Control-") and len(command) == len("Control-x"):
+            keysym = command[-1]
+            char, state = chr(ord(keysym) - 96), 4
+        elif command in {"Escape", "Return", "Tab", "BackSpace", "space"}:
+            char = " " if command == "space" else ""
+            keysym = command
+        else:
+            char = command
+            keysym = command
+        return type("CommandEvent", (), {
+            "char": char, "keysym": keysym, "state": state,
+            "command": command})()
+
+    def _cell_at(self, event) -> tuple[int, int]:
+        line, column = self.text.index(
+            f"@{event.x},{event.y}").split(".", 1)
+        return int(column), int(line) - 1
+
+    def _command_at(self, x: int, y: int) -> str | None:
+        for hit in reversed(self.hits):
+            if hit.enabled and hit.contains(x, y):
+                return hit.command
+        return None
+
+    def _click(self, event) -> str:
+        command = self._command_at(*self._cell_at(event))
+        if command == "focus":
+            self.root.focus_force()
+            return "break"
+        if command and self.on_key is not None:
+            self.on_key(self._event_for_command(command))
+        return "break"
+
+    def _motion(self, event) -> None:
+        command = self._command_at(*self._cell_at(event))
+        self.text.configure(cursor="hand2" if command else "arrow")
+
+    def paint(self, screen: ScreenLike) -> None:
         """Replace the contents with one screen.
 
         Runs of identical (fg, bg) are inserted as single spans, so a row of
         ordinary text costs one insert rather than one per cell.
         """
-        self.last = screen
+        self.last = cells(screen)
+        self.hits = screen.hits if isinstance(screen, InteractiveScreen) else ()
+        grid = cells(screen)
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")
-        for y, row in enumerate(screen):
+        for y, row in enumerate(grid):
             run: list[str] = []
             current: tuple[int, int] | None = None
             for glyph, fg, bg in row:
@@ -159,7 +209,7 @@ class GridWindow:
                 run.append(glyph)
             if run and current is not None:
                 self.text.insert("end", "".join(run), self._tag(*current))
-            if y != len(screen) - 1:
+            if y != len(grid) - 1:
                 self.text.insert("end", "\n")
         self.text.configure(state="disabled")
 

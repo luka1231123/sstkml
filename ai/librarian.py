@@ -8,13 +8,12 @@ the real document, which is authoritative.** That is the whole contract. The
 librarian is a finding aid, not an oracle: it tells the player which tablets are
 in front of him and in what order, and the reading is still his to do.
 
-This matters more here than anywhere else in the AI layer, because the archive
-search IS the plague puzzle (6.12). A librarian that reasons -- "this vow may be
-the one the gods are angry about" -- has solved the game for the player out of a
-prompt that does not contain the answer. So `cause_oath_id` is in FORBIDDEN_KEYS,
-the prompt is built only from Belief hits, and the numeric guard runs against the
-snippets: the summary may use a figure only if a tablet in front of it used that
-figure first.
+This matters especially when sickness makes the court search old vows. The
+keeper may report what priests or tablets claim; he may not infer a privileged
+divine verdict that the material simulation does not contain. The prompt is
+built only from Belief hits, and the numeric guard runs against the snippets:
+the summary may use a figure only if a tablet in front of it used that figure
+first.
 
 Cheap, low stakes, high value, and entirely optional. With the model off the
 templated version simply lists the hits, which is what a finding aid is anyway.

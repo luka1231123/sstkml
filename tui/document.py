@@ -36,6 +36,10 @@ def _trunc(text: str, width: int) -> str:
     return text if len(text) <= width else text[: max(0, width - 1)] + "…"
 
 
+def _spoken_id(value: str) -> str:
+    return value.replace("_", " ")
+
+
 def ledger(title: str, headers: tuple[str, ...], rows: list[Row],
            widths: tuple[int, ...], width: int = 64, height: int = 24,
            note: str = "[esc] close") -> Screen:
@@ -75,7 +79,7 @@ def ledger(title: str, headers: tuple[str, ...], rows: list[Row],
     if len(rows) > room:
         surface.text(3, height - 2, f"…and {len(rows) - room} more",
                      C["ash"], C["ink"])
-    return surface.freeze()
+    return surface.interactive()
 
 
 def tablet(item: dict, body: str | None = None, house: dict | None = None,
@@ -88,7 +92,7 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
     """
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     who = render.actor_name(item["sender"], house)
-    _frame(surface, who.upper(), "[esc] close")
+    _frame(surface, who.upper(), "[a] answer  ·  [esc] close")
 
     # Truncated against the frame, not the surface: `text` clips at the edge of
     # the world, which for a boxed window means writing over the right border.
@@ -127,7 +131,7 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
             shown = f"{value:,}" if isinstance(value, int) else str(value)
             surface.text(width - 4 - len(shown), y, shown, C["bone"], C["ink"])
             y += 1
-    return surface.freeze()
+    return surface.interactive()
 
 
 # --- the tablets the game actually opens -------------------------------------
@@ -149,29 +153,6 @@ def order_of(b: dict, previous: list[str] | None = None) -> list[str]:
     return kept + [letter_id for letter_id in live if letter_id not in kept]
 
 
-def stack(b: dict, width: int = 80, height: int = 24,
-          order: list[str] | None = None) -> Screen:
-    items = b["stack"]
-    if order:
-        by_id = {item["id"]: item for item in items}
-        items = [by_id[letter_id] for letter_id in order if letter_id in by_id]
-    rows: list[Row] = []
-    for index, item in enumerate(items):
-        rows.append((
-            (render._num(index), "ash"),
-            (item["freshness"], "flame" if not item["read"] else "ash"),
-            (render.actor_name(item["sender"], b.get("house")), "clay"),
-            (render.letter_summary(item["topic"]), "dim"),
-            ("unread" if not item["read"] else "read",
-             "flame" if not item["read"] else "ash"),
-        ))
-    unread = sum(1 for item in items if not item["read"])
-    return ledger(f"THE STACK — {len(items)} on the pile, {unread} unread",
-                  ("", "", "from", "concerning", ""),
-                  rows, (4, 1, 24, 24, -8), width, height,
-                  note="[1-9] read  ·  [esc] close")
-
-
 def stores(b: dict, width: int = 62, height: int = 22) -> Screen:
     rows: list[Row] = []
     for good, amount in sorted(b["stores"].items()):
@@ -182,6 +163,20 @@ def stores(b: dict, width: int = 62, height: int = 22) -> Screen:
              ("bronze", "copper", "tin") else "barley"),
             (sparkline(series, 12), "dim"),
         ))
+    # These are not stores.  They are the two records that tell the player
+    # whether the bronze already in service is being cannibalised.  The first
+    # windowed Stores page accidentally dropped them even though Belief
+    # projected both, making M8's central inference impossible outside CLI.
+    metal = b.get("metal", {})
+    rows.extend((
+        (("bronze in use", "clay"),
+         (render.fmt_good("bronze",
+                          metal.get("bronze_in_circulation", 0)), "gold"),
+         ("equipment", "dim")),
+        (("melt ledger", "clay"),
+         (render.fmt_good("bronze", metal.get("melt_ledger", 0)), "blood"),
+         ("taken back", "dim")),
+    ))
     return ledger("THE STORES", ("", "counted", "these twelve"),
                   rows, (16, -22, 12), width, height)
 
@@ -225,7 +220,7 @@ def page(title: str, lines: list[tuple[int, str, str]], width: int = 70,
             surface.text(3 + indent, y, _trunc(text, width - 6 - indent),
                          C[tone], C["ink"])
         y += 1
-    return surface.freeze()
+    return surface.interactive()
 
 
 def _clause(clause: dict) -> str:
@@ -246,7 +241,8 @@ def _clause(clause: dict) -> str:
         elif isinstance(value, int):
             parts.append(f"{key.replace('_', ' ')} {value:,}")
         else:
-            parts.append(f"{key.replace('_', ' ')} {value}")
+            shown = _spoken_id(value) if isinstance(value, str) else value
+            parts.append(f"{key.replace('_', ' ')} {shown}")
     return f"{clause['kind'].replace('_', ' ')}   " + ", ".join(parts)
 
 
@@ -279,15 +275,15 @@ def fortnight(b: dict, lines: list[str], width: int = 66,
                 break
             surface.text(4, y, wrapped, C["clay"], C["ink"])
             y += 1
-    return surface.freeze()
+    return surface.interactive()
 
 
 def oaths(b: dict, width: int = 76, height: int = 28) -> Screen:
-    """The oath tablets. The clauses are readable; the liability is not (D26).
+    """The oath tablets. Clauses and human claims are readable.
 
     Every figure a superior will later claim is already here, in the clause, in
-    the player's own archive. Nothing on this page says which oath a god is
-    angry about, and nothing ever will.
+    the player's own archive. Priests may interpret misfortune through these
+    vows; the page does not turn that interpretation into physical truth.
     """
     lines: list[tuple[int, str, str]] = []
     for oath in b["oaths"]:
@@ -295,8 +291,9 @@ def oaths(b: dict, width: int = 76, height: int = 28) -> Screen:
                  else "LAPSED — nobody is bound" if oath["lapsed"] else "sworn")
         tone = ("ash" if oath["dissolved"]
                 else "wine" if oath["lapsed"] else "clay")
-        lines.append((0, f"{oath['id']}   ({state})", tone))
-        lines.append((2, "before " + ", ".join(oath["gods"]), "wine"))
+        lines.append((0, f"{_spoken_id(oath['id'])}   ({state})", tone))
+        lines.append((2, "before " + ", ".join(
+            _spoken_id(god) for god in oath["gods"]), "wine"))
         lines.append((2, "between " + ", ".join(
             render.actor_name(p, b.get("house")) for p in oath["parties"]),
             "dim"))
@@ -325,6 +322,9 @@ def land(b: dict, width: int = 70, height: int = 24) -> Screen:
             f"{render.fmt_good('grain', data['last_harvest'])}", "barley"),
         (0, f"the year before               "
             f"{render.fmt_good('grain', data['previous_harvest'])}", "dim"),
+        (0, f"land due ordered              {data['land_due_rate']}/1000"
+            f"   last taken {render.fmt_good('grain', data['last_land_due'])}",
+         "gold"),
         (0, "", "clay"),
         (0, f"seed in store                 "
             f"{render.fmt_good('grain', seed)}", "sand"),
@@ -343,66 +343,15 @@ def land(b: dict, width: int = 70, height: int = 24) -> Screen:
     ]
     for estate in data["estates"]:
         canal = estate.get("canal_condition")
-        state = (f"canal {canal}" if estate["irrigated"] and canal is not None
+        water = (f"canal {canal}" if estate["irrigated"] and canal is not None
                  else "rain-fed")
+        state = f"{water}; hands {estate['hands'] // 10}%"
         # No area and no yield: Belief does not carry them, because a king who
         # wants to know what a field gave has to ask the man who worked it.
         name = _trunc(estate["name"], 30).ljust(31)
-        lines.append((0, f"{name}{estate['place']:<12}{state}", "sand"))
+        lines.append((0, f"{name}{_spoken_id(estate['place']):<12}{state}",
+                      "sand"))
     return page("THE LAND", lines, width, height)
-
-
-def house(b: dict, width: int = 70, height: int = 26) -> Screen:
-    """The family as a tree. Whose claim is better is never stated (D19)."""
-    data = b.get("house")
-    if not data:
-        return page("THE HOUSE", [(0, "no house is recorded.", "ash")],
-                    width, height)
-    members = {person["id"]: person for person in data["members"]}
-    ruler = members.get(data["ruler"])
-
-    def person(p: dict, indent: int, branch: str = "") -> tuple[int, str, str]:
-        # The branch is part of the name column, not a prefix to it: padding the
-        # name alone shears every indented row two cells to the right.
-        name = f"{branch}{p['name']}"[:26].ljust(26)
-        if not p["alive"]:
-            return (indent, f"{name} died in turn {p['died_turn']}", "ash")
-        marks = []
-        if p["heir_rank"]:
-            marks.append(f"heir {p['heir_rank']}")
-        if p["expecting"]:
-            marks.append("with child")
-        if p["married_to_court"]:
-            marks.append("at the court of " + render.actor_name(
-                p["married_to_court"], data))
-        if p["is_queen_mother"]:
-            marks.append("the queen mother")
-        tail = ("  " + ", ".join(marks)) if marks else ""
-        return (indent, f"{name}{p['age_years']:>3}  "
-                        f"{p['health']:<12}{tail}", "clay")
-
-    lines: list[tuple[int, str, str]] = [
-        (0, f"regnal year {b['regnal_year']}, reign {data['reigns']} of this run",
-         "sky"),
-        (0, "─", "faint"),
-    ]
-    if ruler:
-        lines.append(person(ruler, 0))
-        spouse = members.get(ruler["spouse"] or "")
-        if spouse:
-            lines.append(person(spouse, 0, "├─ "))
-        children = [p for p in data["members"] if p["father"] == ruler["id"]]
-        for index, child in enumerate(children):
-            branch = "└─ " if index == len(children) - 1 else "├─ "
-            lines.append(person(child, 0, branch))
-    others = [p for p in data["members"]
-              if p is not ruler and p["id"] != (ruler or {}).get("spouse")
-              and p["father"] != (ruler or {}).get("id")]
-    if others:
-        lines.append((0, "─", "faint"))
-        for p in others:
-            lines.append(person(p, 0))
-    return page("THE HOUSE", lines, width, height)
 
 
 def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
@@ -410,11 +359,24 @@ def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
     rows: list[Row] = [
         ((f["name"], "clay"), (str(f["strength"]), "dim"),
          (f["task"], "flame" if f["task"] == "campaign" else "clay"),
-         (f["place"], "dim"))
+         (_spoken_id(f["place"]), "dim"))
         for f in troops.get("formations", [])
     ]
     for holding, men in sorted(troops.get("garrisons", {}).items()):
-        rows.append((("holding " + holding, "ash"), (str(men), "ash"),
+        rows.append((("holding " + _spoken_id(holding), "ash"),
+                     (str(men), "ash"),
                      ("", "ash"), ("men", "ash")))
-    return ledger("THE MUSTER", ("formation", "men", "at", "place"),
+    for summons in troops.get("summons", []):
+        due = f"due {summons['due_turn']}"
+        if summons["overdue"]:
+            due = f"OVERDUE {summons['due_turn']}"
+        rows.append((
+            ("summons · " + _spoken_id(summons["place"]),
+             "blood" if summons["overdue"] else "flame"),
+            (f"{summons['mustered']}/{summons['required']}",
+             "blood" if summons["mustered"] < summons["required"] else "clay"),
+            (due, "blood" if summons["overdue"] else "dim"),
+            (_spoken_id(summons["oath_id"]), "dim"),
+        ))
+    return ledger("THE MUSTER", ("formation / summons", "men", "order", "place"),
                   rows, (26, -5, 10, 12), width, height)

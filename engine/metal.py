@@ -10,7 +10,7 @@ the workshops go on meeting their demand by melting down what already exists.
 
 The crucial consequence, and the reason this system is in the game:
 
-    **Army strength does not fall. Replacement falls.**
+    **Personnel do not vanish. Equipped capability falls.**
 
 Combat losses stop being replaceable. The player loses the army without ever
 losing a battle. The only warning is a monotonically increasing number on a
@@ -81,6 +81,7 @@ def step(world: World) -> tuple[World, list]:
     if wear:
         metals = dataclasses.replace(
             metals, bronze_in_circulation=metals.bronze_in_circulation - wear)
+        events.append(A.BronzeWorn(wear))
 
     if demand > 0:
         # 1. Meet demand from finished bronze on hand.
@@ -149,8 +150,9 @@ def step(world: World) -> tuple[World, list]:
                 events.append(A.BronzeMelted(melted, metals.melt_ledger))
         events.append(A.WorkshopDemandMet(demand, from_stores))
 
-    # 3. Formations below their equipment floor cannot re-equip. Strength is
-    #    untouched; only the replacement rate moves, and nothing is announced.
+    # 3. Formations below their equipment floor cannot keep every person ready.
+    #    Personnel remain in `strength`; all consumers use the equipped `ready`
+    #    count, so a zero-replacement formation cannot act as a zombie army.
     formations = []
     for formation in court.formations:
         if formation.equipment_floor <= 0:
@@ -158,7 +160,12 @@ def step(world: World) -> tuple[World, list]:
         else:
             rate = 1000 * metals.bronze_in_circulation // formation.equipment_floor
             rate = 0 if rate < 0 else 1000 if rate > 1000 else rate
-        formations.append(dataclasses.replace(formation, replacement_rate=rate))
+        ready = formation.strength * rate // 1000
+        if ready != formation.ready:
+            events.append(A.FormationCapabilityChanged(
+                formation.id, formation.ready, ready, rate))
+        formations.append(dataclasses.replace(
+            formation, replacement_rate=rate, ready=ready))
 
     court = dataclasses.replace(
         court, stores=stores, metals=metals, formations=tuple(formations))

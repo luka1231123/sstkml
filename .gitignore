@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
 .venv/
+.claude/
 saves/*.json
+saves/**/autosave.json
+saves/**/ai_cache/
 saves/screens.txt

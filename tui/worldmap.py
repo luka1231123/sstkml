@@ -1,157 +1,345 @@
-"""The known world: a diagram, not a map (M11, D34).
+"""The court's known-world tablet: a data-driven operational graph.
 
-The distinction matters. A map would imply the king has surveyed the coast; he
-has not, and nobody in 1200 BC had. What he has is a list of places he can send
-a courier to, roughly how far each is, whether the road runs by land or by sea,
-and how the man at the other end feels about him. That is a *graph*, and drawing
-it as a graph is honest where drawing it as a coastline would not be.
+This is not an atlas.  It draws only the places and links present in the
+projected ``world_graph`` Belief, along with the source, age, certainty, and
+seasonal availability that Belief supplies.  In particular, this module has no
+list of Late Bronze Age place names and no scenario-specific coordinates.
 
-So the positions here are authored — they are the shape of the world as a scribe
-at Ugarit would sketch it, north at the top, the sea to the west — and they are
-constant. Nothing on this screen is measured.
-
-What it is *for*: when the sea shuts, half the edges go grey and the player can
-see, in one glance, that the men he needs are now eight fortnights away by road.
-That is a fact he can otherwise only assemble by remembering.
+The graph is rendered as two navigable collections rather than a coastline:
+nodes on the left and edges on the right.  That scales to a scenario larger
+than one window without silently dropping the tail, and it stays honest about
+what a route tablet can say.
 """
 from __future__ import annotations
 
 from tui import art, style
-from tui.grid import INDEX, Screen, Surface
+from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 
-# Where a place sits on the sketch, and what kind of place it is. Authored, not
-# derived: the world is small enough to draw by hand and the drawing should
-# never move under the player.
-PLACES: dict[str, tuple[int, int, str]] = {
-    "hattusa":    (30, 2, "great"),
-    "mira":       (10, 4, "far"),
-    "carchemish": (52, 3, "great"),
-    "assur":      (66, 6, "far"),
-    "emar":       (54, 8, "town"),
-    "ura":        (24, 6, "town"),
-    "babylon":    (66, 12, "far"),
-    "alashiya":   (12, 11, "town"),
-    "seat":       (36, 11, "seat"),
-    "ma_hadu":    (30, 13, "own"),
-    "gibala":     (40, 14, "own"),
-    "amurru":     (38, 16, "town"),
-    "byblos":     (32, 18, "town"),
-    "sidon":      (28, 19, "town"),
-    "tyre":       (24, 20, "town"),
-    "egypt":      (10, 20, "far"),
+MODE_GLYPH = {"land": "·", "sea": "~", "river": "≈"}
+MODE_TONE = {"land": "sand", "sea": "lapis", "river": "sky"}
+CERTAIN_WORDS = frozenset({"charted", "confirmed", "known", "certain"})
+
+ESTEEM_TONE = {
+    "honoured": "gold",
+    "warm": "barley",
+    "formal": "clay",
+    "displeased": "blood",
+    "cold": "blood",
+    "hostile": "blood",
 }
 
-# Which places the roads and the sea-lanes actually join. `sea` links vanish
-# from use when the sea shuts (spec 6.4), which is the whole point of drawing
-# them differently.
-LINKS: tuple[tuple[str, str, str], ...] = (
-    ("seat", "ma_hadu", "land"), ("seat", "gibala", "land"),
-    ("seat", "carchemish", "land"), ("seat", "emar", "land"),
-    ("seat", "amurru", "land"), ("carchemish", "hattusa", "land"),
-    ("carchemish", "assur", "land"), ("emar", "babylon", "land"),
-    ("hattusa", "mira", "land"), ("hattusa", "ura", "land"),
-    ("amurru", "byblos", "land"), ("byblos", "sidon", "land"),
-    ("sidon", "tyre", "land"),
-    ("ma_hadu", "alashiya", "sea"), ("ma_hadu", "ura", "sea"),
-    ("alashiya", "egypt", "sea"), ("tyre", "egypt", "sea"),
-    ("ma_hadu", "byblos", "sea"),
-)
 
-MARKS = {"seat": "▣", "own": "◆", "great": "◈", "town": "◇", "far": "○"}
-
-ESTEEM_TONE = {"warm": "barley", "formal": "clay", "displeased": "blood",
-               "cold": "blood", "hostile": "blood"}
+def _spoken(value: object) -> str:
+    return str(value).replace("_", " ")
 
 
-def _line(surface: Surface, x1: int, y1: int, x2: int, y2: int,
-          glyph: str, fg: int) -> None:
-    """A straight run between two nodes, drawn cell by cell.
+def _certain(item: dict) -> bool:
+    """Use the supplied epistemic state; absence is not certainty."""
+    if item.get("known") is False:
+        return False
+    return str(item.get("certainty", "")).lower() in CERTAIN_WORDS
 
-    Integer Bresenham, and it stops short of both ends so a road never writes
-    over the place it leads to.
+
+def _age(item: dict) -> tuple[str, str]:
+    """Return a visible marker *and* words, so age is never colour-only."""
+    age = item.get("age_turns")
+    if type(age) is not int or age < 0:
+        return "?", "undated"
+    if age < 3:
+        return "●", "fresh"
+    if age <= 8:
+        return "○", f"{age}f old"
+    return "·", f"stale {age}f"
+
+
+def _slice(length: int, scroll: int, room: int) -> tuple[int, int]:
+    room = max(1, room)
+    start = max(0, min(scroll, max(0, length - room)))
+    return start, min(length, start + room)
+
+
+def _number(value: object, default: int = 0) -> int:
+    return value if type(value) is int else default
+
+
+def _source(graph: dict) -> str:
+    source = graph.get("source")
+    return _spoken(source) if source else "source not recorded"
+
+
+def _place_rows(
+    surface: Surface,
+    b: dict,
+    places: list[dict],
+    start: int,
+    end: int,
+    selected: str,
+    split: int,
+    top: int,
+) -> None:
+    by_place: dict[str, list[dict]] = {}
+    for relation in b.get("relations", []):
+        place = relation.get("place")
+        if place:
+            by_place.setdefault(place, []).append(relation)
+
+    seat = b.get("seat", "")
+    for offset, place in enumerate(places[start:end]):
+        y = top + offset
+        place_id = str(place.get("id", ""))
+        name = _spoken(place.get("name") or place_id or "(unnamed)")
+        active = place_id == selected
+        relations = by_place.get(place_id, [])
+        unanswered = sum(
+            _number(relation.get("unanswered")) for relation in relations)
+        esteem = str(relations[0].get("esteem", "")) if relations else ""
+
+        certain = _certain(place)
+        mark = "▣" if place_id == seat else ("◇" if certain else "?")
+        freshness, age = _age(place)
+        epistemic = age if certain else f"uncertain · {age}"
+        if unanswered:
+            epistemic += f" · mail {unanswered}"
+
+        surface.text(2, y, ">" if active else " ",
+                     C["flame"] if active else C["ash"], C["ink"])
+        tone_name = (
+            "flame" if place_id == seat
+            else ESTEEM_TONE.get(esteem, "clay") if relations
+            else "ash")
+        surface.text(4, y, mark, C[tone_name], C["ink"])
+        surface.text(6, y, freshness,
+                     C["clay"] if certain else C["ash"], C["ink"])
+
+        state_room = min(18, max(10, split // 3))
+        name_room = max(1, split - 9 - state_room)
+        surface.text(8, y, name[:name_room],
+                     C["bone"] if active else C[tone_name], C["ink"])
+        state_x = max(9, split - state_room)
+        surface.text(state_x, y, epistemic[:max(0, split - state_x - 1)],
+                     C["dim"] if certain else C["ash"], C["ink"])
+        surface.link(2, y, max(1, split - 3), 1,
+                     f"world:place:{place_id}", enabled=bool(place_id))
+
+
+def _route_row(
+    route: dict,
+    names: dict[str, str],
+    room: int,
+) -> tuple[str, str]:
+    first_id = str(route.get("a", ""))
+    second_id = str(route.get("b", ""))
+    first = names.get(first_id, _spoken(first_id) or "?")
+    second = names.get(second_id, _spoken(second_id) or "?")
+    mode = str(route.get("mode") or "unknown").lower()
+    glyph = MODE_GLYPH.get(mode, "?")
+    legs = route.get("legs")
+    distance = f"{legs}f" if type(legs) is int and legs >= 0 else "?f"
+    availability = str(route.get("availability") or "unknown").lower()
+    certainty = "" if _certain(route) else " · uncertain"
+    _freshness, age = _age(route)
+
+    name_room = max(3, (room - 6) // 2)
+    endpoints = f"{glyph} {first[:name_room]} > {second[:name_room]}"
+    details = (
+        f"  {mode} · {distance} · {availability}{certainty} · {age}")
+    return endpoints[:room], details[:room]
+
+
+def _route_rows(
+    surface: Surface,
+    routes: list[dict],
+    names: dict[str, str],
+    start: int,
+    end: int,
+    selected: str,
+    right: int,
+    room: int,
+    top: int,
+) -> None:
+    for offset, route in enumerate(routes[start:end]):
+        y = top + offset * 2
+        mode = str(route.get("mode") or "unknown").lower()
+        incident = selected and selected in {
+            str(route.get("a", "")), str(route.get("b", ""))}
+        surface.text(right, y, ">" if incident else " ",
+                     C["flame"] if incident else C["ash"], C["ink"])
+        endpoints, details = _route_row(route, names, max(0, room - 2))
+        availability = str(route.get("availability") or "unknown").lower()
+        tone = (
+            C["ash"] if not _certain(route) or availability == "unknown"
+            else C["faint"] if availability == "closed"
+            else C[MODE_TONE.get(mode, "clay")])
+        surface.text(right + 2, y, endpoints, tone, C["ink"])
+        surface.text(right + 2, y + 1, details,
+                     C["dim"] if _certain(route) else C["ash"], C["ink"])
+        a = str(route.get("a", ""))
+        z = str(route.get("b", ""))
+        surface.link(right, y, room, 2, f"world:route:{a}:{z}",
+                     enabled=bool(a and z))
+
+
+def compose(
+    b: dict,
+    width: int = 86,
+    height: int = 30,
+    place_scroll: int = 0,
+    route_scroll: int = 0,
+    selected_place: str = "",
+) -> InteractiveScreen:
+    """Compose a page of the projected graph.
+
+    ``place_scroll`` and ``route_scroll`` are independent because a scenario can
+    have many more edges than nodes.  They are offsets, not page numbers, which
+    lets an integrating controller move by either one row or one screen.
     """
-    dx, dy = abs(x2 - x1), abs(y2 - y1)
-    step_x = 1 if x1 < x2 else -1
-    step_y = 1 if y1 < y2 else -1
-    error = dx - dy
-    x, y = x1, y1
-    cells = []
-    while (x, y) != (x2, y2):
-        cells.append((x, y))
-        doubled = error * 2
-        if doubled > -dy:
-            error -= dy
-            x += step_x
-        if doubled < dx:
-            error += dx
-            y += step_y
-    for cell_x, cell_y in cells[2:-1]:
-        if surface.at(cell_x, cell_y)[0] == " ":
-            surface.put(cell_x, cell_y, glyph, fg, C["ink"])
-
-
-def compose(b: dict, width: int = 86, height: int = 30) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE KNOWN WORLD",
                 note="[esc] close", drop=False)
 
-    open_sea = b["sea_open"]
-    by_place: dict[str, list[dict]] = {}
-    for relation in b["relations"]:
-        by_place.setdefault(relation["place"], []).append(relation)
+    graph = b.get("world_graph") or {}
+    seat_id = str(b.get("seat", ""))
+    places = sorted(
+        (dict(place) for place in graph.get("places", [])
+         if isinstance(place, dict)),
+        key=lambda place: (
+            str(place.get("id", "")) != seat_id,
+            str(place.get("id", ""))),
+    )
+    routes = sorted(
+        (dict(route) for route in graph.get("routes", [])
+         if isinstance(route, dict)),
+        key=lambda route: (
+            str(route.get("a", "")), str(route.get("b", "")),
+            str(route.get("mode", "")), _number(route.get("legs"))),
+    )
+    place_ids = {str(place.get("id", "")) for place in places}
+    if selected_place not in place_ids:
+        selected_place = (
+            seat_id if seat_id in place_ids
+            else str(places[0].get("id", "")) if places else "")
+    routes.sort(key=lambda route: (
+        selected_place not in {
+            str(route.get("a", "")), str(route.get("b", ""))},
+        str(route.get("a", "")), str(route.get("b", "")),
+        str(route.get("mode", "")), _number(route.get("legs")),
+    ))
 
-    top = 1
-    # The roads first, so every node is drawn on top of its own connections.
-    for first, second, kind in LINKS:
-        if first not in PLACES or second not in PLACES:
-            continue
-        x1, y1, _ = PLACES[first]
-        x2, y2, _ = PLACES[second]
-        if kind == "sea":
-            glyph, fg = ("~", C["lapis"]) if open_sea else ("~", C["faint"])
-        else:
-            glyph, fg = "·", C["faint"]
-        _line(surface, x1, y1 + top, x2, y2 + top, glyph, fg)
+    split = max(30, min(width - 30, width // 2))
+    right = split + 2
+    right_room = max(1, width - right - 2)
+    top = 7
+    collection_room = max(1, height - top - 4)
+    route_room = max(1, collection_room // 2)
+    place_start, place_end = _slice(
+        len(places), place_scroll, collection_room)
+    route_start, route_end = _slice(
+        len(routes), route_scroll, route_room)
 
-    for place, (x, y, kind) in PLACES.items():
-        people = by_place.get(place, [])
-        esteem = people[0]["esteem"] if people else ""
-        unanswered = sum(person["unanswered"] for person in people)
-        tone = C[ESTEEM_TONE.get(esteem, "dim")] if people else C["ash"]
-        if kind == "seat":
-            tone = C["flame"]
-        surface.put(x, y + top, MARKS[kind], tone, C["ink"])
-        label = place.replace("_", " ")
-        surface.text(x + 2, y + top, label[: width - x - 6], tone, C["ink"])
-        # A number of letters they have sent and you have not answered. It is a
-        # count, not a reproach: D19 forbids the reproach.
-        if unanswered:
-            surface.text(x + 3 + len(label), y + top, f"({unanswered})",
-                         C["flame"] if unanswered >= 3 else C["dim"], C["ink"])
+    chart_age = graph.get("age_turns")
+    age_words = (
+        f"copied {chart_age} fortnights ago"
+        if type(chart_age) is int and chart_age >= 0
+        else "copy date not recorded")
+    surface.text(
+        3, 2,
+        f"source: {_source(graph)} · {age_words}"[:max(0, width - 6)],
+        C["dim"], C["ink"])
+    surface.text(
+        3, 3,
+        "a route tablet: nodes and courier legs, not a surveyed atlas"
+        [:max(0, width - 6)],
+        C["ash"], C["ink"])
 
-    # The legend, and the one line on the screen that changes with the season.
-    foot = height - 4
-    surface.text(3, foot, "─" * (width - 6), C["faint"], C["ink"])
-    surface.text(3, foot + 1,
-                 "▣ seat   ◆ yours   ◈ a great king   ◇ a town   ○ far off",
-                 C["dim"], C["ink"])
-    surface.text(width - 3 - 22, foot + 1, "(n) letters unanswered",
-                 C["dim"], C["ink"])
-    sea = ("~ the sea lanes are open" if open_sea
-           else "~ the sea is shut; these lanes carry nothing")
-    surface.text(3, foot + 2, sea, C["lapis"] if open_sea else C["ash"],
+    for y in range(4, max(4, height - 3)):
+        surface.put(split, y, "│", C["faint"], C["ink"])
+
+    place_range = (
+        f"{place_start + 1}-{place_end}" if places else "0")
+    route_range = (
+        f"{route_start + 1}-{route_end}" if routes else "0")
+    surface.text(
+        2, 4, f"PLACES  {place_range} OF {len(places)}"[:max(0, split - 3)],
+        C["gold"], C["ink"])
+    surface.text(
+        right, 4,
+        f"ROUTES  {route_range} OF {len(routes)}"[:right_room],
+        C["gold"], C["ink"])
+
+    x = 2
+    x += style.keycap(
+        surface, x, 5, "↑", "earlier", place_start > 0,
+        "world:places:previous") + 2
+    style.keycap(
+        surface, x, 5, "↓", "later", place_end < len(places),
+        "world:places:next")
+    x = right
+    x += style.keycap(
+        surface, x, 5, "ctrl-u", "earlier", route_start > 0,
+        "world:routes:previous") + 2
+    style.keycap(
+        surface, x, 5, "ctrl-d", "later", route_end < len(routes),
+        "world:routes:next")
+
+    if places:
+        _place_rows(
+            surface, b, places, place_start, place_end, selected_place,
+            split, top)
+    else:
+        surface.text(3, top, "no places are entered on this court map.",
+                     C["ash"], C["ink"])
+
+    names = {
+        str(place.get("id", "")): _spoken(
+            place.get("name") or place.get("id", ""))
+        for place in places
+    }
+    if routes:
+        _route_rows(
+            surface, routes, names, route_start, route_end, selected_place,
+            right, right_room, top)
+    else:
+        surface.text(right, top, "no routes are entered on this court map.",
+                     C["ash"], C["ink"])
+
+    sea = (
+        "~ the sea lanes are open"
+        if b.get("sea_open") is True
+        else "~ the sea is shut; seasonal lanes are closed"
+        if b.get("sea_open") is False
+        else "~ seasonal state is not recorded")
+    surface.text(3, height - 3, sea[:max(0, width - 6)],
+                 C["lapis"] if b.get("sea_open") is True else C["ash"],
                  C["ink"])
-    return surface.freeze()
+    style.footer(surface, (
+        style.FooterAction("↑", "places up", place_start > 0,
+                           "world:places:previous"),
+        style.FooterAction("↓", "places down", place_end < len(places),
+                           "world:places:next"),
+        style.FooterAction("esc", "close"),
+    ), y=height - 2, x=2, width=width - 4)
+    return surface.interactive()
 
 
-def compose_with_frieze(b: dict, width: int = 86, height: int = 30) -> Screen:
-    """The map under a seal frieze. Used when the window is opened tall."""
-    screen = compose(b, width, height)
+def compose_with_frieze(
+    b: dict,
+    width: int = 86,
+    height: int = 30,
+    place_scroll: int = 0,
+    route_scroll: int = 0,
+    selected_place: str = "",
+) -> InteractiveScreen:
+    """The same graph under a seal frieze, retaining every hit region."""
+    screen = compose(
+        b, width, height, place_scroll, route_scroll, selected_place)
     surface = Surface(width, height)
     for y, row in enumerate(screen):
         for x, (glyph, fg, bg) in enumerate(row):
             surface.put(x, y, glyph, fg, bg)
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
-    return surface.freeze()
+    for hit in screen.hits:
+        surface.link(
+            hit.x, hit.y, hit.width, hit.height, hit.command, hit.enabled)
+    return surface.interactive()

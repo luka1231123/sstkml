@@ -143,8 +143,8 @@ def test_the_room_is_a_conversation_and_not_a_menu() -> None:
     text = plain_text(counsel.compose(b, [
         ("king", counsel.QUESTIONS[0][1]),
         ("scribe", counsel.answer(b, "grain", SEED, 8))], 6))
-    assert "YOU SAY" in text
-    assert "[/] speak" in text
+    assert "YOU SAY" in text and "GIVE AN ORDER" in text
+    assert "[enter] tell him" in text
     assert "Yabninu:" in text
 
 
@@ -176,8 +176,9 @@ def test_the_room_says_what_a_question_costs() -> None:
 
 def test_the_map_places_every_correspondent_somewhere() -> None:
     b = _belief()
+    charted = {place["id"] for place in b["world_graph"]["places"]}
     for relation in b["relations"]:
-        assert relation["place"] in worldmap.PLACES, relation["place"]
+        assert relation["place"] in charted, relation["place"]
 
 
 def test_the_map_greys_the_sea_when_the_sea_is_shut() -> None:
@@ -189,10 +190,10 @@ def test_the_map_greys_the_sea_when_the_sea_is_shut() -> None:
     assert "the sea lanes are open" in plain_text(worldmap.compose(b, 86, 30))
 
 
-def test_no_road_is_drawn_over_a_place() -> None:
-    """Roads stop short of both ends, or the map spells nothing."""
+def test_the_route_tablet_names_nodes_and_the_kind_of_link() -> None:
     text = plain_text(worldmap.compose(_belief(), 86, 30))
-    assert "seat" in text and "hattusa" in text and "alashiya" in text
+    assert "Ugarit" in text and "Hattusa" in text and "Alashiya" in text
+    assert "land" in text and "sea" in text
 
 
 # --- the altar and the tablet house -------------------------------------------

@@ -1,5 +1,4 @@
-"""M9 house and cult: the cast, child mortality, marriage abroad, succession
-and the oath reset, and divination that reads a future it did not invent."""
+"""M9 house and cult: cast, mortality, marriage, succession, and divination."""
 from __future__ import annotations
 
 import dataclasses
@@ -7,7 +6,7 @@ import json
 
 from belief.project import project
 from engine import actions as A
-from engine import divine, house
+from engine import divine, house, relations
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
@@ -107,7 +106,10 @@ def test_a_dead_woman_bears_no_child():
 
 def test_succession_resets_the_regnal_year_and_lapses_every_oath():
     world = _run(120)
-    assert world.date.year > 1 and world.court.liability["oath_hatti_grain"] > 0
+    assert world.date.year > 1
+    _, breaches = relations.audit_oaths(world)
+    assert A.OathViolated(
+        "oath_hatti_grain", "provide_goods") in breaches
     world = _kill(world, "ammurapi")
     world, events = house.succeed(world)
 
@@ -120,35 +122,34 @@ def test_succession_resets_the_regnal_year_and_lapses_every_oath():
     # Every oath sworn to a KING lapses. Not broken -- lapsed.
     royal = [o for o in world.oaths if not o.dissolved and not o.binds_house]
     assert royal and all(o.lapsed for o in royal)
-    # A vow sworn to a GOD does not (M10, D26). The god is not interested in
-    # which of them is currently alive, and the liability goes on accruing.
+    # A house vow does not lapse; the archive still records the obligation.
     vows = [o for o in world.oaths if o.binds_house]
     assert vows and not any(o.lapsed for o in vows)
     hatti = next(o for o in world.oaths if o.id == "oath_hatti_grain")
     assert hatti.sworn_by == "ammurapi", (
         "the record of who swore it must survive him")
-    assert world.court.liability["oath_hatti_grain"] == 0
-    assert any(world.court.liability.get(o.id, 0) > 0 for o in vows), (
-        "the new king inherits his predecessors' debts to heaven")
+    _, breaches = relations.audit_oaths(world)
+    assert not any(event.oath_id == "oath_hatti_grain"
+                   for event in breaches
+                   if isinstance(event, A.OathViolated))
 
 
 def test_a_lapsed_oath_binds_nobody_until_a_living_man_swears():
     world = _run(120)
     world = _kill(world, "ammurapi")
     world, _ = house.succeed(world)
-    for _ in range(30):
-        world, _ = advance(world)
-    assert world.court.liability["oath_hatti_grain"] == 0, (
-        "a lapsed oath accrued liability; nobody swore it")
+    _, breaches = relations.audit_oaths(world)
+    assert not any(event.oath_id == "oath_hatti_grain"
+                   for event in breaches
+                   if isinstance(event, A.OathViolated))
 
     world, events = apply(world, A.SwearOath("oath_hatti_grain"))
     assert any(isinstance(e, A.OathSworn) for e in events)
     oath = world.oaths[0]
     assert not oath.lapsed and oath.sworn_by == "niqmaddu"
-    for _ in range(26):
-        world, _ = advance(world)
-    assert world.court.liability["oath_hatti_grain"] > 0, (
-        "a re-sworn oath must bind the man who swore it")
+    _, breaches = relations.audit_oaths(world)
+    assert A.OathViolated(
+        "oath_hatti_grain", "provide_goods") in breaches
 
 
 def test_re_swearing_is_refused_when_it_would_be_meaningless():
@@ -236,23 +237,20 @@ def test_marriage_abroad_refuses_the_cases_that_would_be_nonsense():
         pass
 
 
-# --- divination (spec 6.11) --------------------------------------------------
+# --- divination (M13.0: fallible forecast, never privileged future) ----------
 
-def test_the_engine_reads_a_future_it_did_not_invent():
-    """The honest part. `dies_within` is a pure function of (seed, turn,
-    person), so the answer exists before the question is asked -- and it is
-    the answer that actually comes true."""
-    world = _run(40)
-    foretold = {pid: house.dies_within(world, pid, 8)
-                for pid in sorted(world.court.house)}
-    played = world
-    for _ in range(8):
-        played, _ = advance(played)
-    for pid, said in foretold.items():
-        actually = not played.court.house[pid].alive
-        was_alive = world.court.house[pid].alive
-        if was_alive:
-            assert said == actually, f"{pid}: foretold {said}, happened {actually}"
+def test_mortality_outcomes_are_not_evidence_available_to_the_diviner():
+    """Two possible futures can have the same visible age and health evidence."""
+    forecasts = set()
+    outcomes = set()
+    for seed in range(SEED, SEED + 200):
+        world = load_scenario("ugarit", seed)
+        forecasts.add(divine.evidence_forecast(
+            world, "death", world.court.ruler))
+        outcomes.add(house.dies_within(world, world.court.ruler, 8))
+    assert len(forecasts) == 1
+    assert outcomes == {False, True}, (
+        "the test needs seeds with both mortality outcomes to prove the seam")
 
 
 def test_a_wrong_omen_is_a_plausible_neighbour_never_noise():
@@ -276,27 +274,38 @@ def test_the_diviner_is_sometimes_wrong_and_the_answer_is_always_sayable():
         reported = events[0].reported
         assert reported in divine.HARVEST_BANDS
         said.add(reported)
-        matched += reported == divine.true_answer(world, "harvest", "")
+        matched += reported == divine.evidence_forecast(world, "harvest", "")
     assert 0 < matched < 60, (
-        f"the diviner was right {matched}/60 times: he is an oracle or a fraud")
+        f"the diviner followed the evidence {matched}/60 times")
 
 
-def test_an_offering_buys_accuracy_and_the_player_is_never_told_it():
+def test_an_offering_buys_a_rite_not_better_access_to_tomorrow():
     world = _run(30)
-    world = dataclasses.replace(
-        world, court=dataclasses.replace(world.court, diviner_loyalty=1000))
-    plain = sum(divine.consult(w, "harvest", "")[1][0].reported
-                == divine.true_answer(w, "harvest", "")
-                for w in _advanced(world, 40))
-    rich = sum(divine.consult(w, "harvest", "", 4000)[1][0].reported
-               == divine.true_answer(w, "harvest", "")
-               for w in _advanced(world, 40))
-    assert rich >= plain, f"the offering bought nothing ({plain} -> {rich})"
-    # And nothing anywhere records whether an omen was true.
+    _, plain = divine.consult(world, "harvest", "", 0)
+    _, rich = divine.consult(world, "harvest", "", 4000)
+    assert plain[0].reported == rich[0].reported
+
+    before = world.court.stores["wine"]
+    world, _ = apply(world, A.ConsultDiviner("harvest", "", "wine", 40))
+    assert world.court.stores["wine"] == before - 40
+
+    # Nothing anywhere records whether the forecast later proved right.
     world, _ = apply(world, A.ConsultDiviner("harvest"))
     blob = json.dumps(project(world))
     for forbidden in ("accuracy", "true_answer", "correct", "was_true"):
         assert forbidden not in blob
+
+
+def test_harvest_forecast_cannot_read_the_unobserved_climate_suffix():
+    world = _run(30)
+    now = world.date.absolute
+    changed = dataclasses.replace(
+        world, climate=world.climate[:now + 1]
+        + tuple(0 for _ in world.climate[now + 1:]))
+    assert divine.evidence_forecast(world, "harvest", "") == \
+        divine.evidence_forecast(changed, "harvest", "")
+    assert divine.consult(world, "harvest", "")[1][0].reported == \
+        divine.consult(changed, "harvest", "")[1][0].reported
 
 
 def _advanced(world, turns):
@@ -353,10 +362,10 @@ def test_the_player_sees_health_as_a_word_and_never_the_future():
     belief = project(world)
     member = belief["house"]["members"][0]
     assert isinstance(member["health"], str)
-    blob = json.dumps(belief)
+    house_blob = json.dumps(belief["house"])
     for hidden in ("fertility", "will_die", "pregnant_until", "age_turns",
                    "mortality", "diviner_competence", "diviner_loyalty"):
-        assert hidden not in blob, f"{hidden} reached the player"
+        assert hidden not in house_blob, f"{hidden} reached the player"
 
 
 def test_a_lapsed_oath_is_visible_because_the_player_must_act_on_it():

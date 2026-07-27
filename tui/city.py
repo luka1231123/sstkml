@@ -197,6 +197,7 @@ def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
         surface.text(pad + 2, ground + 1, "]", C["dim"], C["ink"])
         surface.text(pad + 4, ground + 1, label,
                      C["bone"] if inst["inspected"] else C["clay"], C["ink"])
+        surface.link(pad, ground + 1, 4 + len(label), 1, str(index + 1))
         if not inst["head"]:
             surface.text(pad + 4 + len(label) + 1, ground + 1, "×",
                          C["blood"], C["ink"])
@@ -210,7 +211,8 @@ def _divider(surface: Surface, x: int, y: int, width: int) -> None:
 
 
 def compose(b: dict, history: dict[str, list[int]] | None = None,
-            width: int = 96, height: int = 36) -> Screen:
+            width: int = 96, height: int = 36,
+            notice: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE CITY",
                 note="[esc] close", drop=False)
@@ -285,15 +287,20 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
     foot = height - 4
     _divider(surface, 3, foot, width - 6)
-    surface.text(3, foot + 1,
-                 "the figure is what he reports; ! is one you went and saw; "
-                 "× is a post nobody holds."[: width - 6],
-                 C["ash"], C["ink"])
+    revenue = b.get("revenue", {})
+    footnote = (
+        notice if notice else
+        "the figure is what he reports; ! is one you saw; "
+        f"harbour due {revenue.get('harbour_rate', 0)}/1000, "
+        f"last took {revenue.get('last_harbour_due', 0)} "
+        f"{revenue.get('harbour_good', 'oil')}.")
+    surface.text(3, foot + 1, footnote[: width - 6],
+                 C["flame"] if notice else C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
               " [1-9] go and look for yourself — one hour"
               "   [n] the works   [esc] close",
               fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    return surface.interactive()
 
 
 def detail(b: dict, inst: dict, history: list[int] | None = None,
@@ -354,4 +361,4 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
         style.bar(surface, 2, height - 2, width - 4,
                   f" [r] set the men to it — about {want:,} days of corvée",
                   fg=C["clay"], bg=C["lapis"])
-    return surface.freeze()
+    return surface.interactive()

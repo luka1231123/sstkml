@@ -38,16 +38,6 @@ def _clamp(x: int, lo: int = 0, hi: int = 1000) -> int:
     return lo if x < lo else hi if x > hi else x
 
 
-# --- A2/A6 (placeholder): estate deliveries ----------------------------------
-def add_income(court: Court) -> tuple[Court, list]:
-    """Flat estate deliveries. Agriculture (M8) replaces this with real yields."""
-    if court.grain_income <= 0:
-        return court, []
-    stores = dict(court.stores)
-    stores["grain"] = stores.get("grain", 0) + court.grain_income
-    return dataclasses.replace(court, stores=stores), [A.GrainReceived(court.grain_income)]
-
-
 # --- A8: rations paid, arrears updated ---------------------------------------
 def pay_rations(court: Court) -> tuple[Court, list]:
     events: list = []
@@ -72,14 +62,23 @@ def pay_rations(court: Court) -> tuple[Court, list]:
 
         size = g.size
         if desertion:
-            size -= size * desertion // 1000
+            departed = size * desertion // 1000
+            size -= departed
+            if departed:
+                events.append(A.DependentsDeparted(
+                    gid, g.place, departed, "ration arrears"))
         loyalty = _clamp(g.loyalty + loyalty_delta)
+        revolting = bool(revolt)
 
         groups[gid] = dataclasses.replace(
             g, arrears=arrears, loyalty=loyalty,
-            output_modifier=out_mod, size=size,
+            output_modifier=0 if revolting else out_mod, size=size,
+            revolting=revolting,
         )
         events.append(A.RationsPaid(gid, owed, paid, arrears, debt_weeks))
+        if revolting != g.revolting:
+            events.append(A.GroupRevoltChanged(
+                gid, g.place, revolting, size))
         if debt_weeks >= 2 and g.member_name:
             events.append(A.Grumbling(gid, g.member_name, debt_weeks))
 
@@ -122,7 +121,6 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
     stores = dict(court.stores)
     legitimacy = court.legitimacy
     unrest = court.unrest
-    deck_weight = court.misfortune_weight
     for rite in court.rites:
         if rite.fortnight != fortnight:
             continue
@@ -139,11 +137,9 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
             bite = 1500 - temple // 2
             legitimacy = _clamp(legitimacy + rite.skip_legitimacy * bite // 1000)
             unrest = _clamp(unrest + rite.skip_unrest * bite // 1000)
-            deck_weight += rite.skip_deck_weight * bite // 1000
             events.append(A.RiteSkipped(rite.id))
     return dataclasses.replace(court, stores=stores, legitimacy=legitimacy,
-                               unrest=unrest,
-                               misfortune_weight=deck_weight), events
+                               unrest=unrest), events
 
 
 # --- A9: unrest recompute -----------------------------------------------------

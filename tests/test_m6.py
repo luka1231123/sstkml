@@ -1,4 +1,4 @@
-"""M6 relations: gifts, gossip, protocol, unanswered letters, oaths, and fate."""
+"""M6 relations: gifts, gossip, protocol, unanswered letters, and oaths."""
 from __future__ import annotations
 
 import dataclasses
@@ -12,8 +12,7 @@ from belief.project import project
 from engine import actions as A
 from engine.core import Date, canonical_json, lerp_table, state_hash
 from engine.reduce import apply
-from engine.relations import (audit_oaths, deliver_protocol, draw_misfortune,
-                              evaluate_gift)
+from engine.relations import audit_oaths, deliver_protocol, evaluate_gift
 from engine.state import GiftRecord, Letter, ProtocolRecord, Relation
 from engine.tick import advance
 from load import load_scenario
@@ -108,8 +107,7 @@ def _pending_world():
         path=("byblos", "seat"), edge_index=1, legs_into_edge=0,
         at_node="seat", arrive_turn=0)
     return dataclasses.replace(
-        world, correspondents=(), inbox=(letter,), oaths=(),
-        misfortune_deck=())
+        world, correspondents=(), inbox=(letter,), oaths=())
 
 
 def test_unanswered_decay_reading_reply_and_patron_notice():
@@ -174,20 +172,20 @@ def test_protocol_penalties_wrong_gods_and_delivery_idempotence():
 
     world, letter = _protocol_world(
         "hatti_king", 900, ("wrong_oath_gods",))
+    before_court = world.court
     world, _ = deliver_protocol(world, letter)
     assert world.relations["hatti_king"].esteem == 520
-    assert world.court.liability["oath_hatti_grain"] == 220
+    assert world.court == before_court
     assert world.relations["hatti_king"].reply_delay_until == 12
     again, _ = deliver_protocol(world, letter)
-    assert again.court.liability["oath_hatti_grain"] == 220
+    assert again == world
 
     queued, letter = _protocol_world(
         "hatti_king", 900, ("wrong_oath_gods",))
     queued = dataclasses.replace(
         queued, date=Date(1, 7, 7), letters_in_transit=(letter,))
-    queued, events = advance(queued)
-    assert queued.court.liability["oath_hatti_grain"] == 220
-    assert any(isinstance(event, A.MisfortuneOccurred) for event in events)
+    queued, _events = advance(queued)
+    assert queued.relations["hatti_king"].reply_delay_until == 10
 
 
 def test_status_mismatch_only_bites_when_brotherhood_is_used():
@@ -217,11 +215,11 @@ def test_status_mismatch_only_bites_when_brotherhood_is_used():
     assert world.relations["byblos_king"].status_mismatch_known
 
 
-def test_oath_deadline_hidden_liability_and_deterministic_misfortune():
+def test_oath_deadline_records_breach_without_causing_random_physics():
     world = load_scenario("ugarit", SEED)
     world = dataclasses.replace(world, date=Date(1, 24, 24))
-    world, events = audit_oaths(world)
-    assert world.court.liability["oath_hatti_grain"] == 220
+    audited, events = audit_oaths(world)
+    assert audited == world
     assert events == [A.OathViolated("oath_hatti_grain", "provide_goods")]
 
     fulfilled = load_scenario("ugarit", SEED)
@@ -232,28 +230,15 @@ def test_oath_deadline_hidden_liability_and_deterministic_misfortune():
         fulfilled, date=Date(1, 24, 24),
         court=dataclasses.replace(
             fulfilled.court, treasury_gifts_sent=(record,)))
-    fulfilled, events = audit_oaths(fulfilled)
-    assert fulfilled.court.liability["oath_hatti_grain"] == 0
+    audited, events = audit_oaths(fulfilled)
+    assert audited == fulfilled
     assert events == []
 
-    doomed = load_scenario("ugarit", SEED)
-    doomed = dataclasses.replace(
-        doomed, date=Date(1, 8, 8),
-        court=dataclasses.replace(
-            doomed.court, liability={"oath_hatti_grain": 220},
-            legitimacy=700, unrest=0))
-    first, events = draw_misfortune(doomed)
-    second, again = draw_misfortune(doomed)
-    assert first == second and events == again
-    assert events == [A.MisfortuneOccurred("bad_omens", "", 0)]
-    assert (first.court.legitimacy, first.court.unrest) == (690, 20)
 
-
-def test_belief_hides_liability_and_parser_knows_gifts():
+def test_removed_divine_liability_and_parser_knows_gifts():
     world = load_scenario("ugarit", SEED)
-    world = dataclasses.replace(
-        world, court=dataclasses.replace(
-            world.court, liability={"oath_hatti_grain": 999}))
+    assert "liability" not in {
+        field.name for field in dataclasses.fields(type(world.court))}
     belief = project(world)
     assert "liability" not in json.dumps(belief)
     assert belief["oaths"][0]["id"] == "oath_hatti_grain"

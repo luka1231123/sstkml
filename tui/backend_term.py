@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import sys
 
-from tui.grid import ANSI, Screen, pure_ascii
+from tui.grid import ANSI, ScreenLike, cells, pure_ascii
 
 CLEAR = "\x1b[2J\x1b[H"
 HOME = "\x1b[H"
@@ -31,13 +31,13 @@ def supports_colour(stream=None) -> bool:
     return bool(getattr(stream, "isatty", lambda: False)())
 
 
-def to_ansi(screen: Screen, colour: bool = True,
+def to_ansi(screen: ScreenLike, colour: bool = True,
             ascii_only: bool = False) -> str:
     """Render one screen to a string of ANSI. No IO, so it is testable."""
     if ascii_only:
         screen = pure_ascii(screen)
     out: list[str] = []
-    for row in screen:
+    for row in cells(screen):
         current: tuple[int, int] | None = None
         for glyph, fg, bg in row:
             if colour and (fg, bg) != current:
@@ -50,7 +50,7 @@ def to_ansi(screen: Screen, colour: bool = True,
     return "".join(out).rstrip("\n")
 
 
-def paint(screen: Screen, stream=None, clear: bool = True,
+def paint(screen: ScreenLike, stream=None, clear: bool = True,
           colour: bool | None = None, ascii_only: bool = False) -> None:
     stream = stream or sys.stdout
     if colour is None:

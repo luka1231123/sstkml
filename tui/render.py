@@ -207,6 +207,33 @@ def stores_screen(b: dict) -> str:
     return "\n".join(lines)
 
 
+def justice_screen(b: dict) -> str:
+    """The command-mode form of the court. The windowed game draws the room."""
+    petitions = b.get("justice", {}).get("petitions", [])
+    lines = ["  THE COURT OF JUSTICE", ""]
+    if not petitions:
+        lines.append("    no one waits for a judgement.")
+        return "\n".join(lines)
+    for index, petition in enumerate(petitions):
+        lines.append(
+            f"  {index + 1}. {actor_name(petition['petitioner'], b.get('house'))}"
+            f" against {actor_name(petition['against'], b.get('house'))}"
+            f" — {petition['kind']}, {petition['waiting']} fortnights waiting")
+        precedent = petition.get("precedent")
+        if precedent:
+            lines.append(
+                f"     cites {precedent['document_ref']}: "
+                f"{precedent['verdict']} in an earlier {precedent['kind']} case")
+        if petition["heard"]:
+            lines.append(f"     claim: {petition['claim_text']}")
+            lines.append(f"     answer: {petition['counter_text']}")
+        else:
+            lines.append("     (neither man has been heard)")
+    lines.append(
+        "\n  hear <case>  (1 hour)    rule <case> for|against|split|defer")
+    return "\n".join(lines)
+
+
 def land_screen(b: dict) -> str:
     """What the ruler can find out about his own fields, which is not much.
 
@@ -221,6 +248,9 @@ def land_screen(b: dict) -> str:
                  f"{fmt_good('grain', land['last_harvest']):>28}")
     lines.append(f"    the year before               "
                  f"{fmt_good('grain', land['previous_harvest']):>28}")
+    lines.append(f"    due ordered                  "
+                 f"{land['land_due_rate']:>5}/1000; last taken "
+                 f"{fmt_good('grain', land['last_land_due'])}")
     lines.append("")
     seed, ground = land["seed_in_store"], land["seed_in_ground"]
     want = land["seed_recommended"]
@@ -249,9 +279,9 @@ def land_screen(b: dict) -> str:
                          f"{land['works_days']:,} days")
     lines.append("")
     for estate in land["estates"]:
-        note = ""
+        note = f"   hands {estate['hands'] // 10}%"
         if estate["irrigated"]:
-            note = f"   canal at {estate['canal_condition']}"
+            note += f"; canal at {estate['canal_condition']}"
         lines.append(f"    {estate['name']:<44}{note}")
     lines.append("\n  order hands to the fields with:  harvest <group>")
     return "\n".join(lines)
@@ -322,6 +352,10 @@ def house_screen(b: dict) -> str:
         marks = []
         if p["heir_rank"]:
             marks.append(f"heir {p['heir_rank']}")
+        if p.get("named_heir"):
+            marks.append("NAMED HEIR")
+        if p.get("post"):
+            marks.append(p["post"])
         if p["expecting"]:
             marks.append("with child")
         if p["married_to_court"]:
@@ -354,6 +388,20 @@ def house_screen(b: dict) -> str:
         if mother["alive"] and mother["agenda"]:
             lines.append(f"      she is understood to want: {mother['agenda']}")
 
+    shown = {house["ruler"]}
+    if ruler:
+        shown.add(ruler.get("spouse"))
+        shown.update(p["id"] for p in house["members"]
+                     if p["father"] == ruler["id"])
+    shown.update(p["id"] for p in house["members"] if p["is_queen_mother"])
+    kin = [p for p in house["members"]
+           if p["alive"] and p["id"] not in shown]
+    if kin:
+        lines.append("")
+        lines.append("  KIN AT COURT")
+        for person in kin:
+            lines.append(person_line(person, "  "))
+
     # The queen mother has her own block above; she is not listed twice.
     buried = [p for p in house["members"]
               if not p["alive"] and not p["is_queen_mother"]]
@@ -373,12 +421,14 @@ def house_screen(b: dict) -> str:
             lines.append(f"    {omen['id']:<5} turn {omen['turn']:>3}  "
                          f"{omen['question']}{subject}: {omen['reported']}"
                          f"  [{state}{defied}]")
-    lines.append("\n  divine with:  omen harvest | omen death <person> | omen route")
+    lines.append(
+        "\n  ask for a forecast with:  "
+        "omen harvest | omen death <person> | omen route")
     return "\n".join(lines)
 
 
 def oaths_screen(b: dict) -> str:
-    lines = ["  OATH TABLETS — the clauses are readable; divine liability is not", ""]
+    lines = ["  OATH TABLETS — the clauses the court has recorded", ""]
     for oath in b["oaths"]:
         state = ("dissolved" if oath["dissolved"]
                  else "LAPSED — nobody is bound" if oath["lapsed"] else "sworn")
@@ -496,13 +546,10 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.PatronSought):
             out.append(
                 f"  A merchant whispers: {actor_name(e.actor)} seeks another patron.")
-        elif isinstance(e, A.MisfortuneOccurred):
-            out.append("  Misfortune has fallen upon the house. The diviners take note.")
-        elif isinstance(e, A.PlagueBegan):
-            # A plague announces itself. Unlike the melt (D19), this is not a
-            # thing the player is meant to have to notice -- the difficulty of
-            # 6.12 is finding the CAUSE, and hiding the epidemic itself would
-            # only make the archive search start late.
+        elif isinstance(e, A.PlagueBegan) and e.place_id == court.seat:
+            # Sickness at the seat is directly observable. A foreign authored
+            # introduction is World truth and stays off this court report until
+            # a traveller or correspondent actually brings word of it.
             out.append("  There is sickness in the city. Men are lying in the "
                        "streets by the customs house.")
         elif isinstance(e, A.PlagueDeaths) and e.place_id == court.seat:
@@ -526,6 +573,14 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.Threshed):
             out.append(
                 f"  The threshing floor is counted: {fmt_good('grain', e.qa)}.")
+        elif isinstance(e, A.LandDueTaken):
+            out.append(
+                f"  At {e.rate} in a thousand, the due brings "
+                f"{fmt_good('grain', e.taken)} to the crown.")
+        elif isinstance(e, A.MerchantWithdrew):
+            out.append(
+                f"  Word comes that {actor_name(e.actor)} is clearing "
+                "his cargoes elsewhere.")
         elif isinstance(e, A.CorveeRaised):
             out.append(f"  The levy is called: {e.days:,} days of labour.")
         # Finishing is announced; progress is not, and a fortnight in which the

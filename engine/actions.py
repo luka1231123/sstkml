@@ -38,6 +38,24 @@ class ReadLetter:
 
 
 @dataclasses.dataclass(frozen=True)
+class ArchiveLetter:
+    """Move an arrived tablet off the active pile without destroying it."""
+    letter_id: str
+    archived: bool = True
+
+
+@dataclasses.dataclass(frozen=True)
+class DelegateLetter:
+    """Entrust follow-up to a named, living member of the court household.
+
+    Delegation is a recorded responsibility, not an automatic answer: the
+    correspondent continues to wait until the ruler actually sends a reply.
+    """
+    letter_id: str
+    person_id: str
+
+
+@dataclasses.dataclass(frozen=True)
 class DictateReply:
     letter_id: str   # the Stack item being answered
     intent: str      # free-text purpose; prose is composed outside engine/
@@ -146,6 +164,45 @@ class SearchArchive:
     query: str
 
 
+@dataclasses.dataclass(frozen=True)
+class HearPetition:
+    """Spend an audience hour hearing both sides. Truth remains hidden."""
+    petition_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class RulePetition:
+    """Give one of 6.19's four verdicts, heard or unheard."""
+    petition_id: str
+    verdict: str                 # for | against | split | defer
+
+
+@dataclasses.dataclass(frozen=True)
+class SetLandDue:
+    rate: int                    # per thousand of the gross harvest
+
+
+@dataclasses.dataclass(frozen=True)
+class SetHarbourDue:
+    rate: int                    # per thousand of cargo cleared
+
+
+@dataclasses.dataclass(frozen=True)
+class PlacePerson:
+    person_id: str
+    post: str                    # institution id | governor: | command: | court:
+
+
+@dataclasses.dataclass(frozen=True)
+class DismissPerson:
+    post: str                    # institution id | governor: | command: | court:
+
+
+@dataclasses.dataclass(frozen=True)
+class NameHeir:
+    person_id: str
+
+
 # --- Events ------------------------------------------------------------------
 
 
@@ -153,11 +210,6 @@ class SearchArchive:
 class TurnAdvanced:
     year: int
     fortnight: int
-
-
-@dataclasses.dataclass(frozen=True)
-class GrainReceived:
-    amount: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -173,6 +225,30 @@ class RationsPaid:
     paid: int
     arrears: int
     debt_weeks: int
+
+
+@dataclasses.dataclass(frozen=True)
+class DependentsDeparted:
+    group_id: str
+    place_id: str
+    heads: int
+    reason: str
+
+
+@dataclasses.dataclass(frozen=True)
+class DependentsDied:
+    group_id: str
+    place_id: str
+    heads: int
+    cause: str
+
+
+@dataclasses.dataclass(frozen=True)
+class GroupRevoltChanged:
+    group_id: str
+    place_id: str
+    revolting: bool
+    heads: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -249,6 +325,19 @@ class LetterRead:
 
 
 @dataclasses.dataclass(frozen=True)
+class LetterArchived:
+    letter_id: str
+    archived: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class LetterDelegated:
+    letter_id: str
+    person_id: str
+    turn: int
+
+
+@dataclasses.dataclass(frozen=True)
 class LedgerInspected:
     ledger: str
     true_value: int
@@ -307,13 +396,6 @@ class OathViolated:
     clause_kind: str
 
 
-@dataclasses.dataclass(frozen=True)
-class MisfortuneOccurred:
-    card_id: str
-    good: str
-    loss: int
-
-
 # --- M8: land and metal ------------------------------------------------------
 
 @dataclasses.dataclass(frozen=True)
@@ -361,6 +443,7 @@ class SummonsReceived:
 class CorveeRaised:
     days: int
     unrest_delta: int
+    sources: tuple[tuple[str, int], ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -378,10 +461,31 @@ class BronzeSmelted:
 
 
 @dataclasses.dataclass(frozen=True)
+class BronzeWorn:
+    """Bronze leaving service through wear, loss, burial, and breakage."""
+    amount: int
+
+
+@dataclasses.dataclass(frozen=True)
+class FormationCapabilityChanged:
+    formation_id: str
+    before: int
+    after: int
+    replacement_rate: int
+
+
+@dataclasses.dataclass(frozen=True)
 class InstitutionDecayed:
     """The fabric went a little. Nothing surfaces this (spec 6.18, D19)."""
     institution_id: str
     condition: int
+
+
+@dataclasses.dataclass(frozen=True)
+class InstitutionUpkeepConsumed:
+    institution_id: str
+    good: str
+    amount: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -485,6 +589,14 @@ class PlagueSpread:
 
 
 @dataclasses.dataclass(frozen=True)
+class PlagueProgressed:
+    """Material SIR ledger for one settlement and one disease phase."""
+    place_id: str
+    new_infections: int
+    recovered: int
+
+
+@dataclasses.dataclass(frozen=True)
 class PlagueDeaths:
     place_id: str
     dead: int
@@ -492,8 +604,7 @@ class PlagueDeaths:
 
 @dataclasses.dataclass(frozen=True)
 class OathExpiated:
-    """Note what this event does NOT carry: whether it worked. The court made an
-    offering and the court does not know (spec 6.12)."""
+    """A performed ritual, with no objective divine verdict."""
     oath_id: str
     offering: int
 
@@ -514,6 +625,112 @@ class ArchiveSearched:
 class OathLapsed:
     oath_id: str
     reason: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PetitionArrived:
+    petition_id: str
+    petitioner: str
+    against: str
+    kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PetitionHeard:
+    petition_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PetitionRuled:
+    petition_id: str
+    verdict: str
+    precedent_ref: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class JusticeCorrectionDue:
+    """Hidden scheduled payload. Only its witness tablet enters Belief."""
+    petition_id: str
+    witness: str
+    finding: str
+    legitimacy_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class LandDueSet:
+    rate: int
+
+
+@dataclasses.dataclass(frozen=True)
+class HarbourDueSet:
+    rate: int
+
+
+@dataclasses.dataclass(frozen=True)
+class LandDueTaken:
+    gross: int
+    rate: int
+    taken: int
+
+
+@dataclasses.dataclass(frozen=True)
+class HarbourDueTaken:
+    good: str
+    cargoes: int
+    rate: int
+    taken: int
+    lot_id: str = ""
+    owner: str = ""
+    cleared: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class HarbourCargoWithdrawn:
+    lot_id: str
+    owner: str
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
+class MerchantResponseDue:
+    actor: str
+    esteem_delta: int
+    traffic_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class MerchantWithdrew:
+    actor: str
+    esteem_delta: int
+    traffic_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class EstateLabourFled:
+    estate_id: str
+    place_id: str
+    before: int
+    after: int
+
+
+@dataclasses.dataclass(frozen=True)
+class PersonPlaced:
+    person_id: str
+    post: str
+    displaced: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class PersonDismissed:
+    person_id: str
+    post: str
+
+
+@dataclasses.dataclass(frozen=True)
+class HeirNamed:
+    person_id: str
+    displaced_rank: int
 
 
 # --- M12: building and repair (6.21) ------------------------------------------
@@ -554,6 +771,13 @@ class WorkProgressed:
 
 
 @dataclasses.dataclass(frozen=True)
+class WorkMaterialConsumed:
+    project: str
+    good: str
+    amount: int
+
+
+@dataclasses.dataclass(frozen=True)
 class WorkFinished:
     project: str
     institution: str
@@ -568,30 +792,49 @@ class WorkAbandoned:
     days_lost: int
 
 
+@dataclasses.dataclass(frozen=True)
+class OfferingConsumed:
+    purpose: str
+    good: str
+    amount: int
+
+
 # --- Registry for log round-tripping -----------------------------------------
 
 _TYPES = {
     c.__name__: c for c in (
-        EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, DictateReply,
+        EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, ArchiveLetter,
+        DelegateLetter, DictateReply,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
+        HearPetition, RulePetition,
+        SetLandDue, SetHarbourDue, PlacePerson, DismissPerson, NameHeir,
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
-        BronzeSmelted, BronzeMelted, WorkshopDemandMet, InstitutionDecayed,
+        BronzeSmelted, BronzeWorn, FormationCapabilityChanged,
+        BronzeMelted, WorkshopDemandMet,
+        InstitutionDecayed, InstitutionUpkeepConsumed,
         BeginBuild, BeginRepair, AbandonWork, WorkBegun, WorkProgressed,
-        WorkFinished, WorkAbandoned,
+        WorkMaterialConsumed, WorkFinished, WorkAbandoned, OfferingConsumed,
         MarryAbroad, ConsultDiviner, SuppressOmen, DefyOmen, SwearOath,
         Conceived, ChildBorn, HouseMemberDied, RulerSucceeded,
         SuccessionFailed, MarriedAbroad, OmenTaken, OmenSuppressed,
         OmenLeaked, OmenDefied, OathSworn, OathLapsed,
         Quarantine, Expiate, SearchArchive,
-        PlagueBegan, PlagueSpread, PlagueDeaths, OathExpiated,
+        PlagueBegan, PlagueSpread, PlagueProgressed, PlagueDeaths, OathExpiated,
         QuarantineSet, ArchiveSearched,
-        TurnAdvanced, GrainReceived, Spoiled, RationsPaid, RitePerformed,
+        PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
+        LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,
+        HarbourCargoWithdrawn, EstateLabourFled,
+        MerchantResponseDue, MerchantWithdrew, PersonPlaced, PersonDismissed,
+        HeirNamed,
+        TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,
+        DependentsDied, GroupRevoltChanged, RitePerformed,
         RiteSkipped, UnrestChanged, Grumbling, SeedEaten, AllocationSet,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,
-        LetterIntercepted, LetterRead, LedgerInspected, GiftSent, GiftArrived,
+        LetterIntercepted, LetterRead, LetterArchived, LetterDelegated,
+        LedgerInspected, GiftSent, GiftArrived,
         GiftJudged, RumourArrived, PatronNoticeDue, PatronSought,
-        ProtocolApplied, OathViolated, MisfortuneOccurred,
+        ProtocolApplied, OathViolated,
     )
 }
 
