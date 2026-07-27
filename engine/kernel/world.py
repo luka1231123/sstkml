@@ -86,6 +86,19 @@ class Kernel:
                 return site_id
         return ""
 
+    def deciders(self) -> tuple[EntityId, ...]:
+        """Every organization that decides, in a stable order.
+
+        More than one per settlement: a palace and a temple both draw on the
+        same people, and which of them goes short in a thin year is settled by
+        the allocator rather than by an authored split.
+        """
+        return tuple(
+            org_id for org_id in sorted(self.registry.orgs)
+            if self.registry.orgs[org_id].policy in POLICIES
+            and self.registry.settlements[
+                self.registry.orgs[org_id].settlement].autonomous)
+
     def autonomous(self) -> tuple[EntityId, ...]:
         """The settlements that decide for themselves, in a stable order."""
         return tuple(
@@ -145,7 +158,32 @@ def subsistence(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
     return tuple(intents)
 
 
-POLICIES = {"subsistence": subsistence}
+def cult(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
+    """Work the god's land. Render nothing: the temple owes the crown nothing.
+
+    A second claimant on the same person-days is the point of this policy. The
+    fields and the temple estate draw on one body of people, and the allocator
+    -- not a hand-tuned split -- decides who goes short.
+    """
+    intents: list[Intent] = []
+    subjects = sorted({c.subject for c in belief.claims
+                       if c.attribute == "labour"})
+    for subject in subjects:
+        labour = belief.value(subject, "labour", 0)
+        if labour <= 0:
+            continue
+        # The temple asks for the share of the season's hands custom gives it,
+        # and asks for all of it whether or not the fields can spare them.
+        intents.append(Intent(
+            id=f"{actor}|work|{subject}", actor=actor, kind="work",
+            turn=belief.value(subject, "turn", 0), subject=subject,
+            resource=f"{subject}#labour", quantity=labour * 3 // 10,
+            authority=actor, priority=1,
+            basis=tuple(c.id for c in belief.about(subject, "labour"))))
+    return tuple(intents)
+
+
+POLICIES = {"subsistence": subsistence, "cult": cult}
 
 
 # --- the phases ---------------------------------------------------------------
@@ -155,8 +193,8 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
     world: Kernel = snapshot.world
     beliefs = dict(kernel.beliefs)
     turn = snapshot.turn
-    for settlement in world.autonomous():
-        actor = world.controller(settlement)
+    for actor in world.deciders():
+        settlement = world.registry.orgs[actor].settlement
         need = sum(c.ration() for c in world.cohorts_of(settlement))
         owed = sum(o.outstanding() for o in world.obligations
                    if o.party == settlement and o.status in ("due", "part_paid"))
@@ -189,10 +227,8 @@ def _intents(kernel: Kernel, snapshot: Snapshot) -> tuple[Intent, ...]:
     """Phase 4. Every council decides from its own belief, from one snapshot."""
     world: Kernel = snapshot.world
     produced: list[Intent] = []
-    for settlement in world.autonomous():
-        actor = world.controller(settlement)
-        org = world.registry.orgs[actor]
-        policy = POLICIES[org.policy]
+    for actor in world.deciders():
+        policy = POLICIES[world.registry.orgs[actor].policy]
         produced.extend(policy(actor, kernel.beliefs[actor]))
     return tuple(sorted(produced, key=lambda i: i.id))
 
@@ -209,7 +245,9 @@ def _produce(kernel: Kernel, allocation: R.Allocation) -> tuple[Kernel, list]:
     book = kernel.book.at_phase(kernel.date.absolute, "production")
     climate = kernel.climate_at(kernel.date.absolute)
 
-    made: dict[EntityId, int] = {}
+    # Each organization's granted days make its own grain: the temple's estate
+    # is not the council's granary, and a lot has one owner.
+    made: dict[tuple[EntityId, EntityId], int] = {}
     for grant in allocation.grants:
         if not grant.resource.endswith("#labour") or grant.granted <= 0:
             continue
@@ -219,18 +257,22 @@ def _produce(kernel: Kernel, allocation: R.Allocation) -> tuple[Kernel, list]:
             continue
         site = kernel.registry.sites[site_id]
         # qa per person-day, scaled 1000, against the year's climate.
-        made[settlement] = (made.get(settlement, 0)
-                            + grant.granted * site.capacity // 1000 * climate // 100)
+        key = (settlement, grant.actor)
+        made[key] = (made.get(key, 0)
+                     + grant.granted * site.capacity // 1000 * climate // 100)
 
-    for settlement in sorted(made):
-        quantity = made[settlement]
+    deciders = kernel.deciders()
+    for settlement, owner in sorted(made):
+        quantity = made[(settlement, owner)]
         if quantity <= 0:
             continue
-        owner = kernel.controller(settlement)
-        # The settlement itself is the stable parent, so one harvest per
-        # settlement per turn is ordinal 0 and no other settlement's
-        # existence can shift it.
-        lot_id = mint(settlement, kernel.date.absolute, "lot", 0)
+        # The settlement is the stable parent, and the ordinal is the owner's
+        # place among that settlement's own deciders -- not among the world's,
+        # or an organization founded in Alashiya would renumber Ma'hadu's lots.
+        local = [o for o in deciders
+                 if kernel.registry.orgs[o].settlement == settlement]
+        lot_id = mint(settlement, kernel.date.absolute, "lot",
+                      local.index(owner) if owner in local else 0)
         book = book.create(lot_id, GRAIN, quantity, owner=owner,
                            holder=owner, location=settlement,
                            reason="harvested")
@@ -309,7 +351,9 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
             take = min(offer - moved, lot.free)
             if take <= 0:
                 continue
-            part = mint(obligation.party, kernel.date.absolute, "lot", i + 1)
+            # Offset well clear of the production ordinals above, so a levy and
+            # a harvest in the same fortnight cannot mint the same id.
+            part = mint(obligation.party, kernel.date.absolute, "lot", 100 + i)
             book = book.give(
                 lot.id, take, obligation.beneficiary, "levied",
                 authority=obligation.id,
@@ -339,13 +383,36 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
                                     dict(kernel.seasons))):
             obligations[i] = O.renew(obligation)
 
-    return dataclasses.replace(kernel, obligations=tuple(obligations)), events
+    return dataclasses.replace(
+        kernel, book=book, obligations=tuple(obligations)), events
 
 
 # --- the turn -----------------------------------------------------------------
 
+@dataclasses.dataclass(frozen=True)
+class TurnLog:
+    """What a turn actually did. The inspector's whole evidence base (spec 7.5).
+
+    Not stored in the world. The run is deterministic, so a developer asking
+    why something happened re-runs the world and collects these -- which keeps
+    an ever-growing causal log out of the save file without giving up the
+    ability to answer the question.
+    """
+    turn: int
+    intents: tuple[Intent, ...] = ()
+    allocation: R.Allocation = dataclasses.field(default_factory=R.Allocation)
+    transfers: tuple[W.Transfer, ...] = ()
+    events: tuple = ()
+
+
 def advance(kernel: Kernel) -> tuple[Kernel, list]:
     """One fortnight, phases in order, every settlement crossing them together."""
+    kernel, events, _log = advance_logged(kernel)
+    return kernel, events
+
+
+def advance_logged(kernel: Kernel) -> tuple[Kernel, list, TurnLog]:
+    """`advance`, and the workings alongside the result."""
     date = kernel.date
     fortnight = date.fortnight % 24 + 1
     kernel = dataclasses.replace(kernel, date=Date(
@@ -372,7 +439,13 @@ def advance(kernel: Kernel) -> tuple[Kernel, list]:
         T.Step("settlement", "obligations", lambda k: _settle(k, intents))))
     events.extend(produced)
 
-    return kernel, events
+    log = TurnLog(
+        turn=kernel.date.absolute, intents=intents, allocation=allocation,
+        # The book's ledger is drained on the turn's first `at_phase`, so what
+        # stands on it now is this turn's movements and only this turn's.
+        transfers=kernel.book.transfers,
+        events=tuple(events))
+    return kernel, events, log
 
 
 def faults(kernel: Kernel) -> tuple[str, ...]:

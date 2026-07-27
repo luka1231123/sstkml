@@ -31,11 +31,30 @@ M13.0 establishes the honest one-city foundation:
 - causal auditing and a pinned foundation benchmark guard conservation and
   accidental performance regressions.
 
-The wider world is not finished. Foreign settlements still need the autonomous
-households, production, ownership, trade, transport, politics, and information
-systems specified for M13.1–M13.6. M14 builds displacement and conflict on that
-state; M15 authors scenario starts; M16 finishes and ships the game. There is no
-M17.
+M13.1 adds the world kernel beside it:
+
+- Region, Polity, Settlement, Site, Route, Cohort, and Organization entities,
+  with identifiers derived from a stable parent, turn, domain, and local
+  ordinal rather than from any world-wide counter;
+- goods held as lots whose owner and holder are separate, where every change
+  leaves a transfer record and the ledger alone accounts for the world total;
+- obligations with closed clause kinds, a lifecycle, and consequences the
+  parties believe rather than effects the engine applies;
+- a fortnight run as spec 6.1's phases, with every settlement crossing each
+  phase together and one global allocation of everything exclusive;
+- actor Belief: dated, sourced claims that keep their conflicts, read by
+  policies that take `(actor, belief)` and never the world;
+- Ma'hadu and an Alashiyan port producing, consuming, deciding, and changing
+  with Ugarit idle — and identically with Ugarit deleted outright.
+
+Ugarit itself is still the detailed pre-kernel `Court`, kept as the
+`legacy_court` adapter until the M13.2 grain slice replaces it. Kernel
+production is not yet seasonal; the sowing-to-threshing chain is M13.2's.
+
+The wider world is not finished. Foreign settlements still need trade,
+transport, credit, envoys, standing orders, and the generated institutions
+specified for M13.2–M13.6. M14 builds displacement and conflict on that state;
+M15 authors scenario starts; M16 finishes and ships the game. There is no M17.
 
 ## Run
 
@@ -64,7 +83,15 @@ the simulation.
 .venv/bin/python tools/m13_audit.py
 .venv/bin/python tools/m13_benchmark.py
 .venv/bin/python tools/balance.py prudent 96
+.venv/bin/python tools/kernel_inspect.py where grain
 ```
+
+`tools/kernel_inspect.py` is the developer's causal inspector (spec 7.5): it
+answers why a lot exists, where a quantity went, why an actor chose what it
+chose, what evidence a belief rests on, what an obligation authorized, and who
+asked for something and did not get it. It is omniscient and never
+player-facing, and it works by replaying the deterministic world rather than by
+keeping a causal log in the save.
 
 The engine is standard-library-only, integer-state, immutable, seeded, and
 replayable. `belief/` is the only World-to-player projection boundary.
@@ -73,6 +100,7 @@ replayable. `belief/` is the only World-to-player projection boundary.
 
 ```text
 engine/   World state, actions, causal systems, tick, and records
+engine/kernel/  snapshot, intents, one global allocation, the phased turn
 belief/   safe, dated player projections
 ai/       optional validated language layer and grounded Help
 tui/      shared character-cell UI and Tk/terminal backends

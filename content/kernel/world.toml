@@ -108,6 +108,17 @@ kind = "council"
 policy = "subsistence"
 authority = 300
 
+# A second claimant on the same body of people. The elders and the temple both
+# want the fortnight's hands, and in a thin year the allocator decides who goes
+# short -- there is no authored split between them.
+[[orgs]]
+id = "org:mahadu_temple"
+name = "the house of Baal at the harbour"
+settlement = "settlement:mahadu"
+kind = "temple"
+policy = "cult"
+authority = 700
+
 [[cohorts]]
 id = "cohort:mahadu_fields"
 settlement = "settlement:mahadu"

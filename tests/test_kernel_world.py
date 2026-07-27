@@ -196,12 +196,58 @@ def test_goods_are_conserved_across_a_run() -> None:
         assert unexplained == 0, (sourced, sunk, unexplained)
 
 
+def test_rendering_a_tribute_actually_moves_the_grain() -> None:
+    """Recording a payment is not making one.
+
+    The first version of the settlement phase computed the levy and dropped the
+    updated book on the floor: the obligation went to discharged while the
+    grain never changed hands. Every ledger agreed, and nothing was paid.
+    """
+    kernel, _ = _run(load_kernel(), turns=10)
+    crown = "polity:ugarit"
+    theirs = [lot for lot in kernel.book.owned_by(crown) if lot.good == "grain"]
+    assert theirs, "the crown owns grain it did not own before"
+    assert sum(lot.quantity for lot in theirs) == 1800
+
+    # Ownership moved; custody and place did not. Nothing has carried it yet,
+    # and M13.1 has no transport -- so it is the crown's grain, in Ma'hadu.
+    assert all(lot.location == MAHADU for lot in theirs)
+    assert all(lot.holder != crown for lot in theirs)
+
+
 def test_a_recurring_render_stands_again_next_year() -> None:
     kernel, events = _run(load_kernel(), turns=30)
     tribute = kernel.obligations[0]
     assert "renewed" in " ".join(tribute.history)
     assert tribute.rendered == 0 and tribute.status in ("pending", "due")
     assert sum(1 for e in events if e[0] == "due") >= 1
+
+
+def test_two_claimants_on_one_body_of_people_and_authority_decides() -> None:
+    """The allocator has to bind, or it is decoration.
+
+    Ma'hadu's elders and its temple both want the fortnight's hands. Nothing
+    splits them by hand: the temple outranks the elders, takes what it asked
+    for, and the elders go short by exactly that much.
+    """
+    kernel = load_kernel()
+    assert kernel.deciders() == ("org:alashiya_council", "org:mahadu_council",
+                                 "org:mahadu_temple")
+
+    kernel, _, log = K.advance_logged(kernel)
+    at_mahadu = {g.actor: g for g in log.allocation.grants
+                 if g.resource == f"{MAHADU}#labour"}
+    assert set(at_mahadu) == {"org:mahadu_council", "org:mahadu_temple"}
+
+    temple, elders = at_mahadu["org:mahadu_temple"], at_mahadu["org:mahadu_council"]
+    assert temple.met, "the higher authority is served first, and in full"
+    assert not elders.met
+    assert elders.short == temple.granted
+    assert temple.granted + elders.granted == kernel.labour(MAHADU)
+
+    # And each keeps what its own hands made: a lot has one owner.
+    owners = {lot.owner for lot in kernel.book.at(MAHADU) if lot.good == "grain"}
+    assert {"org:mahadu_council", "org:mahadu_temple"} <= owners
 
 
 def test_the_allocation_inside_a_turn_never_exceeds_the_labour_that_exists() -> None:
