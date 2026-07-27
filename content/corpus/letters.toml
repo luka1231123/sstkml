@@ -10,6 +10,9 @@ The grain you owe me under your oath has not come. {ships_promised} ships were
 promised to me; one has sailed. The season turns and my storehouses stand open
 and empty. See to it. Do not make me write to you a third time."""
 
+[grain_owed.labels]
+ships_promised = "ships you were promised"
+ships_sailed = "ships that have actually sailed"
 [ships_sighted]
 summary = "Alashiya. Sealed, the governor. Ships off the coast. He is afraid."
 template = """To the king of Ugarit, from {sender}, your servant.
@@ -17,6 +20,9 @@ Ships not our own have been seen off my coast, {ships} of them, and I have but
 {men} men under arms. I have written to you before and had no answer. In the
 name of the gods, send word, and send men, before they are upon us."""
 
+[ships_sighted.labels]
+men = "men you have under arms on the island"
+ships = "ships seen off your coast"
 [exemption]
 summary = "Sinaranu, merchant. Unsealed. Wants his exemption again."
 template = """To my lord the king: I, {sender}, your servant, at your feet.
@@ -31,6 +37,8 @@ May it be well with you, with your house, your wives, your sons, your troops.
 I have sent you {gold} talents of gold, a gift between brothers. Write to me of
 your health, and of the ships that pass before your harbour these days."""
 
+[greeting.labels]
+gold = "talents of gold you have sent him"
 [arrears_complaint]
 summary = "A servant of your house. The ration has not come."
 template = """To the king, my lord: I am {sender}, of {group}.
@@ -38,6 +46,9 @@ The ration has not reached us these {weeks} fortnights. The children ask for it
 and I have no answer to give them. I have not forgotten my lord. I beg my lord:
 do not forget his servants."""
 
+[arrears_complaint.labels]
+group = "the body of people you belong to"
+weeks = "fortnights your ration has not come"
 [great_king_demand]
 summary = "The viceroy. Troops are summoned. A date is named."
 template = """To Ammurapi: thus {sender}. In the name of the Sun, my lord and
@@ -45,6 +56,9 @@ yours, send me {troops} men of your household troops, and let them be here
 within {within} fortnights. The Sun does not ask twice. See that they come, and
 that they come armed. Do not write to me of the sea; write to me of soldiers."""
 
+[great_king_demand.labels]
+troops = "household troops you are summoning"
+within = "fortnights he has to send them"
 [vassal_plea]
 summary = "A vassal. His towns are being taken. He begs, again."
 template = """To the king of Ugarit, my brother -- would that I could say my
@@ -53,6 +67,9 @@ comes. I have written and written. Behold, if help does not come before the sea
 opens, there will be no kingdom here to help. Send word to the Sun on my behalf,
 for he listens to you and not to me."""
 
+[vassal_plea.labels]
+enemy = "who is taking them"
+towns_taken = "towns of yours that have been taken"
 [tribute_due]
 summary = "Sidon. A reminder, courteous and cold, of what is owed."
 template = """To my brother the king of Ugarit, thus {sender}. The purple you
@@ -60,6 +77,8 @@ promised for the house of the god -- {purple} measures -- has not come with the
 last ship. I say nothing of it to others. But the god counts, and so do I. Let
 it come with the next, and we remain brothers."""
 
+[tribute_due.labels]
+purple = "measures of purple you were promised"
 [brother_greeting]
 summary = "A great king, as an equal. Gifts, and a scale being taken."
 template = """To Ammurapi, my brother, thus {sender}: may it be well with you,
@@ -67,6 +86,9 @@ your house, your wives, your sons, your chariots. I send you {number} of {gift}
 as a gift between brothers who are equals. Write to me of your health -- and tell
 me, my brother, what the king of Egypt last sent to your house. I would know it."""
 
+[brother_greeting.labels]
+gift = "what you are sending"
+number = "how many you are sending"
 [grain_offer]
 summary = "Ura. Grain for copper, if the sea allows and the price suits."
 template = """To the house of the king of Ugarit, from {sender}. I have {grain}
@@ -74,14 +96,54 @@ measures of good grain lying on the quay, and the season is short. I will let it
 go for {price_copper} of copper the measure, no less, for the risk is mine. Send
 word and send the metal, and it is yours before the sea shuts."""
 
+[grain_offer.labels]
+grain = "measures of grain lying on your quay"
+price_copper = "copper you want per measure"
 [gift_insult]
 summary = "A royal seal. The gift was weighed. The words are colder than the scale."
 template = """To the king of Ugarit: your gift has been weighed before my servants.
 You sent {quantity} of {good}. Is this how your house values mine? Other kings
 know the measure of honour. Send no explanation; send what is fitting."""
 
+[gift_insult.labels]
+good = "what he sent you"
+quantity = "how much he sent you"
 [warning]
 summary = "A distant hand. Movement, rumour, a name to remember."
 template = """To the king of Ugarit. I am {sender}, and I write what I have seen,
 not what I have been told. {enemy}. Believe it or not as you will; I have
 discharged my duty in the writing. Watch your coast, and count your friends."""
+
+[warning.labels]
+enemy = "what you have heard of"
+ships = "ships said to be moving"
+
+[estate_report]
+summary = "An overseer. The fields, the hands, and a request."
+template = """To the king, my lord: thus {sender}, your servant, at the feet of my lord.
+Concerning {estate}: the sowing went into the ground, some {sown} hundred measures
+of it, and the ground took it as the ground does. But I am short of hands, my
+lord, by {hands_short} hundred days of labour before the season closes, and what
+is not worked is not reaped. Send me men, or send me word that none are coming,
+that I may know which of the fields to let go."""
+
+[estate_report.labels]
+estate = "which estate you are writing about"
+hands_short = "hundreds of labour-days you are short of"
+sown = "hundreds of measures of seed that went into your ground"
+
+[daughter_abroad]
+summary = "Your daughter, from a court that is not yours. She hears things."
+template = """To the king my father, from your daughter, in the house of {court}.
+May it be well with you, and with my mother, and with my brothers.
+They speak of you here. I am held in regard -- some {regard} measures of it, as
+these things are counted -- and I hear that what is owed to this house from
+yours stands at {their_debt} hundreds, though nobody says it to me directly.
+I tell you what I hear, my father, and I ask only that you do not forget that I
+am also of this house now, and that what is good for it is not always what you
+would choose."""
+
+[daughter_abroad.labels]
+court = "the court you now live in"
+regard = "how highly you are held there, as you would like it understood"
+their_debt = "hundreds that court owes your father's house"

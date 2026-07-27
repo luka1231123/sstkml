@@ -13,6 +13,7 @@ import heapq
 
 from engine import actions as A
 from engine.core import stream
+from engine import report
 from engine.state import Letter, ProtocolRecord, World
 from engine.systems import sea_open
 
@@ -140,10 +141,27 @@ def step_letters(world: World) -> tuple[World, list]:
 
 
 # --- generation (A15): who writes this turn ----------------------------------
+def _assert_facts(world: World, sender: str, facts: tuple,
+                  exaggerate: tuple[str, ...],
+                  understate: tuple[str, ...]) -> tuple[tuple, tuple]:
+    """Return (asserted, true). The sender's bias is applied once, here, at the
+    moment he writes -- so the tablet says the same wrong thing forever after,
+    and a second source can contradict it."""
+    relation = world.relations.get(sender)
+    bias = relation.report_bias if relation is not None else 0
+    if bias <= 0 or not (exaggerate or understate):
+        return facts, ()
+    asserted = report.assert_facts(
+        facts, bias, exaggerate, understate,
+        world.seed, world.date.absolute, sender)
+    return asserted, (facts if asserted != facts else ())
+
+
 def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
                 facts: tuple, outgoing: bool = False, recipient: str | None = None,
                 protocol_profile: str = "", protocol_total: int = 0,
-                protocol_violations: tuple[str, ...] = ()) -> Letter:
+                protocol_violations: tuple[str, ...] = (),
+                true_facts: tuple = ()) -> Letter:
     seat = world.court.seat
     if outgoing:
         src, dst = seat, origin      # replies go the other way; origin is the target place
@@ -155,7 +173,7 @@ def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
         recipient=recipient or (sender if outgoing else world.court.actor),
         topic=topic, facts=facts, sent_turn=world.date.absolute,
         path=path, edge_index=0, legs_into_edge=0, at_node=src,
-        outgoing=outgoing,
+        outgoing=outgoing, true_facts=true_facts,
         protocol_profile=protocol_profile, protocol_total=protocol_total,
         protocol_violations=protocol_violations,
     )
@@ -170,10 +188,13 @@ def generate_incoming(world: World) -> tuple[World, list]:
     inbox = world.inbox
     events: list = []
 
-    def emit(sender, origin, topic, facts):
+    def emit(sender, origin, topic, facts, exaggerate=(), understate=()):
         nonlocal seq, inbox
         seq += 1
-        L = _new_letter(world, seq, sender, origin, topic, facts)
+        asserted, true = _assert_facts(
+            world, sender, facts, exaggerate, understate)
+        L = _new_letter(world, seq, sender, origin, topic, asserted,
+                        true_facts=true)
         if len(L.path) <= 1:                       # already at the seat
             inbox = inbox + (dataclasses.replace(L, arrive_turn=now),)
             events.append(A.LetterArrived(L.id, L.sender, L.topic))
@@ -185,7 +206,46 @@ def generate_incoming(world: World) -> tuple[World, list]:
         delayed = relation is not None and now < relation.reply_delay_until
         if (not delayed and c.cadence > 0 and now - c.offset >= 0
                 and (now - c.offset) % c.cadence == 0):
-            emit(c.actor, c.place, c.topic, c.facts)
+            emit(c.actor, c.place, c.topic, c.facts, c.exaggerate, c.understate)
+
+    # A daughter married abroad (spec 6.10). She is a permanent asset who is
+    # also an independent agent: she writes home with what the court she now
+    # lives in is saying, which is intelligence available from no other source,
+    # and she shades it toward her own position there. She is the best
+    # correspondent in the game and she is not on your side.
+    for person in sorted(world.court.house.values(), key=lambda p: p.id):
+        if not (person.alive and person.married_to_court):
+            continue
+        offset = sum(ord(ch) for ch in person.id) % 5
+        if (now - offset) % 5:
+            continue
+        relation = world.relations.get(person.married_to_court)
+        if relation is None:
+            continue
+        emit(person.id, person.location, "daughter_abroad",
+             (("court", person.married_to_court),
+              ("regard", max(1, relation.esteem // 100)),
+              ("their_debt", abs(relation.obligation) // 100)),
+             exaggerate=("regard",), understate=("their_debt",))
+
+    # Estate overseers (spec 6.4). The ruler cannot see his own fields; he gets
+    # these. They inflate need and conceal failure, and their `report_bias`
+    # (M7) is what turns that intent into numbers. This is the whole of the
+    # player's information about the land besides the gauge and last year's
+    # floor -- and it is written by men who want more hands sent to them.
+    for estate in sorted(world.court.estates.values(), key=lambda e: e.id):
+        overseer = f"overseer_{estate.id}"
+        if overseer not in world.relations:
+            continue
+        offset = sum(ord(ch) for ch in estate.id) % 6
+        if (now - offset) % 6:
+            continue
+        needed = estate.area_iku * estate.labour_days_per_iku
+        short = max(0, needed - estate.labour_days_supplied)
+        emit(overseer, estate.place, "estate_report",
+             (("estate", estate.name), ("hands_short", short // 100),
+              ("sown", estate.seed_sown // 100)),
+             exaggerate=("hands_short",), understate=("sown",))
 
     # A group deep in arrears: a named member writes. Sparse, offset by group.
     for gid in sorted(world.court.dependents):
@@ -201,10 +261,13 @@ def generate_incoming(world: World) -> tuple[World, list]:
 
 
 def inject_incoming(world: World, sender: str, origin: str, topic: str,
-                    facts: tuple) -> World:
+                    facts: tuple, exaggerate: tuple[str, ...] = (),
+                    understate: tuple[str, ...] = ()) -> World:
     """Create an engine-decided incoming letter outside the cadence deck."""
     seq = world.letter_seq + 1
-    letter = _new_letter(world, seq, sender, origin, topic, facts)
+    asserted, true = _assert_facts(world, sender, facts, exaggerate, understate)
+    letter = _new_letter(world, seq, sender, origin, topic, asserted,
+                         true_facts=true)
     if len(letter.path) <= 1:
         letter = dataclasses.replace(letter, arrive_turn=world.date.absolute)
         return dataclasses.replace(

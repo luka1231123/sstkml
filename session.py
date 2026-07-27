@@ -15,7 +15,7 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 
-SAVE_VERSION = 6
+SAVE_VERSION = 10     # M10: plague, the archive, vows that bind the house
 
 
 def _verify_protocol(world, action):

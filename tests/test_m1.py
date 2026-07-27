@@ -29,19 +29,26 @@ def test_replay_matches():
 
 
 def test_grain_is_conserved():
-    """in - consumed - spoiled == delta_stock, exactly, every turn (no out flows in M1)."""
+    """in - consumed - spoiled == delta_stock, exactly, every turn.
+
+    M8 added the threshing floor as a second inflow: what comes off it, less
+    what is held back as next year's seed, which moves to the other stock
+    rather than leaving the world.
+    """
     world = load_scenario("ugarit", SEED)
     for _ in range(60):
         before = world.court.stores["grain"]
         world, events = advance(world)
         after = world.court.stores["grain"]
         income = sum(e.amount for e in events if isinstance(e, A.GrainReceived))
+        threshed = sum(e.qa - e.held_back_as_seed for e in events
+                       if isinstance(e, A.Threshed))
         paid = sum(e.paid for e in events if isinstance(e, A.RationsPaid))
         spoiled = sum(e.amount for e in events
                       if isinstance(e, A.Spoiled) and e.good == "grain")
         rite = sum(_rite_grain(world.court, e.rite_id) for e in events
                    if isinstance(e, A.RitePerformed))
-        assert after == before - spoiled + income - rite - paid
+        assert after == before - spoiled + income + threshed - rite - paid
 
 
 def test_arrears_monotone_under_zero_allocation():

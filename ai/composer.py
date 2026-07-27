@@ -106,10 +106,14 @@ def split_draft(draft: Draft, recipient: str) -> tuple[Draft, ...]:
     return ()
 
 
-def _mark_guard_fail(client) -> None:
-    log = getattr(client, "ai_log", None)
-    if log:
-        log[-1]["guard_fail"] = True
+def _mark_guard_fail(client, role: str = "composer") -> None:
+    flag = getattr(client, "flag_last", None)
+    if flag is not None:
+        flag(role, guard_fail=True)
+    else:                                   # a test double with only an ai_log
+        log = getattr(client, "ai_log", None)
+        if log:
+            log[-1]["guard_fail"] = True
 
 
 def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,

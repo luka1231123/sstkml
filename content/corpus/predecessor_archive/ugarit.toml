@@ -1,0 +1,400 @@
+# THE PREDECESSOR ARCHIVE OF UGARIT (spec 6.12, 6.17)
+#
+# These documents exist before turn 1. They are what is already in the room when
+# the player sits down: four generations of tablets, most of them worthless,
+# some of them not.
+#
+# THE PUZZLE. When an epidemic begins the engine designates a `cause_oath_id`
+# from the oaths that genuinely carry liability. Two of the three vows below
+# accrue liability from turn 1, because both name festivals that are no longer
+# on Ammurapi's calendar. A third names one that IS still kept, so it never
+# accrues and can never be the cause -- it is here to be eliminated by a reader
+# who checks the rite list, which is the one deduction the archive fully rewards.
+#
+# Spec 6.12: "Author them so that a careful reader can narrow the field to three
+# candidates but not to one." The three candidates are the vows below. Narrowing
+# to one is not possible from the archive, and is not supposed to be: the last
+# step is an offering made on an informed guess, which is what the historical
+# kings were also doing.
+#
+# `received_turn` is negative: these arrived before the game began, and the
+# archive sorts by received_turn only (6.17), so they sit at the top of every
+# result set. The oldest thing in the room is the thing nobody has read.
+#
+# `dated_as` is the sender's own regnal date. It is NOT comparable to the
+# player's calendar or to any other sender's. That is the point of the field.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE THREE VOWS. Each has a live Oath object in the scenario file; these are
+# the documents that record them.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[documents]]
+ref = "PA-UG-003"
+kind = "oath"
+received_turn = -240
+sender = "niqmaddu_iii"
+dated_as = "yr 2 of Niqmaddu, Hiyaru, latter half"
+title = "the vow of Niqmaddu to Baal of Saphon"
+tags = ["vow", "oath", "baal", "saphon", "festival", "rain", "predecessor"]
+body = """
+Niqmaddu, king of Ugarit, servant of Baal of Saphon, in the second year.
+
+In the year the rain did not come and the wells of Ma'hadu went bitter, I went
+up the mountain and I swore before Baal of Saphon and before the assembly of
+the gods: that the festival of the first rain shall be kept in the house of
+Baal in the latter half of Hiyaru, in that fortnight and no other, with a bull
+and with grain, by me and by my sons and by the sons of my sons, so long as
+there is a king in Ugarit.
+
+The rain came in the third year. Let it be written that the rain came.
+"""
+
+[[documents]]
+ref = "PA-UG-011"
+kind = "oath"
+received_turn = -186
+sender = "ammistamru_ii"
+dated_as = "yr 9 of Ammistamru, Abu, former half"
+title = "the vow of Ammistamru concerning the dead of the plague"
+tags = ["vow", "oath", "dagan", "plague", "sickness", "festival", "predecessor"]
+body = """
+Ammistamru, king of Ugarit, in the ninth year, when the sickness had passed
+from the city.
+
+Before Dagan and before Baal I have sworn: that in the former half of Abu, in
+every year, the house of the king shall set out bread and beer for the dead of
+the sickness at the gate of the city, and the king himself shall stand there,
+and shall not send another in his place.
+
+I have counted the dead of my household at eleven. I have not counted the dead
+of the city. Let no one say afterwards that the number was not written, for it
+was not possible to write it.
+"""
+
+[[documents]]
+ref = "PA-UG-019"
+kind = "oath"
+received_turn = -122
+sender = "niqmepa_vi"
+dated_as = "yr 14 of Niqmepa, Simanu, former half"
+title = "the vow of Niqmepa at the founding of the granary"
+tags = ["vow", "oath", "baal", "granary", "festival", "harvest", "predecessor"]
+body = """
+Niqmepa, king of Ugarit, in the fourteenth year.
+
+When the new granary was built at the seat I swore before Baal that the rite of
+the threshing floor should be kept in the former half of Simanu with the
+first grain of the harvest, and that the first grain should not be sold, nor
+given to any king, nor put on any ship, before it had been set before the god.
+
+This I have kept in every year of my reign.
+"""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE CHAFF. Twenty documents that are exactly what an archive is mostly made
+# of: receipts, complaints about receipts, and one man's opinion of another
+# man's ship. Several use the words "vow", "oath", "Baal" and "sickness", so a
+# keyword search returns them and the player has to actually read.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[documents]]
+ref = "PA-UG-001"
+kind = "inventory"
+received_turn = -251
+sender = "yabninu_scribe"
+dated_as = "yr 1 of Niqmaddu, Ittabnu, former half"
+title = "inventory of the storehouse at Ma'hadu"
+tags = ["inventory", "grain", "mahadu", "predecessor"]
+body = """
+Grain in the storehouse at Ma'hadu at the turn of the year, in the first year.
+Oil, in jars, and the jars counted. Wool of the queen's house, unwashed. Two
+anchors of stone, broken, not replaced.
+"""
+
+[[documents]]
+ref = "PA-UG-002"
+kind = "letter_in"
+received_turn = -244
+sender = "alashiya_gov"
+dated_as = "yr 1, the month of the copper, latter half"
+title = "the governor of Alashiya, on a shipment of copper"
+tags = ["letter_in", "copper", "alashiya", "trade", "predecessor"]
+body = """
+To the king of Ugarit, my brother. The copper you asked for is loaded. The tin
+you asked for is not, and I have written to you three times about the tin, and
+you have written to me about the copper.
+"""
+
+[[documents]]
+ref = "PA-UG-004"
+kind = "ration_record"
+received_turn = -238
+sender = "yabninu_scribe"
+dated_as = "yr 2 of Niqmaddu, Hiyaru, latter half"
+title = "issue of grain and beer for the festival of the first rain"
+tags = ["ration_record", "festival", "baal", "grain", "predecessor"]
+body = """
+Issued from the granary for the house of Baal, in the latter half of Hiyaru:
+grain, and beer, and one bull of the king's own herd. The bull was led up the
+mountain and the king went with it. Recorded by the hand of Yabninu.
+"""
+
+[[documents]]
+ref = "PA-UG-005"
+kind = "letter_in"
+received_turn = -232
+sender = "hatti_king"
+dated_as = "yr 18 of My Sun, the month of the harvest"
+title = "My Sun, the Great King, on the matter of grain"
+tags = ["letter_in", "hatti", "grain", "oath", "predecessor"]
+body = """
+Thus My Sun, Great King, King of Hatti. To the king of Ugarit, my servant.
+
+You have sworn. The grain is to go to Ura and from Ura it is to go up. Whether
+your own people eat is a matter you will arrange. It is not a matter you will
+write to me about again.
+"""
+
+[[documents]]
+ref = "PA-UG-006"
+kind = "ration_record"
+received_turn = -229
+sender = "yabninu_scribe"
+dated_as = "yr 3 of Niqmaddu, Simanu, former half"
+title = "the rite of the threshing floor, the third year"
+tags = ["ration_record", "festival", "harvest", "granary", "predecessor"]
+body = """
+The first grain of the harvest set before the god at the threshing floor, in the
+former half of Simanu, and afterwards returned to the granary. Nothing of it
+sold. Nothing of it shipped.
+"""
+
+[[documents]]
+ref = "PA-UG-007"
+kind = "letter_in"
+received_turn = -224
+sender = "sinaranu_merchant"
+dated_as = "the year of the two ships"
+title = "Sinaranu, on the loss of a ship"
+tags = ["letter_in", "trade", "ship", "sea", "predecessor"]
+body = """
+To the king, my lord. The ship did not come to Byblos and did not come back. I
+have asked at Arwad and they say a ship went by in the night. I do not think it
+was mine. I ask that the king remember whose grain was on it.
+"""
+
+[[documents]]
+ref = "PA-UG-008"
+kind = "letter_out"
+received_turn = -220
+sender = "ugarit"
+dated_as = "yr 4 of Niqmaddu, Abu, latter half"
+title = "to the governor of Alashiya, concerning tin"
+tags = ["letter_out", "tin", "alashiya", "trade", "predecessor"]
+body = """
+Say to the governor of Alashiya, my brother. Concerning the tin about which I
+have written: I have written. The smiths are standing in the yard. Send it with
+the next ship and I will not raise the matter of the anchorage dues.
+"""
+
+[[documents]]
+ref = "PA-UG-009"
+kind = "inventory"
+received_turn = -214
+sender = "yabninu_scribe"
+dated_as = "yr 5 of Niqmaddu, Ittabnu, latter half"
+title = "bronze issued to the smiths and not returned"
+tags = ["inventory", "bronze", "smiths", "metal", "predecessor"]
+body = """
+Bronze issued by weight to the smiths of the palace quarter and not yet
+returned as work. The account is old. Three of the smiths named in it are dead
+and the bronze has not been asked for.
+"""
+
+[[documents]]
+ref = "PA-UG-010"
+kind = "letter_in"
+received_turn = -198
+sender = "amurru_king"
+dated_as = "yr 2 of the king of Amurru, the month of the flood"
+title = "the king of Amurru, on a marriage"
+tags = ["letter_in", "amurru", "marriage", "house", "predecessor"]
+body = """
+To my brother the king of Ugarit. Your daughter is in my house and she is well
+and she writes to you, and I would be glad if you would read what she writes
+before you read what my scribe writes, because she is more honest than he is
+and I say so in front of him.
+"""
+
+[[documents]]
+ref = "PA-UG-012"
+kind = "ration_record"
+received_turn = -184
+sender = "yabninu_scribe"
+dated_as = "yr 9 of Ammistamru, Abu, former half"
+title = "bread and beer at the gate, for the dead"
+tags = ["ration_record", "festival", "dead", "sickness", "gate", "predecessor"]
+body = """
+Bread and beer set out at the gate of the city for the dead of the sickness, in
+the former half of Abu. The king stood at the gate from the morning. The
+quantities were small because the granary was small in that year.
+"""
+
+[[documents]]
+ref = "PA-UG-013"
+kind = "letter_in"
+received_turn = -180
+sender = "temple_baal"
+dated_as = "yr 10 of Ammistamru, Hiyaru, latter half"
+title = "the house of Baal, on the festival of the first rain"
+tags = ["letter_in", "baal", "festival", "rain", "temple", "predecessor"]
+body = """
+To the king, my lord. The bull did not come up this year and the god was not
+served in the manner that was sworn. I am told the herd was short. I write only
+so that it is written, and I have written it also in the record of the house.
+"""
+
+[[documents]]
+ref = "PA-UG-014"
+kind = "letter_in"
+received_turn = -171
+sender = "hatti_king"
+dated_as = "yr 26 of My Sun, the month of the harvest"
+title = "My Sun, on troops"
+tags = ["letter_in", "hatti", "troops", "oath", "predecessor"]
+body = """
+Thus My Sun. To the king of Ugarit, my servant. When I summon your troops you
+will send them within two months. You have sworn this before the thousand gods
+of Hatti and the gods of your own land, whose names are written in the tablet.
+"""
+
+[[documents]]
+ref = "PA-UG-015"
+kind = "omen"
+received_turn = -166
+sender = "diviner_palace"
+dated_as = "yr 12 of Ammistamru, Simanu"
+title = "an omen taken concerning the harvest"
+tags = ["omen", "divination", "harvest", "predecessor"]
+body = """
+The liver was inspected concerning the harvest of that year. The mark was on
+the left. The diviner said the harvest would be middling. The harvest was poor.
+This is recorded without comment.
+"""
+
+[[documents]]
+ref = "PA-UG-016"
+kind = "inventory"
+received_turn = -160
+sender = "overseer_temple_lands"
+dated_as = "yr 13 of Ammistamru, Tashritu"
+title = "the lands of the house of Baal"
+tags = ["inventory", "land", "temple", "baal", "grain", "predecessor"]
+body = """
+The fields of the house of Baal, measured in iku, and the render owed from them
+to the god. The render has been taken as grain since the time of Niqmaddu and
+the god has not objected, and it is not for me to say whether the god has
+objected.
+"""
+
+[[documents]]
+ref = "PA-UG-017"
+kind = "letter_in"
+received_turn = -152
+sender = "byblos_king"
+dated_as = "yr 6 of the king of Gubla"
+title = "the king of Gubla, on the price of timber"
+tags = ["letter_in", "byblos", "timber", "trade", "predecessor"]
+body = """
+To the king of Ugarit, my brother. The price is the price. I have not raised it
+and I have not lowered it and I have said so to your merchant twice. He is a
+good man and he does not listen.
+"""
+
+[[documents]]
+ref = "PA-UG-018"
+kind = "letter_in"
+received_turn = -140
+sender = "temple_baal"
+dated_as = "yr 3 of Niqmepa, Hiyaru, latter half"
+title = "the house of Baal, again, on the festival of the first rain"
+tags = ["letter_in", "baal", "festival", "rain", "temple", "predecessor"]
+body = """
+To the king, my lord. It is the third year that the festival of the first rain
+has not been kept in the latter half of Hiyaru. The old men of the house say it
+was sworn. I have looked for the tablet and I have not found it, and the man
+who would have known where it was is dead.
+"""
+
+[[documents]]
+ref = "PA-UG-020"
+kind = "ration_record"
+received_turn = -118
+sender = "yabninu_scribe"
+dated_as = "yr 15 of Niqmepa, Simanu, former half"
+title = "the rite of the threshing floor, the fifteenth year"
+tags = ["ration_record", "festival", "harvest", "granary", "predecessor"]
+body = """
+The first grain set before the god at the threshing floor in the former half of
+Simanu, according to the vow, and returned afterwards to the granary.
+"""
+
+[[documents]]
+ref = "PA-UG-021"
+kind = "letter_in"
+received_turn = -96
+sender = "sinaranu_merchant"
+dated_as = "the year the sea was late"
+title = "Sinaranu, on the sickness at Alashiya"
+tags = ["letter_in", "sickness", "alashiya", "trade", "ship", "predecessor"]
+body = """
+To the king, my lord. I did not put in at the harbour because there was a
+sickness in the town and men were lying in the street by the customs house. I
+went on to Arwad and sold there at a worse price. I ask the king to believe
+that the price was the sickness and not my judgement.
+"""
+
+[[documents]]
+ref = "PA-UG-022"
+kind = "inventory"
+received_turn = -72
+sender = "yabninu_scribe"
+dated_as = "yr 1 of Ammurapi, Ittabnu"
+title = "the rites of the year, as they are now kept"
+tags = ["inventory", "festival", "rites", "calendar", "predecessor"]
+body = """
+The rites kept by the house of the king in the course of the year, with the
+fortnight of each and what is required for it. This list was made new at the
+accession because the old list was in poor condition. Where a rite could not be
+read it was not copied.
+"""
+
+[[documents]]
+ref = "PA-UG-023"
+kind = "letter_in"
+received_turn = -60
+sender = "hatti_king"
+dated_as = "yr 4 of My Sun"
+title = "My Sun, on the accession of Ammurapi"
+tags = ["letter_in", "hatti", "oath", "accession", "predecessor"]
+body = """
+Thus My Sun. To Ammurapi, king of Ugarit. Your father is dead and what your
+father swore to me died with him, as is the custom. Come, and swear it again,
+and bring the grain with you so that we are not detained by the counting.
+"""
+
+[[documents]]
+ref = "PA-UG-024"
+kind = "letter_in"
+received_turn = -48
+sender = "temple_baal"
+dated_as = "yr 2 of Ammurapi, Abu, former half"
+title = "the house of Baal, on the gate"
+tags = ["letter_in", "baal", "temple", "dead", "gate", "sickness", "predecessor"]
+body = """
+To the king, my lord. Nobody stood at the gate in the former half of Abu. I do
+not know whether anyone was supposed to. There is a memory in the house that
+there was once a thing done there, and there is no tablet for it in the house,
+and I am told the king's own archive is larger than ours.
+"""

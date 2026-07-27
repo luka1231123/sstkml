@@ -54,7 +54,7 @@ def test_integer_table_and_every_gift_band_boundary():
 def test_gift_arrival_gossip_insult_and_replay():
     world = load_scenario("ugarit", SEED)
     world, events = apply(world, A.SendGift("hatti_king", "copper", 1013))
-    assert world.court.stores["copper"] == 2587
+    assert world.court.stores["copper"] == 36000 - 1013
     assert events[0].arrival_turn == 7
     keys = [(item.at, canonical_json(item.payload)) for item in world.schedule]
     assert keys == sorted(keys)

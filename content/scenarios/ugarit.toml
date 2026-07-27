@@ -1,7 +1,8 @@
 # Ammurapi of Ugarit (spec 7.2).
 # Wealthy because everyone passes through, sworn to Hatti, militarily hopeless.
 # The tightest, cleanest ruleset -- the default and the tutorial.
-# Grain income is a flat estate delivery here; agriculture (M8) makes it real.
+# Grain comes off a threshing floor once a year (M8); what the fields return is
+# opaque, and the player reasons about it from proxies.
 # The economy runs a structural deficit: you cannot feed everyone forever.
 # The game is the order in which you let them starve.
 
@@ -9,7 +10,31 @@ scenario = "ugarit"
 actor = "ammurapi"
 seat = "seat"
 attention_base = 10
-grain_income = 34000            # qa per fortnight from crown + temple estates
+# Small standing deliveries that are not the harvest: garden plots, fishponds,
+# olive and vine renders, the odd tribute in kind. The harvest itself now comes
+# once a year off the threshing floor (M8, superseding D4).
+grain_income = 4000
+
+# The predecessor's harvest, and the one datum about the land the player can
+# actually trust on turn one (spec 6.4). Everything else he learns about the
+# fields is a proxy: a gauge reading copied by a tired hand, or an overseer with
+# an interest in the answer.
+last_harvest = 1050000
+
+# Turn one falls at fortnight 1, two fortnights into a growing season the
+# predecessor began. Bank those two, so year one is a normal year and the
+# player's first `last_harvest` is a number he can reason from.
+opening_growing_turns = 2
+
+# Names drawn for children born in play, so a new person is an authored name.
+house_names_f = [
+  "Sharelli", "Tarriyelli", "Pidray", "Talaya", "Arsay", "Batshamem",
+  "Ummi-hebi", "Nikkal-mati",
+]
+house_names_m = [
+  "Niqmaddu", "Ibiranu", "Ammistamru", "Yaqarum", "Arhalba", "Niqmepa",
+  "Ilimilku", "Abdi-anati",
+]
 
 # Names for the faces of a ration cut (spec 6.3). One is drawn per group at load.
 names = [
@@ -18,7 +43,10 @@ names = [
 ]
 
 # Pay-down order when grain runs short. The single most important screen.
-priority = ["household", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers"]
+# Feeding the people who bring in the harvest before the people who guard it is
+# the right answer and the game should not hide it -- but it is only the right
+# answer until the season the coast is raided.
+priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers"]
 
 # The palace scribe who copies every number the ruler reads (spec 6.7). Ugarit's
 # ruler is literate, but the granary is still counted by a tired junior hand.
@@ -27,12 +55,22 @@ priority = ["household", "garrison_mahadu", "cult_baal", "smiths_palace", "weave
 competence = 800
 fatigue = 500
 
+# Opening stores. Grain is roughly ten fortnights of full entitlement, so the
+# granary is visibly falling from turn one and the inherited harvest at
+# fortnight 12 is a genuine relief rather than a formality.
+#
+# seed_grain opens at NOUGHT, and that is not an oversight: the game begins at
+# fortnight 1, mid-growing-season, so the predecessor's seed is already in the
+# ground. The store refills off the threshing floor at fortnight 12 and empties
+# into the fields again at 19, which means there is exactly one window a year --
+# six fortnights, f13 to f18 -- in which seed grain is a thing you could eat.
+# Doing so is free that turn and ruinous at the next threshing (spec 6.2).
 [stores]
-grain = 180000
-seed_grain = 60000
+grain = 820000
+seed_grain = 0
 oil = 4000
 wine = 3000
-copper = 3600
+copper = 36000
 tin = 1800
 bronze = 900
 
@@ -76,10 +114,193 @@ entitlement = 60
 function = "weaving"
 place = "seat"
 
+# The people who actually bring the harvest in. Starve them and the fields go
+# short of hands, which does nothing at all until the following threshing.
+[[groups]]
+id = "field_hands"
+name = "field hands of the crown estates"
+size = 400
+entitlement = 40
+function = "field_labour"
+place = "seat"
+
 # The sea shuts outside this window (spec 3.2). Nine fortnights of frozen
 # information, then the spring flood. sailing_open is inclusive [7, 21].
+#
+# The farming year is Levantine and rain-fed: sow after the first autumn rains,
+# grow through the wet winter, cut barley then wheat in late spring, thresh on
+# the floor before high summer. low_water is authored but idle here -- Ugarit
+# has no canals, and the window exists for the Delta and Mesopotamian
+# scenarios that arrive in M12.
 [season]
 sailing_open = [7, 21]
+sowing       = [19, 22]
+growing      = [23, 7]
+harvest      = [8, 11]
+threshing    = [12, 13]
+low_water    = [14, 18]
+
+# The twelfth-century downturn (spec 6.4). x = regnal year, y = the climate
+# baseline that year, 100 = normal. The whole series is drawn at scenario start
+# and nothing that happens later can perturb it: a bad year was always going to
+# be a bad year, and this is what lets divination read a true future value.
+# The curve is gentle and long. No single year announces a crisis.
+[climate]
+drought_curve = [
+  [0, 104], [1, 100], [2, 97], [3, 99], [4, 92],
+  [5, 88], [6, 91], [7, 82], [8, 78], [9, 74], [12, 68],
+]
+
+# ── The land (spec 6.4). Yields are opaque: the player sees a gauge reading he
+# did not take, letters from overseers with their own interests, and last
+# year's number. The game opens with the predecessor's crop already sown, so
+# year one is inherited and only year two answers to the player.
+#
+# Full inputs, normal year: 1,188,000 qa against 1,492,800 qa of ration
+# entitlement. The deficit is deliberate (D4) and structural: the game is the
+# order in which groups are let go, not whether everyone can be fed.
+[[estates]]
+id = "royal_lands"
+name = "the royal lands about the city"
+place = "seat"
+area_iku = 2400
+base_yield_per_iku = 145
+seed_per_iku = 10
+labour_days_per_iku = 6
+
+[[estates]]
+id = "siyannu"
+name = "the plain of Siyannu"
+place = "gibala"
+area_iku = 2200
+base_yield_per_iku = 140
+seed_per_iku = 10
+labour_days_per_iku = 6
+
+[[estates]]
+id = "ilishtamai"
+name = "the fields of Ilishtamai"
+place = "seat"
+area_iku = 2000
+base_yield_per_iku = 140
+seed_per_iku = 10
+labour_days_per_iku = 6
+
+[[estates]]
+id = "temple_lands"
+name = "the lands of the house of Baal"
+place = "ma_hadu"
+area_iku = 1800
+base_yield_per_iku = 140
+seed_per_iku = 10
+labour_days_per_iku = 6
+
+# ── Metal (spec 6.5). Copper is near, at Alashiya, and there is plenty of it.
+# Tin comes the long eastern road through Emar, Mari and Assur, and there is
+# half a talent of it. Nothing warns about this and nothing is meant to.
+[metals]
+bronze_in_circulation = 24000   # tools, weapons, chariot fittings in use
+melt_ledger = 0
+
+[[workshops]]
+id = "palace_forge"
+name = "the palace forge"
+group_id = "smiths_palace"
+bronze_demand = 600             # shekels a fortnight, maintenance and replacement
+
+[[formations]]
+id = "chariotry"
+name = "the maryannu chariotry"
+strength = 90
+equipment_floor = 18000         # fittings, armour, and the fear they carry
+
+[[formations]]
+id = "household_troops"
+name = "the household troops"
+strength = 400
+equipment_floor = 9000
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE HOUSE (spec 6.10). A cast, not a stat block. Ages in years; the engine
+# keeps fortnights. Everyone here writes letters eventually, and not all of
+# them are on your side.
+#
+# Ammurapi is the last king of Ugarit. He has two sons -- which is one more than
+# most houses manage and one fewer than is comfortable -- a daughter of
+# marriageable age who is the most valuable diplomatic instrument he owns, and
+# a mother who has her own estates, her own revenues, and her own view about
+# which of her grandsons should follow.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[house]]
+id = "ammurapi"
+name = "Ammurapi"
+sex = "m"
+age_years = 34
+health = 720
+spouse = "ehli_nikkalu"
+own_agenda = "hold the house together"
+
+[[house]]
+id = "ehli_nikkalu"
+name = "Ehli-Nikkalu, the queen"
+sex = "f"
+age_years = 29
+health = 760
+spouse = "ammurapi"
+own_agenda = "see her own son on the seat"
+
+# The queen mother is an institution, not a stat (spec 6.10). She kept the
+# regency once and has not entirely handed it back.
+[[house]]
+id = "sharelli"
+name = "Sharelli, the queen mother"
+sex = "f"
+age_years = 56
+health = 640
+faction = "queen_mother"
+is_queen_mother = true
+own_agenda = "protect her own estates and her favoured grandson"
+
+[[house]]
+id = "niqmaddu"
+name = "Niqmaddu"
+sex = "m"
+age_years = 11
+health = 700
+mother = "ehli_nikkalu"
+father = "ammurapi"
+own_agenda = "be seen to be the elder"
+
+[[house]]
+id = "ibiranu"
+name = "Ibiranu"
+sex = "m"
+age_years = 6
+health = 660
+mother = "ehli_nikkalu"
+father = "ammurapi"
+own_agenda = "be liked by his grandmother"
+
+# Old enough to be sent. Whoever receives her gains a permanent tie and you
+# gain the best correspondent you will ever have, who is not your servant.
+[[house]]
+id = "pidray"
+name = "Pidray"
+sex = "f"
+age_years = 17
+health = 780
+mother = "ehli_nikkalu"
+father = "ammurapi"
+own_agenda = "marry well and be remembered at home"
+
+# The diviner reads the liver for you. He is competent, reasonably loyal, and
+# belongs to the temple, which has views about whether the king should stay
+# home and keep the rites (spec 6.11).
+[diviner]
+competence = 640
+loyalty = 700
+faction = "temple"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # THE CORRESPONDENCE GRAPH (spec 6.6). No map, no scale, no coordinates -- only
@@ -92,105 +313,139 @@ sailing_open = [7, 21]
 [[places]]
 id = "seat"
 name = "Ugarit"
+population = 7000
 [[places]]
 id = "ma_hadu"
 name = "Ma'hadu"
+population = 2200
 [[places]]
 id = "gibala"
 name = "Gib'ala"
+population = 900
 [[places]]
 id = "mukish"
 name = "Alalakh"
+population = 3000
 [[places]]
 id = "halab"
 name = "Halab"
+population = 4000
 [[places]]
 id = "carchemish"
 name = "Carchemish"
+population = 5000
 [[places]]
 id = "emar"
 name = "Emar"
+population = 2500
 [[places]]
 id = "tunip"
 name = "Tunip"
+population = 1800
 [[places]]
 id = "qadesh"
 name = "Qadesh"
+population = 2000
 [[places]]
 id = "amurru"
 name = "Sumur"
+population = 2600
 [[places]]
 id = "arwad"
 name = "Arwad"
+population = 1400
 [[places]]
 id = "byblos"
 name = "Gubla"
+population = 3200
 [[places]]
 id = "beirut"
 name = "Beirut"
+population = 1500
 [[places]]
 id = "sidon"
 name = "Sidon"
+population = 1200
 [[places]]
 id = "tyre"
 name = "Tyre"
+population = 1200
 [[places]]
 id = "akko"
 name = "Akko"
+population = 1200
 [[places]]
 id = "ashkelon"
 name = "Ashkelon"
+population = 1200
 [[places]]
 id = "gaza"
 name = "Gaza"
+population = 1200
 [[places]]
 id = "damascus"
 name = "Upe"
+population = 1200
 [[places]]
 id = "hattusa"
 name = "Hattusa"
+population = 1200
 [[places]]
 id = "tarhuntassa"
 name = "Tarhuntassa"
+population = 1200
 [[places]]
 id = "ura"
 name = "Ura"
+population = 1200
 [[places]]
 id = "mira"
 name = "Mira"
+population = 1200
 [[places]]
 id = "millawanda"
 name = "Millawanda"
+population = 1200
 [[places]]
 id = "lukka"
 name = "the Lukka lands"
+population = 1200
 [[places]]
 id = "alashiya"
 name = "Alashiya"
+population = 1200
 [[places]]
 id = "kition"
 name = "Kition"
+population = 1200
 [[places]]
 id = "kaphtor"
 name = "Kaphtor"
+population = 1200
 [[places]]
 id = "rhodes"
 name = "Rhodes"
+population = 1200
 [[places]]
 id = "mari"
 name = "Mari"
+population = 1200
 [[places]]
 id = "assur"
 name = "Assur"
+population = 1200
 [[places]]
 id = "babylon"
 name = "Babylon"
+population = 1200
 [[places]]
 id = "egypt"
 name = "the Delta"
+population = 1200
 [[places]]
 id = "memphis"
 name = "Memphis"
+population = 1200
 
 # ── Routes. legs = fortnights. Sea legs are seasonal; land and river stay open
 # all winter -- so in winter the Hittite and Syrian letters keep coming and the
@@ -513,9 +768,13 @@ mode = "river"
 seasonal = false
 risk = 190
 
-# ── Who writes, and how often. Facts are authored here in M2/M3; report bias
-# and distortion (M7) will twist them at the source later. The frantic vassal
-# (Gubla) writes oftenest and is oftenest right (spec 6.8).
+# ── Who writes, and how often. `facts` are TRUE at the moment of writing; what
+# the tablet asserts is these figures run through the sender's `report_bias`
+# (below) in the direction of his interest. `exaggerate` is what he has a motive
+# to inflate -- threats, enemies, what he is owed. `understate` is what he plays
+# down -- his own strength, his own stores, what he has already delivered.
+# The frantic vassal (Gubla) writes oftenest and is oftenest right (spec 6.8):
+# he is the control case that makes the liars legible.
 [[correspondents]]
 actor = "hatti_king"
 place = "hattusa"
@@ -523,6 +782,7 @@ cadence = 6
 offset = 2
 topic = "grain_owed"
 facts = { ships_promised = 4, ships_sailed = 1 }
+understate = ["ships_sailed"]   # what you have already sent him counts for less
 [[correspondents]]
 actor = "carchemish_viceroy"
 place = "carchemish"
@@ -530,6 +790,8 @@ cadence = 5
 offset = 1
 topic = "great_king_demand"
 facts = { troops = 200, within = 2 }
+exaggerate = ["troops"]         # ask high, expecting to be short-changed
+understate = ["within"]         # and name a deadline tighter than he needs
 [[correspondents]]
 actor = "alashiya_gov"
 place = "alashiya"
@@ -537,6 +799,8 @@ cadence = 3
 offset = 0
 topic = "ships_sighted"
 facts = { ships = 12, men = 30 }
+exaggerate = ["ships"]          # the spec's own example (8.6): he is frightened
+understate = ["men"]            # and wants troops, so his garrison shrinks
 [[correspondents]]
 actor = "pharaoh"
 place = "egypt"
@@ -544,6 +808,7 @@ cadence = 9
 offset = 4
 topic = "greeting"
 facts = { gold = 5 }
+exaggerate = ["gold"]           # the Amarna complaint: the gold is never what the letter said
 [[correspondents]]
 actor = "byblos_king"
 place = "byblos"
@@ -551,6 +816,7 @@ cadence = 4
 offset = 1
 topic = "vassal_plea"
 facts = { towns_taken = 3, enemy = "the men of Amurru" }
+exaggerate = ["towns_taken"]    # but see his report_bias: Gubla barely lies
 [[correspondents]]
 actor = "amurru_king"
 place = "amurru"
@@ -558,6 +824,7 @@ cadence = 7
 offset = 3
 topic = "vassal_plea"
 facts = { towns_taken = 1, enemy = "raiders from the sea" }
+exaggerate = ["towns_taken"]    # Amurru is playing both sides and wants cover
 [[correspondents]]
 actor = "sidon_king"
 place = "sidon"
@@ -565,6 +832,7 @@ cadence = 8
 offset = 5
 topic = "tribute_due"
 facts = { purple = 40 }
+exaggerate = ["purple"]         # what was promised grows in the telling
 [[correspondents]]
 actor = "tyre_king"
 place = "tyre"
@@ -572,6 +840,7 @@ cadence = 8
 offset = 2
 topic = "vassal_plea"
 facts = { towns_taken = 2, enemy = "the king of Sidon" }
+exaggerate = ["towns_taken"]    # Tyre wants you against Sidon and will pay in adjectives
 [[correspondents]]
 actor = "assyria_king"
 place = "assur"
@@ -579,6 +848,7 @@ cadence = 12
 offset = 6
 topic = "brother_greeting"
 facts = { gift = "fine horses", number = 6 }
+exaggerate = ["number"]
 [[correspondents]]
 actor = "babylon_king"
 place = "babylon"
@@ -586,6 +856,7 @@ cadence = 14
 offset = 8
 topic = "brother_greeting"
 facts = { gift = "lapis", number = 20 }
+exaggerate = ["number"]
 [[correspondents]]
 actor = "ura_merchant"
 place = "ura"
@@ -593,6 +864,8 @@ cadence = 6
 offset = 2
 topic = "grain_offer"
 facts = { grain = 8000, price_copper = 400 }
+exaggerate = ["price_copper"]   # a merchant's markup, stated as a fact of the market
+understate = ["grain"]          # and the cargo is always smaller than the price implies
 [[correspondents]]
 actor = "sinaranu"
 place = "ma_hadu"
@@ -607,6 +880,7 @@ cadence = 10
 offset = 3
 topic = "warning"
 facts = { enemy = "the Lukka", ships = 30 }
+exaggerate = ["ships"]          # a distant court passing on a rumour it cannot check
 [[correspondents]]
 actor = "emar_overseer"
 place = "emar"
@@ -627,6 +901,7 @@ last_gift_from_us = 0
 last_gift_from_them = 0
 best_known_rival_gift = 5000
 known_rival_gift_source = "pharaoh"
+report_bias = 500   # presses by making your deliveries look smaller
 
 [[relations]]
 other = "carchemish_viceroy"
@@ -634,6 +909,7 @@ status_claim = "servant"
 their_status_claim = "servant"
 esteem = 560
 obligation = -1000
+report_bias = 300   # a viceroy's margin: he asks high and dates it early
 
 [[relations]]
 other = "alashiya_gov"
@@ -641,6 +917,7 @@ status_claim = "lord"
 their_status_claim = "lord"
 esteem = 650
 obligation = 0
+report_bias = 2200   # frightened, isolated, and asking for troops. the worst witness you have
 
 [[relations]]
 other = "pharaoh"
@@ -649,6 +926,7 @@ their_status_claim = "brother"
 esteem = 720
 obligation = 2000
 last_gift_from_them = 4500
+report_bias = 800   # the gold in the letter is never the gold in the crate
 
 [[relations]]
 other = "byblos_king"
@@ -657,6 +935,7 @@ their_status_claim = "lord"
 esteem = 480
 obligation = 0
 is_vassal = true
+report_bias = 150   # writes oftenest and is oftenest right (spec 6.8). the control case
 
 [[relations]]
 other = "amurru_king"
@@ -664,6 +943,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 430
 obligation = 0
+report_bias = 900   # playing both sides; his losses are cover for his choices
 
 [[relations]]
 other = "sidon_king"
@@ -671,6 +951,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 600
 obligation = 0
+report_bias = 400   # courteous, cold, and generous with what you owe him
 
 [[relations]]
 other = "tyre_king"
@@ -678,6 +959,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 590
 obligation = 0
+report_bias = 700   # wants you against Sidon
 
 [[relations]]
 other = "assyria_king"
@@ -685,6 +967,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 540
 obligation = 0
+report_bias = 600   # a new great king, loud about his gifts
 
 [[relations]]
 other = "babylon_king"
@@ -692,6 +975,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 560
 obligation = 0
+report_bias = 600   # an old great king, loud about his gifts
 
 [[relations]]
 other = "ura_merchant"
@@ -699,6 +983,7 @@ status_claim = "lord"
 their_status_claim = "lord"
 esteem = 620
 obligation = 0
+report_bias = 800   # a merchant. the markup is stated as a market fact
 
 [[relations]]
 other = "sinaranu"
@@ -706,6 +991,7 @@ status_claim = "lord"
 their_status_claim = "lord"
 esteem = 680
 obligation = 0
+report_bias = 0   # asks plainly, and asserts no numbers at all
 
 [[relations]]
 other = "mira_king"
@@ -713,6 +999,7 @@ status_claim = "brother"
 their_status_claim = "brother"
 esteem = 500
 obligation = 0
+report_bias = 1200   # far away, passing on a rumour he cannot check
 
 [[relations]]
 other = "emar_overseer"
@@ -720,6 +1007,43 @@ status_claim = "lord"
 their_status_claim = "lord"
 esteem = 580
 obligation = 0
+report_bias = 0   # your own overseer, with nothing to gain by lying
+
+# ── The estate overseers (spec 6.4). Your own servants, and still not honest:
+# they inflate the hands they need and play down what went into the ground,
+# because a man who reports a full sowing gets no more labour sent to him.
+# Yarimmu, closest to the palace and most watched, is the most nearly straight.
+[[relations]]
+other = "overseer_royal_lands"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 700
+obligation = 0
+report_bias = 350   # under the king's eye, and it shows
+
+[[relations]]
+other = "overseer_siyannu"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 620
+obligation = 0
+report_bias = 900   # a day's sail away, and asks for hands every season
+
+[[relations]]
+other = "overseer_ilishtamai"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 650
+obligation = 0
+report_bias = 600
+
+[[relations]]
+other = "overseer_temple_lands"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 660
+obligation = 0
+report_bias = 750   # answers to the god first and the king second
 
 [[oaths]]
 id = "oath_hatti_grain"
@@ -734,6 +1058,76 @@ kind = "provide_goods"
 good = "grain"
 qty = 48000
 per_year = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE VOWS OF THE PREDECESSORS (spec 6.12). `binds_house = true`: a promise to a
+# king dies with the man, a promise to a god does not. These three are still
+# binding on Ammurapi, who did not make any of them.
+#
+# Two of them name festivals that are NOT in the rite list below, so they are in
+# violation from turn 1 and accrue liability every year, silently. The third
+# names `first_fruits`, which IS kept, so it never accrues and can never be the
+# cause -- a reader who checks the calendar can eliminate it, and that is the
+# one clean deduction the puzzle offers. The tablets recording all three are in
+# content/corpus/predecessor_archive/ugarit.toml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[oaths]]
+id = "vow_first_rain"
+parties = ["ammurapi", "baal_saphon"]
+superior = ""
+gods = ["baal_saphon", "el"]
+sworn_turn = -240
+sworn_by = "niqmaddu_iii"
+binds_house = true
+
+[[oaths.clauses]]
+kind = "maintain_rite"
+rite = "festival_first_rain"
+fortnight = 4
+
+[[oaths]]
+id = "vow_dead_at_the_gate"
+parties = ["ammurapi", "dagan"]
+superior = ""
+gods = ["dagan", "baal_saphon"]
+sworn_turn = -186
+sworn_by = "ammistamru_ii"
+binds_house = true
+
+[[oaths.clauses]]
+kind = "maintain_rite"
+rite = "bread_at_the_gate"
+fortnight = 13
+
+[[oaths]]
+id = "vow_threshing_floor"
+parties = ["ammurapi", "baal_saphon"]
+superior = ""
+gods = ["baal_saphon"]
+sworn_turn = -122
+sworn_by = "niqmepa_vi"
+binds_house = true
+
+[[oaths.clauses]]
+kind = "maintain_rite"
+rite = "first_fruits"
+fortnight = 9
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PLAGUE (spec 6.12). Parameters only; no epidemic is scheduled. It arrives, if
+# it arrives, off a courier from somewhere that already has it.
+# ─────────────────────────────────────────────────────────────────────────────
+[plague]
+# beta must exceed gamma + mortality or the epidemic cannot grow at all: the
+# basic reproduction number is beta / (gamma + mortality), and at 240/270 the
+# sickness burns out from any seeding, silently and every time. At 520 it is
+# about 1.9, which over a fortnightly step is an epidemic that runs for roughly
+# two years and takes a tenth of the city -- the right order for the period.
+beta = 520          # transmission per mille per fortnight
+gamma = 180         # recoveries per mille of the infected
+mortality = 90      # deaths per mille of the infected
+exposure = 45       # chance in 1000 that an arrival from a sick place seeds
 
 [[rites]]
 id = "new_year_baal"

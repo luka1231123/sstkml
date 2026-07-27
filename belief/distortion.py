@@ -19,9 +19,21 @@ def p_error(competence: int, fatigue: int) -> int:
     return 0 if p < 0 else 1000 if p > 1000 else p
 
 
-def transcribe(value: int, seed: int, turn: int, key: str, perr: int) -> int:
+def transcribe(value: int, seed: int, turn: int, key: str, perr: int,
+               sexagesimal: bool = False) -> int:
     """Return the scribe's copy of an integer: usually right, sometimes wrong in
-    a realistic way -- a digit transposed, or a sexagesimal slip (x60 or /60)."""
+    a realistic way -- a digit transposed, a wedge miscut, or a sexagesimal slip.
+
+    `sexagesimal` marks a bulk quantity written in places (grain in qa), where
+    gaining or losing a place is the characteristic error and is dramatic
+    precisely because the magnitudes are large. Counted things -- ships, men,
+    towns -- are not written that way and must not slip by a factor of sixty.
+
+    Both bugs this guards against were found by M7, when the Voicer first put
+    these figures into sentences: three captured towns were copied as 180, and
+    thirty-six ships off the coast as 2,160. Neither is a scribal slip. The
+    first is a different war and the second is a different century.
+    """
     if perr <= 0 or value == 0:
         return value
     rng = stream(seed, turn, "scribe.error", key)
@@ -32,6 +44,8 @@ def transcribe(value: int, seed: int, turn: int, key: str, perr: int) -> int:
         i = rng.int(len(s) - 1)
         s[i], s[i + 1] = s[i + 1], s[i]
         return int("".join(s))
-    if value >= 60 and rng.chance(1, 2):          # dropped a sexagesimal place
-        return value // 60
-    return value * 60                              # added one
+    if sexagesimal and value >= 60:
+        if rng.chance(1, 2):
+            return value // 60                     # dropped a sexagesimal place
+        return value * 60                          # added one
+    return max(1, value + rng.pick((-2, -1, 1, 2)))  # a wedge too many or too few

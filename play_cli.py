@@ -24,8 +24,20 @@ INSPECT_COST = 1
 SEARCH_COST = 1
 GIFT_COST = 1
 
+HARVEST_COST = 1
+CORVEE_COST = 1
+DREDGE_COST = 1
+OMEN_COST = 2
+MARRY_COST = 2
+SWEAR_COST = 2
+SEARCH_COST = 1       # spec 6.17: one hour per query, and it is a real hour
+EXPIATE_COST = 2
+QUARANTINE_COST = 1
+SUPPRESS_COST = 2
+
 HELP = """  commands (a leading ':' is optional)
-    stack | lists | stores | archive | relations | oaths   switch screen
+    stack | lists | stores | archive | relations | oaths | land | house
+    plague | tablets
     read <i>                 read a letter in full            (2 hours)
     reply <i> <intent>       answer it with a free-text intent        (2 hours)
     dictate <i>              write the reply yourself, ending with '.' (2 hours)
@@ -35,6 +47,22 @@ HELP = """  commands (a leading ':' is optional)
     pri <group> <group>..    set the pay-down order
     eat <qa>                 move seed grain into the granary now
     gift <actor> <good> <n>  send goods to a correspondent        (1 hour)
+    harvest <group>          order a group to the fields          (1 hour)
+    recall <group>           send it back to its own work         (1 hour)
+    corvee <days>            levy labour outside the lists; costs unrest (1 hour)
+    dredge <estate> <days>   restore a canal, at low water only   (1 hour)
+    omen harvest|route       ask the diviner about the year       (2 hours)
+    omen death <person>      ask whether a man has long           (2 hours)
+    hush <omen>              keep an omen off the record; it may leak (2 hours)
+    defy <omen>              act against it; costs legitimacy either way
+    marry <person> <actor>   send a daughter to a foreign court   (2 hours)
+    swear <oath>             re-swear an oath that lapsed on a death (2 hours)
+    tablets <word>..         search the tablet house, incl. what your
+                             predecessors left                    (1 hour)
+    tablet <ref>             read one out in full
+    expiate <oath> [qa]      make an offering against one named oath (2 hours)
+    close <place>            shut the road and harbour to a place  (1 hour)
+    open <place>             open it again                         (1 hour)
     end                      end the fortnight
     save <path>              write a save file
     help  |  quit
@@ -72,11 +100,13 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
     from ai.client import OllamaClient
     from ai.composer import compose, raw_draft, split_draft
     from ai.parser import action_cost, parse
+    from ai.voicer import Voicer
 
     world = load_scenario(scenario, seed)
     log: list[dict] = []
     ai_log: list[dict] = []
     client = None if no_ai else OllamaClient(ai_log, f"saves/{scenario}/ai_cache")
+    voicer = Voicer(client, seed)
     turns = 0
     screen = "stack"
     print("\n  SAY TO THE KING, MY LORD\n")
@@ -85,11 +115,16 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
         world, events = advance(world)
         turns += 1
         b = project(world)
+        # Spec 8.7: bodies fill in Stack order behind the player, top first.
+        # This returns immediately; nothing below ever waits on it.
+        voicer.schedule(b["stack"], world.date.absolute)
         spent = 0
         print("\n" + "═" * 78)
         print(render.header(b))
         for ln in render.events_lines(events, world.court):
             print(ln)
+        if voicer.note():
+            print(voicer.note())
         print()
 
         def commit(action):
@@ -155,6 +190,7 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                 print("  choose send, split, dictate, or burn.")
 
         search_results = None
+        tablet_query = None
         end = False
         while not end:
             b = project(world)
@@ -166,6 +202,14 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                 print(render.relations_screen(b))
             elif screen == "oaths":
                 print(render.oaths_screen(b))
+            elif screen == "land":
+                print(render.land_screen(b))
+            elif screen == "house":
+                print(render.house_screen(b))
+            elif screen == "plague":
+                print(render.plague_screen(b))
+            elif screen == "tablets":
+                print(render.tablets_screen(b, tablet_query))
             else:
                 print({"stack": render.stack_screen, "lists": render.lists_screen,
                        "stores": render.stores_screen}[screen](b))
@@ -182,10 +226,13 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
             parts = line.split()
             verb, args = parts[0].lower(), parts[1:]
 
-            if verb in ("stack", "lists", "stores", "archive", "relations", "oaths"):
+            if verb in ("stack", "lists", "stores", "archive", "relations",
+                        "oaths", "land", "house", "plague", "tablets"):
                 screen = verb
                 if verb != "archive":
                     search_results = None
+                if verb == "tablets" and not args:
+                    tablet_query = None
             elif verb == "help":
                 print(HELP)
             elif verb in ("quit", "q", "exit"):
@@ -206,7 +253,7 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                     print(f"  not hours enough. reading is {READ_COST}; you have {left}.")
                 else:
                     it = next(x for x in b["stack"] if x["id"] == lid)
-                    print("\n" + render.letter_full(it))
+                    print("\n" + render.letter_full(it, voicer.body(it)[0]))
                     commit(A.ReadLetter(lid))
                     spent += READ_COST
             elif verb == "inspect" and args:
@@ -261,6 +308,154 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                     commit(A.EatSeed(int(args[0])))
                 except ValueError:
                     print("  eat needs an integer qa.")
+            elif verb in ("harvest", "recall") and len(args) == 1:
+                if left < HARVEST_COST:
+                    print("  no hour remains to send the order out.")
+                else:
+                    try:
+                        commit(A.SendToHarvest(args[0], verb == "harvest"))
+                        spent += HARVEST_COST
+                        print("  the order goes out to the fields."
+                              if verb == "harvest" else
+                              "  they are sent back to their own work.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "corvee" and len(args) == 1:
+                if left < CORVEE_COST:
+                    print("  no hour remains to summon the levy.")
+                else:
+                    try:
+                        evs = commit(A.RaiseCorvee(int(args[0])))
+                        spent += CORVEE_COST
+                        raised = next(
+                            (e for e in evs if isinstance(e, A.CorveeRaised)), None)
+                        if raised:
+                            print(f"  {raised.days:,} days are levied. "
+                                  f"The villages are not glad of it.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "dredge" and len(args) == 2:
+                if left < DREDGE_COST:
+                    print("  no hour remains for the canal.")
+                else:
+                    try:
+                        evs = commit(A.DredgeCanal(args[0], int(args[1])))
+                        spent += DREDGE_COST
+                        done = next(
+                            (e for e in evs if isinstance(e, A.CanalDredged)), None)
+                        if done:
+                            print(f"  the channel is cleared; it stands at "
+                                  f"{done.condition}.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "omen" and args:
+                if left < OMEN_COST:
+                    print(f"  the liver takes {OMEN_COST} hours to read.")
+                else:
+                    try:
+                        evs = commit(A.ConsultDiviner(
+                            args[0], args[1] if len(args) > 1 else ""))
+                        spent += OMEN_COST
+                        taken = next(
+                            (e for e in evs if isinstance(e, A.OmenTaken)), None)
+                        if taken:
+                            print(f"  the diviner reads the liver and says: "
+                                  f"{taken.reported}.   ({taken.omen_id})")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "hush" and len(args) == 1:
+                if left < SUPPRESS_COST:
+                    print("  there are not hours enough to keep it quiet.")
+                else:
+                    try:
+                        evs = commit(A.SuppressOmen(args[0]))
+                        spent += SUPPRESS_COST
+                        if any(isinstance(e, A.OmenLeaked) for e in evs):
+                            print("  it is kept from the record. by evening "
+                                  "the whole quarter is repeating it.")
+                        else:
+                            print("  it is kept from the record.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "defy" and len(args) == 1:
+                try:
+                    evs = commit(A.DefyOmen(args[0]))
+                    lost = next(
+                        (e for e in evs if isinstance(e, A.OmenDefied)), None)
+                    if lost:
+                        print("  you act against the omen. the temple says "
+                              "nothing, and says it loudly.")
+                except ValueError as ex:
+                    print(f"  {ex}")
+            elif verb == "marry" and len(args) == 2:
+                if left < MARRY_COST:
+                    print("  a marriage is not arranged in the hours left.")
+                else:
+                    try:
+                        evs = commit(A.MarryAbroad(args[0], args[1]))
+                        spent += MARRY_COST
+                        wed = next(
+                            (e for e in evs if isinstance(e, A.MarriedAbroad)), None)
+                        if wed:
+                            print(f"  {wed.name} goes to the house of "
+                                  f"{render.actor_name(wed.actor)}. She will write.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "tablets" and args:
+                # Spec 6.17: keyword and tag, one hour per query. The hour is
+                # the mechanic -- a king hunting a broken oath during an
+                # epidemic is spending the attention the granary needed.
+                if left < SEARCH_COST:
+                    print("  the keeper has gone. it will keep until the morning.")
+                else:
+                    query = " ".join(args).lower()
+                    commit(A.SearchArchive(query))
+                    spent += SEARCH_COST
+                    screen, tablet_query = "tablets", query
+            elif verb == "tablet" and len(args) == 1:
+                ref = args[0].upper()
+                doc = next((d for d in world.documents if d.ref == ref), None)
+                if doc is None:
+                    print(f"  there is no tablet [{ref}] in the house.")
+                else:
+                    hit = {"ref": doc.ref, "sender": doc.sender,
+                           "dated_as": doc.dated_as}
+                    print(render.tablet_full(hit, doc.body))
+            elif verb == "expiate" and args:
+                if left < EXPIATE_COST:
+                    print("  the offering cannot be made in the hours left.")
+                else:
+                    try:
+                        offering = int(args[1]) if len(args) > 1 else 0
+                        commit(A.Expiate(args[0], offering))
+                        spent += EXPIATE_COST
+                        # Deliberately no verdict, here or anywhere (6.12).
+                        print("  the offering is made. the god does not answer.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb in ("close", "open") and len(args) == 1:
+                if left < QUARANTINE_COST:
+                    print("  there are no hours to send the order.")
+                else:
+                    try:
+                        commit(A.Quarantine(args[0], lift=(verb == "open")))
+                        spent += QUARANTINE_COST
+                        print("  the road is open again." if verb == "open"
+                              else "  the road is closed, and so is the harbour "
+                                   "to that place. nothing comes from there now, "
+                                   "including word.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "swear" and len(args) == 1:
+                if left < SWEAR_COST:
+                    print("  the oath needs hours and witnesses.")
+                else:
+                    try:
+                        commit(A.SwearOath(args[0]))
+                        spent += SWEAR_COST
+                        print("  the gods are named again, and the tablet is sealed.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
             elif verb == "gift" and len(args) == 3:
                 if left < GIFT_COST:
                     print("  no hour remains to seal and dispatch a gift.")
@@ -310,9 +505,16 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                                 end = True
                             elif isinstance(action, A.ReadLetter):
                                 item = next(x for x in b["stack"] if x["id"] == action.letter_id)
-                                print("\n" + render.letter_full(item))
+                                print("\n" + render.letter_full(
+                                    item, voicer.body(item)[0]))
                                 commit(action)
                                 used += action_cost(action)
+                            elif isinstance(action, A.SendToHarvest):
+                                commit(action)
+                                used += action_cost(action)
+                                print("  the order goes out to the fields."
+                                      if action.to_fields else
+                                      "  they are sent back to their own work.")
                             elif isinstance(action, A.DictateReply):
                                 used += desk_reply(action.letter_id, action.intent, left - used)
                             else:

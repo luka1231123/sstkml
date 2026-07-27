@@ -259,6 +259,17 @@ def _clause_violated(world: World, oath, clause) -> bool:
             and year_start <= gift.arrive_turn <= world.date.absolute
         )
         return delivered < int(args["qty"])
+    if clause.kind == "maintain_rite":
+        # A vow that a named festival will be kept, every year, for ever
+        # (spec 6.12's "quietly violable"). It is checked once a year, on the
+        # fortnight it names, and it is violated if that rite is simply not on
+        # the court's calendar any more -- which is the ordinary fate of a
+        # festival nobody alive remembers being told to keep. The player is
+        # never notified, because nobody at court knows either. It is in the
+        # archive, and only in the archive.
+        if world.date.fortnight != int(args["fortnight"]):
+            return False
+        return not any(rite.id == args["rite"] for rite in world.court.rites)
     if clause.kind == "no_contact_with":
         actor = args["actor"]
         return any(
@@ -272,7 +283,11 @@ def audit_oaths(world: World) -> tuple[World, list]:
     liability = dict(world.court.liability)
     events = []
     for oath in sorted(world.oaths, key=lambda value: value.id):
-        if oath.dissolved:
+        # A lapsed oath binds nobody (spec 6.9, M9): the man who swore it is
+        # dead, and until a living man swears again there is no relationship to
+        # violate and no god to offend. This is not a loophole -- it is why
+        # every succession anywhere is a diplomatic emergency.
+        if oath.dissolved or oath.lapsed:
             continue
         weight = max(
             1, sum(world.god_ranks.get(god, 1) for god in oath.gods))

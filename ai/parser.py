@@ -11,6 +11,8 @@ from engine import actions as A
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
     "INSPECT_LEDGER", "EAT_SEED", "SEND_GIFT", "END_TURN",
+    "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE",
+    "CONSULT_DIVINER", "MARRY_ABROAD", "SWEAR_OATH",
 }
 _ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
           "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx")
@@ -87,9 +89,42 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(.{1,200})", text)
     if match and (letter := _resolve_letter(match[1], belief)):
         return ParseResult((A.DictateReply(letter, match[2]),), source="preparser")
+    match = re.fullmatch(
+        r"(?:send|order|put)\s+(?:the\s+)?(\w+)\s+to\s+(?:the\s+)?(?:harvest|fields)",
+        text)
+    if match and match[1] in groups:
+        return ParseResult((A.SendToHarvest(match[1], True),), source="preparser")
+    match = re.fullmatch(
+        r"(?:recall|return)\s+(?:the\s+)?(\w+)(?:\s+from\s+(?:the\s+)?(?:harvest|fields))?",
+        text)
+    if match and match[1] in groups:
+        return ParseResult((A.SendToHarvest(match[1], False),), source="preparser")
+    match = re.fullmatch(r"(?:raise|levy|call)(?:\s+a)?\s+corvee(?:\s+of)?\s+(\d+)(?:\s+days)?", text)
+    if match:
+        return ParseResult((A.RaiseCorvee(int(match[1])),), source="preparser")
+    match = re.fullmatch(
+        r"(?:omen|divine|consult)(?:\s+the\s+diviner)?(?:\s+about)?"
+        r"(?:\s+the)?\s+(harvest|route)", text)
+    if match:
+        return ParseResult((A.ConsultDiviner(match[1]),), source="preparser")
+    match = re.fullmatch(
+        r"(?:omen|divine|consult)(?:\s+the\s+diviner)?(?:\s+about)?"
+        r"\s+(?:the\s+)?death(?:\s+of)?\s+(\w+)", text)
+    if match and match[1] in _house_ids(belief):
+        return ParseResult((A.ConsultDiviner("death", match[1]),),
+                           source="preparser")
+    match = re.fullmatch(
+        r"(?:swear|re-?swear)(?:\s+the)?(?:\s+oath)?\s+([\w:.-]+)", text)
+    if match and match[1] in {o["id"] for o in belief.get("oaths", [])}:
+        return ParseResult((A.SwearOath(match[1]),), source="preparser")
     if text in {"end", "end turn", "finish", "finish turn"}:
         return ParseResult((A.EndTurn(),), source="preparser")
     return None
+
+
+def _house_ids(belief: dict) -> set:
+    return {p["id"] for p in belief.get("house", {}).get("members", [])
+            if p["alive"]}
 
 
 def _affordances(belief: dict, hours_left: int) -> str:
@@ -101,6 +136,8 @@ def _affordances(belief: dict, hours_left: int) -> str:
         f"Hours left: {hours_left}\n"
         f"Letters (use exact id): {letters}\nGroups: {groups}\n"
         f"Correspondents: {actors}\nGift goods: {goods}\n"
+        f"House (living): {', '.join(sorted(_house_ids(belief))) or 'none'}\n"
+        f"Oaths: {', '.join(o['id'] for o in belief.get('oaths', [])) or 'none'}\n"
         "Ledgers: granary, seed\nReply intent: free text, at most 200 characters\n"
         "Legal verbs: " + ", ".join(sorted(VERBS))
     )
@@ -145,6 +182,32 @@ def _action(item: dict, belief: dict):
                 or type(quantity) is not int):
             raise ValueError("invalid gift")
         return A.SendGift(recipient, good, quantity)
+    if verb in ("SEND_TO_HARVEST", "RECALL_FROM_HARVEST"):
+        group = args.get("group")
+        if group not in groups:
+            raise ValueError("unknown group")
+        return A.SendToHarvest(group, verb == "SEND_TO_HARVEST")
+    if verb == "RAISE_CORVEE" and type(args.get("days")) is int:
+        return A.RaiseCorvee(args["days"])
+    if verb == "CONSULT_DIVINER":
+        question = args.get("question")
+        if question not in ("harvest", "death", "route"):
+            raise ValueError("the diviner does not read that")
+        subject = args.get("subject", "")
+        if question == "death" and subject not in _house_ids(belief):
+            raise ValueError("no such person in the house")
+        return A.ConsultDiviner(question, subject if question == "death" else "")
+    if verb == "MARRY_ABROAD":
+        person, actor = args.get("person"), args.get("actor")
+        actors = {r["other"] for r in belief.get("relations", [])}
+        if person not in _house_ids(belief) or actor not in actors:
+            raise ValueError("invalid marriage")
+        return A.MarryAbroad(person, actor)
+    if verb == "SWEAR_OATH":
+        oath = args.get("oath")
+        if oath not in {o["id"] for o in belief.get("oaths", [])}:
+            raise ValueError("no such oath")
+        return A.SwearOath(oath)
     if verb == "END_TURN":
         return A.EndTurn()
     raise ValueError("invalid arguments")
@@ -192,6 +255,10 @@ def action_cost(action) -> int:
         return 2
     if isinstance(action, A.InspectLedger):
         return 1
-    if isinstance(action, A.SendGift):
+    if isinstance(action, (A.ConsultDiviner, A.MarryAbroad, A.SwearOath,
+                           A.SuppressOmen)):
+        return 2
+    if isinstance(action, (A.SendGift, A.SendToHarvest, A.RaiseCorvee,
+                           A.DredgeCanal)):
         return 1
     return 0

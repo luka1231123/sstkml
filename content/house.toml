@@ -1,0 +1,83 @@
+# THE HOUSE AND THE CULT (spec 6.10, 6.11).
+#
+# A dynasty is not a stat block, it is a cast. These tables decide who is born,
+# who lives, and who the gods are willing to talk about. All of them are read
+# with `lerp_table(table, x)` and all of them are integers.
+#
+# The mortality figures are high on purpose. They are roughly what the period
+# actually did to people, and they are the reason heirs past the second are
+# both insurance and a faction.
+
+# x = age in FORTNIGHTS (24 to the year), y = fertility 0..1000.
+# Women: nothing before about fifteen, a long plateau, gone by the mid forties.
+[tables]
+fertility_female = [
+  [0, 0], [336, 0], [360, 300], [432, 850], [720, 800],
+  [864, 520], [1008, 180], [1080, 0], [2000, 0],
+]
+# Men: later to start, and it declines rather than stopping.
+fertility_male = [
+  [0, 0], [360, 0], [384, 400], [480, 900], [960, 850],
+  [1200, 600], [1440, 350], [1800, 120], [2400, 0],
+]
+
+# Per-YEAR death chance in permille, checked once a year, before health.
+# x = age in fortnights. The first year of life is the dangerous one, and the
+# shape of this curve is why a house with one heir is a house with none.
+mortality_by_age = [
+  [0, 220], [24, 90], [120, 30], [360, 14], [720, 20],
+  [960, 32], [1200, 55], [1440, 100], [1680, 200], [1920, 380],
+  [2160, 650],
+]
+
+# Multiplier in permille applied to the death chance, by health 0..1000.
+# Poor health roughly trebles it; rude health roughly halves it.
+mortality_by_health = [
+  [0, 3200], [200, 2200], [500, 1300], [700, 1000], [900, 700], [1000, 550],
+]
+
+# x = combined fertility of the pair (mean), y = per-turn conception chance
+# in permille. A married, healthy, co-located pair is looking at a child every
+# two to three years, which is about right and is not a slider.
+conception = [
+  [0, 0], [200, 4], [500, 22], [700, 38], [900, 52], [1000, 60],
+]
+
+# ── Divination (spec 6.11) ────────────────────────────────────────────────────
+# x = diviner competence 0..1000, y = accuracy in permille. Note the floor: a
+# bad diviner is worse than a coin, because he is confident. And note the
+# ceiling: nobody reads the liver at better than four in five.
+divination_accuracy = [
+  [0, 300], [300, 430], [600, 620], [800, 730], [1000, 800],
+]
+
+# x = offering value (see relations.toml gift values), y = permille added.
+# Capped, because the gods are not for sale, only for hire.
+offering_bonus = [
+  [0, 0], [200, 30], [600, 70], [1500, 110], [4000, 140], [10000, 150],
+]
+
+# x = the diviner's loyalty to you 0..1000, y = the chance in permille that he
+# shades the answer toward what his faction already wants. A loyal diviner is
+# not an honest diviner; he is a diviner who is loyal to YOU.
+diviner_bias = [
+  [0, 620], [300, 460], [600, 260], [850, 90], [1000, 40],
+]
+
+[rules]
+# Pregnancy runs 20 fortnights (spec 6.10), scheduled at conception.
+gestation_turns = 20
+# Yearly checks land on this fortnight, so births, deaths and the turn of the
+# year are not all on the same tick.
+mortality_fortnight = 6
+# Age of majority in fortnights: below this a person cannot rule unaided, marry
+# abroad, or swear an oath.
+majority_turns = 360
+# What defying a published omen costs, whether or not the omen was right.
+defied_omen_legitimacy = -80
+# Suppressing one costs hours instead, and may leak.
+suppression_leak_permille = 220
+suppressed_leak_legitimacy = -140
+# A succession is a shock to legitimacy even when it is clean.
+succession_legitimacy_floor = 400
+contested_legitimacy_penalty = -160

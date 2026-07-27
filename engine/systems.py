@@ -128,12 +128,27 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
 
 
 # --- A9: unrest recompute -----------------------------------------------------
+_UNREST_SATURATION_WEEKS = 8      # spec 6.3's bottom band: flight or revolt
+
+
 def recompute_unrest(court: Court) -> tuple[Court, list]:
-    """Unrest pulls toward a target set by aggregate arrears, and decays down."""
-    total_debt_weeks = 0
+    """Unrest pulls toward a target set by aggregate arrears, and decays down.
+
+    The target is the *share of the population* in arrears, not the sum of every
+    group's debt_weeks. Summing meant unrest scaled with how finely the payroll
+    happened to be divided: M8 added one group and a court that let its weavers
+    go -- a fifth of the heads, and a survivable choice -- saturated at maximum
+    unrest within four turns. Weighting by size makes the price proportional to
+    how many people you actually stopped feeding, which is the thing the system
+    is meant to be about.
+    """
+    heads = weighted = 0
     for g in court.dependents.values():
-        total_debt_weeks += g.arrears // max(1, g.size * g.entitlement)
-    target = _clamp(total_debt_weeks * 60)
+        owed = max(1, g.size * g.entitlement)
+        debt_weeks = min(g.arrears // owed, _UNREST_SATURATION_WEEKS)
+        heads += g.size
+        weighted += g.size * debt_weeks
+    target = _clamp(1000 * weighted // max(1, heads * _UNREST_SATURATION_WEEKS))
     # Move a third of the way toward target each turn: momentum, not a step.
     unrest = court.unrest + (target - court.unrest) // 3
     unrest = _clamp(unrest)

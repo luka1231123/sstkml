@@ -59,6 +59,83 @@ class SendGift:
     quantity: int
 
 
+@dataclasses.dataclass(frozen=True)
+class SendToHarvest:
+    """Order a group to the fields instead of its own function (spec 6.4).
+    One line, because the garrison-or-the-harvest choice must be one line."""
+    group_id: str
+    to_fields: bool = True
+
+
+@dataclasses.dataclass(frozen=True)
+class RaiseCorvee:
+    """Labour levied outside the ration lists entirely, and paid for in unrest."""
+    days: int
+
+
+@dataclasses.dataclass(frozen=True)
+class DredgeCanal:
+    """Restore an irrigated estate's canal. Only in the low-water window."""
+    estate_id: str
+    days: int
+
+
+@dataclasses.dataclass(frozen=True)
+class MarryAbroad:
+    """Send a daughter to a foreign court (spec 6.10). The primary instrument
+    of foreign policy, and it is not reversible."""
+    person_id: str
+    actor: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ConsultDiviner:
+    question: str        # "harvest" | "death" | "route"
+    subject: str = ""
+    offering_good: str = ""
+    offering_quantity: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class SuppressOmen:
+    omen_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class DefyOmen:
+    omen_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class SwearOath:
+    """Re-swear a lapsed oath. Every succession requires this, and the other
+    party will want something for it (spec 6.9)."""
+    oath_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Quarantine:
+    """Close the routes to a place (spec 6.12). It works, and it costs: the
+    trade stops, the correspondent takes it personally, and the letters that
+    would have told you what was happening there stop too."""
+    place_id: str
+    lift: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class Expiate:
+    """Make an offering against one named oath. Nothing in the response will
+    tell you whether it was the right one (spec 6.12)."""
+    oath_id: str
+    offering: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class SearchArchive:
+    """Spec 6.17: keyword and tag, one hour per query."""
+    query: str
+
+
 # --- Events ------------------------------------------------------------------
 
 
@@ -227,12 +304,199 @@ class MisfortuneOccurred:
     loss: int
 
 
+# --- M8: land and metal ------------------------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class Sown:
+    seed_qa: int
+    recommended_qa: int
+
+
+@dataclasses.dataclass(frozen=True)
+class Harvested:
+    estate_id: str
+    qa: int
+
+
+@dataclasses.dataclass(frozen=True)
+class Threshed:
+    qa: int
+    held_back_as_seed: int
+
+
+@dataclasses.dataclass(frozen=True)
+class SentToHarvest:
+    group_id: str
+    to_fields: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class CorveeRaised:
+    days: int
+    unrest_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class CanalDredged:
+    estate_id: str
+    days: int
+    condition: int
+
+
+@dataclasses.dataclass(frozen=True)
+class BronzeSmelted:
+    bronze: int
+    copper_used: int
+    tin_used: int
+
+
+@dataclasses.dataclass(frozen=True)
+class BronzeMelted:
+    """Recycled out of circulation to meet a shortfall. Nothing surfaces this
+    to the player; it is the melt ledger's only input (spec 6.5)."""
+    amount: int
+    ledger_total: int
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkshopDemandMet:
+    demand: int
+    from_stores: int
+
+
+# --- M9: the house and the cult ----------------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class Conceived:
+    mother: str
+    father: str
+    due_turn: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ChildBorn:
+    child_id: str
+    mother: str
+    father: str
+    sex: str
+
+
+@dataclasses.dataclass(frozen=True)
+class HouseMemberDied:
+    person_id: str
+    name: str
+    age_years: int
+
+
+@dataclasses.dataclass(frozen=True)
+class RulerSucceeded:
+    person_id: str
+    name: str
+    contested: bool
+    rivals: int
+
+
+@dataclasses.dataclass(frozen=True)
+class SuccessionFailed:
+    last_ruler: str
+
+
+@dataclasses.dataclass(frozen=True)
+class MarriedAbroad:
+    person_id: str
+    name: str
+    actor: str
+
+
+@dataclasses.dataclass(frozen=True)
+class OmenTaken:
+    omen_id: str
+    question: str
+    subject: str
+    reported: str
+
+
+@dataclasses.dataclass(frozen=True)
+class OmenSuppressed:
+    omen_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class OmenLeaked:
+    omen_id: str
+    legitimacy_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class OmenDefied:
+    omen_id: str
+    legitimacy_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class OathSworn:
+    oath_id: str
+    sworn_by: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PlagueBegan:
+    place_id: str
+    turn: int
+
+
+@dataclasses.dataclass(frozen=True)
+class PlagueSpread:
+    place_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PlagueDeaths:
+    place_id: str
+    dead: int
+
+
+@dataclasses.dataclass(frozen=True)
+class OathExpiated:
+    """Note what this event does NOT carry: whether it worked. The court made an
+    offering and the court does not know (spec 6.12)."""
+    oath_id: str
+    offering: int
+
+
+@dataclasses.dataclass(frozen=True)
+class QuarantineSet:
+    place_id: str
+    lifted: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class ArchiveSearched:
+    query: str
+    hits: int
+
+
+@dataclasses.dataclass(frozen=True)
+class OathLapsed:
+    oath_id: str
+    reason: str
+
+
 # --- Registry for log round-tripping -----------------------------------------
 
 _TYPES = {
     c.__name__: c for c in (
         EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, DictateReply,
-        InspectLedger, SendGift,
+        InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
+        Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
+        BronzeSmelted, BronzeMelted, WorkshopDemandMet,
+        MarryAbroad, ConsultDiviner, SuppressOmen, DefyOmen, SwearOath,
+        Conceived, ChildBorn, HouseMemberDied, RulerSucceeded,
+        SuccessionFailed, MarriedAbroad, OmenTaken, OmenSuppressed,
+        OmenLeaked, OmenDefied, OathSworn, OathLapsed,
+        Quarantine, Expiate, SearchArchive,
+        PlagueBegan, PlagueSpread, PlagueDeaths, OathExpiated,
+        QuarantineSet, ArchiveSearched,
         TurnAdvanced, GrainReceived, Spoiled, RationsPaid, RitePerformed,
         RiteSkipped, UnrestChanged, Grumbling, SeedEaten, AllocationSet,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,

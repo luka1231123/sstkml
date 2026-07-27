@@ -25,12 +25,17 @@ DOMAINS: frozenset[str] = frozenset({
     "scribe.error",
     "letters.interception",
     "plague.transmission",
+    "plague.cause",
     "house.conception",
     "divination",
     "deck",
     "rivals",
     "displacement",
     "relations.patron_notice",
+    "report.bias",
+    "house.mortality",
+    "house.sex",
+    "succession",
 })
 
 
