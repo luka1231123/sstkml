@@ -56,3 +56,12 @@ bronze_per_batch = 10
 # What a formation cannot re-equip below. Authored per formation in the
 # scenario; this is the floor for anything that does not name one.
 default_equipment_floor = 0
+# Bronze in service wears, is lost, is buried with its owner and goes out as a
+# gift. Per ten thousand, per fortnight, and it happens whether or not the forge
+# is working -- which is what makes the forge worth paying for. See the note in
+# engine/metal.py: without this, starving the smiths *preserved* the army.
+# 100 per 10,000 is 1% a fortnight, about a quarter of the kit a year. Swept
+# across 16 seeds: at 60 four seeds still ended with a perfect replacement rate,
+# at 180 the army is gone by turn 60 on every seed. At 100 no seed ends whole
+# and none ends at nothing.
+bronze_attrition_per_10000 = 100

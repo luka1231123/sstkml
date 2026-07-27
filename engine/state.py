@@ -170,6 +170,8 @@ class MetalState:
     """Spec 6.5. `melt_ledger` only ever increases, and nothing announces it."""
     bronze_in_circulation: int    # bronze existing as tools, weapons, chariot fittings
     melt_ledger: int = 0          # CUMULATIVE shekels recycled out of circulation
+    in_service_ceiling: int = 0   # what the court has hands and uses for; a fed
+                                  # forge holds the stock here and never above it
 
 
 @dataclasses.dataclass(frozen=True)

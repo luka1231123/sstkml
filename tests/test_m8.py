@@ -267,20 +267,62 @@ def test_tin_is_the_chokepoint():
     assert metal.smelt(1_000_000, 0) == (0, 0, 0)     # no tin, no bronze
 
 
-def test_the_melt_ledger_only_ever_rises_and_conserves_bronze():
+def test_the_melt_ledger_only_ever_rises_and_records_every_melt():
+    """Circulation is no longer conserved -- it wears down and is made up.
+
+    What is still exact: the ledger never falls, every shekel that leaves
+    circulation *by melting* lands on it, and the forge never builds a hoard
+    above what the court has hands and uses for.
+    """
     world = _run(1)
-    ledger = 0
-    total = (world.court.metals.bronze_in_circulation
-             + world.court.metals.melt_ledger)
+    ledger = world.court.metals.melt_ledger
+    ceiling = world.court.metals.in_service_ceiling
     for _ in range(70):
-        world, _ = advance(world)
+        before = world.court.metals.bronze_in_circulation
+        world, events = advance(world)
         metals = world.court.metals
         assert metals.melt_ledger >= ledger, "the melt ledger may never fall"
+        melted = sum(e.amount for e in events
+                     if isinstance(e, A.BronzeMelted))
+        assert metals.melt_ledger - ledger == melted, (
+            "every shekel melted must land on the ledger, and nothing else")
         ledger = metals.melt_ledger
-        assert metals.bronze_in_circulation + metals.melt_ledger == total, (
-            "bronze leaving circulation must land on the ledger")
-    assert ledger > 0, "70 turns and nothing was melted; the chain never bit"
+        assert 0 <= metals.bronze_in_circulation <= ceiling, (
+            "the forge maintains the kit; it does not accumulate a hoard")
+        assert metals.bronze_in_circulation <= before + 600, (
+            "circulation cannot rise by more than the forge can make")
 
+
+def test_starving_the_smiths_loses_the_army_rather_than_saving_it():
+    """The inversion the 32-seed sweep found, locked shut.
+
+    Before attrition, cutting the forge collapsed demand, so nothing was
+    smelted, nothing was melted, and circulation sat at its opening figure for
+    the whole run -- chariotry ended at a perfect 1000 on exactly the seeds
+    where the smiths went unpaid. Starving the workshops preserved the army,
+    which is the opposite of what 6.5 is for.
+    """
+    world = _run(1)
+    for group_id in world.court.dependents:
+        world, _ = apply(world, A.Allocate(group_id, 0))
+    for _ in range(60):
+        world, _ = advance(world)
+    metals = world.court.metals
+    assert metals.bronze_in_circulation < metals.in_service_ceiling, (
+        "an unpaid forge must still lose the kingdom's bronze")
+    chariotry = next(f for f in world.court.formations if f.id == "chariotry")
+    assert chariotry.replacement_rate < 1000, (
+        "starving the smiths must not preserve the chariotry")
+
+
+def test_a_fed_forge_with_tin_holds_the_kit_at_its_ceiling():
+    """The other half: paying them and having tin is what standing still costs."""
+    world = _run(1)
+    for _ in range(12):
+        world, _ = advance(world)
+    metals = world.court.metals
+    assert metals.bronze_in_circulation > metals.in_service_ceiling * 9 // 10
+    assert world.court.stores.get("tin", 0) < 1800, "the forge must be eating tin"
 
 def test_strength_holds_while_replacement_falls():
     """Spec 6.5's whole point. The player loses the army without losing a

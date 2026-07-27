@@ -20,34 +20,34 @@
 
 **The two real failure points.** (1) **Attention inflation** — M12 adds hearing, inspecting, appointing and building to a fortnight that already cannot afford to read its post. If the hour budget is not re-tuned, everything new is dead content. The fix is that most of M12 is *free* actions on screens (appoint, name an heir, set a due, order the corvée) and only `hear` and `inspect` cost hours. (2) **Legibility** — a machine with two hidden multipliers, a head who lies about one of them, and a year-long build time can become a system the player cannot form a theory about. The CITY screen has to make condition and output visible *as a history*, not as a number, or the whole thing reads as random.
 
-**Known gap, now measured (`tools/sweep.py`).** 32 seeds x 96 turns, both
-policies. The deficit itself is sound: **passive empties the granary and maxes
-unrest on all 32 seeds**, so there is no seed with no game in it, and **prudent
+**Known gap, now measured and one inversion fixed (`tools/sweep.py`).** 32 seeds
+x 96 turns, both policies. The deficit is sound: **passive empties the granary
+and maxes unrest on all 32 seeds**, so no seed has no game in it, and **prudent
 never maxes unrest on any seed**, so competence is never punished by weather
-alone. Granary first empty under prudent: turn 59 (min), 80 (median), 83 (max),
-and 4 seeds never. That spread is one year of runway and it is the right shape.
+alone. Granary first empty under prudent: 59 / 80 / 83 (min / median / max), and
+4 seeds never — one year of runway, which is the right shape.
 
-**The bronze chain is inverted, and one seed could never have shown it.**
-Chariotry replacement at turn 96 ranges 0 to 1000 across seeds, and it is
-perfectly correlated with whether the *smiths* were paid:
+**The bronze chain was inverted and one seed could never have shown it.** Demand
+is scaled by the smiths' `output_modifier`, so starving the forge — the obvious
+low-risk cut, since smiths do not riot — collapsed demand to nothing, nothing
+was smelted, nothing melted, and `bronze_in_circulation` sat at its opening
+24,000 for the whole run. Chariotry ended at a **perfect 1000 on exactly the
+seeds where the forge went unpaid**. Starving the workshops preserved the army.
 
-| smiths paid to turn 30–60 | tin runs dry | melted | chariotry ends |
-|---|---|---|---|
-| yes (mod 520–780) | yes | 13,884–21,864 | **118–562** |
-| no (mod 80 by turn 30) | never | **0** | **1000** |
+Fixed with two terms in `engine/metal.py`: bronze in service **wears** at
+`bronze_attrition_per_10000 = 100` (1% a fortnight) whether or not anyone works,
+and what the forge **actually makes goes back into service**, capped at
+`in_service_ceiling` so it maintains the kit rather than building a hoard. The
+rate was swept: at 60 four seeds still ended whole, at 180 the army is gone by
+turn 60 everywhere, at 100 no seed ends at 1000 and none ends at 0.
 
-Starving the workshops *preserves* the army. Demand is scaled by the smiths'
-`output_modifier` (`engine/metal.py`), so cutting the smiths — the obvious low-
-risk cut, since smiths do not riot — collapses demand, nothing is smelted,
-nothing is melted, and `bronze_in_circulation` stays at its starting 24,000
-forever. That is the exact opposite of 6.5: the melt ledger is supposed to be
-the invisible price of keeping the workshops running.
+After: chariotry ends 0 / 555 / 840 across seeds. A fed forge holds the kit
+while tin lasts and then eats it (melt 16,140, chariotry 130 on the canonical
+seed); a starved forge melts nothing and bleeds slowly to ~770. Both lose the
+army, for different reasons, at different speeds.
 
-The canonical seed `8814402919` is one where the smiths happen to stay paid, so
-every balance report before this sweep showed the mechanic working.
-
-**The fix, not yet applied:** bronze in circulation must decay on its own —
-wear, loss, burial — so replacement falls whether or not anything is melted, and
-paying the smiths *slows* the fall instead of causing it. One attrition term in
-`engine/metal.py`, then re-sweep; the melt ledger keeps its job and the
-incentive points the right way.
+**Still open, and it is a sequencing fact rather than a tuning one:** over 96
+turns the payer still ends *worse* than the miser, because tin always runs out
+around turn 51 and cannot be replaced. Paying the forge cannot be made the
+better play until tin can be **bought** — which is M13's trade network. Do not
+re-tune attrition to paper over this; the chain is meant to be closed by trade.

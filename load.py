@@ -241,7 +241,13 @@ def load_scenario(name: str, seed: int) -> World:
         metals=MetalState(
             bronze_in_circulation=int(
                 metal_cfg.get("bronze_in_circulation", 0)),
-            melt_ledger=int(metal_cfg.get("melt_ledger", 0))),
+            melt_ledger=int(metal_cfg.get("melt_ledger", 0)),
+            # The court starts fully equipped, so what it holds on day one is
+            # what it has hands and uses for. A working forge maintains that
+            # stock and never exceeds it (6.5).
+            in_service_ceiling=int(metal_cfg.get(
+                "in_service_ceiling",
+                metal_cfg.get("bronze_in_circulation", 0)))),
         house=house, ruler=cfg["actor"],
         diviner_competence=int(diviner.get("competence", 600)),
         diviner_loyalty=int(diviner.get("loyalty", 700)),

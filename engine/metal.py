@@ -64,6 +64,24 @@ def step(world: World) -> tuple[World, list]:
     demand = sum(w.bronze_demand for w in court.workshops) * smith_modifier // 1000
     metals = court.metals
 
+    # 0. Attrition. Bronze in service wears, is lost, is buried with its owner,
+    #    goes out as a gift and does not come back. It happens whether or not
+    #    anyone is working, and it is the term that makes the workshops worth
+    #    paying for.
+    #
+    #    Without it the system was exactly backwards. Demand is scaled by the
+    #    smiths' output_modifier, so starving the smiths -- the obvious low-risk
+    #    cut, since smiths do not riot -- collapsed demand to nothing, nothing
+    #    was smelted, nothing was melted, and circulation sat at its opening
+    #    figure for the whole run. The 32-seed sweep found chariotry ending at a
+    #    perfect 1000 on precisely the seeds where the forge went unpaid.
+    #    Starving the workshops preserved the army, which is the opposite of 6.5.
+    wear = metals.bronze_in_circulation * rules.get(
+        "bronze_attrition_per_10000", 0) // 10000
+    if wear:
+        metals = dataclasses.replace(
+            metals, bronze_in_circulation=metals.bronze_in_circulation - wear)
+
     if demand > 0:
         # 1. Meet demand from finished bronze on hand.
         from_stores = min(demand, stores.get("bronze", 0))
@@ -90,12 +108,32 @@ def step(world: World) -> tuple[World, list]:
                 shortfall -= used
                 events.append(A.BronzeSmelted(bronze, copper_used, tin_used))
 
+        # 1c. Whatever the forge actually made goes into service. This is the
+        #     only thing that ever puts metal back, and it needs tin, which is
+        #     the point of the whole system: new bronze requires the one input
+        #     that comes down the longest road.
+        # Capped at the ceiling: the forge maintains the kingdom's kit, it does
+        # not accumulate a hoard. Growth above what the court has men and uses
+        # for would only buy invisible headroom against a collapse that is
+        # supposed to arrive on time.
+        served = demand - shortfall
+        if served:
+            ceiling = (metals.in_service_ceiling
+                       or metals.bronze_in_circulation + served)
+            metals = dataclasses.replace(
+                metals, bronze_in_circulation=min(
+                    ceiling, metals.bronze_in_circulation + served))
+
         # 2. Meet whatever remains by melting. This is the quiet part, and the
-        #    only thing that ever writes to the melt ledger.
+        #    only thing that ever writes to the melt ledger. Recycled metal
+        #    keeps the shops open and adds nothing: what comes off the fire is
+        #    what went into it, less the dross, and the ledger is the record of
+        #    a court eating its own capital to look busy.
         if shortfall > 0:
             melted = min(shortfall, metals.bronze_in_circulation)
             if melted:
-                metals = MetalState(
+                metals = dataclasses.replace(
+                    metals,
                     bronze_in_circulation=metals.bronze_in_circulation - melted,
                     melt_ledger=metals.melt_ledger + melted)
                 events.append(A.BronzeMelted(melted, metals.melt_ledger))
