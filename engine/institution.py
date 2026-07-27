@@ -70,6 +70,24 @@ def effective(court, inst) -> int:
     return inst.capacity * inst.condition // 1000 * staff // 1000
 
 
+def factor(court, kind: str) -> int:
+    """0..1000: how well the city's institution of this kind is working.
+
+    The two multipliers folded into one number, for the systems that consume it.
+    A court with no institution of that kind is unaffected -- 1000 -- because
+    the absence of a building is not the same as a ruined one, and scenarios
+    that do not author a city must keep playing exactly as they did.
+    """
+    matching = sorted((i for i in court.institutions.values() if i.kind == kind),
+                      key=lambda i: i.id)
+    if not matching:
+        return 1000
+    inst = matching[0]
+    group = court.dependents.get(inst.group)
+    staff = group.output_modifier if group is not None else 1000
+    return max(0, min(1000, inst.condition * staff // 1000))
+
+
 def reported_condition(court, inst, seed: int, turn: int) -> int:
     """The figure the head puts in his report, which is not the figure.
 

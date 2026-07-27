@@ -96,6 +96,16 @@ def step(world: World) -> tuple[World, list]:
             per_batch = rules.get("bronze_per_batch", 10)
             copper_per_tin = rules.get("copper_per_tin", 9)
             wanted_batches = (shortfall + per_batch - 1) // per_batch
+            # The forge's own fabric caps what can be *made*, never what the
+            # court needs (6.18). Scaling demand was the first attempt and it
+            # reproduced the inversion one level up: a collapsing workshop
+            # asked for less, melted less, and so preserved the army. The
+            # chariots need their fittings whether or not the roof leaks --
+            # what a ruined forge cannot do is smelt new metal to supply them,
+            # so the shortfall goes to the melting pot instead.
+            from engine import institution
+            forge = institution.factor(court, "workshop")
+            wanted_batches = wanted_batches * forge // 1000
             bronze, copper_used, tin_used = smelt(
                 min(stores.get("copper", 0), wanted_batches * copper_per_tin),
                 min(stores.get("tin", 0), wanted_batches),

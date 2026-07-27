@@ -47,6 +47,13 @@ def search(world: World, query: str, limit: int = 12) -> tuple[Document, ...]:
     # predecessor archive is turn 0 or negative, so it sorts to the top, which
     # is right: the oldest thing in the room is the thing you have not read.
     hits.sort(key=lambda d: (d.received_turn, d.ref))
+    # A tablet house nobody minds returns less of what is in it (6.18). The
+    # documents do not move; the keeper simply cannot lay hands on them. Two is
+    # the floor, because a search that returns nothing at all reads as a bug
+    # rather than as neglect.
+    from engine import institution
+    keeping = institution.factor(world.court, "archive")
+    limit = max(2, limit * keeping // 1000)
     return tuple(hits[:limit])
 
 

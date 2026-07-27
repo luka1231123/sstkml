@@ -92,9 +92,22 @@ _SPOILAGE_PER_1000 = {"grain": 4, "seed_grain": 4, "oil": 6, "wine": 3}
 
 
 def spoilage(court: Court) -> tuple[Court, list]:
+    """A8. What sits through the fortnight and does not keep.
+
+    The granary's condition rides on the grain only (6.18): a roof that lets the
+    rain in loses grain, and does nothing at all to the oil in the cellar or the
+    metal in the yard. At a sound granary the rate is the authored one; at a
+    ruined one it is half again as much. Nothing announces the difference and
+    the loss looks exactly like ordinary spoilage, which it is.
+    """
+    from engine import institution
+
     events: list = []
     stores = dict(court.stores)
+    granary = institution.factor(court, "granary")
     for good, rate in _SPOILAGE_PER_1000.items():
+        if good in ("grain", "seed_grain"):
+            rate = rate * (1500 - granary // 2) // 1000
         stock = stores.get(good, 0)
         loss = stock * rate // 1000     # floor: small stocks never spoil, and that's true
         if loss:
@@ -118,9 +131,15 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
                 stores[good] -= qty
             events.append(A.RitePerformed(rite.id, rite.hours, True))
         else:
-            legitimacy = _clamp(legitimacy + rite.skip_legitimacy)
-            unrest = _clamp(unrest + rite.skip_unrest)
-            deck_weight += rite.skip_deck_weight
+            # A festival missed at a temple nobody has repaired lands harder:
+            # the priesthood has been saying so for years and now has its
+            # proof. Half again at a ruin, the authored figure at a sound one.
+            from engine import institution
+            temple = institution.factor(court, "temple")
+            bite = 1500 - temple // 2
+            legitimacy = _clamp(legitimacy + rite.skip_legitimacy * bite // 1000)
+            unrest = _clamp(unrest + rite.skip_unrest * bite // 1000)
+            deck_weight += rite.skip_deck_weight * bite // 1000
             events.append(A.RiteSkipped(rite.id))
     return dataclasses.replace(court, stores=stores, legitimacy=legitimacy,
                                unrest=unrest,

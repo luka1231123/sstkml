@@ -11,9 +11,28 @@ condition**, flattering it in proportion to what he owes his men and never above
 buys the truth for one hour and lapses with the fortnight. The CITY screen (`y`)
 shows the reported figure **as a history**, so a level line of reassurance over
 a building that is quietly going is the thing the player learns to read.
-**Not yet wired: the outputs.** Condition multiplies nothing yet — the harbour
-does not gate cargoes, the granary does not gate spoilage. That is the next
-commit, and it needs a re-sweep because it touches the tuned economy.
+**Four of the six outputs are wired**, and each feeds a system that already
+exists: the granary rides on grain spoilage *and nothing else in the cellar*,
+the temple on how hard a missed festival lands, the tablet house on how many
+hits a search returns (floor of two — a search returning nothing reads as a bug
+rather than as neglect), and the forge on **how much new bronze can be smelted**.
+The harbour and the walls are deliberately not wired: nothing imports by sea
+until M13's trade and nothing attacks until M14, and a multiplier with no
+consumer is a number pretending to be a mechanic.
+
+The forge took two attempts and the first repeated the bronze inversion one
+level up. Scaling *demand* by the forge's condition made a collapsing workshop
+ask for less, melt less, and so **preserve** the army — chariotry ended 761–863
+and the M8 target test went red. The chariots need their fittings whether or not
+the roof leaks; what a ruined forge cannot do is smelt new metal to supply them,
+so the shortfall goes to the melting pot. Condition caps what can be *made*,
+never what the court *needs*.
+
+Re-swept, 32 seeds x 96 turns, and it moved the metal story strictly the right
+way: chariotry ends **32 / 512 / 578** (was 0 / 555 / 840) and melted-per-
+thousand is **424 / 490 / 976** — there is no longer any seed where the melt
+ledger stays at zero. 6.5 now fires on every seed rather than three quarters of
+them. Granary and unrest are unmoved: 59 / 80 / 83, never maxed.
 
 **Next:** the rest of M12 (D39, D40; spec 6.18–6.22). Institutions layered over the existing dependent groups, heads who are people and who misreport, justice and precedent in the hall, the land due and the harbour due, `place` and the heir, and building as a long bet on which crisis is coming. Then M13 — **the world, the envoy, and the standing order** (D35, renumbered): foreign cities carrying the same institutions, seen only as far as the player has travelled. M14 Displacement, M15 scenarios, M16 epilogue.
 

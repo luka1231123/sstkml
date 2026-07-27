@@ -177,3 +177,83 @@ def test_the_old_payroll_is_untouched() -> None:
         assert 0 <= group.output_modifier <= 1000
         assert group.arrears >= 0
         assert group.size > 0
+
+
+# --- the outputs, wired ---------------------------------------------------------
+#
+# Four of the six feed a system that exists. The harbour and the walls do not:
+# nothing imports by sea until M13's trade and nothing attacks until M14, and a
+# multiplier with no consumer would be a number pretending to be a mechanic.
+
+def _with_condition(world, key: str, condition: int):
+    institutions = dict(world.court.institutions)
+    institutions[key] = dataclasses.replace(
+        institutions[key], condition=condition)
+    return dataclasses.replace(
+        world, court=dataclasses.replace(
+            world.court, institutions=institutions))
+
+
+def test_a_court_with_no_city_is_unaffected() -> None:
+    """Scenarios that author no institutions must play exactly as they did."""
+    world = _world(1)
+    bare = dataclasses.replace(
+        world, court=dataclasses.replace(world.court, institutions={}))
+    assert I.factor(bare.court, "granary") == 1000
+    assert I.factor(bare.court, "workshop") == 1000
+
+
+def test_a_ruined_granary_loses_more_grain_and_only_grain() -> None:
+    from engine import systems
+
+    sound = _with_condition(_world(1), "granary_seat", 1000)
+    ruined = _with_condition(_world(1), "granary_seat", 0)
+    _, sound_events = systems.spoilage(sound.court)
+    _, ruined_events = systems.spoilage(ruined.court)
+    lost = {e.good: e.amount for e in sound_events}
+    lost_worse = {e.good: e.amount for e in ruined_events}
+    assert lost_worse["grain"] > lost["grain"]
+    assert lost_worse.get("wine", 0) == lost.get("wine", 0), (
+        "a leaking granary must not spoil the cellar")
+
+
+def test_a_ruined_forge_melts_faster_rather_than_slower() -> None:
+    """The inversion, one level up: scaling *demand* by the forge's condition
+    made a collapsing workshop ask for less, melt less, and so preserve the
+    army. The fabric caps what can be made, never what the court needs."""
+    def melted(condition: int) -> int:
+        world = _with_condition(_world(1), "forge_palace", condition)
+        world = dataclasses.replace(
+            world, court=dataclasses.replace(
+                world.court, stores={**world.court.stores, "tin": 400}))
+        for _ in range(24):
+            world, _ = advance(world)
+        return world.court.metals.melt_ledger
+
+    assert melted(200) > melted(1000), "a ruined forge must cost more, not less"
+
+
+def test_a_neglected_tablet_house_returns_fewer_tablets() -> None:
+    from engine import archive
+
+    sound = _with_condition(_world(1), "tablet_house", 1000)
+    neglected = _with_condition(_world(1), "tablet_house", 200)
+    many = archive.search(sound, "oath")
+    few = archive.search(neglected, "oath")
+    assert len(few) < len(many)
+    assert len(few) >= 2, "a search returning nothing reads as a bug, not neglect"
+
+
+def test_a_missed_festival_lands_harder_at_a_ruined_temple() -> None:
+    from engine import systems
+
+    def after(condition: int):
+        world = _with_condition(_world(1), "temple_baal", condition)
+        court = dataclasses.replace(
+            world.court, stores={g: 0 for g in world.court.stores})
+        rite = court.rites[0]
+        court, _ = systems.do_rites(court, rite.fortnight)
+        return court.legitimacy
+
+    assert after(100) < after(1000), (
+        "a temple nobody repaired must make a skipped rite worse")
