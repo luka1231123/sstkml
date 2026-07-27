@@ -16,6 +16,7 @@ from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
+from session import new_seed
 from tui import render
 
 READ_COST = 2
@@ -99,12 +100,17 @@ def _raw_tablet() -> str:
         lines.append(line)
 
 
-def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -> None:
+def run(scenario: str = "ugarit", seed: int | None = None,
+        no_ai: bool = False) -> None:
     from ai.client import OllamaClient
     from ai.composer import compose, raw_draft, split_draft
     from ai.parser import action_cost, parse
     from ai.voicer import Voicer
 
+    if seed is None:
+        seed = new_seed()
+    print(f"  seed {seed} — replay this same world with:  "
+          f"./run.sh --cli {scenario} {seed}\n")
     world = load_scenario(scenario, seed)
     log: list[dict] = []
     ai_log: list[dict] = []
@@ -557,5 +563,5 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
 if __name__ == "__main__":
     argv = [arg for arg in sys.argv[1:] if arg != "--no-ai"]
     sc = argv[0] if argv else "ugarit"
-    sd = int(argv[1]) if len(argv) > 1 else 8814402919
+    sd = int(argv[1]) if len(argv) > 1 else None
     run(sc, sd, "--no-ai" in sys.argv)

@@ -7,6 +7,7 @@ determinism regression in the field, not just in tests.
 from __future__ import annotations
 
 import json
+import secrets
 from pathlib import Path
 
 from engine.actions import EndTurn, from_dict, to_dict
@@ -14,6 +15,18 @@ from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
+
+def new_seed() -> int:
+    """A seed for a game nobody has played yet.
+
+    The engine is deterministic on purpose and must stay that way -- a save is
+    a seed plus an action log, replayed and hash-verified. That is a statement
+    about *reproducing* a run, not about every run being the same one, and
+    pinning the default seed quietly turned the second into the first. Drawn
+    here, outside the engine, and printed so any run can be replayed on demand.
+    """
+    return secrets.randbits(48)
+
 
 SAVE_VERSION = 11     # D25: troops have a task, a place, and a summons to answer
 

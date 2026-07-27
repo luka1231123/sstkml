@@ -29,10 +29,9 @@ from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
+from session import new_seed
 from tui import document, hall
 from tui.grid import Screen
-
-SEED = 8814402919
 
 READ_COST = 2
 
@@ -48,9 +47,11 @@ TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
 class Game:
     """World, Belief, the fortnight's hours, and the windows open on them."""
 
-    def __init__(self, scenario: str = "ugarit", seed: int = SEED) -> None:
+    def __init__(self, scenario: str = "ugarit", seed: int | None = None) -> None:
         from tui.backend_tk import App
 
+        self.seed = new_seed() if seed is None else seed
+        seed = self.seed
         self.world = load_scenario(scenario, seed)
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
@@ -62,7 +63,7 @@ class Game:
         self.stack_order: list[str] = document.order_of(project(self.world))
 
         self.hall_window = self.app.window(
-            "hall", "Say to the King, my lord", 92, 30,
+            "hall", f"Say to the King, my lord — seed {seed}", 92, 30,
             on_key=self.on_key, on_close=self.quit)
         self.repaint()
         # A Tk program launched from a terminal opens *behind* the terminal on
@@ -216,7 +217,9 @@ def main(argv: list[str]) -> int:
         return 1
     args = [a for a in argv[1:] if not a.startswith("-")]
     scenario = args[0] if args else "ugarit"
-    seed = int(args[1]) if len(args) > 1 else SEED
+    seed = int(args[1]) if len(args) > 1 else new_seed()
+    print(f"seed {seed} — pass it back to play this same world again:\n"
+          f"  ./run.sh {scenario} {seed}")
     Game(scenario, seed).run()
     return 0
 

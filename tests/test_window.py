@@ -7,6 +7,8 @@ without a display is the whole reason `available()` exists.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from belief.project import project
 from engine.tick import advance
 from load import load_scenario
@@ -345,3 +347,35 @@ def test_there_is_only_ever_one_tk_root_in_a_process():
     assert app_one.windows == {}
     assert backend_tk._root() is first
     assert first.winfo_exists()
+
+
+def test_a_new_game_is_a_new_world():
+    """Determinism is about *reproducing* a run, not about every run being the
+    same one. A pinned default seed quietly turned the second into the first."""
+    import play_cli
+    import play_gui
+    from session import new_seed
+    assert len({new_seed() for _ in range(8)}) == 8
+    assert not hasattr(play_gui, "SEED"), "no module-level pinned seed"
+    assert "8814402919" not in Path(play_gui.__file__).read_text()
+    assert "8814402919" not in Path(play_cli.__file__).read_text()
+
+
+def test_the_seed_given_back_reproduces_the_world_exactly():
+    """The printed seed has to be the whole story, or it is decoration."""
+    from engine.core import state_hash
+    from engine.tick import advance
+    from load import load_scenario
+    from session import new_seed
+    seed = new_seed()
+    runs = []
+    for _ in range(2):
+        world = load_scenario("ugarit", seed)
+        for _ in range(6):
+            world, _ = advance(world)
+        runs.append(state_hash(world))
+    assert runs[0] == runs[1]
+    other = load_scenario("ugarit", new_seed())
+    for _ in range(6):
+        other, _ = advance(other)
+    assert state_hash(other) != runs[0]
