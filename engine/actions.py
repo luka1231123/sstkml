@@ -68,6 +68,16 @@ class SendToHarvest:
 
 
 @dataclasses.dataclass(frozen=True)
+class AssignTroops:
+    """Spec 11: `ASSIGN_TROOPS formation=<id> task=... place=<id>`. The same
+    men hold the walls, bring in the barley, or go north to a muster, and they
+    cannot do two of those (D25). An empty `place` means the seat."""
+    formation_id: str
+    task: str                     # garrison | harvest | campaign | watch
+    place: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
 class RaiseCorvee:
     """Labour levied outside the ration lists entirely, and paid for in unrest."""
     days: int
@@ -331,6 +341,23 @@ class SentToHarvest:
 
 
 @dataclasses.dataclass(frozen=True)
+class TroopsAssigned:
+    formation_id: str
+    task: str
+    place: str
+
+
+@dataclasses.dataclass(frozen=True)
+class SummonsReceived:
+    """A demand for men arrived and the clock started (D25). The count here is
+    the oath's, not the tablet's -- the tablet is free to ask for more."""
+    oath_id: str
+    place: str
+    n: int
+    due_turn: int
+
+
+@dataclasses.dataclass(frozen=True)
 class CorveeRaised:
     days: int
     unrest_delta: int
@@ -488,6 +515,7 @@ _TYPES = {
     c.__name__: c for c in (
         EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, DictateReply,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
+        AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
         BronzeSmelted, BronzeMelted, WorkshopDemandMet,
         MarryAbroad, ConsultDiviner, SuppressOmen, DefyOmen, SwearOath,

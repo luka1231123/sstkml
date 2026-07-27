@@ -63,20 +63,23 @@ def climate_at(world: World, turn: int) -> int:
 def labour_supplied(court: Court, per_head: int) -> int:
     """Labour-days available to the fields this turn (spec 6.4).
 
-    Three sources: groups whose standing function is field labour, groups the
+    Four sources: groups whose standing function is field labour, groups the
     ruler has *ordered* to the harvest at the cost of whatever they normally do,
-    and corvee raised outside the lists entirely and paid for in unrest.
+    formations tasked to `harvest` (spec 6.4 line 566, D25), and corvee raised
+    outside the lists entirely and paid for in unrest.
 
     A group deep in arrears supplies less, through `output_modifier`. Starving
     the people who bring in the harvest is a slow way to lose the harvest, and
     the feedback takes a season to arrive.
     """
+    from engine.troops import harvest_hands
+
     total = 0
     for gid in sorted(court.dependents):
         group = court.dependents[gid]
         if group.function == "field_labour" or gid in court.at_harvest:
             total += group.size * per_head * group.output_modifier // 1000
-    return total + court.corvee_days
+    return total + harvest_hands(court, per_head) + court.corvee_days
 
 
 # --- the yield formula -------------------------------------------------------

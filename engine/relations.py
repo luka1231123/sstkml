@@ -259,6 +259,19 @@ def _clause_violated(world: World, oath, clause) -> bool:
             and year_start <= gift.arrive_turn <= world.date.absolute
         )
         return delivered < int(args["qty"])
+    if clause.kind == "provide_troops":
+        # Judged once, on the day the summons falls due, and never again: one
+        # failed muster is one breach, however long the overlord goes on
+        # remembering it. What counts is strength standing at the muster place
+        # under task `campaign` -- men still on the walls at home are men not
+        # sent, whatever the king intended by them.
+        from engine.troops import mustered_for
+        for summons in world.court.summons:
+            if (summons.oath_id == oath.id
+                    and summons.due_turn == world.date.absolute
+                    and mustered_for(world.court, summons.place) < summons.n):
+                return True
+        return False
     if clause.kind == "maintain_rite":
         # A vow that a named festival will be kept, every year, for ever
         # (spec 6.12's "quietly violable"). It is checked once a year, on the

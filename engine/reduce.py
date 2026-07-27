@@ -68,6 +68,10 @@ def apply(world: World, action) -> tuple[World, list]:
         return (replace_court(world, at_harvest=tuple(sorted(at_harvest))),
                 [A.SentToHarvest(action.group_id, action.to_fields)])
 
+    if isinstance(action, A.AssignTroops):
+        from engine.troops import assign
+        return assign(world, action)
+
     if isinstance(action, A.RaiseCorvee):
         rules = world.land_rules
         cap = rules.get("corvee_max_days", 6000)

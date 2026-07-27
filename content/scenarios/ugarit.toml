@@ -208,17 +208,36 @@ name = "the palace forge"
 group_id = "smiths_palace"
 bronze_demand = 600             # shekels a fortnight, maintenance and replacement
 
+# Spec 7.2: `troops` total under 400, and there is no military solution to
+# anything. 390 across three formations, which is the whole army: enough to hold
+# the seat OR to answer the muster at Carchemish OR to bring in a harvest, and
+# never two of them (D25, D32). `task` and `place` are the starting orders and
+# the player may change any of them for an hour.
 [[formations]]
 id = "chariotry"
 name = "the maryannu chariotry"
 strength = 90
 equipment_floor = 18000         # fittings, armour, and the fear they carry
+task = "garrison"
+place = "seat"
 
 [[formations]]
 id = "household_troops"
 name = "the household troops"
-strength = 400
+strength = 260
 equipment_floor = 9000
+task = "garrison"
+place = "seat"
+
+# The four men in a tower of spec 7.2, and they are forty. A watch counts half
+# against a raid, because a watch is men who can see a sail coming.
+[[formations]]
+id = "coast_watch"
+name = "the watch on the coast"
+strength = 40
+equipment_floor = 2000
+task = "watch"
+place = "ma_hadu"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # THE HOUSE (spec 6.10). A cast, not a stat block. Ages in years; the engine
@@ -790,6 +809,7 @@ cadence = 5
 offset = 1
 topic = "great_king_demand"
 facts = { troops = 200, within = 2 }
+summons_oath = "oath_hatti_grain"   # this tablet starts the clock on arrival (D25)
 exaggerate = ["troops"]         # ask high, expecting to be short-changed
 understate = ["within"]         # and name a deadline tighter than he needs
 [[correspondents]]
@@ -1058,6 +1078,16 @@ kind = "provide_goods"
 good = "grain"
 qty = 48000
 per_year = true
+
+# Spec 7.2: the grain ships and the troops go north while the coast is watched
+# by four men in a tower. 200 of 390 men, mustered at Carchemish within two
+# fortnights of the viceroy's letter -- which asks for more than 200, because he
+# exaggerates and expects to be short-changed. The clause is the true figure and
+# it is readable on the OATHS page from turn 1.
+[[oaths.clauses]]
+kind = "provide_troops"
+n = 200
+within = 2
 
 # ─────────────────────────────────────────────────────────────────────────────
 # THE VOWS OF THE PREDECESSORS (spec 6.12). `binds_house = true`: a promise to a

@@ -386,3 +386,59 @@ no field anywhere that could be read the other way. An epidemic about to burn ou
 on its own looks exactly like one that has been expiated, which is the honest
 version of the historical situation. `test_nothing_announces_whether_the_offering_was_right`
 asserts the silence, in the same spirit as D19's melt.
+
+## D32 — The military entity, closing D25 (pre-M11)
+D25 listed four missing things and said to do them before M11 because raid
+targeting reads a term that had no source. All four are now in.
+
+**`Formation.task` and `Formation.place`** (spec 11's `ASSIGN_TROOPS`). Four
+tasks, and the point of having them is that they are exclusive. The same men
+hold the seat, watch the coast, reap the barley, or go north to a muster, and a
+king with 390 of them cannot do two of those. `Formation` is *not* merged into
+`DependentGroup` and must not be: D25 has the argument, and it still stands.
+
+**Troops are labour** (spec 6.4 line 566). `harvest_hands` adds
+`strength * labour_days_per_head` for every formation tasked to `harvest`, on
+the same per-head rate as everybody else, with no `output_modifier` — a soldier
+is fed out of the payroll group he belongs to, and starving him surfaces as
+unrest long before it surfaces as a short harvest. The garrison-or-the-harvest
+dilemma is now a real one in both directions, and the test named for it in
+`tests/test_troops.py` pins both ends at once.
+
+**`garrison_strength(place)`**, which is what M11 was actually waiting for.
+Garrison counts full, watch counts half, harvest and campaign count nought.
+A watch is men who can see a sail coming and cannot do anything about it; spec
+7.2's four men in a tower are the whole joke and should not read as a defence.
+This is the one number in the module invented rather than specified, and M11
+should revisit the half if raid weighting reads wrong.
+
+**`provide_troops(n, within_turns_of_summons)`**, and the design is in where the
+number comes from. The clause carries the true figure; the letter is only the
+trigger. The viceroy of Carchemish already exaggerated `troops` (M7's
+`report_bias`), so the tablet asks for more men than the oath obliges, and the
+king who obeys the tablet sends men he did not owe out of an army that cannot
+spare them. The oath is readable on the OATHS page from turn 1. Nothing points
+this out.
+
+Two smaller things follow from that, both deliberate:
+
+- **The clock starts on delivery, not on reading.** `note_summons` runs off
+  arrivals in A3, before the A10 audit, and does not care whether the tablet has
+  been opened. An unread demand is still a demand delivered, and the Great
+  King's clerks date it from the day their courier handed it over. The summons
+  is correspondingly absent from Belief until the letter is read — he is bound
+  by something he has not been told about, which is the argument for reading the
+  pile and the only one the game makes.
+- **It is judged once, on the due turn.** One failed muster is one breach,
+  however long the overlord goes on remembering it. Same shape as the yearly
+  grain clause, and the same reason: liability is a weight on the misfortune
+  deck, not a bill.
+
+Also done, the content fix D25 asked for: Ugarit's formations were 490 against
+spec 7.2's "under 400". Now 390 — chariotry 90, household troops 260, and a
+40-man watch at Ma'hadu that exists to be the tower. Answering the summons costs
+200 of them.
+
+Still deliberately absent, exactly as D25 said: no combat resolution, no unit
+types, no morale, no terrain. M11 needs raids against garrison strength and
+nothing more.

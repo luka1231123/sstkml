@@ -11,7 +11,7 @@ from engine import actions as A
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
     "INSPECT_LEDGER", "EAT_SEED", "SEND_GIFT", "END_TURN",
-    "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE",
+    "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE", "ASSIGN_TROOPS",
     "CONSULT_DIVINER", "MARRY_ABROAD", "SWEAR_OATH",
 }
 _ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
@@ -99,6 +99,14 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
         text)
     if match and match[1] in groups:
         return ParseResult((A.SendToHarvest(match[1], False),), source="preparser")
+    match = re.fullmatch(
+        r"(?:assign|send|order|set)\s+(?:the\s+)?([\w:.-]+)\s+to\s+"
+        r"(garrison|watch|harvest|campaign)"
+        r"(?:\s+(?:at|in|to)\s+(?:the\s+)?([\w:.-]+))?", text)
+    if match and match[1] in _formation_ids(belief):
+        return ParseResult(
+            (A.AssignTroops(match[1], match[2], match[3] or ""),),
+            source="preparser")
     match = re.fullmatch(r"(?:raise|levy|call)(?:\s+a)?\s+corvee(?:\s+of)?\s+(\d+)(?:\s+days)?", text)
     if match:
         return ParseResult((A.RaiseCorvee(int(match[1])),), source="preparser")
@@ -122,6 +130,10 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     return None
 
 
+def _formation_ids(belief: dict) -> set:
+    return {f["id"] for f in belief.get("troops", {}).get("formations", [])}
+
+
 def _house_ids(belief: dict) -> set:
     return {p["id"] for p in belief.get("house", {}).get("members", [])
             if p["alive"]}
@@ -138,6 +150,8 @@ def _affordances(belief: dict, hours_left: int) -> str:
         f"Correspondents: {actors}\nGift goods: {goods}\n"
         f"House (living): {', '.join(sorted(_house_ids(belief))) or 'none'}\n"
         f"Oaths: {', '.join(o['id'] for o in belief.get('oaths', [])) or 'none'}\n"
+        f"Formations: {', '.join(sorted(_formation_ids(belief))) or 'none'}\n"
+        "Troop tasks: garrison, watch, harvest, campaign\n"
         "Ledgers: granary, seed\nReply intent: free text, at most 200 characters\n"
         "Legal verbs: " + ", ".join(sorted(VERBS))
     )
@@ -187,6 +201,15 @@ def _action(item: dict, belief: dict):
         if group not in groups:
             raise ValueError("unknown group")
         return A.SendToHarvest(group, verb == "SEND_TO_HARVEST")
+    if verb == "ASSIGN_TROOPS":
+        from engine.troops import TASKS
+        formation, task = args.get("formation"), args.get("task")
+        if formation not in _formation_ids(belief):
+            raise ValueError("unknown formation")
+        if task not in TASKS:
+            raise ValueError("troops cannot be set to that")
+        place = args.get("place", "")
+        return A.AssignTroops(formation, task, place if type(place) is str else "")
     if verb == "RAISE_CORVEE" and type(args.get("days")) is int:
         return A.RaiseCorvee(args["days"])
     if verb == "CONSULT_DIVINER":

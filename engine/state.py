@@ -131,12 +131,38 @@ class Workshop:
 @dataclasses.dataclass(frozen=True)
 class Formation:
     """A body of troops. Its strength does not fall when bronze runs out --
-    its ability to replace losses does, which is the entire point (spec 6.5)."""
+    its ability to replace losses does, which is the entire point (spec 6.5).
+
+    `task` and `place` are the whole military entity (spec 11's ASSIGN_TROOPS,
+    D25). A formation is in exactly one place doing exactly one thing, and a
+    king with four hundred men has four hundred men for all of it: the walls,
+    the harvest, and the muster his overlord has summoned him to. There is no
+    combat resolution behind any of this and there is not meant to be."""
     id: str
     name: str
     strength: int
     equipment_floor: int          # bronze in circulation below which re-equipping fails
     replacement_rate: int         # 0..1000, derived each turn from the floor
+    task: str = "garrison"        # garrison | harvest | campaign | watch
+    place: PlaceId = ""           # where they stand; the seat unless ordered elsewhere
+
+
+@dataclasses.dataclass(frozen=True)
+class Summons:
+    """A demand for troops under an oath, and the clock it starts (spec 6.9's
+    `provide_troops(n, within_turns_of_summons)`).
+
+    `n` and `due_turn` come from the CLAUSE, not from the tablet that carries
+    the demand. The letter is only the trigger, and the man who writes it is at
+    liberty to ask for more men than the oath obliges -- which the viceroy of
+    Carchemish does. The oath is readable from turn 1 by anyone who thinks to
+    check it against the letter.
+    """
+    oath_id: str
+    place: PlaceId                # where they are to muster: the letter's origin
+    n: int                        # what the clause actually requires
+    called_turn: int
+    due_turn: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -213,6 +239,11 @@ class Court:
     # Archive searches run this turn, so the TUI can show the hits it paid for.
     # Cleared every turn like `inspected`.
     searched: tuple[str, ...] = ()
+    # --- D25: troops ---
+    # Every summons this reign has received, answered or not, oldest first. They
+    # are never removed: a demand that went unanswered four years ago is exactly
+    # the sort of thing the other party remembers.
+    summons: tuple[Summons, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -305,6 +336,9 @@ class Correspondent:
     # direction of his interest, which is a property of what he is writing about.
     exaggerate: tuple[str, ...] = ()
     understate: tuple[str, ...] = ()
+    # If set, a letter from this correspondent is a summons under the named oath
+    # (D25). The number of men is the clause's, not the letter's.
+    summons_oath: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -333,6 +367,10 @@ class Letter:
     protocol_profile: str = ""
     protocol_total: int = 0
     protocol_violations: tuple[str, ...] = ()
+    # This tablet is a summons under the named oath (D25). Carried on the letter
+    # because the summons begins when the demand reaches the court, not when the
+    # correspondent sat down to dictate it a month's sailing away.
+    summons_oath: str = ""
 
 
 @dataclasses.dataclass(frozen=True)

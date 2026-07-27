@@ -254,6 +254,34 @@ def land_screen(b: dict) -> str:
     return "\n".join(lines)
 
 
+def troops_screen(b: dict) -> str:
+    """The army, which is one page long and always will be (D25).
+
+    No strengths of anybody else's, no readiness figure, no assessment. Where
+    the men are, what they were told to do, and which musters have been demanded
+    of him and read. A summons he has not read is not here.
+    """
+    troops = b.get("troops") or {}
+    if not troops:
+        return "  TROOPS\n\n    you have no formations."
+    lines = ["  TROOPS — where they stand and what they were told", ""]
+    for f in troops["formations"]:
+        lines.append(f"    {f['name']:<34}{f['strength']:>5} men   "
+                     f"{f['task']:<9} at {f['place']}")
+    lines.append("")
+    for place, strength in sorted(troops["garrisons"].items()):
+        lines.append(f"    holding {place:<26}{strength:>5} men")
+    for summons in troops["summons"]:
+        lines.append("")
+        state = "OVERDUE" if summons["overdue"] else f"by turn {summons['due_turn']}"
+        lines.append(f"    summoned under {summons['oath_id']}: "
+                     f"{summons['required']} men to {summons['place']}, {state}")
+        lines.append(f"      mustered there: {summons['mustered']} men")
+    lines.append("\n  order them with:  assign <formation> "
+                 "garrison|watch|harvest|campaign [place]")
+    return "\n".join(lines)
+
+
 def relations_screen(b: dict) -> str:
     lines = ["  KNOWN WORLD — claims, gifts, and obligations", ""]
     for relation in b["relations"]:

@@ -161,7 +161,7 @@ def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
                 facts: tuple, outgoing: bool = False, recipient: str | None = None,
                 protocol_profile: str = "", protocol_total: int = 0,
                 protocol_violations: tuple[str, ...] = (),
-                true_facts: tuple = ()) -> Letter:
+                true_facts: tuple = (), summons_oath: str = "") -> Letter:
     seat = world.court.seat
     if outgoing:
         src, dst = seat, origin      # replies go the other way; origin is the target place
@@ -175,7 +175,7 @@ def _new_letter(world: World, seq: int, sender: str, origin: str, topic: str,
         path=path, edge_index=0, legs_into_edge=0, at_node=src,
         outgoing=outgoing, true_facts=true_facts,
         protocol_profile=protocol_profile, protocol_total=protocol_total,
-        protocol_violations=protocol_violations,
+        protocol_violations=protocol_violations, summons_oath=summons_oath,
     )
 
 
@@ -188,13 +188,14 @@ def generate_incoming(world: World) -> tuple[World, list]:
     inbox = world.inbox
     events: list = []
 
-    def emit(sender, origin, topic, facts, exaggerate=(), understate=()):
+    def emit(sender, origin, topic, facts, exaggerate=(), understate=(),
+             summons_oath=""):
         nonlocal seq, inbox
         seq += 1
         asserted, true = _assert_facts(
             world, sender, facts, exaggerate, understate)
         L = _new_letter(world, seq, sender, origin, topic, asserted,
-                        true_facts=true)
+                        true_facts=true, summons_oath=summons_oath)
         if len(L.path) <= 1:                       # already at the seat
             inbox = inbox + (dataclasses.replace(L, arrive_turn=now),)
             events.append(A.LetterArrived(L.id, L.sender, L.topic))
@@ -206,7 +207,8 @@ def generate_incoming(world: World) -> tuple[World, list]:
         delayed = relation is not None and now < relation.reply_delay_until
         if (not delayed and c.cadence > 0 and now - c.offset >= 0
                 and (now - c.offset) % c.cadence == 0):
-            emit(c.actor, c.place, c.topic, c.facts, c.exaggerate, c.understate)
+            emit(c.actor, c.place, c.topic, c.facts, c.exaggerate,
+                 c.understate, c.summons_oath)
 
     # A daughter married abroad (spec 6.10). She is a permanent asset who is
     # also an independent agent: she writes home with what the court she now

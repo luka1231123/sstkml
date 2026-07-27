@@ -58,6 +58,12 @@ build deviates from it.
   he could not read. You search the tablet house an hour at a time, you make an
   offering against your best guess, and nothing ever tells you whether it was
   accepted. The epidemic curve is the only answer you get.
+- **Troops.** The army is 390 men in three formations, and each of them is in
+  one place doing one thing: holding the seat, watching the coast, reaping, or
+  answering the muster the Great King has summoned them to. It cannot be two.
+  The summons arrives by tablet and the clock starts when the courier hands it
+  over, read or not; the viceroy asks for more men than the oath obliges, and
+  the oath is on the page from turn 1 for anyone who thinks to check.
 
 ## Play
 
@@ -99,7 +105,8 @@ engine/   stdlib only. core, state, actions, reduce, tick, systems, relations,
           house (birth, death, marriage, succession), divine (omens read off a
           future fixed at load, then distorted by the diviner), plague
           (integer SIR + the theological puzzle), archive (the permanent
-          record, and the hour it costs to search it).
+          record, and the hour it costs to search it), troops (task, place,
+          garrison strength, and the summons clock).
 belief/   World -> Belief projection (plain dicts; the only thing UI/AI read).
 ai/       optional Ollama client, parser/composer/voicer/librarian, numeric guard,
           protocol grader, and the prompt boundary (client.safe_fields).

@@ -168,6 +168,47 @@ def _metal(world) -> dict:
     }
 
 
+def _troops(world) -> dict:
+    """Where the army is and what it has been told to do (D25).
+
+    All of it exact: these are the king's own standing orders, and a man who
+    does not know where he sent his own household troops has worse problems
+    than a scribe. What is NOT exact is the summons list -- a demand that has
+    arrived but has not been read is not on it, because nobody has told him.
+    The clock is running all the same.
+    """
+    from engine.troops import garrison_strength, mustered_for
+
+    court = world.court
+    if not court.formations:
+        return {}
+    read_summons = {
+        (letter.summons_oath, letter.arrive_turn)
+        for letter in world.inbox if letter.summons_oath and letter.read
+    }
+    # Only places somebody is actually holding. A city he has sent men to
+    # campaign at is not a city he garrisons, and a line reading nought there
+    # would say the opposite of what it means.
+    places = sorted({f.place for f in court.formations
+                     if f.task in ("garrison", "watch")})
+    return {
+        "formations": [
+            {"id": f.id, "name": f.name, "strength": f.strength,
+             "task": f.task, "place": f.place}
+            for f in sorted(court.formations, key=lambda f: f.id)
+        ],
+        "garrisons": {p: garrison_strength(court, p) for p in places},
+        "summons": [
+            {"oath_id": s.oath_id, "place": s.place, "required": s.n,
+             "due_turn": s.due_turn,
+             "mustered": mustered_for(court, s.place),
+             "overdue": world.date.absolute > s.due_turn}
+            for s in court.summons
+            if (s.oath_id, s.called_turn) in read_summons
+        ],
+    }
+
+
 def _plague(world, perr: int) -> dict:
     """What a king can actually know about an epidemic (spec 6.12).
 
@@ -365,6 +406,7 @@ def project(world) -> dict:
         # and does (spec 6.5). The player finds out the first time he takes
         # casualties, which is several milestones away.
         "metal": _metal(world),
+        "troops": _troops(world),
         "store_history": {
             good: list(series)
             for good, series in sorted(c.store_history.items())},

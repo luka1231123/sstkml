@@ -26,6 +26,7 @@ GIFT_COST = 1
 
 HARVEST_COST = 1
 CORVEE_COST = 1
+ASSIGN_COST = 1
 DREDGE_COST = 1
 OMEN_COST = 2
 MARRY_COST = 2
@@ -37,7 +38,7 @@ SUPPRESS_COST = 2
 
 HELP = """  commands (a leading ':' is optional)
     stack | lists | stores | archive | relations | oaths | land | house
-    plague | tablets
+    plague | tablets | troops
     read <i>                 read a letter in full            (2 hours)
     reply <i> <intent>       answer it with a free-text intent        (2 hours)
     dictate <i>              write the reply yourself, ending with '.' (2 hours)
@@ -50,6 +51,8 @@ HELP = """  commands (a leading ':' is optional)
     harvest <group>          order a group to the fields          (1 hour)
     recall <group>           send it back to its own work         (1 hour)
     corvee <days>            levy labour outside the lists; costs unrest (1 hour)
+    assign <formation> <task> [place]
+                             garrison | watch | harvest | campaign   (1 hour)
     dredge <estate> <days>   restore a canal, at low water only   (1 hour)
     omen harvest|route       ask the diviner about the year       (2 hours)
     omen death <person>      ask whether a man has long           (2 hours)
@@ -208,6 +211,8 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                 print(render.house_screen(b))
             elif screen == "plague":
                 print(render.plague_screen(b))
+            elif screen == "troops":
+                print(render.troops_screen(b))
             elif screen == "tablets":
                 print(render.tablets_screen(b, tablet_query))
             else:
@@ -227,7 +232,8 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
             verb, args = parts[0].lower(), parts[1:]
 
             if verb in ("stack", "lists", "stores", "archive", "relations",
-                        "oaths", "land", "house", "plague", "tablets"):
+                        "oaths", "land", "house", "plague", "tablets",
+                        "troops"):
                 screen = verb
                 if verb != "archive":
                     search_results = None
@@ -318,6 +324,18 @@ def run(scenario: str = "ugarit", seed: int = 8814402919, no_ai: bool = False) -
                         print("  the order goes out to the fields."
                               if verb == "harvest" else
                               "  they are sent back to their own work.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb == "assign" and len(args) in (2, 3):
+                if left < ASSIGN_COST:
+                    print("  no hour remains to move men.")
+                else:
+                    try:
+                        commit(A.AssignTroops(
+                            args[0], args[1], args[2] if len(args) == 3 else ""))
+                        spent += ASSIGN_COST
+                        print("  the order is given. They march, or they stand,"
+                              " where you have said.")
                     except ValueError as ex:
                         print(f"  {ex}")
             elif verb == "corvee" and len(args) == 1:

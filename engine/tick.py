@@ -58,6 +58,11 @@ def advance(world: World) -> tuple[World, list]:
     from engine import mail
     world, e = mail.step_letters(world); events += e
     world = relations.update_unanswered(world)
+    # A demand for men becomes a standing summons the moment it is delivered,
+    # read or not (D25). Before the A10 audit, so a summons that came due this
+    # turn is judged this turn.
+    from engine import troops
+    world, e = troops.note_summons(world); events += e
 
     # A4 plague: introduction off this turn's arrivals, then the compartment
     # step and mortality. Before the house, because a member of the household

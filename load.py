@@ -102,6 +102,7 @@ def load_scenario(name: str, seed: int) -> World:
                                key=lambda kv: kv[0])),
             exaggerate=tuple(sorted(c.get("exaggerate", []))),
             understate=tuple(sorted(c.get("understate", []))),
+            summons_oath=c.get("summons_oath", ""),
         )
         for c in cfg.get("correspondents", [])
     )
@@ -195,7 +196,9 @@ def load_scenario(name: str, seed: int) -> World:
                   equipment_floor=int(f.get(
                       "equipment_floor",
                       land_cfg["metal"]["default_equipment_floor"])),
-                  replacement_rate=1000)
+                  replacement_rate=1000,
+                  task=f.get("task", "garrison"),
+                  place=f.get("place", cfg["seat"]))
         for f in cfg.get("formations", []))
     metal_cfg = cfg.get("metals", {})
 

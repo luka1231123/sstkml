@@ -1,8 +1,8 @@
 # STATUS
 
-**Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian). 121 tests green. Plays: `python3 play_cli.py ugarit`.
+**Done:** M0 (determinism spine) · M1 (famine loop) · M2 (letters/closed-sea) · M3 (scribe distortion + archive) · M4 (numeric guard + optional prose parser) · M5 (formulae + protocol grader + desk) · M6 (relations, gifts, status, unanswered decay, oaths, protocol consequences, misfortune) · M7 (persona cards, report bias, distorted asserted facts, background generation, prompt boundary) · M8 (climate series, agriculture, labour and corvee, canals, the bronze chain, the melt ledger, workshops) · M9 (the house, reproduction, child mortality, marriage abroad as an agent, the queen mother, succession and the oath reset, divination) · M10 (integer SIR, quarantine, the predecessor archive, `cause_oath_id`, expiation, the librarian) · D25 (troops: task, place, garrison strength, troops on the harvest, the `provide_troops` clause and its summons). 139 tests green. Plays: `python3 play_cli.py ugarit`.
 
-**Next:** M11 — displacement: rival courts, displaced groups, reception policy, the coalition, raid targeting. Target per spec: a coalition assembled entirely from refusals, verifiable in the log. **Do the troops work first (D25)** — raid targeting reads `garrison_strength[place]`, which has no source in current state.
+**Next:** M11 — displacement: rival courts, displaced groups, reception policy, the coalition, raid targeting. Target per spec: a coalition assembled entirely from refusals, verifiable in the log. `engine/troops.garrison_strength(court, place)` is there for 6.13's weighting now (D32); the one number in it that was invented rather than specified is the half-weight for `watch`, so check that first if raid targeting reads wrong.
 
 **Rules that bite:** engine/ = stdlib only, integers only, no `random`/`hash()`/floats in engine. Read `SAY_TO_THE_KING_spec.md` Part 0 + `DECISIONS.md` before changing anything.
 
@@ -40,11 +40,13 @@ still bind. Searching costs an hour, and nothing anywhere tells the player
 whether an offering was accepted — the curve is the only answer. Do not add a
 confirmation message: see D31.
 
-**Known gap: troops (D25).** `Formation` has no `task` and no `place`, so
-`ASSIGN_TROOPS` does not exist, troops supply no harvest labour, and there is no
-`garrison_strength(place)` — which M11's raid targeting requires. The
-`provide_troops` oath clause is neither implemented nor authored. Do this before
-M11. Do not merge `Formation` into `DependentGroup`: see D25.
+**The army is 390 men, since D25 (D32).** Three formations, each in one place
+doing one thing, and it cannot be two: the seat, the coast, the harvest, or the
+muster at Carchemish. The summons clock starts when the courier hands the tablet
+over, read or not, and the tablet asks for more men than the oath obliges
+because the viceroy exaggerates. The true figure is in the clause, on the OATHS
+page, from turn 1. Nothing points this out. Still absent and meant to be: combat
+resolution, unit types, morale, terrain.
 
 **Known gap.** The balance numbers (D16, `tools/balance.py`) are verified on one
 seed, `8814402919`. A seed sweep is worth doing before M13.
