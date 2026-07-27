@@ -138,6 +138,9 @@ def _land(world, perr: int) -> dict:
         # His own standing orders, which he knows exactly because he gave them.
         "hands_to_the_fields": list(court.at_harvest),
         "corvee_days": court.corvee_days,
+        # Days already given to a building site, and therefore not to the
+        # fields (6.21). He knows this one exactly: he gave the order.
+        "works_days": court.works_days,
         "labour_days_this_turn": labour_supplied(court, per_head),
         "labour_days_needed": needed,
         "estates": [
@@ -185,6 +188,47 @@ def _institutions(world) -> list[dict]:
             "upkeep": {good: qty for good, qty in inst.upkeep},
             "history": list(court.institution_history.get(key, ())),
         })
+    return out
+
+
+def _works_season(world) -> bool:
+    """Whether the men can work this fortnight. He can see the weather."""
+    from engine import works
+
+    return works.working_season(world)
+
+
+def _projects(world) -> list[dict]:
+    """Work in hand (6.21). Everything here is exact.
+
+    No scribe stands between the ruler and a building site: he can see the men,
+    he ordered them there, and the overseer's count of days is the one number
+    in the game nobody has any reason to dress up. What is *not* here is any
+    estimate of when it will be done -- that depends on the corvée he has not
+    raised yet and the season he cannot hurry.
+    """
+    court = world.court
+    out = []
+    for key in sorted(court.projects):
+        p = court.projects[key]
+        out.append({
+            "id": p.id, "what": p.name, "kind": p.kind, "place": p.place,
+            "repair": bool(p.institution), "institution": p.institution,
+            "days_done": p.days_done, "days_needed": p.days_needed,
+            "spent": {good: qty for good, qty in p.spent},
+            "started_turn": p.started_turn,
+        })
+    return out
+
+
+def _plans(world) -> list[dict]:
+    """What can be put up, and what it would cost. Authored, so exact."""
+    out = []
+    for kind in sorted(world.works_plans):
+        plan = world.works_plans[kind]
+        out.append({"kind": kind, "name": plan["name"],
+                    "days": int(plan["days"]),
+                    "capacity": int(plan["capacity"])})
     return out
 
 
@@ -444,7 +488,14 @@ def project(world) -> dict:
         # and does (spec 6.5). The player finds out the first time he takes
         # casualties, which is several milestones away.
         "metal": _metal(world),
+        "seat": world.court.seat,
         "institutions": _institutions(world),
+        "projects": _projects(world),
+        "plans": _plans(world),
+        "works_season": _works_season(world),
+        "works_materials": dict(world.works_materials),
+        "repair_days_per_point": world.works_rules.get(
+            "repair_days_per_point", 3),
         "troops": _troops(world),
         "store_history": {
             good: list(series)

@@ -27,6 +27,7 @@ GIFT_COST = 1
 
 HARVEST_COST = 1
 CORVEE_COST = 1
+WORKS_COST = 1
 ASSIGN_COST = 1
 DREDGE_COST = 1
 OMEN_COST = 2
@@ -55,6 +56,9 @@ HELP = """  commands (a leading ':' is optional)
     assign <formation> <task> [place]
                              garrison | watch | harvest | campaign   (1 hour)
     dredge <estate> <days>   restore a canal, at low water only   (1 hour)
+    build <kind> [place]     put something up; it eats corvee and grain (1 hour)
+    repair <institution>     make a thing whole; cheaper than building (1 hour)
+    abandon <work>           call the men off; what they ate is gone (1 hour)
     omen harvest|route       ask the diviner about the year       (2 hours)
     omen death <person>      ask whether a man has long           (2 hours)
     hush <omen>              keep an omen off the record; it may leak (2 hours)
@@ -356,6 +360,33 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                         if raised:
                             print(f"  {raised.days:,} days are levied. "
                                   f"The villages are not glad of it.")
+                    except ValueError as ex:
+                        print(f"  {ex}")
+            elif verb in ("build", "repair", "abandon") and args:
+                if left < WORKS_COST:
+                    print("  no hour remains to give the order.")
+                else:
+                    try:
+                        if verb == "build":
+                            order = A.BeginBuild(
+                                args[0], args[1] if len(args) > 1
+                                else world.court.seat)
+                        elif verb == "repair":
+                            order = A.BeginRepair(args[0])
+                        else:
+                            order = A.AbandonWork(args[0])
+                        evs = commit(order)
+                        spent += WORKS_COST
+                        begun = next((e for e in evs
+                                      if isinstance(e, A.WorkBegun)), None)
+                        if begun:
+                            print(f"  the men are called to {begun.what}: "
+                                  f"{begun.days_needed:,} days of labour.")
+                        off = next((e for e in evs
+                                    if isinstance(e, A.WorkAbandoned)), None)
+                        if off:
+                            print(f"  they go home. {off.days_lost:,} days "
+                                  f"and what they ate stay spent.")
                     except ValueError as ex:
                         print(f"  {ex}")
             elif verb == "dredge" and len(args) == 2:

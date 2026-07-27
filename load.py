@@ -203,6 +203,7 @@ def load_scenario(name: str, seed: int) -> World:
     metal_cfg = cfg.get("metals", {})
 
     house_cfg = tomllib.loads((CONTENT / "house.toml").read_text())
+    works_cfg = tomllib.loads((CONTENT / "works.toml").read_text())
 
     # The cast (spec 6.10). Ages are authored in YEARS and stored in fortnights,
     # because the engine has one time unit and the content should read like a
@@ -296,6 +297,15 @@ def load_scenario(name: str, seed: int) -> World:
             name: tuple((int(x), int(y)) for x, y in points)
             for name, points in house_cfg["tables"].items()},
         house_rules={k: int(v) for k, v in house_cfg["rules"].items()},
+        works_rules={k: int(v) for k, v in works_cfg["rules"].items()
+                     if k not in ("per_1000_days", "season")},
+        works_season=works_cfg["rules"].get("season", ""),
+        works_materials={k: int(v) for k, v
+                         in works_cfg["rules"]["per_1000_days"].items()},
+        works_plans={kind: {**plan, "days": int(plan["days"]),
+                            "condition": int(plan["condition"]),
+                            "capacity": int(plan["capacity"])}
+                     for kind, plan in works_cfg.get("build", {}).items()},
         house_names_f=tuple(cfg.get("house_names_f", [])),
         house_names_m=tuple(cfg.get("house_names_m", [])),
     )

@@ -87,6 +87,13 @@ def advance(world: World) -> tuple[World, list]:
     from engine import institution
     world, e = institution.step(world); events += e
 
+    # A7c: the men on the building site work, or the season is wrong, or the
+    # storehouse cannot feed them, and nothing distinguishes the three (6.21).
+    # After A7b, so a fortnight's decay is never cancelled by the same
+    # fortnight's repair -- the fabric goes first and the men catch up.
+    from engine import works
+    world, e = works.step(world); events += e
+
     court = world.court
     # A8 spoilage (stock sitting through the fortnight), then estate deliveries,
     # then rites take their cut, then A8 rations pay from the remainder.

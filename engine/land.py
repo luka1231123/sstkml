@@ -79,7 +79,11 @@ def labour_supplied(court: Court, per_head: int) -> int:
         group = court.dependents[gid]
         if group.function == "field_labour" or gid in court.at_harvest:
             total += group.size * per_head * group.output_modifier // 1000
-    return total + harvest_hands(court, per_head) + court.corvee_days
+    # The corvée the building site already took is not in the fields. This
+    # subtraction is the entire cost of building (6.21): not the goods, the
+    # hands, billed a year later at the harvest with nothing to connect it to.
+    left = max(0, court.corvee_days - court.works_days)
+    return total + harvest_hands(court, per_head) + left
 
 
 # --- the yield formula -------------------------------------------------------
@@ -226,7 +230,7 @@ def step(world: World) -> tuple[World, list]:
                     climate_sum=0, climate_turns=0, standing_yield=0, pest=1000)
             court = dataclasses.replace(
                 court, previous_harvest=court.last_harvest, last_harvest=total,
-                at_harvest=(), corvee_days=0)
+                at_harvest=(), corvee_days=0, works_days=0)
 
     court = dataclasses.replace(court, estates=estates, stores=stores)
     return dataclasses.replace(world, court=court), events

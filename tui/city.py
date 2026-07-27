@@ -145,8 +145,23 @@ def lower_town(surface: Surface, width: int, base: int) -> None:
              lit=C["faint"], mid=C["faint"], dark=C["faint"], edge=C["faint"])
 
 
+def scaffold(surface: Surface, left: int, top: int, ground: int) -> None:
+    """Poles and rungs over a building the men are out on.
+
+    Drawn in the two-column gap either side of the slot, so it never eats a
+    column of the building itself, and rung by rung across it. A player who
+    ordered a repair four fortnights ago and has forgotten should be able to
+    see, without reading anything, that his men are still up there.
+    """
+    for y in range(top, ground):
+        surface.put(left - 1, y, "│", C["ash"], C["ink"])
+        surface.put(left + SLOT, y, "│", C["ash"], C["ink"])
+    for y in range(top + 1, ground, 3):
+        surface.text(left - 1, y, "┄" * (SLOT + 2), C["ash"], C["ink"])
+
+
 def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
-            width: int) -> None:
+            width: int, under_work: frozenset = frozenset()) -> None:
     """The city, standing or not, on one line of ground.
 
     Bottom-aligned so a tall temple and a low channel share a horizon. Buildings
@@ -164,6 +179,8 @@ def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
         art.occlude(surface, left, ground - len(rows), rows)
         art.draw(surface, left, ground - len(rows), rows,
                  lit=lit, mid=mid, dark=dark, edge=edge)
+        if inst["id"] in under_work:
+            scaffold(surface, left, ground - len(rows), ground)
 
         # The ground each thing stands in. A quay in earth reads as a mistake.
         earth = art.GROUND.get(inst["kind"], "▒")
@@ -193,7 +210,7 @@ def _divider(surface: Surface, x: int, y: int, width: int) -> None:
 
 
 def compose(b: dict, history: dict[str, list[int]] | None = None,
-            width: int = 96, height: int = 32) -> Screen:
+            width: int = 96, height: int = 36) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE CITY",
                 note="[esc] close", drop=False)
@@ -203,11 +220,14 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
 
+    projects = b.get("projects") or []
+    under_work = frozenset(p["institution"] for p in projects if p["institution"])
+
     ground = 14
     sky(surface, b, width, horizon=ground - 6)
     lower_town(surface, width, base=ground - 7)
     if institutions:
-        skyline(surface, 3, ground, institutions, width)
+        skyline(surface, 3, ground, institutions, width, under_work)
     else:
         surface.text(3, ground - 1,
                      "this court holds nothing that could fall down.",
@@ -219,9 +239,10 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
               "  what stands             it              he has been saying"
               "   now   kept by", fg=C["bone"], bg=C["faint"])
 
+    works_top = height - 9
     y = table + 2
     for inst in institutions:
-        if y >= height - 5:
+        if y >= works_top - 1:
             break
         # Vacant posts are marked with a word, never with a colour alone.
         vacancy = "" if inst["head"] else "no one minds it"
@@ -244,6 +265,24 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
                      C["blood"] if vacancy else C["dim"], C["ink"])
         y += 1
 
+    # Work in hand, stated and not judged. Three lines at most: the rest is on
+    # the WORKS screen, which is where anything can be done about it.
+    style.bar(surface, 2, works_top, width - 4,
+              "  the men are out on", fg=C["bone"], bg=C["faint"])
+    if not projects:
+        surface.text(3, works_top + 1, "nothing. the city is as you found it.",
+                     C["ash"], C["ink"])
+    for index, project in enumerate(projects[:3]):
+        row = works_top + 1 + index
+        surface.text(3, row, project["what"][:26], C["clay"], C["ink"])
+        surface.text(31, row, "making it whole" if project["repair"]
+                     else "putting it up", C["dim"], C["ink"])
+        share = project["days_done"] * 12 // max(1, project["days_needed"])
+        style.meter(surface, 48, row, 12, share, fg=C["barley"])
+        surface.text(62, row,
+                     f"{project['days_done']:,} of {project['days_needed']:,} days",
+                     C["dim"], C["ink"])
+
     foot = height - 4
     _divider(surface, 3, foot, width - 6)
     surface.text(3, foot + 1,
@@ -251,13 +290,14 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
                  "× is a post nobody holds."[: width - 6],
                  C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
-              " [1-9] go and look for yourself — one hour   [esc] close",
+              " [1-9] go and look for yourself — one hour"
+              "   [n] the works   [esc] close",
               fg=C["clay"], bg=C["lapis"])
     return surface.freeze()
 
 
 def detail(b: dict, inst: dict, history: list[int] | None = None,
-           width: int = 68, height: int = 20) -> Screen:
+           width: int = 68, height: int = 22) -> Screen:
     """One institution, opened: the building itself, and what it can do."""
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     document._frame(surface, inst["name"].upper(), "[esc] close")
@@ -295,8 +335,23 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
             surface.text(26, y, f"{qty} {good}", C["clay"], C["ink"])
             y += 1
     if history:
-        surface.text(4, height - 4, "what he has been saying",
+        surface.text(4, height - 6, "what he has been saying",
                      C["dim"], C["ink"])
-        surface.text(4, height - 3, sparkline(history, width - 10),
+        surface.text(4, height - 5, sparkline(history, width - 10),
                      C["sand"], C["ink"])
+
+    # The one verb on this screen. What it costs is stated in days, because
+    # days are what it costs -- the grain is a consequence and the player can
+    # work it out on the WORKS screen if he cares to.
+    project = next((p for p in (b.get("projects") or [])
+                    if p["institution"] == inst["id"]), None)
+    if project is not None:
+        surface.text(4, height - 3,
+                     f"the men are out on it: {project['days_done']:,} of "
+                     f"{project['days_needed']:,} days", C["barley"], C["ink"])
+    elif inst["condition"] < 1000:
+        want = (1000 - inst["condition"]) * b.get("repair_days_per_point", 3)
+        style.bar(surface, 2, height - 2, width - 4,
+                  f" [r] set the men to it — about {want:,} days of corvée",
+                  fg=C["clay"], bg=C["lapis"])
     return surface.freeze()

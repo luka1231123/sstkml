@@ -196,6 +196,32 @@ class Institution:
 
 
 @dataclasses.dataclass(frozen=True)
+class Project:
+    """Work in hand: a thing being built, or a thing being made whole (6.21).
+
+    Days come out of the corvée, which is the same pool of hands the fields
+    draw on, so every day here is a day the estates did not get and the bill
+    arrives at the harvest a year later. Materials are consumed **as the work
+    proceeds**, never at completion: an abandoned project is a loss and not a
+    refund, and that is the whole reason building is a decision.
+
+    `institution` names what is being repaired, or is empty on a build, in
+    which case `kind` and `place` say what will stand there when it is done.
+    """
+    id: str
+    institution: str          # InstitutionId being repaired, or "" on a build
+    kind: str                 # what is going up (or what is being made whole)
+    place: PlaceId
+    name: str                 # what it will be called
+    days_needed: int
+    days_done: int = 0
+    condition_target: int = 0     # what it stands at when finished
+    capacity: int = 0             # only used on a build
+    started_turn: int = 0
+    spent: tuple[tuple[GoodId, int], ...] = ()   # eaten so far, never returned
+
+
+@dataclasses.dataclass(frozen=True)
 class Rite:
     id: str
     fortnight: int
@@ -253,6 +279,12 @@ class Court:
     # one because a flat line of reassurance is the thing worth drawing.
     institution_history: Mapping[str, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
+    # Work in hand (6.21), and the days of this season's corvée already given
+    # to it. `labour_supplied` subtracts those days from the fields, which is
+    # the whole cost of building: not the goods, the hands.
+    projects: Mapping[str, "Project"] = dataclasses.field(default_factory=dict)
+    works_days: int = 0
+    project_seq: int = 0
     # 24 fortnights of stock readings per good, for the STORES sparkline (9.4).
     store_history: Mapping[GoodId, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
@@ -526,6 +558,13 @@ class World:
     house_tables: Mapping[str, tuple[tuple[int, int], ...]] = dataclasses.field(
         default_factory=dict)
     house_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # Building and repair (6.21), authored in content/works.toml.
+    works_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    works_season: str = ""       # the named span in `season` mudbrick goes up in
+    works_materials: Mapping[GoodId, int] = dataclasses.field(
+        default_factory=dict)
+    works_plans: Mapping[str, Mapping[str, int]] = dataclasses.field(
+        default_factory=dict)
     # Name pools for children born in play, so a new person is still an
     # authored name rather than a generated identifier.
     house_names_f: tuple[str, ...] = ()

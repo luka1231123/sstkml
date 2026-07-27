@@ -1,0 +1,95 @@
+# Building and repair (spec 6.21). What a thing costs to put up, and what it
+# costs to buy back the years nobody minded it.
+#
+# Everything here is in **days of the corvée** and in goods eaten as the work
+# proceeds. The goods are the real surprise: a building site is four hundred men
+# who have to be fed, so the material cost of a wall is grain — the same grain
+# the granary is holding against the year the harvest fails. Building is
+# therefore a bet placed with your food, resolved a year and a half later.
+
+[rules]
+# What one project can absorb in a fortnight. The corvée cap is 6,000 days a
+# season (content/land.toml), so a single project running all four working
+# fortnights takes about a quarter of what the crown can call up in a year.
+days_per_fortnight = 400
+# Days of labour to buy back one point of condition. A ruin at 300 is 2,100
+# days to make whole: five fortnights of every hand you have.
+repair_days_per_point = 3
+# The season mudbrick can go up in, named out of the scenario's [season] table.
+# Work in the rains is work washed away, so nothing happens outside it and
+# nothing says so — the number simply does not move.
+season = "low_water"
+
+# Goods eaten per thousand days worked, whatever the project. Men on a wall eat
+# the same as men on a quay.
+#
+# Grain and copper only, and the omission is deliberate. Every good on this list
+# is a good that can stop a project dead, and oil has no source in the game
+# before trade (M13) -- so a rate of forty a thousand, trivial on paper, meant
+# that every long run reached a fortnight where the wall stopped forever for
+# want of a lamp. A material cost the player cannot resolve is not difficulty,
+# it is a wall in the road. Grain he can grow; copper comes from Alashiya and
+# running out of it is a story.
+[rules.per_1000_days]
+grain = 5000
+copper = 60
+
+# --- what can be built, and what it is worth new ------------------------------
+#
+# `days` is the whole job. `condition` is what it stands at the day it opens:
+# new work is good work, but nothing in this world is ever a perfect thousand.
+# `capacity` is what it could do whole and fed (6.18).
+
+[build.granary]
+name = "a granary"
+days = 900
+condition = 900
+capacity = 1000
+
+[build.walls]
+name = "a circuit of walls"
+days = 4000
+condition = 900
+capacity = 1000
+
+[build.workshop]
+name = "a workshop"
+days = 1200
+condition = 900
+capacity = 400
+
+[build.archive]
+name = "a tablet house"
+days = 700
+condition = 900
+capacity = 1000
+
+[build.harbour]
+name = "a quay"
+days = 2600
+condition = 850
+capacity = 800
+
+[build.temple]
+name = "a temple"
+days = 3000
+condition = 900
+capacity = 1000
+
+[build.canal]
+name = "a canal"
+days = 1800
+condition = 850
+capacity = 1000
+
+[build.road]
+name = "a road"
+days = 1500
+condition = 850
+capacity = 1000
+
+[build.garrison]
+name = "a garrison"
+days = 1100
+condition = 900
+capacity = 600

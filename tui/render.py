@@ -244,6 +244,9 @@ def land_screen(b: dict) -> str:
         lines.append(f"    ordered to the fields: {who}")
     if land["corvee_days"]:
         lines.append(f"    corvee raised this season: {land['corvee_days']:,} days")
+        if land.get("works_days"):
+            lines.append(f"    of which given to the works: "
+                         f"{land['works_days']:,} days")
     lines.append("")
     for estate in land["estates"]:
         note = ""
@@ -525,6 +528,14 @@ def events_lines(events, court) -> list[str]:
                 f"  The threshing floor is counted: {fmt_good('grain', e.qa)}.")
         elif isinstance(e, A.CorveeRaised):
             out.append(f"  The levy is called: {e.days:,} days of labour.")
+        # Finishing is announced; progress is not, and a fortnight in which the
+        # men did nothing is not announced either. A building site is a thing
+        # you can walk to and look at, so the fortnight report has no business
+        # narrating it (D19). The opening of a new granary, on the other hand,
+        # is a day the city keeps.
+        elif isinstance(e, A.WorkFinished):
+            out.append(f"  {e.what} is finished." if not e.built
+                       else f"  {e.what} stands open. Nobody is over it yet.")
         # The house, unlike the melt ledger, is announced. A death in the
         # family is not a number on a page nobody reads; it is the loudest
         # thing that happens in a fortnight.

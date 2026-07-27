@@ -516,6 +516,58 @@ class OathLapsed:
     reason: str
 
 
+# --- M12: building and repair (6.21) ------------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class BeginBuild:
+    """Put something up that is not there. Days, materials, and a season."""
+    kind: str
+    place: str
+
+
+@dataclasses.dataclass(frozen=True)
+class BeginRepair:
+    """Buy back the years nobody minded it. Cheaper than building, and nothing
+    reminds you that it wants doing."""
+    institution: str
+
+
+@dataclasses.dataclass(frozen=True)
+class AbandonWork:
+    """Call the men off. What has been eaten stays eaten (6.21)."""
+    project: str
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkBegun:
+    project: str
+    what: str
+    days_needed: int
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkProgressed:
+    project: str
+    days: int
+    days_done: int
+    days_needed: int
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkFinished:
+    project: str
+    institution: str
+    what: str
+    built: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkAbandoned:
+    project: str
+    what: str
+    days_lost: int
+
+
 # --- Registry for log round-tripping -----------------------------------------
 
 _TYPES = {
@@ -525,6 +577,8 @@ _TYPES = {
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
         BronzeSmelted, BronzeMelted, WorkshopDemandMet, InstitutionDecayed,
+        BeginBuild, BeginRepair, AbandonWork, WorkBegun, WorkProgressed,
+        WorkFinished, WorkAbandoned,
         MarryAbroad, ConsultDiviner, SuppressOmen, DefyOmen, SwearOath,
         Conceived, ChildBorn, HouseMemberDied, RulerSucceeded,
         SuccessionFailed, MarriedAbroad, OmenTaken, OmenSuppressed,

@@ -83,3 +83,35 @@ turns the payer still ends *worse* than the miser, because tin always runs out
 around turn 51 and cannot be replaced. Paying the forge cannot be made the
 better play until tin can be **bought** — which is M13's trade network. Do not
 re-tune attrition to paper over this; the chain is meant to be closed by trade.
+
+## M12 #10 — building and repair (6.21), done
+
+`Project`, `engine/works.py`, phase A7c, `content/works.toml`, THE WORKS window,
+`[r]` on an institution, `build` / `repair` / `abandon` in command mode.
+
+Days come out of `Court.corvee_days` through `Court.works_days`, which
+`land.labour_supplied` subtracts — a wall raised in the sowing fortnights is a
+wall raised out of next year's grain. Materials are what the men eat, charged
+per thousand days worked. Work only happens in `low_water`, and out of season,
+out of corvée and out of grain all look identical from the palace.
+
+Measured, seed 8814402919, a ruler who commissions a circuit of walls at Ugarit
+and calls up 6,000 days every year: **finished in the fifth regnal year**, two
+and a half low-water seasons, at a cost of 20,000 qa of grain, 240 of copper,
+and a visibly smaller harvest in the year he did the most of it.
+
+### Two things found on the way, one fixed and one not
+
+**Fixed: oil could stop a wall forever.** The first material rate included oil
+at 40 a thousand — trivial on paper. But oil has no source in the game before
+trade (M13), so every long run reached a fortnight where the project stopped
+dead for want of a lamp and never restarted. A material cost the player cannot
+resolve is not difficulty, it is a wall in the road. Grain and copper only now.
+
+**Not fixed, and not mine to fix here: oil trends to zero in every long run.**
+The temple's upkeep is 10 oil a fortnight and nothing anywhere produces any. By
+about the fourth regnal year the stock is nought, the temple's upkeep is
+permanently unmet, and it takes the +2 unpaid-upkeep decay for the rest of the
+run with no way for the player to stop it. This is the same shape as the tin
+problem and it wants the same answer — **M13 trade** — so it is written down
+here rather than papered over with a production term that does not exist.

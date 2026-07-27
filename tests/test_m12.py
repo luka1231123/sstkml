@@ -328,7 +328,7 @@ def test_the_city_screen_stays_inside_its_frame() -> None:
 
     b = project(_world(12))
     lines = plain_text(city.compose(b)).splitlines()
-    assert len(lines) == 32
+    assert len(lines) == 36
     for line in lines:
         assert len(line) == 96
         assert line[0] in "╔║╚" and line[-1] in "╗║╝", repr(line[-20:])
@@ -362,8 +362,8 @@ def test_the_detail_window_stays_inside_its_frame() -> None:
     b = project(_world(20))
     for inst in b["institutions"]:
         lines = plain_text(
-            city.detail(b, inst, inst.get("history"), 68, 20)).splitlines()
-        assert len(lines) == 20
+            city.detail(b, inst, inst.get("history"), 68, 22)).splitlines()
+        assert len(lines) == 22
         for line in lines:
             assert len(line) == 68 and line[0] in "╔║╚"
 
@@ -408,3 +408,162 @@ def test_nothing_drawn_reaches_the_list_below_it() -> None:
     for line in lines[16:]:
         # Not the blocks: the sparkline is made of those. The drawn glyphs.
         assert not (set(line) & set("▟▙≈╲╱▲∩◘╫▤▩")), repr(line)
+
+
+# --- building and repair (6.21) -----------------------------------------------
+#
+# The load-bearing claim: a building site is not a purchase. It takes the hands
+# that would have brought in the harvest, it eats as it goes, and calling it off
+# gets nothing back.
+
+def _working_world(turns: int = 14, corvee: int = 6000):
+    """A world in the low-water fortnights with the corvée called up."""
+    from engine import works
+
+    world = _world(turns)
+    assert works.working_season(world), "these tests need a working season"
+    world, _ = apply(world, A.RaiseCorvee(corvee))
+    return world
+
+
+def test_a_building_site_takes_the_hands_the_fields_wanted() -> None:
+    """The whole cost of building (6.21). Not the goods -- the hands."""
+    from engine.land import labour_supplied
+
+    idle = _working_world()
+    busy, _ = apply(idle, A.BeginRepair("walls_seat"))
+    busy, _ = advance(busy)
+    per_head = busy.land_rules["labour_days_per_head"]
+    assert busy.court.works_days > 0
+    after, _ = advance(idle)
+    assert labour_supplied(busy.court, per_head) < labour_supplied(
+        after.court, per_head)
+
+
+def test_the_men_eat_as_they_work_and_calling_them_off_returns_nothing() -> None:
+    world, _ = apply(_working_world(), A.BeginRepair("walls_seat"))
+    before = world.court.stores["grain"]
+    world, _ = advance(world)
+    project = next(iter(world.court.projects.values()))
+    assert project.spent, "a fortnight of work must have eaten something"
+    eaten = dict(project.spent)["grain"]
+    world, events = apply(world, A.AbandonWork(project.id))
+    assert not world.court.projects
+    assert any(isinstance(e, A.WorkAbandoned) for e in events)
+    # The grain is gone. Nothing anywhere gives it back.
+    spent_total = before - world.court.stores["grain"]
+    assert spent_total >= eaten
+    world, _ = advance(world)
+    assert world.court.stores["grain"] <= before
+
+
+def test_nothing_happens_out_of_season_and_nothing_says_so() -> None:
+    """Mudbrick does not go up in the rains, and no event explains the
+    stillness. The number not moving is the whole message (D19)."""
+    from engine import works
+
+    world = _working_world()
+    # A circuit of walls: 4,000 days, far more than one season can finish, so
+    # the project is certain to still be in hand when the rains come.
+    world, _ = apply(world, A.BeginBuild("walls", "seat"))
+    # Walk to a fortnight outside the working span.
+    for _ in range(24):
+        world, events = advance(world)
+        if not works.working_season(world):
+            break
+    else:
+        raise AssertionError("no closed season found in a whole year")
+    done_before = next(iter(world.court.projects.values())).days_done
+    world, events = advance(world)
+    still = world.court.projects["work1"]
+    assert still.days_done == done_before
+    assert not [e for e in events if isinstance(e, A.WorkProgressed)]
+
+
+def test_a_repair_does_not_arrive_at_a_thousand() -> None:
+    """The fabric goes on going while the men work, and the player eats the
+    difference. That is the cost of having left it so long."""
+    world, _ = apply(_working_world(), A.BeginRepair("walls_seat"))
+    for _ in range(12):
+        world, _ = advance(world)
+        if not world.court.projects:
+            break
+    walls = world.court.institutions["walls_seat"]
+    assert walls.condition > 900, "the repair must actually repair"
+    assert walls.condition < 1000, "and must not undo the decay it took to do"
+
+
+def test_something_built_stands_empty_until_somebody_is_placed_over_it() -> None:
+    world, _ = apply(_working_world(), A.BeginBuild("granary", "ma_hadu"))
+    for _ in range(6):
+        world, _ = advance(world)
+        if not world.court.projects:
+            break
+    built = [i for i in world.court.institutions.values()
+             if i.place == "ma_hadu" and i.kind == "granary"]
+    assert built, "the granary never opened"
+    assert built[0].head == "" and built[0].group == ""
+    assert built[0].condition < 1000
+
+
+def test_the_work_cannot_outrun_the_corvee() -> None:
+    world = _working_world(corvee=300)
+    world, _ = apply(world, A.BeginRepair("walls_seat"))
+    world, _ = advance(world)
+    assert next(iter(world.court.projects.values())).days_done == 300
+    world, _ = advance(world)
+    assert next(iter(world.court.projects.values())).days_done == 300, (
+        "the pool is empty; the men go home until more are called up")
+
+
+def test_repairing_what_is_whole_is_refused() -> None:
+    world = _with_condition(_working_world(), "walls_seat", 1000)
+    try:
+        apply(world, A.BeginRepair("walls_seat"))
+    except ValueError:
+        return
+    raise AssertionError("a whole wall wants nothing doing")
+
+
+def test_the_season_closing_frees_the_hands_again() -> None:
+    """`works_days` is a claim on this season's corvée, so it resets with it."""
+    world, _ = apply(_working_world(), A.BeginRepair("walls_seat"))
+    for _ in range(24):
+        world, _ = advance(world)
+        if world.court.corvee_days == 0:
+            break
+    assert world.court.works_days == 0
+
+
+def test_the_new_orders_survive_a_save() -> None:
+    for action in (A.BeginBuild("granary", "seat"), A.BeginRepair("walls_seat"),
+                   A.AbandonWork("work1")):
+        assert A.from_dict(A.to_dict(action)) == action
+
+
+def test_the_works_screen_stays_inside_its_frame() -> None:
+    from tui import works as works_page
+    from tui.grid import plain_text
+
+    world, _ = apply(_working_world(), A.BeginRepair("walls_seat"))
+    world, _ = advance(world)
+    b = project(world)
+    for pick in ("", "a"):
+        lines = plain_text(works_page.compose(b, pick, 82, 32)).splitlines()
+        assert len(lines) == 32
+        for line in lines:
+            assert len(line) == 82 and line[0] in "╔║╚"
+    assert "call them off" in plain_text(works_page.compose(b, "a", 82, 32))
+
+
+def test_a_building_under_repair_wears_its_scaffolding() -> None:
+    from tui import city
+    from tui.grid import plain_text
+
+    world = _working_world()
+    quiet = plain_text(city.compose(project(world)))
+    world, _ = apply(world, A.BeginRepair("walls_seat"))
+    world, _ = advance(world)
+    busy = plain_text(city.compose(project(world)))
+    assert "┄" not in quiet and "┄" in busy
+    assert "the men are out on" in busy

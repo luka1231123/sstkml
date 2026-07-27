@@ -900,3 +900,31 @@ picture now, which is where a lie belongs, and `inspect` is what buys the truth.
 The one invariant worth a test: **weathering is monotone in condition**, counted
 by glyph weight rather than eyeballed. A step that swapped a glyph for a heavier
 one would read, at a glance, as a building being repaired.
+
+## D42 — building costs hands, and the hands are the harvest's
+
+`Project` (6.21) draws its days from `Court.corvee_days` — the same seasonal
+pool `land.labour_supplied` feeds the estates from — through a second counter,
+`Court.works_days`, that the fields subtract. That subtraction is the entire
+cost of building. Not the goods: the hands, billed a year later at a harvest
+with nothing to connect it to.
+
+Three consequences, all deliberate:
+
+**Materials are what the men eat.** One rate for every project, charged per
+thousand days worked, and the biggest line in it is grain. A building site
+competes with the granary directly, which is what makes a wall a bet placed with
+your food.
+
+**Nothing is refunded.** Calling the men off returns the unspent days to the
+season's pool and nothing else. What they ate is eaten. A project you can cancel
+cleanly is a purchase, not a decision.
+
+**Nothing explains a fortnight in which the number did not move.** Out of
+season, out of corvée, and out of grain look identical from the palace, and the
+fortnight report says nothing about any of them (D19). Only `WorkFinished` is
+announced, because the opening of a granary is a day the city keeps.
+
+A repair is priced when the order is given and never revised. The fabric decays
+while the men work, so a repair commissioned at 400 lands near 950 rather than
+at 1000. That gap is not a rounding error, it is the interest on having left it.

@@ -33,10 +33,12 @@ from engine.tick import advance
 from load import load_scenario
 from session import new_seed
 from ai import counsel as ai_counsel, librarian
+from tui import works as works_page
 from tui import (altar, archive, city, composer, counsel, document, hall,
                  help as help_page, render, worldmap)
 from tui.grid import Screen
 
+ORDER_COST = 1
 READ_COST = 2
 REPLY_COST = 2
 OMEN_COST = 2
@@ -68,7 +70,7 @@ ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
     "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
     "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
     "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
-    "y": ("city", "The City", (96, 32), "on_city_key"),
+    "y": ("city", "The City", (96, 36), "on_city_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -110,6 +112,7 @@ class Game:
         # is session state: none of it is a fact about the kingdom, so none of
         # it is logged and a replay is unaffected.
         self.desk: dict | None = None
+        self.works_pick = ""          # a work in hand, awaiting [x]
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
         self.counsel_typing = False
@@ -181,12 +184,14 @@ class Game:
         if key == "world":
             return worldmap.compose(b, 86, 30)
         if key == "city":
-            return city.compose(b, None, 96, 32)
+            return city.compose(b, None, 96, 36)
+        if key == "works":
+            return works_page.compose(b, self.works_pick, 82, 32)
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
             if inst is not None:
-                return city.detail(b, inst, inst.get("history"), 68, 20)
+                return city.detail(b, inst, inst.get("history"), 68, 22)
         if key == "counsel":
             return counsel.compose(b, self.counsel_said, self.hours,
                                    self.counsel_typed, self.counsel_typing,
@@ -464,6 +469,68 @@ class Game:
                     f"He reads the liver and says: {taken.reported}.")
             self.repaint()
 
+    def open_works(self) -> None:
+        """The works window. Free to look at: the hours go on the orders."""
+        window = self.app.window(
+            "works", "The Works", 82, 32,
+            on_key=self.on_works_key, on_close=lambda: self.app.close("works"))
+        self.repaint()
+        window.focus()
+
+    def on_works_key(self, event) -> None:
+        """Commission, or call off. Both are one hour and neither is confirmed
+        twice -- except calling off, which is two keys because what the men
+        have eaten does not come back (6.21)."""
+        if event.keysym == "Escape":
+            self.works_pick = ""
+            self.app.close("works")
+            return
+        char = (event.char or "").lower()
+        b = self.belief
+        projects = b.get("projects") or []
+        plans = b.get("plans") or []
+
+        if char in works_page.PICK:
+            index = works_page.PICK.index(char)
+            if index < len(projects):
+                self.works_pick = char
+                self.repaint()
+            return
+        if char == "x" and self.works_pick:
+            index = works_page.PICK.index(self.works_pick)
+            if index < len(projects):
+                self.do(A.AbandonWork(projects[index]["id"]), ORDER_COST)
+            self.works_pick = ""
+            self.repaint()
+            return
+        if char in works_page.ORDER:
+            index = works_page.ORDER.index(char)
+            if index < len(plans):
+                self.order(A.BeginBuild(plans[index]["kind"],
+                                        b.get("seat", "seat")))
+            return
+
+    def on_institution_key(self, event, key: str, institution: str) -> None:
+        """One verb: [r], set the men to it. Everything else closes the window.
+
+        The order is given here rather than on the CITY list because repair is
+        a thing you decide about *one* building, standing in front of it, and
+        the list is for comparing."""
+        if event.keysym == "Escape":
+            self.app.close(key)
+            return
+        if (event.char or "").lower() == "r":
+            self.order(A.BeginRepair(institution))
+
+    def order(self, action) -> None:
+        """An order the engine may refuse. A refusal is silent, as everywhere:
+        the men do not appear and the player works out why (D19)."""
+        try:
+            self.do(action, ORDER_COST)
+        except ValueError:
+            pass
+        self.repaint()
+
     def on_city_key(self, event) -> None:
         """Numbers walk down to the thing and look at it. An hour, every time.
 
@@ -474,6 +541,9 @@ class Game:
             self.app.close("city")
             return
         char = event.char or ""
+        if char.lower() == "n":
+            self.open_works()
+            return
         institutions = self.belief.get("institutions", [])
         if char.isdigit() and char != "0":
             index = int(char) - 1
@@ -485,8 +555,9 @@ class Game:
                         INSPECT_COST)
             key = f"institution:{inst['id']}"
             window = self.app.window(
-                key, inst["name"], 68, 20,
-                on_key=lambda e, k=key: self.on_tablet_key(e, k),
+                key, inst["name"], 68, 22,
+                on_key=lambda e, k=key, i=inst["id"]: self.on_institution_key(
+                    e, k, i),
                 on_close=lambda k=key: self.app.close(k))
             self.repaint()
             window.focus()

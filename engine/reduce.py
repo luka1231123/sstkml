@@ -98,6 +98,14 @@ def apply(world: World, action) -> tuple[World, list]:
                               unrest=unrest),
                 [A.CorveeRaised(days, unrest - world.court.unrest)])
 
+    if isinstance(action, (A.BeginBuild, A.BeginRepair, A.AbandonWork)):
+        from engine import works
+        if isinstance(action, A.BeginBuild):
+            return works.begin_build(world, action)
+        if isinstance(action, A.BeginRepair):
+            return works.begin_repair(world, action)
+        return works.abandon(world, action)
+
     if isinstance(action, A.DredgeCanal):
         from engine.core import in_range
         estate = world.court.estates.get(action.estate_id)
