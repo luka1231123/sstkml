@@ -877,3 +877,26 @@ that were paperwork are cut.**
 **Kept and given teeth:** `swear`. It is inert today because nothing pursues a
 broken oath; it becomes the spine at M14, when the clause that says two hundred
 men is the reason Carchemish comes or does not.
+
+## D41 — the city is drawn, and it is drawn from the lie
+
+A table of conditions with a sparkline each was legible and dead. The CITY
+screen now stands its institutions up as buildings on one ground line, and
+`art.weather` erodes each drawing to match its condition: dressed stone at 800,
+hollow at 400, a dithered footprint at 100. Holes are punched on a fixed
+`(x, y)` lattice, never at random — the same ruin every time, so repairing a
+thing brings it back the way it went.
+
+This is the fourth station to earn art after the three in D34, on a stricter
+test than "it would look nice": **here the picture is the information.** A
+player who never reads a figure on this screen can still see which quarter of
+his city is going, which is exactly the failure mode 6.18 risks — two hidden
+multipliers and a flattering head add up to a system that reads as random.
+
+And it draws the *reported* condition, not the true one. The harbourmaster in
+arrears says his quay is sound, so the quay is drawn sound. The lie is in the
+picture now, which is where a lie belongs, and `inspect` is what buys the truth.
+
+The one invariant worth a test: **weathering is monotone in condition**, counted
+by glyph weight rather than eyeballed. A step that swapped a glyph for a heavier
+one would read, at a glance, as a building being repaired.
