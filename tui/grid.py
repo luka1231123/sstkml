@@ -75,6 +75,15 @@ _ASCII_FOLD = {
     **{block: plain for block, plain in zip(BLOCKS, BLOCKS_ASCII)},
     "·": ".", "—": "-", "–": "-", "…": ".", "▓": "#", "░": ".", "▒": "+",
     "•": "*", "→": ">", "←": "<", "↑": "^", "↓": "v", "×": "x",
+    # The drawn things (tui/art.py). Quadrants and half blocks lose their
+    # handedness here; what survives is the silhouette, which is the part
+    # carrying the meaning.
+    "▟": "/", "▛": "/", "▗": ".", "▘": "'", "▚": "%", "▐": "|", "▲": "^",
+    "▀": "-",
+    "▙": "\\", "▜": "\\", "▖": ".", "▝": "'", "▞": "%", "▌": "|",
+    "◢": "/", "◤": "/", "◣": "\\", "◥": "\\",
+    "≈": "~", "≡": "=", "▪": "*", "▫": "o", "∩": "n", "◘": "o", "╫": "+",
+    "▤": "#", "▩": "#", "╱": "/", "╲": "\\",
 }
 
 

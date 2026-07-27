@@ -68,7 +68,7 @@ ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
     "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
     "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
     "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
-    "y": ("city", "The City", (96, 30), "on_city_key"),
+    "y": ("city", "The City", (96, 32), "on_city_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -181,7 +181,7 @@ class Game:
         if key == "world":
             return worldmap.compose(b, 86, 30)
         if key == "city":
-            return city.compose(b, None, 96, 30)
+            return city.compose(b, None, 96, 32)
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)

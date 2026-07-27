@@ -97,6 +97,54 @@ def _short(inst: dict, kinds: list[str]) -> str:
     return word[:SLOT]
 
 
+# Where the birds are. Fixed, like everything else here: a scatter that is the
+# same scatter every fortnight reads as a place, where one that moved would read
+# as an animation nobody asked for.
+BIRDS = ((13, 4), (17, 3), (22, 4), (40, 3), (45, 4))
+
+
+def sky(surface: Surface, b: dict, width: int, horizon: int) -> None:
+    """The moon, some birds, and a haze on the hills behind the lower town.
+
+    The moon is the one decoration on this screen that is also information: the
+    month is lunar and the turn is half of one, so a waxing moon is the former
+    half of Ayyaru and a waning moon the latter. Nothing says so. A player who
+    never notices loses nothing; a player who does has a clock he never has to
+    read.
+    """
+    latter = "latter" in b.get("date", "")
+    moon = art.MOON_WANING if latter else art.MOON_WAXING
+    art.draw(surface, width - 12, 2, moon,
+             lit=C["bone"], mid=C["sand"], dark=C["faint"], edge=C["faint"])
+
+    for bx, by in BIRDS:
+        if bx < width - 14:
+            surface.text(bx, by, art.BIRD, C["ash"], C["ink"])
+
+    for row, cloud in enumerate(art.CLOUD):
+        surface.text(width - 34, 2 + row, cloud, C["faint"], C["ink"])
+
+    # The far shore the lower town stands on. Drawn under the band, so the town
+    # has a ground of its own and does not float above the palace quarter.
+    surface.text(3, horizon, "▁" * (width - 6), C["faint"], C["ink"])
+
+
+def lower_town(surface: Surface, width: int, base: int) -> None:
+    """The rest of Ugarit: everything that is not a great house, drawn faint.
+
+    Two thirds of the screen used to be empty field. The palace quarter standing
+    alone on bare ground read as six objects in a diagram; standing in front of
+    a town it reads as the top of something. Nothing here is clickable and
+    nothing here is simulated -- this is the only purely decorative element on
+    the screen, and it is drawn faint enough to stay behind the six that are not.
+    """
+    band = art.town(width - 6, offset=0)
+    # One colour, and the dimmest that still reads: a distant thing drawn with
+    # the foreground's range of light and shade competes with the foreground.
+    art.draw(surface, 3, base - len(band) + 1, band,
+             lit=C["faint"], mid=C["faint"], dark=C["faint"], edge=C["faint"])
+
+
 def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
             width: int) -> None:
     """The city, standing or not, on one line of ground.
@@ -113,6 +161,7 @@ def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
         rows = art.weather(
             art.BUILDINGS.get(inst["kind"], art.HOVEL), inst["condition"])
         lit, mid, dark, edge = HUES.get(inst["kind"], DEFAULT_HUE)
+        art.occlude(surface, left, ground - len(rows), rows)
         art.draw(surface, left, ground - len(rows), rows,
                  lit=lit, mid=mid, dark=dark, edge=edge)
 
@@ -136,8 +185,15 @@ def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
                          C["blood"], C["ink"])
 
 
+def _divider(surface: Surface, x: int, y: int, width: int) -> None:
+    """A rule with beads on it. A plain line is furniture; this is a border."""
+    surface.text(x, y, "─" * width, C["faint"], C["ink"])
+    for column in range(0, width, 11):
+        surface.text(x + column, y, "◦", C["ash"], C["ink"])
+
+
 def compose(b: dict, history: dict[str, list[int]] | None = None,
-            width: int = 96, height: int = 30) -> Screen:
+            width: int = 96, height: int = 32) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE CITY",
                 note="[esc] close", drop=False)
@@ -147,7 +203,9 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
 
-    ground = 12
+    ground = 14
+    sky(surface, b, width, horizon=ground - 6)
+    lower_town(surface, width, base=ground - 7)
     if institutions:
         skyline(surface, 3, ground, institutions, width)
     else:
@@ -187,7 +245,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         y += 1
 
     foot = height - 4
-    style.rule(surface, 3, foot, width - 6)
+    _divider(surface, 3, foot, width - 6)
     surface.text(3, foot + 1,
                  "the figure is what he reports; ! is one you went and saw; "
                  "× is a post nobody holds."[: width - 6],

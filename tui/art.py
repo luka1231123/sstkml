@@ -309,71 +309,71 @@ LAMP = (
 QUAY = (
     "    ▐▌       ",
     "    ▐█▙      ",
-    "    ▐███▙    ",
-    "   ▄▟█████▙  ",
+    "   ╱▐███▙    ",
+    "  ╱▄▟█████▙  ",
     " ▄█████████▙ ",
-    "▟█▓▒░▒░▒░▒▓█▙",
-    "█████████████",
+    "▟█≡≡≡≡≡≡≡≡▓█▙",
+    "██▤██▤██▤██▤█",
 )
 
 SILOS = (
     "   ▄▄▄▄▄▄▄   ",
     "  ▟███████▙  ",
     " ▐█▀▀███▀▀█▌ ",
-    " ▐█ ░███░ █▌ ",
+    " ▐█ ▩███▩ █▌ ",
     " ▐█▄▄███▄▄█▌ ",
-    "▐███████████▌",
-    "█████████████",
+    "▐███≡≡≡≡≡███▌",
+    "███▪██∩██▪███",
 )
 
 RAMPART = (
     "█▀█▀█▀█▀█▀█▀█",
-    "█████████████",
+    "█▪███▪███▪███",
     "███▄▄▄▄▄▄▄███",
     "███▛▀▀▀▀▀▜███",
     "███▌░░░░░▐███",
-    "███▌░███░▐███",
-    "█████████████",
+    "███▌░░∩░░▐███",
+    "██≡≡≡≡≡≡≡≡≡██",
 )
 
 FORGE = (
-    "  ░   ░      ",
+    "  ░ · ░      ",
     "  ▒   ▒  ░   ",
     "  ▐▌ ▐▌  ▒   ",
     "  ▐███████▙  ",
-    " ▟█████████▙ ",
-    "▐█▓▒░███░▒▓█▌",
-    "█████████████",
+    " ▟███▪█▪███▙ ",
+    "▐█▓▒░◘◘◘░▒▓█▌",
+    "███≡≡≡≡≡≡≡███",
 )
 
 ZIGGURAT = (
     "      ▲      ",
     "     ▟█▙     ",
-    "    ▟███▙    ",
+    "    ▟█∩█▙    ",
     "   ▐█████▌   ",
-    "  ▄▄▄███▄▄▄  ",
-    " ▟█████████▙ ",
-    "▟███████████▙",
-    "█▓▒░▓▒█▒▓░▒▓█",
-    "█████████████",
+    "  ▄▄▄≡≡≡▄▄▄  ",
+    " ▟███≡≡≡███▙ ",
+    "▟██▪█≡≡≡█▪██▙",
+    "█▓▒░▓≡≡≡▓░▒▓█",
+    "████▪█∩█▪████",
 )
 
 TABLET_HOUSE = (
     "   ▄▄▄▄▄▄▄   ",
     "  ▟███████▙  ",
-    " ▐█▌▐█▌▐█▌█▌ ",
+    " ▐█▤▤█▤▤█▤█▌ ",
     " ▐█████████▌ ",
-    " ▐█░█░█░█░█▌ ",
-    "▐███████████▌",
-    "█████████████",
+    " ▐█▤▤█▤▤█▤█▌ ",
+    "▐████∩██████▌",
+    "███≡≡≡≡≡≡≡███",
 )
 
 CHANNEL = (
-    "  ░░░░░░░░░  ",
+    "  ╫░░░░░░░╫  ",
     "▄▄▄▄▄▄▄▄▄▄▄▄▄",
     "█≈≈≈≈≈≈≈≈≈≈≈█",
     "█≈≈≈≈≈≈≈≈≈≈≈█",
-    "█████████████",
+    "██≡██≡██≡████",
 )
 
 CAUSEWAY = (
@@ -382,18 +382,18 @@ CAUSEWAY = (
     "    ▒▒▒▒▒    ",
     "   ▒▒▒▒▒▒▒   ",
     "  ▓▓▓▓▓▓▓▓▓  ",
-    " ▓▓▓▓▓▓▓▓▓▓▓ ",
+    "▪▓▓▓▓▓▓▓▓▓▓▪ ",
     "█████████████",
 )
 
 PALACE = (
     "   ▄▄▄▄▄▄▄   ",
     "  ▟███████▙  ",
-    " ▟█████████▙ ",
+    " ▟█▪█▪█▪█▪█▙ ",
     "▐███▀▀▀▀▀███▌",
-    "▐██▌░░░░░▐██▌",
-    "▐██▌░███░▐██▌",
-    "█████████████",
+    "▐██▌╫╫╫╫╫▐██▌",
+    "▐██▌╫╫∩╫╫▐██▌",
+    "███≡≡≡≡≡≡≡███",
 )
 
 BARRACKS = (
@@ -401,19 +401,19 @@ BARRACKS = (
     " █ █ █   █ █ ",
     "▄▄▄▄▄▄▄▄▄▄▄▄▄",
     "█▛▀▀▀▀▀▀▀▀▀▜█",
-    "█▌░▐█▌░▐█▌░▐█",
+    "█▌◘░◘░◘░◘░◘▐█",
     "█▙▄▄▄▄▄▄▄▄▄▄█",
-    "█████████████",
+    "███≡≡≡∩≡≡≡███",
 )
 
-HOVEL = (      # anything the content authors that this module has never heard of
+HOVEL = (
     "             ",
     "             ",
     "   ▄▄▄▄▄▄▄   ",
     "  ▟███████▙  ",
-    " ▐█▌░░░░░▐█▌ ",
-    " ▐█████████▌ ",
-    "█████████████",
+    " ▐█▌▪░░░▪▐█▌ ",
+    " ▐████∩████▌ ",
+    "██≡≡≡≡≡≡≡≡≡██",
 )
 
 BUILDINGS = {
@@ -433,9 +433,11 @@ GROUND = {"harbour": "≈", "canal": "≈"}
 _FALL = (
     {},
     {"█": "▓", "▓": "▒", "▒": "░"},
-    {"█": "▒", "▓": "░", "▒": "░", "▟": "▒", "▙": "▒", "▛": "░", "▜": "░"},
+    {"█": "▒", "▓": "░", "▒": "░", "▟": "▒", "▙": "▒", "▛": "░", "▜": "░",
+     "≡": "·", "▤": "·", "▩": "·", "◘": "·", "╫": "·", "▪": "·", "∩": "·"},
     {"█": "░", "▓": "░", "▒": "░", "▟": "░", "▙": "░", "▛": " ", "▜": " ",
-     "▲": "·", "▐": "░", "▌": "░", "▄": "░", "▀": "░"},
+     "▲": "·", "▐": "░", "▌": "░", "▄": "░", "▀": "░", "≡": " ", "▤": " ",
+     "▩": " ", "◘": " ", "╫": " ", "▪": " ", "∩": " ", "╱": " ", "·": " "},
 )
 
 
@@ -464,3 +466,101 @@ def weather(rows, condition: int):
             line.append(glyph)
         out.append("".join(line))
     return tuple(out)
+
+
+# --- the lower town -----------------------------------------------------------
+#
+# What stands behind the palace quarter. Three rows, drawn faint, and never the
+# same run twice across a width: the motifs are different widths and cycle in a
+# fixed order, so the band desynchronises with itself and reads as a town rather
+# than as wallpaper. Fixed order, because there is no random in this project.
+
+_T_HOUSE = (
+    " ▄▄▄▄ ",
+    "▗████▖",
+    "▐█▪▪█▌",
+)
+_T_GABLE = (
+    "  ▟▙ ",
+    " ▟██▙",
+    "▐███▌",
+)
+_T_HUT = (
+    "▗▄▄▖",
+    "▐██▌",
+    "▐▪▪▌",
+)
+_T_SHRINE = (
+    "  ▄▄▄  ",
+    " ▟███▙ ",
+    "▐█▪∩▪█▌",
+)
+_T_PALM = (
+    "▚▄█▄▞",
+    "  █  ",
+    "  █  ",
+)
+_T_YARD = (
+    "   ",
+    "   ",
+    "▫ ▫",
+)
+_T_ROW = (
+    "▗▄▄▖▗▄▖ ",
+    "▐██▌▐█▌ ",
+    "▐▪█▌▐▪▌ ",
+)
+
+TOWN_MOTIFS = (_T_HOUSE, _T_YARD, _T_HUT, _T_GABLE, _T_ROW, _T_PALM,
+               _T_SHRINE, _T_YARD, _T_GABLE, _T_HUT, _T_HOUSE, _T_PALM,
+               _T_SHRINE, _T_ROW, _T_HUT, _T_YARD)
+
+
+def town(width: int, offset: int = 0) -> tuple[str, ...]:
+    """A band of lower town `width` columns wide. Three rows, bottom-aligned."""
+    rows = ["", "", ""]
+    index = offset
+    while len(rows[0]) < width:
+        motif = TOWN_MOTIFS[index % len(TOWN_MOTIFS)]
+        for line, piece in zip(range(3), motif):
+            rows[line] += piece
+        index += 1
+    return tuple(row[:width] for row in rows)
+
+
+def occlude(surface: Surface, x: int, y: int, rows, bg: int = C["ink"]) -> None:
+    """Clear what stands behind a drawing, per column, beneath its silhouette.
+
+    `draw` writes nothing where a drawing has a space, which is right for a
+    picture on an empty field and wrong for one standing in front of a town: the
+    lower town would show through the gate of the walls. Blanking the whole
+    bounding box would cut a rectangle out of the sky instead, so each column is
+    cleared only from its own first ink downwards.
+    """
+    for column in range(max(len(row) for row in rows)):
+        top = next((index for index, row in enumerate(rows)
+                    if column < len(row) and row[column] != " "), None)
+        if top is None:
+            continue
+        for index in range(top, len(rows)):
+            surface.put(x + column, y + index, " ", C["ink"], bg)
+
+
+# --- the sky ------------------------------------------------------------------
+
+# The month is lunar and the turn is half of one, so the moon over the city is
+# the calendar: waxing in the former half, waning in the latter. It is the one
+# decoration on this screen that is also information.
+MOON_WAXING = (
+    " ▄▄▖ ",
+    "▐███▌",
+    " ▀▀▘ ",
+)
+MOON_WANING = (
+    " ▗▄▄ ",
+    "▐███▌",
+    " ▝▀▀ ",
+)
+
+BIRD = "╲╱"
+CLOUD = ("▗▄▄▄▖  ▄▄", " ▀▀▀▀▀▀▀ ")

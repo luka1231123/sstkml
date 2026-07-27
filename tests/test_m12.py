@@ -328,7 +328,7 @@ def test_the_city_screen_stays_inside_its_frame() -> None:
 
     b = project(_world(12))
     lines = plain_text(city.compose(b)).splitlines()
-    assert len(lines) == 30
+    assert len(lines) == 32
     for line in lines:
         assert len(line) == 96
         assert line[0] in "╔║╚" and line[-1] in "╗║╝", repr(line[-20:])
@@ -366,3 +366,45 @@ def test_the_detail_window_stays_inside_its_frame() -> None:
         assert len(lines) == 20
         for line in lines:
             assert len(line) == 68 and line[0] in "╔║╚"
+
+
+def test_the_moon_over_the_city_is_the_half_of_the_month() -> None:
+    """The one decoration that is also information (the calendar is lunar)."""
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(1))
+    former = plain_text(city.compose({**b, "date": "yr 1, Ayyaru, former half"}))
+    latter = plain_text(city.compose({**b, "date": "yr 1, Ayyaru, latter half"}))
+    assert former != latter, "the moon must turn with the fortnight"
+    assert "▄▄▖" in former and "▗▄▄" in latter
+
+
+def test_the_lower_town_stands_behind_the_great_houses() -> None:
+    """`draw` writes nothing where a drawing has a space, so without `occlude`
+    the distant town shows through the gate of the walls."""
+    from tui import art
+    from tui.grid import Surface, plain_text
+
+    surface = Surface(20, 10)
+    art.draw(surface, 0, 4, art.town(20))
+    art.occlude(surface, 3, 3, art.BUILDINGS["walls"])
+    art.draw(surface, 3, 3, art.BUILDINGS["walls"])
+    lines = plain_text(surface.freeze()).splitlines()
+    for row, line in enumerate(lines[3:10]):
+        for column in range(3, 16):
+            behind = line[column]
+            assert behind in art.BUILDINGS["walls"][row] or behind == " ", (
+                f"the town shows through the walls at {column},{row + 3}")
+
+
+def test_nothing_drawn_reaches_the_list_below_it() -> None:
+    """Decoration that leaks into the table is a misread number, eventually."""
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(6))
+    lines = plain_text(city.compose(b)).splitlines()
+    for line in lines[16:]:
+        # Not the blocks: the sparkline is made of those. The drawn glyphs.
+        assert not (set(line) & set("▟▙≈╲╱▲∩◘╫▤▩")), repr(line)
