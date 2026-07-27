@@ -1,14 +1,26 @@
-"""The city: the machine, and its condition as a history (spec 6.18, M12).
+"""The city: the machine, drawn, and its condition as a history (spec 6.18, M12).
 
 The screen exists because of a specific failure mode. A system with two hidden
 multipliers, a head who flatters one of them, and decay measured in years can
 become a thing the player cannot form a theory about — and a system you cannot
 form a theory about reads as random, which is worse than reads as hard.
 
-So condition is shown **as a shape, not a number**. Twelve fortnights of
-sparkline per institution: a line that sags tells the player something he can
-act on, where 604 tells him nothing at all. The figure is beside it for anyone
-who wants to do the arithmetic.
+So condition is shown **as a shape, not a number**, twice over.
+
+*As a skyline.* Every institution is a building standing on the same ground
+line, and the building is eroded to match its condition (`art.weather`): dressed
+stone at 800, hollowed at 400, a dithered footprint at 100. A player who has
+never read a figure on this screen can still see which quarter of his city is
+going. This is the fourth station to earn art (D34 named three), and it earns it
+because here the picture *is* the information.
+
+*As a line.* Twelve fortnights of sparkline per institution: a line that sags
+tells the player something he can act on, where 604 tells him nothing at all.
+
+Both are drawn from the **reported** condition — what the heads say, not what is
+so. A harbourmaster in arrears writes that his quay is sound, and so the quay is
+drawn sound, and it goes on being drawn sound until the player spends an hour
+walking down to it. The lie is in the picture, which is where a lie belongs.
 
 What is not here: any statement that a condition is bad, any threshold, any
 colour that means danger on its own, and any suggestion about what to repair
@@ -16,7 +28,7 @@ first. The player reads the shapes and decides (D19).
 """
 from __future__ import annotations
 
-from tui import document, style
+from tui import art, document, style
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -36,9 +48,96 @@ DOES = {
     "garrison": "holds the place",
 }
 
+# lit, mid, dark, edge. Mudbrick and plaster for most of it; the temple takes
+# the gold leaf, the forge its fire, the water its own colour.
+HUES = {
+    "harbour": (C["sand"], C["clay"], C["faint"], C["sky"]),
+    "canal": (C["sky"], C["lapis"], C["faint"], C["sky"]),
+    "temple": (C["gold"], C["sand"], C["faint"], C["dim"]),
+    "workshop": (C["flame"], C["sand"], C["faint"], C["dim"]),
+    "walls": (C["clay"], C["dim"], C["faint"], C["faint"]),
+    "granary": (C["barley"], C["sand"], C["faint"], C["dim"]),
+    "garrison": (C["clay"], C["dim"], C["faint"], C["blood"]),
+    "road": (C["sand"], C["ash"], C["faint"], C["dim"]),
+}
+DEFAULT_HUE = (C["sand"], C["clay"], C["faint"], C["dim"])
+
+SLOT = art.BUILDING_WIDTH          # 13
+PITCH = SLOT + 2
+DRAWN = 6                          # how many will stand in the skyline
+
+
+# What to write under a building. The kind, not the name: `walls` under the
+# walls, where the name would put `Ugarit` under them and say nothing.
+WORD = {
+    "harbour": "harbour", "granary": "granary", "walls": "walls",
+    "workshop": "forge", "temple": "temple", "archive": "tablets",
+    "canal": "canal", "road": "road", "household": "palace",
+    "garrison": "garrison",
+}
+
+
+def _spoken(word: str) -> str:
+    """Content ids are written `master_smith`; nobody says it that way."""
+    return word.replace("_", " ")
+
+
+def _short(inst: dict, kinds: list[str]) -> str:
+    """A label that fits under a building, and that distinguishes it.
+
+    The kind reads best -- `walls` under the walls, where the name would put
+    `Ugarit` under them and say nothing -- so it is used unless the city holds
+    two of a kind, in which case the name has to do the telling apart.
+    """
+    word = WORD.get(inst["kind"], inst["kind"])
+    if kinds.count(inst["kind"]) > 1:
+        parts = [w for w in inst["name"].replace("-", " ").split()
+                 if w.lower() not in ("the", "of", "at", "a")]
+        word = parts[-1] if parts else word
+    return word[:SLOT]
+
+
+def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
+            width: int) -> None:
+    """The city, standing or not, on one line of ground.
+
+    Bottom-aligned so a tall temple and a low channel share a horizon. Buildings
+    are eroded from the reported condition, which is the only condition anyone
+    in the palace has.
+    """
+    room = max(1, (width - x - 2) // PITCH)
+    standing = institutions[:min(DRAWN, room)]
+    kinds = [i["kind"] for i in standing]
+    for index, inst in enumerate(standing):
+        left = x + index * PITCH
+        rows = art.weather(
+            art.BUILDINGS.get(inst["kind"], art.HOVEL), inst["condition"])
+        lit, mid, dark, edge = HUES.get(inst["kind"], DEFAULT_HUE)
+        art.draw(surface, left, ground - len(rows), rows,
+                 lit=lit, mid=mid, dark=dark, edge=edge)
+
+        # The ground each thing stands in. A quay in earth reads as a mistake.
+        earth = art.GROUND.get(inst["kind"], "▒")
+        surface.text(left, ground, earth * SLOT,
+                     C["sky"] if earth == "≈" else C["ash"], C["ink"])
+
+        # The number you press, and a word for what it is. A vacant post is
+        # marked here as well as in the list, because the skyline is where the
+        # eye goes first and a building nobody minds should say so.
+        label = _short(inst, kinds)
+        pad = left + (SLOT - len(label) - 4) // 2
+        surface.text(pad, ground + 1, "[", C["dim"], C["ink"])
+        surface.text(pad + 1, ground + 1, str(index + 1), C["flame"], C["ink"])
+        surface.text(pad + 2, ground + 1, "]", C["dim"], C["ink"])
+        surface.text(pad + 4, ground + 1, label,
+                     C["bone"] if inst["inspected"] else C["clay"], C["ink"])
+        if not inst["head"]:
+            surface.text(pad + 4 + len(label) + 1, ground + 1, "×",
+                         C["blood"], C["ink"])
+
 
 def compose(b: dict, history: dict[str, list[int]] | None = None,
-            width: int = 88, height: int = 28) -> Screen:
+            width: int = 96, height: int = 30) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE CITY",
                 note="[esc] close", drop=False)
@@ -46,11 +145,23 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     institutions = b.get("institutions") or []
     history = history or {}
 
-    style.bar(surface, 2, 2, width - 4,
+    surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
+
+    ground = 12
+    if institutions:
+        skyline(surface, 3, ground, institutions, width)
+    else:
+        surface.text(3, ground - 1,
+                     "this court holds nothing that could fall down.",
+                     C["ash"], C["ink"])
+        surface.text(3, ground, "▒" * (width - 6), C["ash"], C["ink"])
+
+    table = ground + 3
+    style.bar(surface, 2, table, width - 4,
               "  what stands             it              he has been saying"
               "   now   kept by", fg=C["bone"], bg=C["faint"])
 
-    y = 4
+    y = table + 2
     for inst in institutions:
         if y >= height - 5:
             break
@@ -62,8 +173,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
         series = history.get(inst["id"]) or inst.get("history") or [
             inst["condition"]]
-        line = sparkline(series, 12)
-        surface.text(45, y, line, C["sand"], C["ink"])
+        surface.text(45, y, sparkline(series, 12), C["sand"], C["ink"])
 
         figure = str(inst["condition"])
         surface.text(64 - len(figure), y, figure,
@@ -76,15 +186,12 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
                      C["blood"] if vacancy else C["dim"], C["ink"])
         y += 1
 
-    if not institutions:
-        surface.text(3, y, "this court holds nothing that could fall down.",
-                     C["ash"], C["ink"])
-
     foot = height - 4
-    surface.text(3, foot, "─" * (width - 6), C["faint"], C["ink"])
+    style.rule(surface, 3, foot, width - 6)
     surface.text(3, foot + 1,
-                 "the figure is what the man in charge of it reports. "
-                 "a ! is one you went and saw.", C["ash"], C["ink"])
+                 "the figure is what he reports; ! is one you went and saw; "
+                 "× is a post nobody holds."[: width - 6],
+                 C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
               " [1-9] go and look for yourself — one hour   [esc] close",
               fg=C["clay"], bg=C["lapis"])
@@ -92,34 +199,46 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
 
 def detail(b: dict, inst: dict, history: list[int] | None = None,
-           width: int = 62, height: int = 20) -> Screen:
-    """One institution, opened. What it is, what it needs, what it can do."""
+           width: int = 68, height: int = 20) -> Screen:
+    """One institution, opened: the building itself, and what it can do."""
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     document._frame(surface, inst["name"].upper(), "[esc] close")
     surface.text(3, 2, DOES.get(inst["kind"], inst["kind"]), C["dim"], C["ink"])
-    surface.text(3, 3, "─" * (width - 6), C["faint"], C["ink"])
+    style.rule(surface, 3, 3, width - 6)
 
-    rows = [
+    rows = art.weather(
+        art.BUILDINGS.get(inst["kind"], art.HOVEL), inst["condition"])
+    lit, mid, dark, edge = HUES.get(inst["kind"], DEFAULT_HUE)
+    left = width - SLOT - 5
+    art.draw(surface, left, 5, rows, lit=lit, mid=mid, dark=dark, edge=edge)
+    surface.text(left, 5 + len(rows), art.GROUND.get(inst["kind"], "▒") * SLOT,
+                 C["sky"] if inst["kind"] in art.GROUND else C["ash"], C["ink"])
+
+    facts = [
         ("condition", f"{inst['condition']}"
                       + ("" if inst["inspected"] else "  (he says)")),
         ("whole, it could", f"{inst['capacity']}"),
         ("as it stands", f"{inst['effective']}"),
         ("kept by", inst["group_name"] or "nobody on the roll"),
-        ("in the charge of", inst["head"] or "NOBODY — the post is vacant"),
-        ("at", inst["place"]),
+        ("in the charge of",
+         _spoken(inst["head"]) if inst["head"] else "NOBODY — the post is open"),
+        ("at", _spoken(inst["place"])),
     ]
     y = 5
-    for label, value in rows:
+    column = left - 1
+    for label, value in facts:
         surface.text(4, y, label, C["dim"], C["ink"])
-        surface.text(24, y, value[: width - 28], C["clay"], C["ink"])
+        surface.text(21, y, value[: max(0, column - 21)], C["clay"], C["ink"])
         y += 1
     if inst["upkeep"]:
         y += 1
         surface.text(4, y, "it wants, a fortnight", C["dim"], C["ink"])
         for good, qty in sorted(inst["upkeep"].items()):
-            surface.text(24, y, f"{qty} {good}", C["clay"], C["ink"])
+            surface.text(26, y, f"{qty} {good}", C["clay"], C["ink"])
             y += 1
     if history:
+        surface.text(4, height - 4, "what he has been saying",
+                     C["dim"], C["ink"])
         surface.text(4, height - 3, sparkline(history, width - 10),
                      C["sand"], C["ink"])
     return surface.freeze()

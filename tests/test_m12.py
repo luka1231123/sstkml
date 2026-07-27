@@ -257,3 +257,112 @@ def test_a_missed_festival_lands_harder_at_a_ruined_temple() -> None:
 
     assert after(100) < after(1000), (
         "a temple nobody repaired must make a skipped rite worse")
+
+
+# --- the city, drawn ----------------------------------------------------------
+#
+# The skyline is not decoration: it is the condition, restated as a shape, and
+# it is drawn from the *reported* figure. These tests hold both claims down.
+
+def test_every_kind_the_screen_names_has_a_building() -> None:
+    from tui import art, city
+
+    for kind in city.DOES:
+        assert kind in art.BUILDINGS, f"{kind} would be drawn as a hovel"
+        assert kind in city.WORD, f"{kind} has no word to stand under it"
+    for kind, rows in art.BUILDINGS.items():
+        assert art.size(rows)[0] == art.BUILDING_WIDTH, kind
+        assert art.size(rows)[1] <= 9, f"{kind} is taller than the sky"
+
+
+def test_a_building_only_ever_loses_ink_as_it_falls() -> None:
+    """The erosion has to be monotone or the picture is lying about the number.
+
+    Counted rather than eyeballed: a weathering step that swapped a glyph for a
+    heavier one would read, at a glance, as a building being repaired.
+    """
+    from tui import art
+
+    for kind, rows in art.BUILDINGS.items():
+        weights = {"█": 4, "▓": 3, "▒": 2, "░": 1, " ": 0}
+        def ink(condition: int) -> int:
+            return sum(weights.get(g, 2) for row in art.weather(rows, condition)
+                       for g in row)
+        levels = [ink(c) for c in (1000, 800, 600, 400, 200, 0)]
+        assert levels == sorted(levels, reverse=True), f"{kind}: {levels}"
+
+
+def test_a_ruin_is_the_same_ruin_every_time() -> None:
+    """No randomness anywhere, including in the holes."""
+    from tui import art
+
+    once = art.weather(art.BUILDINGS["walls"], 300)
+    twice = art.weather(art.BUILDINGS["walls"], 300)
+    assert once == twice
+
+
+def test_the_skyline_draws_what_the_head_says_not_what_is_so() -> None:
+    """A flatterer's quay is drawn sound. That is the whole point of the screen.
+
+    The lie already lives in `condition` by the time Belief hands it over, so
+    this asserts the screen does not go behind Belief's back for the truth.
+    """
+    from tui import city
+    from tui.grid import plain_text
+
+    world = _with_condition(_world(1), "harbour_mahadu", 200)
+    world = _with_arrears(world, "garrison_mahadu", 8)
+    b = project(world)
+    quay = next(i for i in b["institutions"] if i["id"] == "harbour_mahadu")
+    assert quay["condition"] > 400, "the harbourmaster should be flattering it"
+    honest = [dict(i, condition=200 if i["id"] == "harbour_mahadu"
+                   else i["condition"]) for i in b["institutions"]]
+    said = plain_text(city.compose(b))
+    truth = plain_text(city.compose({**b, "institutions": honest}))
+    assert said != truth, "the drawing must move when the reported figure does"
+
+
+def test_the_city_screen_stays_inside_its_frame() -> None:
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(12))
+    lines = plain_text(city.compose(b)).splitlines()
+    assert len(lines) == 30
+    for line in lines:
+        assert len(line) == 96
+        assert line[0] in "╔║╚" and line[-1] in "╗║╝", repr(line[-20:])
+
+
+def test_every_building_carries_the_key_that_opens_it() -> None:
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(4))
+    text = plain_text(city.compose(b))
+    for index in range(1, len(b["institutions"][:city.DRAWN]) + 1):
+        assert f"[{index}]" in text
+    assert "walls" in text and "temple" in text
+
+
+def test_a_vacant_post_is_marked_on_the_skyline_and_in_words() -> None:
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(4))
+    assert any(not i["head"] for i in b["institutions"])
+    text = plain_text(city.compose(b))
+    assert "×" in text and "no one minds it" in text
+
+
+def test_the_detail_window_stays_inside_its_frame() -> None:
+    from tui import city
+    from tui.grid import plain_text
+
+    b = project(_world(20))
+    for inst in b["institutions"]:
+        lines = plain_text(
+            city.detail(b, inst, inst.get("history"), 68, 20)).splitlines()
+        assert len(lines) == 20
+        for line in lines:
+            assert len(line) == 68 and line[0] in "╔║╚"

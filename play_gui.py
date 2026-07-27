@@ -68,7 +68,7 @@ ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
     "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
     "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
     "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
-    "y": ("city", "The City", (88, 28), "on_city_key"),
+    "y": ("city", "The City", (96, 30), "on_city_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -181,12 +181,12 @@ class Game:
         if key == "world":
             return worldmap.compose(b, 86, 30)
         if key == "city":
-            return city.compose(b, None, 88, 28)
+            return city.compose(b, None, 96, 30)
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
             if inst is not None:
-                return city.detail(b, inst, inst.get("history"), 62, 20)
+                return city.detail(b, inst, inst.get("history"), 68, 20)
         if key == "counsel":
             return counsel.compose(b, self.counsel_said, self.hours,
                                    self.counsel_typed, self.counsel_typing,
@@ -485,7 +485,7 @@ class Game:
                         INSPECT_COST)
             key = f"institution:{inst['id']}"
             window = self.app.window(
-                key, inst["name"], 62, 20,
+                key, inst["name"], 68, 20,
                 on_key=lambda e, k=key: self.on_tablet_key(e, k),
                 on_close=lambda k=key: self.app.close(k))
             self.repaint()

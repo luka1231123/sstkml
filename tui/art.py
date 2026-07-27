@@ -293,3 +293,174 @@ LAMP = (
     "▐██▀▀██▌",
     " ▀▄▄▄▄▀ ",
 )
+
+
+# --- the city -----------------------------------------------------------------
+#
+# One drawing per kind of institution, all 13 columns wide and bottom-aligned so
+# they can stand in a row on the same ground line. This is the fourth station to
+# earn art (D34 named three): the CITY screen is a list of buildings, and a list
+# of buildings drawn as buildings is the one place where a picture carries the
+# information rather than decorating it.
+#
+# Nothing here is coloured. `weather()` below erodes the glyphs, `draw()` shades
+# what is left, and the whole silhouette therefore sags as the fabric goes.
+
+QUAY = (
+    "    ▐▌       ",
+    "    ▐█▙      ",
+    "    ▐███▙    ",
+    "   ▄▟█████▙  ",
+    " ▄█████████▙ ",
+    "▟█▓▒░▒░▒░▒▓█▙",
+    "█████████████",
+)
+
+SILOS = (
+    "   ▄▄▄▄▄▄▄   ",
+    "  ▟███████▙  ",
+    " ▐█▀▀███▀▀█▌ ",
+    " ▐█ ░███░ █▌ ",
+    " ▐█▄▄███▄▄█▌ ",
+    "▐███████████▌",
+    "█████████████",
+)
+
+RAMPART = (
+    "█▀█▀█▀█▀█▀█▀█",
+    "█████████████",
+    "███▄▄▄▄▄▄▄███",
+    "███▛▀▀▀▀▀▜███",
+    "███▌░░░░░▐███",
+    "███▌░███░▐███",
+    "█████████████",
+)
+
+FORGE = (
+    "  ░   ░      ",
+    "  ▒   ▒  ░   ",
+    "  ▐▌ ▐▌  ▒   ",
+    "  ▐███████▙  ",
+    " ▟█████████▙ ",
+    "▐█▓▒░███░▒▓█▌",
+    "█████████████",
+)
+
+ZIGGURAT = (
+    "      ▲      ",
+    "     ▟█▙     ",
+    "    ▟███▙    ",
+    "   ▐█████▌   ",
+    "  ▄▄▄███▄▄▄  ",
+    " ▟█████████▙ ",
+    "▟███████████▙",
+    "█▓▒░▓▒█▒▓░▒▓█",
+    "█████████████",
+)
+
+TABLET_HOUSE = (
+    "   ▄▄▄▄▄▄▄   ",
+    "  ▟███████▙  ",
+    " ▐█▌▐█▌▐█▌█▌ ",
+    " ▐█████████▌ ",
+    " ▐█░█░█░█░█▌ ",
+    "▐███████████▌",
+    "█████████████",
+)
+
+CHANNEL = (
+    "  ░░░░░░░░░  ",
+    "▄▄▄▄▄▄▄▄▄▄▄▄▄",
+    "█≈≈≈≈≈≈≈≈≈≈≈█",
+    "█≈≈≈≈≈≈≈≈≈≈≈█",
+    "█████████████",
+)
+
+CAUSEWAY = (
+    "      ░      ",
+    "     ░░░     ",
+    "    ▒▒▒▒▒    ",
+    "   ▒▒▒▒▒▒▒   ",
+    "  ▓▓▓▓▓▓▓▓▓  ",
+    " ▓▓▓▓▓▓▓▓▓▓▓ ",
+    "█████████████",
+)
+
+PALACE = (
+    "   ▄▄▄▄▄▄▄   ",
+    "  ▟███████▙  ",
+    " ▟█████████▙ ",
+    "▐███▀▀▀▀▀███▌",
+    "▐██▌░░░░░▐██▌",
+    "▐██▌░███░▐██▌",
+    "█████████████",
+)
+
+BARRACKS = (
+    " ▲ ▲ ▲   ▲ ▲ ",
+    " █ █ █   █ █ ",
+    "▄▄▄▄▄▄▄▄▄▄▄▄▄",
+    "█▛▀▀▀▀▀▀▀▀▀▜█",
+    "█▌░▐█▌░▐█▌░▐█",
+    "█▙▄▄▄▄▄▄▄▄▄▄█",
+    "█████████████",
+)
+
+HOVEL = (      # anything the content authors that this module has never heard of
+    "             ",
+    "             ",
+    "   ▄▄▄▄▄▄▄   ",
+    "  ▟███████▙  ",
+    " ▐█▌░░░░░▐█▌ ",
+    " ▐█████████▌ ",
+    "█████████████",
+)
+
+BUILDINGS = {
+    "harbour": QUAY, "granary": SILOS, "walls": RAMPART, "workshop": FORGE,
+    "temple": ZIGGURAT, "archive": TABLET_HOUSE, "canal": CHANNEL,
+    "road": CAUSEWAY, "household": PALACE, "garrison": BARRACKS,
+}
+
+BUILDING_WIDTH = 13
+
+# What the ground under each kind is made of. A quay standing in earth reads as
+# a mistake, and it is cheap to be right.
+GROUND = {"harbour": "≈", "canal": "≈"}
+
+# The fabric going, in four steps. `█` is dressed stone and `░` is what is left
+# when nobody has minded it for a decade.
+_FALL = (
+    {},
+    {"█": "▓", "▓": "▒", "▒": "░"},
+    {"█": "▒", "▓": "░", "▒": "░", "▟": "▒", "▙": "▒", "▛": "░", "▜": "░"},
+    {"█": "░", "▓": "░", "▒": "░", "▟": "░", "▙": "░", "▛": " ", "▜": " ",
+     "▲": "·", "▐": "░", "▌": "░", "▄": "░", "▀": "░"},
+)
+
+
+def weather(rows, condition: int):
+    """Erode a building to match its condition, deterministically.
+
+    The holes are punched on a fixed lattice of (x, y) rather than at random --
+    this project has no random -- so the same building at the same condition is
+    always the same ruin, and a player who repairs one watches it come back the
+    way it went.
+    """
+    step = 0 if condition >= 750 else 1 if condition >= 500 else (
+        2 if condition >= 250 else 3)
+    if step == 0:
+        return tuple(rows)
+    fall = _FALL[step]
+    if step == 3:
+        rows = ("" .ljust(len(rows[0])),) + tuple(rows[1:])   # the roof is gone
+    out = []
+    for y, row in enumerate(rows):
+        line = []
+        for x, glyph in enumerate(row):
+            glyph = fall.get(glyph, glyph)
+            if step >= 2 and glyph != " " and (x * 3 + y * 5) % (9 - step) == 0:
+                glyph = " "
+            line.append(glyph)
+        out.append("".join(line))
+    return tuple(out)

@@ -52,7 +52,7 @@ SCREENS = {
     "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
     "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
     "help": ("HELP", lambda b: help_page.compose(74, 44)),
-    "city": ("THE CITY", lambda b: city.compose(b, None, 88, 28)),
+    "city": ("THE CITY", lambda b: city.compose(b, None, 96, 30)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, "", False, 80, 32)),
     "altar": ("THE ALTAR", lambda b: altar.compose(
