@@ -300,3 +300,26 @@ def test_new_post_goes_on_the_end_of_the_pile_not_the_top():
     assert game.stack_order[:len(before)] == [
         letter_id for letter_id in before if letter_id in game.stack_order]
     game.app.stop()
+
+
+def test_diagnose_says_enough_to_tell_a_broken_install_from_a_broken_game():
+    """`./run.sh --check`. The commonest failure on this project is not a bug,
+    it is the wrong interpreter -- Apple's /usr/bin/python3 has neither tomllib
+    nor Tk -- and the report has to make that obvious without a traceback."""
+    from tui.backend_tk import diagnose
+    check = diagnose()
+    assert set(check) == {"interpreter", "version", "in_venv",
+                          "tkinter", "tk_version", "display"}
+    assert check["interpreter"] and check["version"][0].isdigit()
+    assert isinstance(check["in_venv"], bool)
+
+
+def test_the_launcher_and_the_venv_are_part_of_the_project():
+    """The game must not depend on which python happens to be on PATH."""
+    import os
+    from pathlib import Path
+    root = Path(__file__).parent.parent
+    launcher = root / "run.sh"
+    assert launcher.exists(), "run.sh is how the game is started"
+    assert os.access(launcher, os.X_OK), "run.sh must be executable"
+    assert ".venv" in (root / ".gitignore").read_text()

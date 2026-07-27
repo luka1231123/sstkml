@@ -1,0 +1,2 @@
+{"kind":"clarify","question":"What would you like to do? You can allocate resources, consult a diviner, dictate, eat seed, end your turn, inspect a ledger, marry abroad, raise corvee, read a"
+}

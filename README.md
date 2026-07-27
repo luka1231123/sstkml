@@ -1,11 +1,27 @@
 # SAY TO THE KING, MY LORD
 
-A terminal game about ruling a Late Bronze Age kingdom through its archive.
+A game about ruling a Late Bronze Age kingdom through its archive. It runs in
+its own windows and also in a terminal.
 Deterministic simulation core (stdlib only); a local language model will later
 sit on top as an interpretation and prose layer that never touches state.
 
 See `SAY_TO_THE_KING_spec.md` for the full design and `DECISIONS.md` for how the
 build deviates from it.
+
+## Running it
+
+```sh
+./run.sh              # the windowed game
+./run.sh --cli        # the terminal game
+./run.sh --check      # which interpreter, which Tk, is there a display
+./run.sh --test       # the suite
+```
+
+`run.sh` uses the project's own `.venv` and creates one if it is missing. Do not
+start the game with a bare `python3`: on macOS that is often Apple's 3.9, which
+has neither `tomllib` nor Tk, and the error it produces names a module rather
+than the mistake. The window backend needs a python built with Tk —
+`brew install python-tk@3.14`, or `apt install python3-tk`.
 
 ## Status
 

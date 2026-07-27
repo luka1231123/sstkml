@@ -15,6 +15,10 @@ above this file noticing; that is the point of the grid being a type.
 """
 from __future__ import annotations
 
+import os
+import platform
+import subprocess
+
 from tui.grid import RGB, Screen
 
 # One monospace family per platform, first that exists wins. Tk silently
@@ -28,6 +32,25 @@ FONT_STACK = (
 
 def _hex(index: int) -> str:
     return f"#{RGB[index]}"
+
+
+def _activate_process() -> None:
+    """Ask macOS to bring this process to the front. Best effort, never fatal.
+
+    Tk cannot do this for itself: a python launched from a terminal is a
+    background application as far as the window server is concerned, so its
+    windows open behind whatever is already there.
+    """
+    if platform.system() != "Darwin":
+        return
+    try:
+        subprocess.run(
+            ["osascript", "-e",
+             'tell application "System Events" to set frontmost of every '
+             f"process whose unix id is {os.getpid()} to true"],
+            check=False, capture_output=True, timeout=3)
+    except Exception:
+        pass
 
 
 def pick_font(root, size: int = 14) -> tuple[str, int]:
@@ -118,6 +141,22 @@ class GridWindow:
         self.root.lift()
         self.root.focus_force()
 
+    def present(self) -> None:
+        """Bring the window to the front, and mean it.
+
+        A Tk program started from a terminal on macOS opens behind the terminal
+        and does not take the keyboard, which reads exactly like nothing having
+        happened. Raising is therefore three separate things: lift it, hold it
+        on top for a moment so the window manager cannot bury it again, and ask
+        the operating system to make this process frontmost.
+        """
+        self.root.deiconify()
+        self.root.lift()
+        self.root.attributes("-topmost", True)
+        self.root.after(300, lambda: self.root.attributes("-topmost", False))
+        self.root.focus_force()
+        _activate_process()
+
     def close(self) -> None:
         self.root.destroy()
 
@@ -173,6 +212,33 @@ class App:
         """End the session. Only the hall calls this (D33)."""
         if self.tk is not None:
             self.tk.quit()
+
+
+def diagnose() -> dict:
+    """Everything needed to tell a broken install from a broken game."""
+    import sys
+    report = {
+        "interpreter": sys.executable,
+        "version": sys.version.split()[0],
+        "in_venv": sys.prefix != sys.base_prefix,
+        "tkinter": "missing",
+        "tk_version": "",
+        "display": "no",
+    }
+    try:
+        import tkinter
+    except Exception as error:
+        report["tkinter"] = f"missing ({type(error).__name__})"
+        return report
+    report["tkinter"] = "present"
+    report["tk_version"] = str(tkinter.TkVersion)
+    try:
+        root = tkinter.Tk()
+        root.destroy()
+        report["display"] = "yes"
+    except Exception as error:
+        report["display"] = f"no ({type(error).__name__}: {error})"
+    return report
 
 
 def available() -> bool:

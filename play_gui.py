@@ -16,6 +16,14 @@ from __future__ import annotations
 
 import sys
 
+if sys.version_info < (3, 12):
+    # Apple's /usr/bin/python3 is old enough to lack tomllib, and the failure
+    # it produces names a module rather than the mistake. Say the real thing.
+    raise SystemExit(
+        f"this is python {sys.version.split()[0]} at {sys.executable}.\n"
+        "the game needs 3.12 or newer -- /usr/bin/python3 is Apple's and is "
+        "too old.\nuse the project's own interpreter:  ./run.sh")
+
 from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
@@ -57,6 +65,9 @@ class Game:
             "hall", "Say to the King, my lord", 92, 30,
             on_key=self.on_key, on_close=self.quit)
         self.repaint()
+        # A Tk program launched from a terminal opens *behind* the terminal on
+        # macOS, which is indistinguishable from nothing having happened.
+        self.hall_window.present()
 
     # --- state ---------------------------------------------------------------
 
@@ -113,18 +124,22 @@ class Game:
 
     def open_tablet(self, char: str) -> None:
         window_key, title, (w, h), _how = TABLETS[char]
-        self.app.window(window_key, title, w, h,
-                        on_key=lambda e, k=window_key: self.on_tablet_key(e, k),
-                        on_close=lambda k=window_key: self.app.close(k))
+        window = self.app.window(
+            window_key, title, w, h,
+            on_key=lambda e, k=window_key: self.on_tablet_key(e, k),
+            on_close=lambda k=window_key: self.app.close(k))
         self.repaint()
+        window.focus()
 
     def open_letter(self, item: dict) -> None:
         key = f"letter:{item['id']}"
         self.open_letters[key] = item
-        self.app.window(key, f"Tablet — {item['id']}", 62, 26,
-                        on_key=lambda e, k=key: self.on_tablet_key(e, k),
-                        on_close=lambda k=key: self.app.close(k))
+        window = self.app.window(
+            key, f"Tablet — {item['id']}", 62, 26,
+            on_key=lambda e, k=key: self.on_tablet_key(e, k),
+            on_close=lambda k=key: self.app.close(k))
         self.repaint()
+        window.focus()
 
     # --- keys ----------------------------------------------------------------
 
@@ -172,17 +187,36 @@ class Game:
         self.app.run()
 
 
-def main(argv: list[str]) -> int:
-    from tui.backend_tk import available
+def report(check: dict) -> None:
+    print("  interpreter :", check["interpreter"])
+    print("  python      :", check["version"],
+          "(in a venv)" if check["in_venv"] else "(NOT in a venv)")
+    print("  tkinter     :", check["tkinter"],
+          f"Tk {check['tk_version']}" if check["tk_version"] else "")
+    print("  display     :", check["display"])
 
+
+def main(argv: list[str]) -> int:
+    from tui.backend_tk import available, diagnose
+
+    if "--check" in argv:
+        report(diagnose())
+        return 0
     if not available():
-        print("no working Tk on this python, so the window game cannot start.\n"
-              "  macOS/homebrew:  brew install python-tk@3.14\n"
-              "  debian/ubuntu:   apt install python3-tk\n"
-              "the terminal game is unaffected:  python3 play_cli.py ugarit")
+        check = diagnose()
+        print("the window game cannot start on this interpreter.\n")
+        report(check)
+        print("\nthe usual cause is the wrong python: /usr/bin/python3 is "
+              "Apple's and has no Tk\nat all, and homebrew's ships without it "
+              "unless python-tk is installed.\n"
+              "\n  ./run.sh              use the project's own venv\n"
+              "  brew install python-tk@3.14\n"
+              "  apt install python3-tk        (debian/ubuntu)\n"
+              "\nthe terminal game is unaffected:  ./run.sh --cli")
         return 1
-    scenario = argv[1] if len(argv) > 1 else "ugarit"
-    seed = int(argv[2]) if len(argv) > 2 else SEED
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    scenario = args[0] if args else "ugarit"
+    seed = int(args[1]) if len(args) > 1 else SEED
     Game(scenario, seed).run()
     return 0
 

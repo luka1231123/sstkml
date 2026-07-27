@@ -1,6 +1,4 @@
 __pycache__/
-*.py[cod]
-.pytest_cache/
+*.pyc
 .venv/
-save.json
-saves/
+saves/*.json
