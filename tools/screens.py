@@ -31,7 +31,8 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import document, hall, help as help_page                  # noqa: E402
+from tui import (altar, archive, composer, counsel, document, hall,   # noqa: E402
+                 help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
 from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
 
@@ -50,8 +51,32 @@ SCREENS = {
     "oaths": ("THE OATHS", lambda b: document.oaths(b, 76, 28)),
     "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
     "house": ("THE HOUSE", lambda b: document.house(b, 70, 26)),
-    "help": ("HELP", lambda b: help_page.compose(74, 34)),
+    "help": ("HELP", lambda b: help_page.compose(74, 44)),
+    "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
+    "counsel": ("COUNSEL", lambda b: counsel.compose(b, _talk(b), 6, 80, 32)),
+    "altar": ("THE ALTAR", lambda b: altar.compose(
+        b, ["He reads the liver and says: the year will be a poor one."],
+        "harvest", ("oil", 20), 78, 32)),
+    "archive": ("THE TABLET HOUSE", lambda b: archive.compose(
+        b, "oath", b.get("archive_index", {}).get("hits", {}).get("oath", []),
+        "", False, 84, 32)),
+    "desk": ("THE DESK", lambda b: _desk(b)),
 }
+
+
+def _talk(b: dict) -> list[tuple[str, str]]:
+    """A sample exchange, so the room can be read with words in it."""
+    key, question, topic = counsel.QUESTIONS[1]
+    return [("king", question),
+            ("scribe", counsel.answer(b, topic, SEED, 8))]
+
+
+def _desk(b: dict):
+    """The desk answering whatever is at the top of the pile."""
+    item = b["stack"][0]
+    draft = composer.formulary(item["sender"], "refuse", SEED, 8)
+    return composer.compose(item, draft, "refuse", house=b.get("house"),
+                            width=84, height=30)
 
 
 def state(scenario: str = "ugarit", seed: int = SEED, turns: int = 6):
@@ -75,6 +100,14 @@ def read_nth(world, index: int):
     letter_id = stack[index]["id"]
     world, _ = apply(world, A.ReadLetter(letter_id))
     return world, letter_id
+
+
+# Some screens only have anything in them after an action. The reader performs
+# it through the ordinary engine, so what is printed is a state the player could
+# actually be in.
+PREPARE = {
+    "archive": lambda world: apply(world, A.SearchArchive("oath"))[0],
+}
 
 
 def show(screen: Screen, colour: bool = False, ascii_only: bool = False) -> str:
@@ -148,12 +181,14 @@ def main(argv: list[str]) -> int:
         print(f"no such screen: {which}. try:  python3 tools/screens.py list")
         return 1
 
-    world = state(seed=seed, turns=turns)
-    b = project(world)
-    print(f"seed {seed}, turn {turns}, {b['attention']} hours in hand")
+    base = state(seed=seed, turns=turns)
+    print(f"seed {seed}, turn {turns}, "
+          f"{project(base)['attention']} hours in hand")
     for name in names:
         title, compose = SCREENS[name]
-        print(frame(title, show(compose(b), colour, ascii_only), colour))
+        world = PREPARE[name](base) if name in PREPARE else base
+        print(frame(title, show(compose(project(world)), colour, ascii_only),
+                    colour))
     return 0
 
 

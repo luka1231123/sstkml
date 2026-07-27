@@ -32,10 +32,15 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import new_seed
-from tui import document, hall, help as help_page, render
+from ai import librarian
+from tui import (altar, archive, composer, counsel, document, hall,
+                 help as help_page, render, worldmap)
 from tui.grid import Screen
 
 READ_COST = 2
+REPLY_COST = 2
+OMEN_COST = 2
+SEARCH_COST = 1
 
 # Where `STK_DUMP=1` writes what the windows are showing, for `tools/screens.py
 # live`. A running game is otherwise unreadable from outside without a camera.
@@ -50,15 +55,27 @@ TABLETS: dict[str, tuple[str, str, tuple[int, int], object]] = {
     "o": ("oaths", "The Oaths", (76, 28), document.oaths),
     "l": ("land", "The Land", (70, 24), document.land),
     "h": ("house", "The House", (70, 26), document.house),
-    "?": ("help", "Help", (74, 34),
-          lambda b, w=74, h=34: help_page.compose(w, h)),
+    "?": ("help", "Help", (74, 44),
+          lambda b, w=74, h=44: help_page.compose(w, h)),
+}
+
+# The windows that hold a conversation: they own their own keys, because most
+# of them take typing and none of them can afford to fall through to the hall's
+# door list. key -> (window key, title, size, which handler)
+ROOMS: dict[str, tuple[str, str, tuple[int, int], str]] = {
+    "w": ("world", "The Known World", (86, 30), "on_tablet_key"),
+    "c": ("counsel", "Counsel", (80, 32), "on_counsel_key"),
+    "v": ("altar", "The Altar", (78, 32), "on_altar_key"),
+    "a": ("archive", "The Tablet House", (84, 32), "on_archive_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
 # never strand the player). The two lists must not drift, so the controller
-# reads the hall's rather than keeping a second one.
-assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == {
-    window_key for window_key, _t, _s, _how in TABLETS.values()}
+# reads the hall's rather than keeping a second one. The desk is reached from a
+# letter rather than from a key of its own, so it is listed by hand.
+assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
+    {window_key for window_key, _t, _s, _how in TABLETS.values()}
+    | {window_key for window_key, _t, _s, _h in ROOMS.values()} | {"desk"})
 
 
 class Game:
@@ -76,6 +93,18 @@ class Game:
         self.app = App()
         self.open_letters: dict[str, dict] = {}
         self.events: list[str] = []
+        # The windows that hold a conversation rather than a record. All of it
+        # is session state: none of it is a fact about the kingdom, so none of
+        # it is logged and a replay is unaffected.
+        self.desk: dict | None = None
+        self.counsel_said: list[tuple[str, str]] = []
+        self.altar_readings: list[str] = []
+        self.altar_question = "harvest"
+        self.altar_offering: tuple[str, int] | None = None
+        self.archive_query = ""
+        self.archive_hits: list[dict] = []
+        self.archive_summary = ""
+        self.archive_typing = False
         # The pile's display order, held steady across the fortnight so the
         # numbers do not move under the player's finger (see document.order_of).
         self.stack_order: list[str] = document.order_of(project(self.world))
@@ -134,6 +163,25 @@ class Game:
             return document.stack(b, 80, 24, order=self.stack_order)
         if key == "fortnight":
             return document.fortnight(b, self.events, 66, 18)
+        if key == "world":
+            return worldmap.compose(b, 86, 30)
+        if key == "counsel":
+            return counsel.compose(b, self.counsel_said, self.hours, 80, 32)
+        if key == "altar":
+            return altar.compose(b, self.altar_readings, self.altar_question,
+                                 self.altar_offering, 78, 32)
+        if key == "archive":
+            return archive.compose(b, self.archive_query, self.archive_hits,
+                                   self.archive_summary, self.archive_typing,
+                                   84, 32)
+        if key == "desk" and self.desk is not None:
+            item = next((i for i in b["stack"]
+                         if i["id"] == self.desk["letter_id"]), None)
+            if item is not None:
+                return composer.compose(
+                    item, self.desk["draft"], self.desk["intent"],
+                    self.desk["dictating"], house=b.get("house"),
+                    width=84, height=30)
         for _, (window_key, _title, (w, h), how) in TABLETS.items():
             if key == window_key:
                 return how(b, w, h)
@@ -178,6 +226,17 @@ class Game:
         self.repaint()
         window.focus()
 
+    def open_room(self, char: str) -> None:
+        """A conversation window. It binds its own handler and never shares."""
+        window_key, title, (w, h), handler = ROOMS[char]
+        window = self.app.window(
+            window_key, title, w, h, on_key=getattr(self, handler)
+            if handler != "on_tablet_key"
+            else (lambda e, k=window_key: self.on_tablet_key(e, k)),
+            on_close=lambda k=window_key: self.app.close(k))
+        self.repaint()
+        window.focus()
+
     def open_letter(self, item: dict) -> None:
         key = f"letter:{item['id']}"
         self.open_letters[key] = item
@@ -188,6 +247,208 @@ class Game:
         self.repaint()
         window.focus()
 
+    # --- the desk ------------------------------------------------------------
+
+    def open_desk(self, letter_id: str) -> None:
+        """Answer a letter. The tablet is not committed until it is sealed."""
+        item = next((i for i in self.belief["stack"] if i["id"] == letter_id),
+                    None)
+        if item is None or self.hours < REPLY_COST:
+            return                       # silently, as everywhere (D19)
+        self.desk = {
+            "letter_id": letter_id,
+            "intent": composer.INTENTS[0],
+            "dictating": False,
+            "dictated": False,
+            "buffer": "",
+            "draft": composer.formulary(
+                item["sender"], composer.INTENTS[0], self.seed,
+                self.world.date.absolute),
+        }
+        window = self.app.window(
+            "desk", f"The Desk — to {render.actor_name(item['sender'])}",
+            84, 30,
+            on_key=self.on_desk_key,
+            on_close=lambda: self.app.close("desk"))
+        self.repaint()
+        window.focus()
+
+    def _regrade(self) -> None:
+        """Recompose the draft from whatever the desk is currently holding."""
+        item = next(i for i in self.belief["stack"]
+                    if i["id"] == self.desk["letter_id"])
+        # Once the king has taken the stylus the tablet is his. Finishing
+        # dictation used to fall back to the formulary, which silently threw
+        # away everything he had just said.
+        if self.desk["dictating"] or self.desk["dictated"]:
+            self.desk["draft"] = composer.dictated(
+                self.desk["buffer"], item["sender"])
+        else:
+            self.desk["draft"] = composer.formulary(
+                item["sender"], self.desk["intent"], self.seed,
+                self.world.date.absolute)
+
+    def on_desk_key(self, event) -> None:
+        """The one window that takes typing, so it owns every key it sees.
+
+        Nothing here falls through to `on_key`: a king who types `q` into a
+        letter means the letter q, and a controller that quits instead has lost
+        the tablet he was writing.
+        """
+        desk = self.desk
+        if desk is None:
+            return
+        if event.keysym == "Escape":
+            self.desk = None
+            self.app.close("desk")
+            return
+        if desk["dictating"]:
+            if event.keysym in ("BackSpace", "Delete"):
+                desk["buffer"] = desk["buffer"][:-1]
+            elif event.keysym == "Return":
+                desk["buffer"] += "\n"
+            elif event.state & 4 and event.keysym in ("d", "D"):
+                desk["dictating"] = False       # ctrl-d: done dictating
+                desk["dictated"] = True
+            elif event.char and event.char.isprintable():
+                desk["buffer"] += event.char
+            else:
+                return
+            self._regrade()
+            self.repaint()
+            return
+
+        char = (event.char or "").lower()
+        if event.keysym == "Tab":
+            order = composer.INTENTS
+            desk["intent"] = order[
+                (order.index(desk["intent"]) + 1) % len(order)]
+            # Changing what you mean asks the scribe for a fresh draft, and
+            # that discards a dictation. It is the one destructive key here,
+            # which is why it is the one that is easy to reach and hard to hit
+            # by accident.
+            desk["dictated"] = False
+            self._regrade()
+        elif char == "d":
+            desk["dictating"] = True
+            desk["dictated"] = True
+            desk["buffer"] = desk["draft"].text
+            self._regrade()
+        elif event.keysym == "Return":
+            draft = desk["draft"]
+            sealed = self.do(A.DictateReply(
+                desk["letter_id"], desk["intent"], draft.text, draft.profile,
+                draft.score.total, draft.score.violations), REPLY_COST)
+            if sealed:
+                self.desk = None
+                self.app.close("desk")
+                self.hall_window.focus()
+            return
+        else:
+            return
+        self.repaint()
+
+    # --- counsel, the altar, the tablet house --------------------------------
+
+    def ask_counsel(self, topic: str, question: str) -> None:
+        """An hour for an answer he gives from memory.
+
+        No engine action: a conversation changes nothing in the world, and the
+        hours are session state (attention is derived — see `hall.compose`). So
+        nothing goes in the log and a replay is unaffected.
+        """
+        if self.hours < counsel.ASK_COST:
+            return
+        self.hours -= counsel.ASK_COST
+        self.counsel_said.append(("king", question))
+        self.counsel_said.append(("scribe", counsel.answer(
+            self.belief, topic, self.seed, self.world.date.absolute)))
+        self.repaint()
+
+    def on_counsel_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("counsel")
+            return
+        char = event.char or ""
+        for key, question, topic in counsel.QUESTIONS:
+            if char == key:
+                self.ask_counsel(topic, question)
+                return
+
+    def on_altar_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("altar")
+            return
+        char = (event.char or "").lower()
+        for key, _label, topic in altar.QUESTIONS:
+            if char == key:
+                self.altar_question = topic
+                self.repaint()
+                return
+        for key, good, quantity in altar.OFFERINGS:
+            if char == key:
+                self.altar_offering = (good, quantity)
+                self.repaint()
+                return
+        if event.keysym == "Return":
+            good, quantity = self.altar_offering or ("", 0)
+            events = []
+            if self.hours >= OMEN_COST:
+                before = self.world
+                self.world, events = apply(self.world, A.ConsultDiviner(
+                    self.altar_question, "", good, quantity))
+                if self.world is not before:
+                    self.hours -= OMEN_COST
+                    self.log.append(
+                        {"turn": self.world.date.absolute,
+                         "action": A.to_dict(A.ConsultDiviner(
+                             self.altar_question, "", good, quantity))})
+            taken = next((e for e in events
+                          if isinstance(e, A.OmenTaken)), None)
+            if taken is not None:
+                self.altar_readings.append(
+                    f"He reads the liver and says: {taken.reported}.")
+            self.repaint()
+
+    def on_archive_key(self, event) -> None:
+        if event.keysym == "Escape":
+            if self.archive_typing:
+                self.archive_typing = False
+                self.repaint()
+                return
+            self.app.close("archive")
+            return
+        if self.archive_typing:
+            if event.keysym in ("BackSpace", "Delete"):
+                self.archive_query = self.archive_query[:-1]
+            elif event.keysym == "Return":
+                self.archive_typing = False
+                self.search_archive()
+                return
+            elif event.char and event.char.isprintable():
+                self.archive_query += event.char
+            else:
+                return
+            self.repaint()
+            return
+        if (event.char or "") == "/":
+            self.archive_typing = True
+            self.archive_query = ""
+            self.repaint()
+        elif event.keysym == "Return":
+            self.search_archive()
+
+    def search_archive(self) -> None:
+        """One hour per query (spec 6.17), and the hour is the mechanic."""
+        query = self.archive_query.strip().lower()
+        if not query or not self.do(A.SearchArchive(query), SEARCH_COST):
+            self.repaint()
+            return
+        hits = self.belief.get("archive_index", {}).get("hits", {}).get(query, [])
+        self.archive_hits = hits
+        self.archive_summary = librarian.fallback_summary(query, hits)
+        self.repaint()
+
     # --- keys ----------------------------------------------------------------
 
     def on_key(self, event) -> None:
@@ -196,6 +457,14 @@ class Game:
             self.end_fortnight()
         elif char in TABLETS:
             self.open_tablet(char)
+        elif char in ROOMS:
+            self.open_room(char)
+        elif char == "d":
+            # The desk without a letter chosen answers the oldest thing on the
+            # pile, which is what a king with a stack in front of him does.
+            read = [item for item in self.belief["stack"] if item["read"]]
+            if read:
+                self.open_desk(read[0]["id"])
         elif char == "\\":
             # Read the windows out loud. Not a game verb: it costs no hours,
             # changes nothing, and is how a player reports what he was looking
@@ -221,6 +490,11 @@ class Game:
             self.hall_window.focus()
             return
         char = (event.char or "").lower()
+        if key.startswith("letter:") and char == "a":
+            # Answer the tablet you are looking at. The desk opens beside it,
+            # so the claim being answered stays on screen while it is answered.
+            self.open_desk(key.split(":", 1)[1])
+            return
         if key == "stack" and char.isdigit() and char != "0":
             index = int(char) - 1
             if not 0 <= index < len(self.stack_order):

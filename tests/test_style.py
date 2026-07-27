@@ -66,18 +66,26 @@ def test_a_shadow_falls_down_and_right() -> None:
 
 # --- the hall -----------------------------------------------------------------
 
-def test_the_hall_marks_the_doors_that_are_not_built() -> None:
-    """A door the player cannot open is information; a vanished one is a lie."""
+def test_the_hall_shows_every_door_it_has() -> None:
+    """A door the player cannot open is marked; a vanished one is a lie.
+
+    Every door is built now, so what this guards is the other half: nothing is
+    quietly missing from the list, and nothing is marked unbuilt that is not.
+    """
     text = plain_text(hall.compose(_belief(), 92, 30))
-    assert "[o] the oaths" in text
-    assert "[c] counsel ·" in text
-    assert "not yet built" in text
+    for key, label, target in hall.DOORS:
+        assert f"[{key}] {label}" in text
+        if target in hall.BUILT:
+            assert f"[{key}] {label} ·" not in text
+    assert "not yet built" not in text
 
 
 def test_every_built_door_has_a_window_behind_it() -> None:
     import play_gui
 
-    behind = {key for key, _t, _s, _how in play_gui.TABLETS.values()}
+    behind = ({key for key, _t, _s, _how in play_gui.TABLETS.values()}
+              | {key for key, _t, _s, _h in play_gui.ROOMS.values()}
+              | {"desk"})          # reached from a letter, not from a key
     advertised = {target for _k, _l, target in hall.DOORS
                   if target in hall.BUILT}
     assert behind == advertised
@@ -127,7 +135,7 @@ def test_a_fortnight_reports_what_happened_and_not_what_it_means() -> None:
 
 
 def test_help_is_a_written_page_and_never_advice() -> None:
-    text = plain_text(help_page.compose(74, 34))
+    text = plain_text(help_page.compose())
     assert "Reading a tablet costs two" in text
     assert "[s] the stack" in text
     assert "It will not warn you" in text
@@ -135,7 +143,7 @@ def test_help_is_a_written_page_and_never_advice() -> None:
 
 def test_help_fits_every_line_it_promises() -> None:
     """A truncated instruction is worse than no instruction."""
-    text = plain_text(help_page.compose(74, 34))
+    text = plain_text(help_page.compose())
     for _title, rows in help_page.PAGES:
         for _key, sentence in rows:
             assert sentence in text, f"cut off: {sentence!r}"

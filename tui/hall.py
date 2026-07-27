@@ -30,6 +30,7 @@ DOORS = (
     ("m", "the muster", "muster"),
     ("o", "the oaths", "oaths"),
     ("a", "the tablet house", "archive"),
+    ("v", "the altar", "altar"),
     ("h", "the house", "house"),
     ("w", "the known world", "world"),
     ("c", "counsel", "counsel"),
@@ -40,8 +41,9 @@ DOORS = (
 # a dot, never removed: a player who can see the shape of the game and be told
 # "not yet" has been told the truth, and a menu that quietly shrinks has not.
 # The controller reads this rather than keeping its own list.
-BUILT = frozenset({"stack", "roll", "stores", "muster",
-                   "oaths", "land", "house", "help"})
+BUILT = frozenset({"stack", "roll", "stores", "muster", "oaths", "land",
+                   "house", "help", "desk", "archive", "altar", "world",
+                   "counsel"})
 
 
 def _trunc(text: str, width: int) -> str:

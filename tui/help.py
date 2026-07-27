@@ -33,7 +33,16 @@ PAGES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("o", "the oaths — the clauses you are bound by, in full"),
         ("l", "the land — the gauge, the floor, the seed, the hands"),
         ("h", "the house — your family, and who stands to inherit"),
+        ("w", "the known world — who is where, and what is reachable"),
         ("esc", "close a window. the hall never closes but to leave"),
+    )),
+    ("THE ROOMS", (
+        ("d", "the desk — answer a letter. two hours, whatever it says"),
+        ("c", "counsel — Yabninu. an hour a question, and he can be wrong"),
+        ("v", "the altar — put a question to the diviner"),
+        ("a", "the tablet house — search the archive. an hour a query"),
+        ("", "In the stack press 1-9 to read; in an open letter press [a]"),
+        ("", "to answer it, and the desk opens beside the claim it answers."),
     )),
     ("THE WHOLE POINT", (
         ("", "Every window is a real window. Drag two apart and read them"),
@@ -52,7 +61,7 @@ PAGES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
 )
 
 
-def compose(width: int = 74, height: int = 34) -> Screen:
+def compose(width: int = 74, height: int = 44) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="HELP",
                 note="[esc] close", drop=False)

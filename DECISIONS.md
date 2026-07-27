@@ -740,3 +740,39 @@ which key opens what, what an hour costs — and it is never wrong, because
 nothing in it is generated. COUNSEL will know the *world*, cost an hour, and be
 able to be mistaken, because he is a person. That is the whole distinction, and
 it is why HELP can ship without a model.
+
+---
+
+## D37. Art by station, and only where it earns its place
+
+**Twelve faces, chosen by what a man is and not by who he is.** A face per
+correspondent is wallpaper and, worse, it is a crowd of strangers; a dozen faces
+reused for the stations of a small world — king, viceroy, merchant, overseer,
+priest, scribe, physician, herald, queen, envoy, soldier, and the one for a man
+nobody has placed — reads as a court. They are all 13x9, so a face can go in any
+slot without the text beside it moving.
+
+**No drawing carries a colour.** `art.draw()` colours by glyph *weight*: `█▓`
+are the lit face of a thing, `▒░` its shadow, punctuation its edges. So the same
+altar renders in flame at the altar and in ash on a ledger, and every drawing
+survives `plain_text` as a picture rather than as a smear. A test walks every
+drawing in the file for double-width glyphs — one would shear every column to
+its right, silently, which is exactly the class of bug an eye does not catch.
+
+**Where art is allowed:** the three settings D34 named (the hall, the altar, the
+tablet house), and a face beside anyone who speaks. Nowhere else. A picture on a
+ledger would make the numbers feel authored, and the numbers are the one thing
+in this game that must feel found.
+
+**The desk is the one window that takes typing**, so it owns every key it sees
+and nothing falls through to the hall. A king who types `q` into a letter means
+the letter q; a controller that quits instead has lost the tablet he was
+writing. Changing the intent discards a dictation, and it is the only
+destructive key on the screen.
+
+**COUNSEL ships without a model.** Yabninu answers from the same Belief the
+player could read himself, from memory, and is wrong about one answer in five —
+deterministically, unexplained, with no tell to learn. When he is wrong he gives
+a real figure from a real ledger, only the wrong one: the same rule as the
+scribes (D11) and the diviner (M9). The only defence is the ledger, which is two
+keystrokes away and costs nothing, and that is the lesson.
