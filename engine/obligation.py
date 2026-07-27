@@ -180,6 +180,25 @@ def render(obligation: Obligation, quantity: int,
     return obligation
 
 
+def renew(obligation: Obligation) -> Obligation:
+    """Open a recurring clause for its next term.
+
+    A yearly tribute is not one debt that is settled forever. Once its window
+    has passed -- discharged, defaulted, or remitted -- the clause stands again
+    for the next year, with nothing rendered against it. The history carries
+    over: what was paid late, and what was never paid at all, is exactly what
+    the beneficiary remembers.
+    """
+    if obligation.due.kind not in ("season", "every"):
+        raise ClauseError(f"{obligation.id}: {obligation.due.kind} does not recur")
+    if obligation.open:
+        raise ClauseError(
+            f"{obligation.id}: still {obligation.status}; nothing to renew")
+    return dataclasses.replace(
+        obligation, status="pending", rendered=0,
+        history=obligation.history + (f"renewed from {obligation.status}",))
+
+
 def faults(obligations: tuple[Obligation, ...],
            exists=lambda entity_id: True) -> tuple[str, ...]:
     """Everything wrong with a set of obligations, as sentences."""

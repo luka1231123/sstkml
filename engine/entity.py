@@ -229,6 +229,47 @@ class Route:
         return sum(leg.fortnights for leg in self.legs)
 
 
+# --- people and organizations (spec 5.2, 5.3) ---------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class Cohort:
+    """Ordinary population, persistent and counted (spec 5.3).
+
+    A cohort is not a number of people in a settlement's ledger: it has an
+    origin, a residence, a memory of going hungry, and it can be split or
+    merged without losing either. Splitting and merging must conserve people.
+    """
+    id: EntityId
+    settlement: EntityId
+    kind: str                    # "field_labour" | "craft" | "carrier" | ...
+    households: int
+    people: int
+    origin: EntityId = ""        # where they are from, if not where they live
+    labour_per_head: int = 12    # person-days per fortnight
+    ration_per_head: int = 10    # units of grain per person per fortnight
+    hunger: int = 0              # fortnights of shortfall; the cohort's memory
+    grievance: int = 0           # scaled 1000
+
+    def labour(self) -> int:
+        # Hunger takes the strength before it takes the numbers.
+        able = max(0, 1000 - self.hunger * 100)
+        return self.people * self.labour_per_head * min(1000, able) // 1000
+
+    def ration(self) -> int:
+        return self.people * self.ration_per_head
+
+
+@dataclasses.dataclass(frozen=True)
+class Organization:
+    """An enduring actor: palace, temple, merchant house, village council."""
+    id: EntityId
+    name: str
+    settlement: EntityId
+    kind: str                    # "council" | "palace" | "temple" | "merchant"
+    policy: str = "subsistence"  # which deterministic policy it decides by
+    authority: int = 0           # rank, used to break allocation ties
+
+
 # --- registries ---------------------------------------------------------------
 
 @dataclasses.dataclass(frozen=True)
@@ -240,6 +281,9 @@ class Registry:
         default_factory=dict)
     sites: Mapping[EntityId, Site] = dataclasses.field(default_factory=dict)
     routes: Mapping[EntityId, Route] = dataclasses.field(default_factory=dict)
+    cohorts: Mapping[EntityId, Cohort] = dataclasses.field(default_factory=dict)
+    orgs: Mapping[EntityId, Organization] = dataclasses.field(
+        default_factory=dict)
 
     def tables(self) -> tuple[tuple[str, Mapping], ...]:
         return (
@@ -248,6 +292,8 @@ class Registry:
             ("settlements", self.settlements),
             ("sites", self.sites),
             ("routes", self.routes),
+            ("cohorts", self.cohorts),
+            ("orgs", self.orgs),
         )
 
     def exists(self, entity_id: EntityId) -> bool:
@@ -285,6 +331,19 @@ def check(registry: Registry) -> tuple[str, ...]:
         require(pid, "seat", polity.seat, registry.settlements)
         for held in polity.controls:
             require(pid, "controls", held, registry.settlements)
+
+    for cid in sorted(registry.cohorts):
+        cohort = registry.cohorts[cid]
+        require(cid, "settlement", cohort.settlement, registry.settlements)
+        if cohort.people < 0 or cohort.households < 0:
+            faults.append(f"{cid}: negative population")
+        if cohort.households > cohort.people:
+            faults.append(
+                f"{cid}: {cohort.households} households among {cohort.people} people")
+
+    for oid in sorted(registry.orgs):
+        org = registry.orgs[oid]
+        require(oid, "settlement", org.settlement, registry.settlements)
 
     for rid in sorted(registry.routes):
         route = registry.routes[rid]
