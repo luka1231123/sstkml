@@ -149,25 +149,38 @@ def compose(b: dict, width: int = 104, height: int = 36,
     for row in range(5, height - 2):
         surface.put(divider, row, "│", C["faint"], C["ink"])
 
-    # Matters: conclusions and next steps, explicitly advisory.
+    # Matters: the exception, then the man who raised it and what he is going
+    # on. The title and the reason are facts and may be stated flatly; the
+    # third line is advice, and advice is only allowed to appear in somebody's
+    # mouth (UI/UX spec 20: never an unattributed `Do: send grain`).
     style.bar(surface, 2, 5, left_width + 2, " MATTERS BEFORE THE KING",
               fg=C["bone"], bg=C["faint"])
     matters = advice.concerns(b, 4)
     if not matters:
         surface.text(4, 7, "Yabninu has put no immediate concern before you.",
                      C["ash"], C["ink"])
+    # Four rows apiece where there is room for the basis, three where there is
+    # not: the attribution is not optional, but the grounds for it are the
+    # first thing to go when the Hall is short (spec 6, order of contraction).
+    # `floor` is where the hall's own people start; a matter may not run under
+    # them, so a matter that does not fit whole is not drawn at all.
+    floor = min(height - 9, 20)
+    pitch = 4 if (floor - 7) >= len(matters) * 4 else 3
     for index, concern in enumerate(matters):
-        row = 7 + index * 3
-        if row + 1 >= height - 9:
+        row = 7 + index * pitch
+        if row + pitch > floor:
             break
         style.keycap(surface, 4, row, str(index + 1),
                      _trunc(concern.title, left_width - 10),
                      command=str(index + 1))
         surface.text(7, row + 1, _trunc(concern.reason, left_width - 6),
                      C["ash"], C["ink"])
-        surface.text(7, row + 2,
-                     _trunc("Do: " + concern.suggestion, left_width - 6),
+        surface.text(7, row + 2, _trunc(concern.said(), left_width - 6),
                      C["bone"], C["ink"])
+        if pitch >= 4 and concern.basis:
+            surface.text(9, row + 3,
+                         _trunc("— " + concern.basis, left_width - 8),
+                         C["dim"], C["ink"])
 
     # The physical hall remains visible beneath the advice.
     waiting_top = min(height - 9, 20)

@@ -19,6 +19,16 @@ overseer_royal_lands = "Yarimmu, overseer of the royal lands"
 overseer_siyannu = "Abdi-hagab, overseer of Siyannu"
 overseer_ilishtamai = "Kurwanu, overseer of Ilishtamai"
 overseer_temple_lands = "the steward of the house of Baal"
+
+# The men who keep the institutions. They speak on the Hall's matters, because
+# advice may only appear attributed to a named person (UI/UX spec 20), and the
+# keeper of a thing is the person whose report the figure came from. Offices
+# rather than personal names: these posts outlive their holders, and the
+# scenario appoints to them by title.
+harbourmaster = "the harbourmaster"
+steward_granary = "the steward of the granary"
+master_smith = "the master smith"
+high_priest = "the high priest"
 ashiranu_vintner = "Ashiranu, keeper of a vineyard"
 ili_rapihu_shepherd = "Ili-rapihu, a shepherd"
 abdi_anu_shipwright = "Abdi-Anu, a shipwright"

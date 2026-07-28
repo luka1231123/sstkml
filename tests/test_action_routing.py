@@ -111,3 +111,54 @@ def test_a_notice_is_still_an_ordinary_string() -> None:
     assert line[:4] == "that"
     assert line.kind == registry.REFUSAL
     assert not style.Notice("")
+
+
+# --- the adviser (UI/UX spec 20) ---------------------------------------------
+
+def test_no_advice_is_ever_unattributed() -> None:
+    from tui import advice
+
+    belief = project(_world())
+    matters = advice.concerns(belief, 9)
+    assert matters, "the fixture must actually raise concerns"
+    for concern in matters:
+        assert concern.speaker, concern.id
+        assert concern.said().startswith(concern.speaker + ":")
+        # An imperative in the palace's own voice is the thing being removed.
+        assert not concern.said().startswith("Do:")
+
+
+def test_advice_says_what_it_rests_on() -> None:
+    from tui import advice
+
+    belief = project(_world())
+    for concern in advice.concerns(belief, 9):
+        assert concern.basis, concern.id
+
+
+def test_a_vacant_post_speaks_through_the_scribe_and_says_so() -> None:
+    from tui import advice
+
+    held = {"institutions": [
+        {"id": "g", "kind": "granary", "head": "steward_granary", "name": "g"}]}
+    empty = {"institutions": [
+        {"id": "g", "kind": "granary", "head": "", "name": "g"}]}
+    assert advice.speaker_for(held, "granary") == (
+        "the steward of the granary", True)
+    assert advice.speaker_for(empty, "granary") == (advice.SCRIBE, False)
+    # And a kind the city does not have at all is nobody's business but his.
+    assert advice.speaker_for(empty, "harbour") == (advice.SCRIBE, False)
+
+
+def test_the_hall_attributes_every_matter_it_draws() -> None:
+    from tui import advice, hall
+    from tui.grid import plain_text
+
+    belief = project(_world())
+    text = plain_text(hall.compose(belief, 92, 34, hours_left=6))
+    assert "Do:" not in text
+    drawn = [c for c in advice.concerns(belief, 4)
+             if c.title[:20] in text]
+    assert drawn, "the fixture must put something on the Hall"
+    for concern in drawn:
+        assert f"{concern.speaker}:"[:24] in text, concern.id

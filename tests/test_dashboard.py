@@ -51,7 +51,12 @@ def test_hall_is_a_clickable_dashboard_with_advice() -> None:
     view = hall.compose(b)
     text = plain_text(view)
     assert "MATTERS BEFORE THE KING" in text
-    assert "Do:" in text and "INBOX" in text
+    assert "INBOX" in text
+    # Advice appears in somebody's mouth or not at all (UI/UX spec 20). The
+    # old unattributed `Do: ...` imperative made the palace sound omniscient.
+    assert "Do:" not in text
+    assert all(f"{item.speaker}:" in text or item.speaker not in text
+               for item in matters)
     commands = {hit.command for hit in view.hits if hit.enabled}
     assert {"1", "s", "c", "space"} <= commands
 
