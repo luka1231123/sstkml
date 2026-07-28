@@ -45,6 +45,16 @@ class Field:
     name: str
     domain: str
     optional: bool = False
+    argument: str = ""
+    """Which engine field this fills, when it is not the one in this position.
+
+    Fields are matched to the action's dataclass by position, which is right
+    for almost all of them and reads better than restating every engine name.
+    It is wrong wherever the grammar's word order differs from the engine's:
+    `rule <verdict> on <petition>` says the verdict first and `RulePetition`
+    takes the petition first, so building by position silently swapped the two
+    and made the order unusable. Say the name in those cases.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -167,9 +177,9 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         Field("offering", "good", True)),
        mnemonic="c", help_topic="divination"),
     _d("suppress_omen", A.SuppressOmen, "Suppress", "Suppress",
-       ("altar", "house"), ("suppress <omen>",), 2, (Field("omen", "omen"),),
+       ("altar",), ("suppress <omen>",), 2, (Field("omen", "omen"),),
        mnemonic="s", help_topic="omen_response", confirm=True),
-    _d("defy_omen", A.DefyOmen, "Defy", "Defy", ("altar", "house"),
+    _d("defy_omen", A.DefyOmen, "Defy", "Defy", ("altar",),
        ("defy <omen>",), 0, (Field("omen", "omen"),),
        mnemonic="d", help_topic="omen_response", confirm=True),
     _d("swear_oath", A.SwearOath, "Re-swear", "Swear", ("oaths",),
@@ -191,7 +201,8 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
        mnemonic="h", help_topic="justice_orders"),
     _d("rule_petition", A.RulePetition, "Rule", "Rule", ("justice",),
        ("rule <verdict> on <petition>",), 0,
-       (Field("verdict", "verdict"), Field("petition", "petition")),
+       (Field("verdict", "verdict", argument="verdict"),
+        Field("petition", "petition", argument="petition_id")),
        mnemonic="r", help_topic="justice_orders", confirm=True),
     _d("set_land_due", A.SetLandDue, "Set land due", "Land due", ("land",),
        ("set land due to <rate>",), 0, (Field("rate", "quantity"),),
@@ -250,18 +261,18 @@ def cost_of(action) -> int:
 def argument_names(descriptor: ActionDescriptor) -> dict[str, str]:
     """Which engine field each descriptor field fills.
 
-    The two lists are positional: `Field("group", "group")` fills `group_id`
-    because it comes first in both. That contract was already load-bearing --
-    the command palette builds actions by position -- but it was written down
-    nowhere, so the second reader of a logged action had to guess. It reads the
-    engine dataclass rather than restating its field names, so renaming one
-    cannot leave a stale copy here.
+    The two lists are positional unless a field says otherwise: `Field("group",
+    "group")` fills `group_id` because it comes first in both. That contract
+    was already load-bearing -- the command palette builds actions by position
+    -- but it was written down nowhere, and where it did not hold it swapped
+    two arguments in silence. It reads the engine dataclass rather than
+    restating its field names, so renaming one cannot leave a stale copy here.
     """
     engine = [field.name
               for field in dataclasses.fields(descriptor.action_type)]
-    return {field.name: engine[index]
+    return {field.name: (field.argument or engine[index])
             for index, field in enumerate(descriptor.fields)
-            if index < len(engine)}
+            if field.argument or index < len(engine)}
 
 
 def in_context(context: str) -> tuple[ActionDescriptor, ...]:

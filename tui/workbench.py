@@ -52,6 +52,13 @@ class Control:
     label: str = ""
     enabled: bool = True
     why: str = ""
+    command: str = ""
+    """What clicking it says, when `do:<action_id>` would be ambiguous.
+
+    Four verdicts are all one action, so a court that offered them as four
+    `do:rule_petition` regions would give the same answer whichever the player
+    pressed.
+    """
 
     @property
     def descriptor(self) -> registry.ActionDescriptor | None:
@@ -106,35 +113,52 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             notice: str = "", empty: str = "nothing here.",
             note: str = "",
             views: tuple[tuple[str, str], ...] = (),
-            view: str = "") -> InteractiveScreen:
-    """The whole screen: list left, detail right, controls along the bottom."""
+            view: str = "", scene=None, scene_rows: int = 0,
+            detail_min: int = 18) -> InteractiveScreen:
+    """The whole screen: list left, detail right, controls along the bottom.
+
+    `scene` is a band across the top for a window that is a room rather than a
+    ledger -- it is handed the surface and the band it owns, and everything
+    below shifts down by `scene_rows`. Passing none is the ordinary case.
+    """
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title=title,
                 note="[esc] close", drop=False)
     style.notice(surface, 2, 1, width - 4, notice)
     if views:
         tabs(surface, 2, 2, width, views, view)
+    if scene is not None and scene_rows > 0:
+        scene(surface, 1, 3, width - 2, scene_rows)
 
     # The list gets the width its columns actually need, and the detail takes
     # what is left -- rather than a fixed share, which cut the last column off
     # every wide table and hid the very figures the screen exists to compare.
+    # `detail_min` is how many columns the right-hand pane needs to be worth
+    # having. A ledger's detail is a few short lines and 18 will do; a room's
+    # is sentences about a person, and squeezing it to 18 turned every one of
+    # them into a column of stubs.
     natural = sum(abs(spec) for spec in widths) + 2 * len(widths) + 2
-    stacked = width < 68 or natural > width - 24
+    stacked = width < 68 or natural > width - detail_min - 6
     if stacked:
         list_width, detail_x = width - 4, 3
     else:
-        list_width = max(30, min(natural, width - 24))
+        list_width = max(30, min(natural, width - detail_min - 6))
         detail_x = list_width + 4
 
-    top = 3
+    top = 3 + scene_rows
     style.bar(surface, 2, top, list_width, " ", fg=C["bone"], bg=C["faint"])
     _columns(surface, 3, top, headers, widths, list_width,
              header=True)
 
     # The list. Height is what is left after the footer and, when the panes are
     # stacked, after the detail that now sits beneath it.
+    # What the list may occupy. It owns `top` for its header, one row per item,
+    # and one more for the "1-14 OF 18" line -- and below it sit the note and
+    # the controls, which it must not reach. Counted rather than estimated:
+    # the estimate was one row out, so a full page wrote its own scroll line
+    # over whatever the screen had put at the bottom.
     footer_rows = rows_needed(controls, hours, width)
-    available = height - top - 3 - footer_rows
+    available = height - top - 4 - footer_rows - (2 if note else 0)
     if stacked:
         # Both panes in one column. The list keeps at least a third of what is
         # left, so a long detail cannot squeeze the collection down to a single
@@ -169,8 +193,12 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
 
     detail_y = (top + 2 + (page.end - page.start) + 2) if stacked else top + 1
     detail_room = width - detail_x - 2
+    # The note keeps its own row: a detail long enough to reach it used to
+    # print over it, so the line explaining the screen vanished on exactly the
+    # screens with enough in them to need explaining.
+    detail_floor = height - 2 - footer_rows - (1 if note else 0)
     for offset, (text, tone) in enumerate(detail):
-        if detail_y + offset >= height - 2 - footer_rows:
+        if detail_y + offset >= detail_floor:
             break
         surface.text(detail_x, detail_y + offset, text[:detail_room],
                      C.get(tone, C["clay"]), C["ink"])
@@ -256,4 +284,5 @@ def _controls(surface: Surface, controls: list[Control], hours: int,
         for control, caption in row:
             column += style.keycap(
                 surface, column, line, control.key, caption, control.enabled,
-                command=f"do:{control.action_id}", bg=C["lapis"]) + 2
+                command=control.command or f"do:{control.action_id}",
+                bg=C["lapis"]) + 2

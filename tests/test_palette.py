@@ -194,3 +194,34 @@ def test_the_window_says_when_there_are_not_the_hours() -> None:
     line = "repair the great granary"
     text = plain_text(command.compose(line, palette.parse(line, belief), 0))
     assert "0 remain" in text
+
+
+def test_a_field_fills_the_engine_field_of_its_own_name() -> None:
+    """Arguments are matched by position, and position is not always right.
+
+    `rule <verdict> on <petition>` says the verdict first; `RulePetition` takes
+    the petition first. Assembled by position, the order named the petition
+    "for" and the verdict "boundary_ashiranu" -- built without complaint and
+    refused by the engine, so the one command was unusable and said nothing
+    about why. Where an engine field has the same name as a descriptor field,
+    that is the one it must fill.
+    """
+    import dataclasses
+
+    for descriptor in registry.DESCRIPTORS:
+        names = registry.argument_names(descriptor)
+        engine = {field.name
+                  for field in dataclasses.fields(descriptor.action_type)}
+        for field in descriptor.fields:
+            if field.name in engine:
+                assert names[field.name] == field.name, (
+                    descriptor.id, field.name, names[field.name])
+
+
+def test_a_verdict_is_given_on_the_petition_it_names() -> None:
+    belief = _belief()
+    petition = belief["justice"]["petitions"][0]["id"]
+    built = palette.build(palette.parse(f"rule for on {petition}", belief))
+    assert built is not None
+    assert built.petition_id == petition
+    assert built.verdict == "for"

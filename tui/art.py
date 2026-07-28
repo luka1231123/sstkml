@@ -51,6 +51,39 @@ def size(rows) -> tuple[int, int]:
     return (max((len(row) for row in rows), default=0), len(rows))
 
 
+# One letter per palette entry, for painting a drawing cell by cell. Sixteen
+# colours, sixteen letters, and the letters are arbitrary on purpose: they name
+# the palette entry, never the meaning, because meaning is never carried by a
+# colour in this game (spec 9.6).
+PAINT = {
+    "i": "ink", "c": "clay", "d": "dim", "f": "faint", "l": "flame",
+    "r": "blood", "b": "barley", "g": "gold", "z": "lapis", "e": "verdigris",
+    "m": "bone", "h": "shadow", "a": "ash", "w": "wine", "n": "sand",
+    "k": "sky",
+}
+
+
+def paint(surface: Surface, x: int, y: int, rows, mask,
+          default: int = C["clay"], bg: int = C["ink"]) -> None:
+    """Blit a drawing, colouring each cell from a mask laid over it.
+
+    `draw` colours by the weight of the glyph, which is right for a silhouette
+    and wrong for a painted thing: a gold crown, a bronze lamp and a wine-dyed
+    canopy are all the same block. The mask is a second picture of the same
+    shape, one letter per cell naming a palette entry, so the drawing and its
+    colouring are written and edited side by side -- and a row that drifts out
+    of step with the other is visible on the page rather than at run time.
+    """
+    for row_index, row in enumerate(rows):
+        tones = mask[row_index] if row_index < len(mask) else ""
+        for column, glyph in enumerate(row):
+            if glyph == " ":
+                continue
+            letter = tones[column] if column < len(tones) else " "
+            fg = C.get(PAINT.get(letter, ""), default)
+            surface.put(x + column, y + row_index, glyph, fg, bg)
+
+
 # --- faces --------------------------------------------------------------------
 #
 # Twelve, and no more. A recurring face is a person; a face per correspondent is
@@ -201,34 +234,196 @@ STRANGER = (
     "▐▒▒▒▒▒▒▒▒▒▒▒▌",
 )
 
-# Two full figures for the court of justice. They are deliberately plain ASCII
-# rather than portrait blocks: this is a confrontation on the king's floor,
-# and the silhouettes must survive even the strictest terminal degrade path.
-LITIGANT_LEFT = (
-    "     _____     ",
-    "    /_____\\    ",
-    "    | o o |    ",
-    "    |  ^  |    ",
-    "    | --- |    ",
-    "   /|=====|\\   ",
-    "  / |     | \\  ",
-    "    |-----|    ",
-    "    | | | |    ",
-    "   /_/   \\_\\   ",
+# --- the throne room ----------------------------------------------------------
+#
+# The one room the player is actually *in*. Everywhere else he is reading; here
+# he is sitting, and people are standing in front of him waiting to be dealt
+# with. So the scene is not decoration: the figures on the floor are the queue,
+# one for each matter, and the one under the marker is the one the list has
+# selected. Clicking a man selects his business.
+#
+# Drawn in the same block idiom as the faces above. The earlier litigants were
+# plain ASCII on the theory that a silhouette should survive the strictest
+# degrade path, but `pure_ascii` folds the blocks for exactly that reason, so
+# the theory cost the room its whole visual register for nothing.
+
+# The throne under its canopy, on a stepped dais, between the pillars of the
+# hall. Painted rather than shaded: the mask beneath each drawing gives it a
+# gilt canopy crown, a wine-dyed cloth, a gold diadem and a lit face, which is
+# what makes it a room the king is sitting in rather than a diagram of a chair.
+THRONE = (
+    "◢▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄◣",
+    "█▚▞▚▞▚▞▚▞▚▞▚▞▚▞▚▞▚▞▚▞▚▞▚█",
+    "▐░▒▓▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▓▒░▌",
+    "╔═╩═╩═╩═╩═╩═╩═╩═╩═╩═╩═╩═╗",
+    "║▓█▌     ,▄███▄,     ▐█▓║",
+    "║▓█▌    ▟█▄▀▀▀▄█▙    ▐█▓║",
+    "║▓█▌    ▐█ ◘ ◘ █▌    ▐█▓║",
+    "║▓█▌    ▐█▓▒▄▒▓█▌    ▐█▓║",
+    "║▓█▌   ▟▓▒█████▒▓▙   ▐█▓║",
+    "║▓█▙▄▄▟▓▒███████▒▓▙▄▄▟█▓║",
+    "╚═╩═╩═╩═╩═╩═╩═╩═╩═╩═╩═╩═╝",
 )
 
-LITIGANT_RIGHT = (
-    "     .---.     ",
-    "    /_____\\    ",
-    "    | . . |    ",
-    "    |  ^  |    ",
-    "    | === |    ",
-    "   /|-----|\\   ",
-    "  / |     | \\  ",
-    "    |=====|    ",
-    "    | | | |    ",
-    "   /_/   \\_\\   ",
+THRONE_PAINT = (
+    "ggggggggggggggggggggggggg",
+    "gwwwwwwwwwwwwwwwwwwwwwwwg",
+    "gwwwwwwwwwwwwwwwwwwwwwwwg",
+    "nnnnnnnnnnnnnnnnnnnnnnnnn",
+    "nnnn     ggggggg     nnnn",
+    "nnnn    ggggggggg    nnnn",
+    "nnnn    mmmmmmmmm    nnnn",
+    "nnnn    mmwwwwwmm    nnnn",
+    "nnnn   wwwwwwwwwww   nnnn",
+    "nnnnnnwwwwwwwwwwwwwwwnnnn",
+    "nnnnnnnnnnnnnnnnnnnnnnnnn",
 )
+
+# One figure per waiting matter, nine columns wide so a rank of them fits.
+# Three kinds, because what a man is doing in the room is worth a glance: a
+# petitioner stands with his arms out, a man of the house wears the long robe
+# of the palace, an envoy carries what he has brought.
+PETITIONER = (
+    "   ,▄.   ",
+    "  ▟▒█▒▙  ",
+    "  ▝▀█▀▘  ",
+    " ╱▐▓█▓▌╲ ",
+    "  ▐▓█▓▌  ",
+    "  ▐░█░▌  ",
+    "  ▟▘ ▝▙  ",
+)
+
+PETITIONER_PAINT = (
+    "   ccc   ",
+    "  mmmmm  ",
+    "  ccccc  ",
+    " ccccccc ",
+    "  nnnnn  ",
+    "  nnnnn  ",
+    "  aa aa  ",
+)
+
+BOWED = (
+    "         ",
+    "   ,▄.   ",
+    "  ▟▒█▒▙  ",
+    "  ▝▀█▀▘  ",
+    " ╱▐▓█▓▌╲ ",
+    "  ▐░█░▌  ",
+    "  ▟▘ ▝▙  ",
+)
+
+BOWED_PAINT = (
+    "         ",
+    "   aaa   ",
+    "  ddddd  ",
+    "  aaaaa  ",
+    " aaaaaaa ",
+    "  aaaaa  ",
+    "  aa aa  ",
+)
+
+KIN = (
+    "   ,▄.   ",
+    "  ▟▒█▒▙  ",
+    "  ▝▀█▀▘  ",
+    " ╱▐▓█▓▌╲ ",
+    "  ▐▓█▓▌  ",
+    "  ▐░█░▌  ",
+    "  ▐▒█▒▌  ",
+)
+
+KIN_PAINT = (
+    "   ggg   ",
+    "  mmmmm  ",
+    "  ccccc  ",
+    " ccwwwcc ",
+    "  wwwww  ",
+    "  wwwww  ",
+    "  wwwww  ",
+)
+
+BEARER = (
+    "   ,▄.   ",
+    "  ▟▒█▒▙  ",
+    "  ▝▀█▀▘  ",
+    " ╱▐▓█▓▌▟▙",
+    "  ▐▓█▓▌█▌",
+    "  ▐░█░▌▀▘",
+    "  ▟▘ ▝▙  ",
+)
+
+BEARER_PAINT = (
+    "   kkk   ",
+    "  mmmmm  ",
+    "  ccccc  ",
+    " ccccccee",
+    "  cccccee",
+    "  nnnnnee",
+    "  aa aa  ",
+)
+
+FIGURE_WIDTH = 9
+
+# A pillar of the hall: palm capital, fluted shaft, moulded base. Drawn to
+# whatever height the room has left, so it stands on the floor rather than
+# floating above it.
+PILLAR_CAPITAL = ("╲▟█▙╱", "═╬█╬═", "╔╩█╩╗")
+PILLAR_SHAFT = ("║░█░║", "╠▒█▒╣", "║▓█▓║", "╠▒█▒╣")
+PILLAR_BASE = ("╚╦█╦╝", "═╩█╩═", "▟███▙")
+PILLAR_PAINT = {"capital": "ggggg", "shaft": "nnnnn", "base": "nnnnn"}
+
+# A lamp on its stand, in the corners of the floor. The flame is the only
+# flickering thing in the room, so it takes the one colour that means the lamp.
+BRAZIER = (
+    " .:. ",
+    " ▟▓▙ ",
+    "═╬█╬═",
+    " ╱█╲ ",
+    "▄▟█▙▄",
+)
+
+BRAZIER_PAINT = (
+    " lll ",
+    " lll ",
+    "ggggg",
+    " nnn ",
+    "nnnnn",
+)
+
+
+def pillar(height: int) -> tuple[str, ...]:
+    """A pillar drawn to fit, banded rather than one glyph repeated flat."""
+    body = max(0, height - len(PILLAR_CAPITAL) - len(PILLAR_BASE))
+    shaft = tuple(PILLAR_SHAFT[index % len(PILLAR_SHAFT)]
+                  for index in range(body))
+    return PILLAR_CAPITAL + shaft + PILLAR_BASE
+
+
+def pillar_paint(height: int) -> tuple[str, ...]:
+    rows = pillar(height)
+    return tuple(
+        PILLAR_PAINT["capital"] if index < len(PILLAR_CAPITAL)
+        else PILLAR_PAINT["base"] if index >= len(rows) - len(PILLAR_BASE)
+        else PILLAR_PAINT["shaft"]
+        for index in range(len(rows)))
+
+
+# Ornament along the top of a wall: a repeating Levantine guilloche, in five
+# glyphs rather than one so it reads as carving and not as a rule.
+CORNICE = "◢▄◣▀◤▄◥▀"
+PAVING = "▚▞:▞▚·▩▤∙▤▩·"
+
+
+def band(motif: str, width: int, offset: int = 0) -> str:
+    """A repeating ornament cut to a width, at an offset so courses interlock."""
+    return "".join(motif[(index + offset) % len(motif)]
+                   for index in range(max(0, width)))
+
+
+def floor(width: int, offset: int = 0) -> str:
+    """Tiled paving. The offset lets two courses sit out of step."""
+    return band(PAVING, width, offset)
 
 FACES = {
     "king": KING, "viceroy": VICEROY, "merchant": MERCHANT,

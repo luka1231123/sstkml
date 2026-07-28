@@ -11,8 +11,6 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import play, replay, save
-from tui import justice as justice_page
-from tui.grid import plain_text, pure_ascii
 
 SEED = 8814402919
 
@@ -180,40 +178,3 @@ def test_justice_actions_save_and_replay_through_a_correction() -> None:
     path = "/tmp/m12_justice_replay.json"
     save(path, SEED, "ugarit", len(script), log, world)
     assert state_hash(replay(path)) == state_hash(world)
-
-
-def test_the_court_screen_has_two_men_and_no_honesty_marker() -> None:
-    text = plain_text(justice_page.compose(project(_world())))
-    assert "| o o |" in text and "| . . |" in text
-    assert "Ashiranu" in text and "Ili-rapihu" in text
-    assert "honest" not in text.lower() and "truth" not in text.lower()
-    assert "[h] hear" in text and "[s] split" in text
-
-
-def test_the_court_screen_survives_the_ascii_path_and_its_frame() -> None:
-    screen = justice_page.compose(project(_world()), width=90, height=34)
-    assert len(screen) == 34 and all(len(row) == 90 for row in screen)
-    text = plain_text(pure_ascii(screen))
-    assert all(ord(character) < 128 for character in text)
-    assert "BEFORE THE KING" in text
-
-
-def test_the_windowed_court_spends_only_the_hearing_hour() -> None:
-    from tui.backend_tk import available
-    if not available():
-        return
-    import play_gui
-
-    game = play_gui.Game("ugarit", SEED)
-    for window in game.app.windows.values():
-        window.root.withdraw()
-    before = game.hours
-    game.on_key(type("K", (), {"char": "j", "keysym": "j"})())
-    assert "justice" in game.app.windows
-    game.app.windows["justice"].root.withdraw()
-    game.on_justice_key(type("K", (), {"char": "h", "keysym": "h"})())
-    assert game.hours == before - 1
-    game.on_justice_key(type("K", (), {"char": "f", "keysym": "f"})())
-    assert game.hours == before - 1
-    assert "boundary_ashiranu" not in game.world.court.petitions
-    game.app.stop()

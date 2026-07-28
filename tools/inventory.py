@@ -170,12 +170,26 @@ def _workbench_gaps() -> list[str]:
     from belief.project import project
     from engine.tick import advance
     from load import load_scenario
-    from tui import ledgers
+    from tui import ledgers, palace
 
     world = load_scenario("ugarit", 8814402919)
     for _ in range(8):
         world, _ = advance(world)
     belief = project(world)
+
+    gaps = []
+    # The palace states the orders it offers rather than drawing them into a
+    # command string, because several of its controls are not `do:<id>` -- four
+    # verdicts are one action. So it is checked against its own declaration and
+    # a second test checks that declaration is printed.
+    for view, context in palace.CONTEXT_OF.items():
+        offered = {control.action_id
+                   for control in palace.controls_for(belief, view, hours=8)}
+        for descriptor in registry.in_context(context):
+            if descriptor.id not in offered:
+                gaps.append(
+                    f"the palace's {view} does not offer {descriptor.id}, "
+                    f"which the registry says belongs to {context}")
 
     screens = {
         "stores": ledgers.stores(belief, hours=8, width=80, height=28),
@@ -184,7 +198,6 @@ def _workbench_gaps() -> list[str]:
         "muster": ledgers.muster(belief, hours=8, width=84, height=28),
         "oaths": ledgers.oaths(belief, hours=8, width=82, height=28),
     }
-    gaps = []
     for context, screen in screens.items():
         offered = {hit.command.split(":", 1)[1] for hit in screen.hits
                    if hit.command.startswith("do:")}

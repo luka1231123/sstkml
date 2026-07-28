@@ -7,7 +7,7 @@ is exactly where the old screens stopped drawing and said nothing.
 """
 from __future__ import annotations
 
-from tui import archive, city, collection, household, justice, works
+from tui import archive, city, collection, palace, works
 from tui.grid import plain_text
 
 SIZES = (0, 1, 9, 10, 100)
@@ -103,15 +103,15 @@ def _institutions(count: int) -> dict:
 def test_the_docket_shows_a_scrolled_petition_and_says_where_it_is() -> None:
     for count in SIZES:
         belief = _petitions(count)
-        assert plain_text(justice.compose(belief, height=34))
-        if count <= justice.docket_room(34):
+        assert plain_text(palace.compose(belief, view="court", height=36))
+        if not count:
             continue
-        last = f"kind{count - 1}"
-        text = plain_text(justice.compose(
-            belief, selected=f"p{count - 1}", height=34,
+        text = plain_text(palace.compose(
+            belief, view="court", selected=f"p{count - 1}", height=36,
             scroll=count))                       # past the end; must clamp back
-        assert last in text, count
-        assert "OF" in text, "a partial list must say so"
+        assert f"kind{count - 1}" in text, count
+        if count > 12:
+            assert "OF" in text, "a partial list must say so"
 
 
 def test_search_results_beyond_the_ninth_can_be_reached() -> None:
@@ -125,8 +125,9 @@ def test_search_results_beyond_the_ninth_can_be_reached() -> None:
 def test_the_house_shows_its_tenth_adult() -> None:
     for count in SIZES:
         belief = _house(count)
-        assert plain_text(household.compose(belief, height=34))
-    text = plain_text(household.compose(_house(100), scroll=95, height=34))
+        assert plain_text(palace.compose(belief, view="house", height=36))
+    text = plain_text(palace.compose(
+        _house(100), view="house", selected="m99", height=36, scroll=95))
     assert "person99" in text
     assert "OF 100" in text
 

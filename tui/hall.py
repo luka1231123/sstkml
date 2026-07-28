@@ -16,22 +16,19 @@ DOORS = (
     ("y", "City", "city"),
     ("m", "Muster", "muster"),
     ("o", "Oaths", "oaths"),
-    ("j", "Justice", "justice"),
-    ("h", "House", "house"),
+    ("j", "Palace", "palace"),
     ("v", "Altar", "altar"),
     ("a", "Archive", "archive"),
     ("w", "World", "world"),
-    ("f", "Relations", "relations"),
     ("p", "Sickness", "plague"),
     ("?", "Help", "help"),
     ("d", "Desk", "desk"),
 )
 
 BUILT = frozenset({
-    "stack", "roll", "stores", "muster", "oaths", "land", "house", "help",
-    "orders",
-    "desk", "archive", "altar", "world", "relations", "plague", "counsel",
-    "city", "justice",
+    "stack", "roll", "stores", "muster", "oaths", "land", "help",
+    "orders", "desk", "archive", "altar", "world", "plague", "counsel",
+    "city", "palace",
 })
 
 GROUPS = (
@@ -40,10 +37,8 @@ GROUPS = (
     ("KINGDOM", (("t", "Stores"), ("r", "Roll"), ("l", "Land"),
                  ("y", "City"))),
     ("OBLIGATIONS", (("m", "Muster"), ("o", "Oaths"))),
-    ("COURT", (("j", "Justice"), ("h", "House"), ("v", "Altar"),
-               ("a", "Archive"))),
-    ("WORLD", (("w", "World"), ("f", "Relations"), ("p", "Sickness"),
-               ("?", "Help"))),
+    ("COURT", (("j", "Palace"), ("v", "Altar"), ("a", "Archive"))),
+    ("WORLD", (("w", "World"), ("p", "Sickness"), ("?", "Help"))),
 )
 
 

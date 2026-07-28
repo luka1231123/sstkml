@@ -262,21 +262,25 @@ def build(result: Parse):
         return None
     descriptor = result.form.descriptor
     flags = LITERAL_VALUES.get(result.form.text, {})
-    arguments = []
+    names = registry.argument_names(descriptor)
+    # By name, not by position. `rule <verdict> on <petition>` says the verdict
+    # first and the engine takes the petition first, so assembling positionally
+    # built an order with its two arguments exchanged -- and an order that
+    # names the wrong subject is worse than an order refused.
+    arguments = dict(flags)
     for field in descriptor.fields:
+        engine = names.get(field.name, field.name)
         value = result.values.get(field.name)
         if value is None:
-            if field.name in flags:
+            if engine in flags:
                 continue        # the grammar said it in a literal word
             if not field.optional:
                 return None
-            arguments.append(None)
             continue
-        arguments.append(int(value) if field.domain == "quantity" else value)
-    while arguments and arguments[-1] is None:
-        arguments.pop()
+        arguments[engine] = (int(value) if field.domain == "quantity"
+                             else value)
     try:
-        return descriptor.action_type(*arguments, **flags)
+        return descriptor.action_type(**arguments)
     except (TypeError, ValueError):
         return None
 

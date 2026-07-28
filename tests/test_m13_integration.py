@@ -11,7 +11,7 @@ from engine.tick import advance
 from load import load_scenario
 from session import SAVE_VERSION, load_session, save
 from tools.m13_benchmark import DEFAULT_TURNS, measure, over_budget
-from tui import document, plague as plague_page, relations
+from tui import document, palace, plague as plague_page
 from tui.grid import plain_text
 
 SEED = 8814402919
@@ -57,7 +57,8 @@ def test_m13_save_boundary_is_versioned_and_round_trips() -> None:
 
 def test_existing_belief_has_intentional_relations_and_plague_pages() -> None:
     b = project(_world())
-    relation_text = plain_text(relations.compose(b))
+    relation_text = plain_text(palace.compose(b, view="relations",
+                                              width=98, height=36))
     plague_text = plain_text(plague_page.compose(b))
     assert "RELATIONS" in relation_text
     assert "obligation on the tablets" in relation_text

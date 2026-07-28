@@ -9,7 +9,7 @@ from engine import house, institution
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
-from tui import household
+from tui import palace
 from tui.grid import plain_text
 
 SEED = 8814402919
@@ -180,13 +180,23 @@ def test_revenue_and_placement_cross_the_belief_boundary_without_hidden_truth():
 
 def test_the_windowed_house_exposes_people_offices_and_controls():
     world = load_scenario("ugarit", SEED)
-    screen = household.compose(
-        project(world), "talmi_teshub", 86, 34)
-    text = plain_text(screen)
+    belief = project(world)
+    text = plain_text(palace.compose(
+        belief, view="house", selected="talmi_teshub", hours=8,
+        width=98, height=36))
     assert "Talmi-Teshub" in text
-    assert "THE OFFICES" in text
-    assert "name heir" in text
-    assert "land due" in text and "harbour" in text
+    assert "give him a post" in text and "Heir" in text
+    # The posts are a step of appointing rather than a column of letters.
+    posts = plain_text(palace.compose(
+        belief, view="house", choosing="post", person="talmi_teshub",
+        hours=8, width=98, height=36))
+    assert "A POST FOR TALMI-TESHUB" in posts
+    assert "who holds it" in posts
+    # The harbour due belongs to Relations, which is where the specification
+    # puts it and where it now is.
+    harbour = plain_text(palace.compose(belief, view="relations", hours=8,
+                                        width=98, height=36))
+    assert "harbour due" in harbour
 
 
 def test_new_actions_and_delayed_payloads_round_trip_through_the_log_registry():

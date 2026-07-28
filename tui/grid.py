@@ -136,6 +136,14 @@ _ASCII_FOLD = {
     "◢": "/", "◤": "/", "◣": "\\", "◥": "\\",
     "≈": "~", "≡": "=", "▪": "*", "▫": "o", "∩": "n", "◘": "o", "╫": "+",
     "▤": "#", "▩": "#", "╱": "/", "╲": "\\",
+    # Junctions and ornament. The palace's pillars and cornices are carved out
+    # of box-drawing furniture, so the tees and crosses have to fold with the
+    # corners they sit between rather than surviving into an ASCII screen as
+    # the only non-ASCII things left on it.
+    "╠": "+", "╣": "+", "╦": "+", "╩": "+", "╬": "+", "╤": "+", "╧": "+",
+    "╟": "+", "╢": "+", "╪": "+", "├": "+", "┤": "+", "┬": "+", "┴": "+",
+    "┼": "+", "∙": ".", "▬": "-", "◆": "*", "◇": "o", "○": "o", "●": "*",
+    "□": "o", "■": "*", "▼": "v",
 }
 
 

@@ -37,12 +37,10 @@ from engine.tick import advance
 from load import load_scenario
 from session import load_session, new_seed, save as save_session
 from ai import counsel as ai_counsel, help_agent, librarian, parser as ai_parser
-from tui import advice, collection, justice as justice_page
+from tui import advice, collection, palace
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
-from tui import household as household_page
 from tui import plague as plague_page
-from tui import relations as relations_page
 from tui import orders as orders_page
 from tui import works as works_page
 from tui import (altar, archive, city, command as command_page, composer,
@@ -91,9 +89,7 @@ ROOMS: dict[str, tuple[str, str, str]] = {
     "v": ("altar", "The Altar", "on_altar_key"),
     "a": ("archive", "The Tablet House", "on_archive_key"),
     "y": ("city", "The City", "on_city_key"),
-    "j": ("justice", "The Court of Justice", "on_justice_key"),
-    "h": ("house", "The House", "on_house_key"),
-    "f": ("relations", "Relations", "on_relations_key"),
+    "j": ("palace", "The Palace", "on_palace_key"),
     "p": ("plague", "Sickness and Closures", "on_plague_key"),
     "g": ("orders", "Orders", "on_orders_key"),
     "?": ("help", "Help", "on_help_key"),
@@ -206,19 +202,7 @@ class Game:
         ]
         self.inbox_delegate_pick = (
             delegate_people[0]["id"] if delegate_people else "")
-        first_petition = project(self.world).get("justice", {}).get(
-            "petitions", [])
-        self.justice_pick = (
-            first_petition[0]["id"] if first_petition else "")
-        house_people = [
-            person for person in project(self.world).get(
-                "house", {}).get("members", [])
-            if person["alive"] and person["id"] != self.world.court.ruler]
-        house_people.sort(key=lambda p: (-p["age_years"], p["id"]))
-        self.house_pick = house_people[0]["id"] if house_people else ""
         relations = project(self.world).get("relations", [])
-        self.relation_pick = relations[0]["other"] if relations else ""
-        self.relation_scroll = 0
         plague_places = sorted({
             relation["place"] for relation in relations
             if relation.get("place") and relation["place"] != self.world.court.seat
@@ -332,8 +316,7 @@ class Game:
 
     # How far each paged list has been scrolled. Presentation only: no scroll
     # position is a fact about the kingdom, so none of it is saved or logged.
-    SCROLLS = ("justice_scroll", "archive_scroll", "works_scroll",
-               "works_plan_scroll", "house_scroll", "house_post_scroll",
+    SCROLLS = ("archive_scroll", "works_scroll", "works_plan_scroll",
                "city_scroll")
 
     def scroll_of(self, name: str) -> int:
@@ -609,19 +592,14 @@ class Game:
                 b, self.works_pick, width, height, notice=notice,
                 scroll=self.scroll_of("works_scroll"),
                 plan_scroll=self.scroll_of("works_plan_scroll"))
-        if key == "justice":
-            return justice_page.compose(
-                b, self.justice_pick, width, height, notice=notice,
-                scroll=self.scroll_of("justice_scroll"))
-        if key == "house":
-            return household_page.compose(
-                b, self.house_pick, width, height, notice=notice,
-                scroll=self.scroll_of("house_scroll"),
-                post_scroll=self.scroll_of("house_post_scroll"))
-        if key == "relations":
-            return relations_page.compose(
-                b, self.relation_pick, self.relation_scroll, width, height,
-                notice=notice)
+        if key == "palace":
+            state = self.palace_state
+            return palace.compose(
+                b, view=state["view"], selected=self.palace_pick(),
+                scroll=state["scroll"], hours=self.hours,
+                choosing=state["choosing"], person=state["person"],
+                amount=state["amount"], good=state["good"],
+                notice=notice, width=width, height=height)
         if key == "plague":
             return plague_page.compose(
                 b, self.plague_pick, width, height,
@@ -2299,147 +2277,225 @@ class Game:
         elif event.keysym == "Return":
             self.search_archive()
 
-    def on_justice_key(self, event) -> None:
-        """Hear the two men, or rule from what was already known (6.19)."""
-        if event.keysym == "Escape":
-            self.app.close("justice")
-            return
-        petitions = list(self.belief.get("justice", {}).get("petitions", []))
-        char = (event.char or "").lower()
-        _width, height = self._size("justice")
-        room = justice_page.docket_room(height)
-        command = getattr(event, "command", "")
-        if command.startswith("petition:"):
-            self.justice_pick = command.split(":", 1)[1]
-            self.repaint()
-            return
-        if event.keysym in self.STEPS:
-            if self.scrolled("justice_scroll", len(petitions), room,
-                             self.STEPS[event.keysym]):
-                self.repaint()
-            return
-        if char.isdigit() and char != "0":
-            page = collection.page(
-                len(petitions), room, self.scroll_of("justice_scroll"))
-            index = page.absolute(int(char))
-            if index >= 0:
-                self.justice_pick = petitions[index]["id"]
-                self.repaint()
-            return
-        petition = next(
-            (item for item in petitions if item["id"] == self.justice_pick),
-            petitions[0] if petitions else None)
-        if petition is None:
-            return
-        self.justice_pick = petition["id"]
-        try:
-            if char == "h" and not petition["heard"]:
-                self.do(A.HearPetition(petition["id"]), window="justice")
-                return
-            verdict = {"f": "for", "a": "against", "s": "split",
-                       "d": "defer"}.get(char)
-            if verdict is None:
-                return
-            self.do(A.RulePetition(petition["id"], verdict), window="justice")
-            remaining = self.belief.get("justice", {}).get("petitions", [])
-            if verdict != "defer":
-                self.justice_pick = remaining[0]["id"] if remaining else ""
-            self.repaint()
-        except ValueError:
-            # As in the other rooms, a refused act simply does not occur.
-            self.repaint()
+    # --- the palace: court, house and relations in one room (spec 16) --------
 
-    def on_house_key(self, event) -> None:
-        """Choose a person, place or dismiss them, or settle the succession."""
-        if event.keysym == "Escape":
-            self.app.close("house")
-            return
+    @property
+    def palace_state(self) -> dict:
+        state = self.__dict__.get("_palace_state")
+        if state is None:
+            state = self.__dict__["_palace_state"] = {
+                "view": palace.VIEWS[0][0], "pick": {}, "scroll": 0,
+                "choosing": "", "person": "", "amount": 0, "good": "copper"}
+        return state
+
+    def palace_pick(self, listing: str = "") -> str:
+        state = self.palace_state
+        return state["pick"].get(listing or self.palace_listing(), "")
+
+    def palace_listing(self) -> str:
+        state = self.palace_state
+        if state["view"] == "house" and state["choosing"] == "post":
+            return "post"
+        return state["view"]
+
+    def on_palace_key(self, event) -> None:
+        """One room, three views, and one way of choosing a thing in each.
+
+        Every branch below either moves the selection or gives an order. The
+        three screens this replaces each had their own answer to "what does a
+        digit mean here", and two of them had no answer at all to "what does
+        the letter I just pressed act on".
+        """
+        state = self.palace_state
         char = event.char or ""
-        people = [
-            person for person in self.belief.get("house", {}).get("members", [])
-            if person["alive"] and person["id"] != self.world.court.ruler]
-        people.sort(key=lambda p: (-p["age_years"], p["id"]))
-        institutions = self.belief.get("institutions", [])
-        if event.keysym in self.STEPS:
-            step = self.STEPS[event.keysym]
-            shifted = bool(getattr(event, "state", 0) & 1)
-            moved = (
-                self.scrolled("house_post_scroll", len(institutions), 9, step)
-                if shifted else
-                self.scrolled("house_scroll", len(people),
-                              household_page.PEOPLE_ROOM, step))
-            if moved:
+        lower = char.lower()
+        command = getattr(event, "command", "")
+        listing = self.palace_listing()
+
+        if event.keysym == "Escape":
+            if state["choosing"]:
+                state["choosing"] = ""
                 self.repaint()
+                return
+            self.app.close("palace")
+            return
+        if command.startswith("tab:") and not state["choosing"]:
+            state["view"] = command.split(":", 1)[1]
+            state["scroll"] = 0
+            self.repaint()
+            return
+        if command.startswith("pick:"):
+            state["pick"][listing] = command.split(":", 1)[1]
+            self.repaint()
+            return
+
+        rows = self.window_rows("palace")
+        if event.keysym in ("Up", "Down"):
+            if rows:
+                here = (rows.index(self.palace_pick())
+                        if self.palace_pick() in rows else 0)
+                state["pick"][listing] = rows[collection.step(
+                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+            self.repaint()
+            return
+        if event.keysym in self.STEPS:
+            state["scroll"] = max(0, min(state["scroll"] + self.STEPS[event.keysym],
+                                         max(0, len(rows) - 1)))
+            self.repaint()
             return
         if char.isdigit() and char != "0":
-            page = collection.page(
-                len(people), household_page.PEOPLE_ROOM,
-                self.scroll_of("house_scroll"))
-            index = page.absolute(int(char))
-            if index >= 0:
-                self.house_pick = people[index]["id"]
-                self.repaint()
+            number = int(char)
+            if not state["choosing"] and number <= len(palace.VIEWS):
+                state["view"] = palace.VIEWS[number - 1][0]
+                state["scroll"] = 0
+            elif number <= len(rows):
+                state["pick"][listing] = rows[number - 1]
+            self.repaint()
             return
-        person = next(
-            (p for p in people if p["id"] == self.house_pick), None)
-        revenue = self.belief.get("revenue", {})
-        try:
-            if char == "[":
-                self.do(A.SetLandDue(max(
-                    0, revenue.get("land_rate", 300) - 50)), window="house")
-            elif char == "]":
-                self.do(A.SetLandDue(min(
-                    1000, revenue.get("land_rate", 300) + 50)), window="house")
-            elif char == "<":
-                self.do(A.SetHarbourDue(max(
-                    0, revenue.get("harbour_rate", 100) - 50)), window="house")
-            elif char == ">":
-                self.do(A.SetHarbourDue(min(
-                    1000, revenue.get("harbour_rate", 100) + 50)), window="house")
-            elif person is not None and char.lower() == "n":
-                self.do(A.NameHeir(person["id"]), window="house")
-            elif person is not None and char.lower() == "d" and person["post"]:
-                self.do(A.DismissPerson(person["post"]), window="house")
-            elif person is not None and char.lower() in household_page.POST_KEYS:
-                posts = collection.page(
-                    len(institutions), 9, self.scroll_of("house_post_scroll"))
-                index = posts.absolute(
-                    household_page.POST_KEYS.index(char.lower()) + 1)
-                if index >= 0:
-                    self.do(A.PlacePerson(
-                        person["id"], institutions[index]["id"]),
-                        window="house")
-        except ValueError:
-            pass
-        self.repaint()
 
-    def on_relations_key(self, event) -> None:
-        """Navigate foreign claims without pretending they are live truth."""
-        if event.keysym == "Escape":
-            self.app.close("relations")
+        if state["choosing"] == "post":
+            self.palace_place(command, event.keysym, lower)
             return
-        relations = list(self.belief.get("relations", []))
-        if not relations:
+        if state["view"] == "court":
+            self.palace_court(command, lower)
+        elif state["view"] == "house":
+            self.palace_house(command, lower)
+        else:
+            self.palace_relations(command, char)
+
+    def palace_court(self, command: str, char: str) -> None:
+        petition = self.palace_pick("court")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        if not petition:
             return
-        command = getattr(event, "command", "")
-        if command.startswith("select:"):
-            self.relation_pick = command.split(":", 1)[1]
+        heard = next((p["heard"] for p in
+                      self.belief.get("justice", {}).get("petitions", [])
+                      if p["id"] == petition), False)
+        if char == registry.BY_ID["hear_petition"].mnemonic \
+                or wanted == "hear_petition":
+            if heard:
+                self.notify("you have already heard him.", registry.REFUSAL,
+                            window="palace")
+                self.repaint()
+                return
+            self.do(A.HearPetition(petition), window="palace")
+            return
+        verdict = ""
+        if command.startswith("verdict:"):
+            verdict = command.split(":", 1)[1]
+        else:
+            verdict = next((v for key, v, _label in palace.VERDICTS
+                            if key == char), "")
+        if not verdict:
+            return
+        if not heard:
+            self.notify("hear him before you rule.", registry.REFUSAL,
+                        window="palace")
             self.repaint()
             return
-        index = next(
-            (i for i, relation in enumerate(relations)
-             if relation["other"] == self.relation_pick), 0)
-        if event.keysym in {"Up", "Down"}:
-            index = max(
-                0, min(len(relations) - 1,
-                       index + (-1 if event.keysym == "Up" else 1)))
-            self.relation_pick = relations[index]["other"]
-            room = 26
-            if index < self.relation_scroll:
-                self.relation_scroll = index
-            elif index >= self.relation_scroll + room:
-                self.relation_scroll = index - room + 1
+        if self.do(A.RulePetition(petition, verdict), window="palace"):
+            self.palace_state["pick"].pop("court", None)
+
+    def palace_house(self, command: str, char: str) -> None:
+        state = self.palace_state
+        person_id = self.palace_pick("house")
+        person = next((p for p in palace._people(self.belief)
+                       if p["id"] == person_id), None)
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        if command == "choose-post" or char == \
+                registry.BY_ID["place_person"].mnemonic:
+            if person is None:
+                self.notify("choose a man first.", registry.REFUSAL,
+                            window="palace")
+            else:
+                state["choosing"] = "post"
+                state["person"] = person["id"]
+                state["scroll"] = 0
             self.repaint()
+            return
+        if person is None:
+            return
+        if char == registry.BY_ID["dismiss_person"].mnemonic \
+                or wanted == "dismiss_person":
+            if not person.get("post"):
+                self.notify(f"{person['name']} holds no post.",
+                            registry.REFUSAL, window="palace")
+                self.repaint()
+                return
+            self.do(A.DismissPerson(person["post"]), window="palace")
+        elif char == registry.BY_ID["name_heir"].mnemonic \
+                or wanted == "name_heir":
+            self.do(A.NameHeir(person["id"]), window="palace")
+        elif char == registry.BY_ID["marry_abroad"].mnemonic \
+                or wanted == "marry_abroad":
+            court = self.palace_pick("relations") or next(
+                (r["other"] for r in self.belief.get("relations", [])), "")
+            if not court:
+                self.notify("no foreign court is in correspondence.",
+                            registry.REFUSAL, window="palace")
+                self.repaint()
+                return
+            self.do(A.MarryAbroad(person["id"], court), window="palace")
+
+    def palace_place(self, command: str, keysym: str, char: str) -> None:
+        """The second half of appointing: a post for the man already chosen."""
+        state = self.palace_state
+        if command == "cancel":
+            state["choosing"] = ""
+            self.repaint()
+            return
+        if command != "place" and keysym != "Return":
+            return
+        post = self.palace_pick("post")
+        if not post:
+            self.notify("choose a post.", registry.REFUSAL, window="palace")
+            self.repaint()
+            return
+        if self.do(A.PlacePerson(state["person"], post), window="palace"):
+            state["choosing"] = ""
+
+    def palace_relations(self, command: str, char: str) -> None:
+        state = self.palace_state
+        other = self.palace_pick("relations")
+        goods = [good["id"] for good in self.belief.get("gift_goods", [])]
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        revenue = self.belief.get("revenue", {})
+        if char in ("[", "]"):
+            state["amount"] = max(0, state["amount"] + (
+                palace.GIFT_STEP if char == "]" else -palace.GIFT_STEP))
+            self.repaint()
+            return
+        if char.lower() == "g" and goods:
+            here = goods.index(state["good"]) if state["good"] in goods else -1
+            state["good"] = goods[(here + 1) % len(goods)]
+            self.repaint()
+            return
+        if char in ("<", ">") or command == "due":
+            rate = revenue.get("harbour_rate", 100)
+            step = palace.DUE_STEP if char != "<" else -palace.DUE_STEP
+            self.do(A.SetHarbourDue(max(0, min(1000, rate + step))),
+                    window="palace")
+            return
+        if char.lower() == registry.BY_ID["send_gift"].mnemonic \
+                or wanted == "send_gift":
+            if not other or state["amount"] <= 0:
+                self.notify("choose a court and an amount.", registry.REFUSAL,
+                            window="palace")
+                self.repaint()
+                return
+            if self.do(A.SendGift(other, state["good"], state["amount"]),
+                       window="palace"):
+                state["amount"] = 0
+        elif char.lower() == registry.BY_ID["marry_abroad"].mnemonic \
+                or wanted == "marry_abroad":
+            person = self.palace_pick("house") or next(
+                (p["id"] for p in palace._people(self.belief)), "")
+            if not person or not other:
+                self.notify("choose a court, and someone to send.",
+                            registry.REFUSAL, window="palace")
+                self.repaint()
+                return
+            self.do(A.MarryAbroad(person, other), window="palace")
 
     def on_world_key(self, event) -> None:
         """Navigate both collections on the projected route tablet."""

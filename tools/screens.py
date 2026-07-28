@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import desktop, household, inbox, justice, ledgers, orders, works
+from tui import desktop, inbox, ledgers, orders, palace, works
 from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
@@ -59,13 +59,15 @@ SCREENS = {
     "muster": ("THE MUSTER", lambda b: ledgers.muster(b, **_ledger("muster"))),
     "oaths": ("THE OATHS", lambda b: ledgers.oaths(b, **_ledger("oaths"))),
     "land": ("THE LAND", lambda b: ledgers.land(b, **_ledger("land"))),
-    "house": ("THE HOUSE", lambda b: household.compose(
-        b, width=86, height=34)),
+    "palace": ("THE PALACE", lambda b: palace.compose(
+        b, view="court", hours=8, width=98, height=36)),
+    "house": ("THE PALACE — THE HOUSE", lambda b: palace.compose(
+        b, view="house", hours=8, width=98, height=36)),
+    "relations": ("THE PALACE — RELATIONS", lambda b: palace.compose(
+        b, view="relations", hours=8, width=98, height=36)),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
     "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
-    "justice": ("THE COURT OF JUSTICE", lambda b: justice.compose(
-        b, "", 90, 34)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(
         b, _talk(b), 6, "", False, 92, 36)),

@@ -15,8 +15,8 @@ from belief.project import project
 from engine.tick import advance
 from load import load_scenario
 from tui import (altar, archive, city, counsel, desktop, document, hall,
-                 help as help_page, household, inbox, justice, plague,
-                 relations, works, worldmap)
+                 help as help_page, inbox, orders, palace, plague, works,
+                 worldmap)
 from tui.grid import cells, plain_text
 
 SEED = 8814402919
@@ -44,9 +44,9 @@ def _screens(world, b):
             b, w, h, 0, 0, world.court.seat),
         "city": lambda w, h: city.compose(b, None, w, h),
         "works": lambda w, h: works.compose(b, "", w, h),
-        "justice": lambda w, h: justice.compose(b, "", w, h),
-        "house": lambda w, h: household.compose(b, "", w, h),
-        "relations": lambda w, h: relations.compose(b, "", 0, w, h),
+        "palace": lambda w, h: palace.compose(b, view="court", width=w,
+                                              height=h),
+        "orders": lambda w, h: orders.compose(b, [], 0, width=w, height=h),
         "plague": lambda w, h: plague.compose(b, "", w, h),
         "archive": lambda w, h: archive.compose(b, "", [], "", False, w, h),
         "altar": lambda w, h: altar.compose(b, [], "harvest", None, w, h),
@@ -71,7 +71,7 @@ def test_shrinking_to_the_minimum_keeps_the_actions_reachable():
     """Decoration may go; a control may not (spec 6, contraction order)."""
     world, b = _belief()
     screens = _screens(world, b)
-    for key in ("hall", "stack", "city", "justice", "works", "relations"):
+    for key in ("hall", "stack", "city", "palace", "works", "orders"):
         small = plain_text(cells(screens[key](*desktop.minimum_size(key))))
         assert "[" in small and "]" in small, key
 
