@@ -1,15 +1,19 @@
 """The working house: people to place, offices to fill, and the succession."""
 from __future__ import annotations
 
-from tui import render, style
+from tui import collection, render, style
 from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 POST_KEYS = "abcdefghijklmnopqrstuvwxyz"
 
 
+PEOPLE_ROOM = 9          # the nine digits that choose a person
+
+
 def compose(b: dict, picked: str = "", width: int = 86,
-            height: int = 34, notice: str = "") -> InteractiveScreen:
+            height: int = 34, notice: str = "",
+            scroll: int = 0, post_scroll: int = 0) -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 1, 1, width - 3, height - 3,
                 "THE HOUSE", "an office gives a man interests", focus=True)
@@ -21,7 +25,12 @@ def compose(b: dict, picked: str = "", width: int = 86,
     surface.text(4, 3, "Choose a person, then an office.", C["dim"])
     surface.text(4, 4, "PEOPLE", C["gold"])
     left_width = max(38, width // 2 + 2)
-    for index, person in enumerate(members[:9], 1):
+    # Nine at a time and the rest a scroll away. A tenth adult of the house is
+    # a real person with a real claim; showing only nine hid the succession.
+    chosen_row = next(
+        (n for n, person in enumerate(members) if person["id"] == picked), -1)
+    shown = collection.page(len(members), PEOPLE_ROOM, scroll, chosen_row)
+    for index, _absolute, person in shown.rows(members):
         selected = person["id"] == picked
         mark = ">" if selected else " "
         y = 4 + index
@@ -35,7 +44,10 @@ def compose(b: dict, picked: str = "", width: int = 86,
     institutions = b.get("institutions", [])
     right = left_width + 2
     surface.text(right, 4, "POSTS / THE OFFICES", C["gold"])
-    for index, inst in enumerate(institutions[:len(POST_KEYS)]):
+    posts = collection.page(
+        len(institutions), max(1, min(len(POST_KEYS), 9)), post_scroll)
+    for number, _absolute, inst in posts.rows(institutions):
+        index = number - 1
         key = POST_KEYS[index]
         head = (render.actor_name(inst["head"], house)
                 if inst["head"] else "vacant")
@@ -46,6 +58,12 @@ def compose(b: dict, picked: str = "", width: int = 86,
             C["clay"] if inst["head"] else C["blood"])
         surface.link(right, 5 + index, width - right - 4, 1,
                      f"office:{key}")
+
+    if shown.partial:
+        surface.text(4, 14, f"↑↓ people {shown.label()}", C["dim"])
+    if posts.partial:
+        surface.text(right, 5 + (posts.end - posts.start),
+                     f"↑↓ posts {posts.label()}", C["dim"])
 
     selected = next((person for person in members if person["id"] == picked),
                     members[0] if members else None)

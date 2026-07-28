@@ -28,7 +28,7 @@ first. The player reads the shapes and decides (D19).
 """
 from __future__ import annotations
 
-from tui import art, document, style
+from tui import art, collection, document, style
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -210,9 +210,20 @@ def _divider(surface: Surface, x: int, y: int, width: int) -> None:
         surface.text(x + column, y, "◦", C["ash"], C["ink"])
 
 
+def table_room(height: int) -> int:
+    """How many institutions the table can hold at this height.
+
+    Public because the controller resolves a typed `[3]` against the same page
+    the screen drew. Two independent calculations of "which row is the third
+    one" is exactly how a number key comes to open the wrong building.
+    """
+    # ground 14, table 17, rows from 19, and the works band takes height - 9.
+    return max(1, min(9, (height - 9) - 20))
+
+
 def compose(b: dict, history: dict[str, list[int]] | None = None,
             width: int = 96, height: int = 36,
-            notice: str = "") -> Screen:
+            notice: str = "", scroll: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE CITY",
                 note="[esc] close", drop=False)
@@ -228,8 +239,11 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     ground = 14
     sky(surface, b, width, horizon=ground - 6)
     lower_town(surface, width, base=ground - 7)
+    standing = collection.page(
+        len(institutions), table_room(height), scroll)
+    shown = standing.slice(institutions)
     if institutions:
-        skyline(surface, 3, ground, institutions, width, under_work)
+        skyline(surface, 3, ground, shown, width, under_work)
     else:
         surface.text(3, ground - 1,
                      "this court holds nothing that could fall down.",
@@ -239,16 +253,23 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     table = ground + 3
     style.bar(surface, 2, table, width - 4,
               "  what stands             it              he has been saying"
-              "   now   kept by", fg=C["bone"], bg=C["faint"])
+              "   now   kept by"
+              + (f"   {standing.label()}" if standing.partial else ""),
+              fg=C["bone"], bg=C["faint"])
 
     works_top = height - 9
     y = table + 2
-    for inst in institutions:
+    for number, _absolute, inst in standing.rows(institutions):
         if y >= works_top - 1:
             break
         # Vacant posts are marked with a word, never with a colour alone.
         vacancy = "" if inst["head"] else "no one minds it"
-        surface.text(3, y, inst["name"][:23], C["clay"], C["ink"])
+        # The row carries the same number as the building above it. The
+        # skyline only has room for six; the table can show more, and every
+        # row it shows must be openable by the key printed on it.
+        surface.text(1, y, str(number), C["flame"], C["ink"])
+        surface.link(1, y, 24, 1, str(number))
+        surface.text(3, y, inst["name"][:22], C["clay"], C["ink"])
         surface.text(27, y, DOES.get(inst["kind"], inst["kind"])[:16],
                      C["dim"], C["ink"])
 

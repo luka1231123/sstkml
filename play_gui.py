@@ -36,7 +36,7 @@ from engine.tick import advance
 from load import load_scenario
 from session import load_session, new_seed, save as save_session
 from ai import counsel as ai_counsel, help_agent, librarian, parser as ai_parser
-from tui import advice, justice as justice_page
+from tui import advice, collection, justice as justice_page
 from tui import inbox as inbox_page
 from tui import household as household_page
 from tui import plague as plague_page
@@ -302,6 +302,30 @@ class Game:
             table = self.__dict__["_notices"] = {}
         return table
 
+    # How far each paged list has been scrolled. Presentation only: no scroll
+    # position is a fact about the kingdom, so none of it is saved or logged.
+    SCROLLS = ("justice_scroll", "archive_scroll", "works_scroll",
+               "works_plan_scroll", "house_scroll", "house_post_scroll",
+               "city_scroll")
+
+    def scroll_of(self, name: str) -> int:
+        return int(getattr(self, name, 0) or 0)
+
+    def scrolled(self, name: str, total: int, room: int, by: int) -> bool:
+        """Move a list by `by` rows, clamped. True when anything moved.
+
+        Clamped against the collection rather than allowed to run off it: a
+        list scrolled past its end shows an empty rectangle, which reads as a
+        list that has lost its contents.
+        """
+        was = self.scroll_of(name)
+        now = max(0, min(was + by, max(0, total - room)))
+        setattr(self, name, now)
+        return now != was
+
+    STEPS = {"Up": -1, "Down": 1, "Prior": -8, "Next": 8,
+             "Home": -1_000_000, "End": 1_000_000}
+
     def active_window(self) -> str:
         """The window the order was given in, which is where it must answer.
 
@@ -518,7 +542,8 @@ class Game:
         says how much room there is, the screen is built to fit it, and nothing
         is ever scaled or clipped (UI/UX spec 6).
         """
-        window = self.app.windows.get(key)
+        app = getattr(self, "app", None)
+        window = None if app is None else app.windows.get(key)
         if window is not None and window.root.winfo_exists():
             return window.width, window.height
         return desktop.default_size(key)
@@ -549,16 +574,22 @@ class Game:
                 self.world_route_scroll, self.world_place_pick,
                 notice=notice)
         if key == "city":
-            return city.compose(b, None, width, height, notice=notice)
+            return city.compose(b, None, width, height, notice=notice,
+                                scroll=self.scroll_of("city_scroll"))
         if key == "works":
             return works_page.compose(
-                b, self.works_pick, width, height, notice=notice)
+                b, self.works_pick, width, height, notice=notice,
+                scroll=self.scroll_of("works_scroll"),
+                plan_scroll=self.scroll_of("works_plan_scroll"))
         if key == "justice":
             return justice_page.compose(
-                b, self.justice_pick, width, height, notice=notice)
+                b, self.justice_pick, width, height, notice=notice,
+                scroll=self.scroll_of("justice_scroll"))
         if key == "house":
             return household_page.compose(
-                b, self.house_pick, width, height, notice=notice)
+                b, self.house_pick, width, height, notice=notice,
+                scroll=self.scroll_of("house_scroll"),
+                post_scroll=self.scroll_of("house_post_scroll"))
         if key == "relations":
             return relations_page.compose(
                 b, self.relation_pick, self.relation_scroll, width, height,
@@ -595,7 +626,8 @@ class Game:
         if key == "archive":
             return archive.compose(b, self.archive_query, self.archive_hits,
                                    self.archive_summary, self.archive_typing,
-                                   width, height)
+                                   width, height, notice=notice,
+                                   scroll=self.scroll_of("archive_scroll"))
         if key.startswith("archive:"):
             item = self.archive_documents.get(key)
             return None if item is None else archive.tablet(
@@ -1558,25 +1590,45 @@ class Game:
         b = self.belief
         projects = b.get("projects") or []
         plans = b.get("plans") or []
+        _width, height = self._size("works")
+        out = collection.page(
+            len(projects), works_page.project_room(height),
+            self.scroll_of("works_scroll"))
+        plan_page = collection.page(
+            len(plans), len(works_page.ORDER),
+            self.scroll_of("works_plan_scroll"))
 
+        if event.keysym in self.STEPS:
+            # Two lists in one window: the men out scroll, and shifted arrows
+            # take the plans below them.
+            step = self.STEPS[event.keysym]
+            shifted = bool(getattr(event, "state", 0) & 1)
+            moved = (
+                self.scrolled("works_plan_scroll", len(plans),
+                              len(works_page.ORDER), step) if shifted
+                else self.scrolled("works_scroll", len(projects),
+                                   works_page.project_room(height), step))
+            if moved:
+                self.repaint()
+            return
         if char in works_page.PICK:
-            index = works_page.PICK.index(char)
-            if index < len(projects):
+            if out.absolute(works_page.PICK.index(char) + 1) >= 0:
                 self.works_pick = char
                 self.repaint()
             return
         if char == "x" and self.works_pick:
-            index = works_page.PICK.index(self.works_pick)
-            if index < len(projects):
+            index = out.absolute(works_page.PICK.index(self.works_pick) + 1)
+            if index >= 0:
                 self.do(A.AbandonWork(projects[index]["id"]), window="works")
             self.works_pick = ""
             self.repaint()
             return
         if char in works_page.ORDER:
-            index = works_page.ORDER.index(char)
-            if index < len(plans):
+            index = plan_page.absolute(works_page.ORDER.index(char) + 1)
+            if index >= 0:
                 self.order(A.BeginBuild(plans[index]["kind"],
-                                        b.get("seat", "seat")))
+                                        b.get("seat", "seat")),
+                           window="works")
             return
 
     def on_institution_key(self, event, key: str, institution: str) -> None:
@@ -1610,9 +1662,20 @@ class Game:
             self.open_works()
             return
         institutions = self.belief.get("institutions", [])
+        _width, height = self._size("city")
+        room = city.table_room(height)
+        if event.keysym in self.STEPS:
+            if self.scrolled("city_scroll", len(institutions), room,
+                             self.STEPS[event.keysym]):
+                self.repaint()
+            return
         if char.isdigit() and char != "0":
-            index = int(char) - 1
-            if not 0 <= index < len(institutions):
+            # The digit means the nth row *shown*, which after a scroll is not
+            # the nth institution. The screen's own page resolves it.
+            page = collection.page(
+                len(institutions), room, self.scroll_of("city_scroll"))
+            index = page.absolute(int(char))
+            if index < 0:
                 return
             inst = institutions[index]
             if not inst["inspected"]:
@@ -1662,9 +1725,17 @@ class Game:
             self.repaint()
             return
         char = event.char or ""
+        if event.keysym in self.STEPS:
+            if self.scrolled("archive_scroll", len(self.archive_hits),
+                             archive.RESULT_ROOM, self.STEPS[event.keysym]):
+                self.repaint()
+            return
         if char.isdigit() and char != "0":
-            index = int(char) - 1
-            if index < len(self.archive_hits):
+            page = collection.page(
+                len(self.archive_hits), archive.RESULT_ROOM,
+                self.scroll_of("archive_scroll"))
+            index = page.absolute(int(char))
+            if index >= 0:
                 self.open_archive_document(self.archive_hits[index])
             return
         if char == "/":
@@ -1679,11 +1750,25 @@ class Game:
         if event.keysym == "Escape":
             self.app.close("justice")
             return
-        petitions = self.belief.get("justice", {}).get("petitions", [])
+        petitions = list(self.belief.get("justice", {}).get("petitions", []))
         char = (event.char or "").lower()
+        _width, height = self._size("justice")
+        room = justice_page.docket_room(height)
+        command = getattr(event, "command", "")
+        if command.startswith("petition:"):
+            self.justice_pick = command.split(":", 1)[1]
+            self.repaint()
+            return
+        if event.keysym in self.STEPS:
+            if self.scrolled("justice_scroll", len(petitions), room,
+                             self.STEPS[event.keysym]):
+                self.repaint()
+            return
         if char.isdigit() and char != "0":
-            index = int(char) - 1
-            if 0 <= index < len(petitions):
+            page = collection.page(
+                len(petitions), room, self.scroll_of("justice_scroll"))
+            index = page.absolute(int(char))
+            if index >= 0:
                 self.justice_pick = petitions[index]["id"]
                 self.repaint()
             return
@@ -1720,9 +1805,24 @@ class Game:
             person for person in self.belief.get("house", {}).get("members", [])
             if person["alive"] and person["id"] != self.world.court.ruler]
         people.sort(key=lambda p: (-p["age_years"], p["id"]))
+        institutions = self.belief.get("institutions", [])
+        if event.keysym in self.STEPS:
+            step = self.STEPS[event.keysym]
+            shifted = bool(getattr(event, "state", 0) & 1)
+            moved = (
+                self.scrolled("house_post_scroll", len(institutions), 9, step)
+                if shifted else
+                self.scrolled("house_scroll", len(people),
+                              household_page.PEOPLE_ROOM, step))
+            if moved:
+                self.repaint()
+            return
         if char.isdigit() and char != "0":
-            index = int(char) - 1
-            if index < len(people):
+            page = collection.page(
+                len(people), household_page.PEOPLE_ROOM,
+                self.scroll_of("house_scroll"))
+            index = page.absolute(int(char))
+            if index >= 0:
                 self.house_pick = people[index]["id"]
                 self.repaint()
             return
@@ -1747,9 +1847,11 @@ class Game:
             elif person is not None and char.lower() == "d" and person["post"]:
                 self.do(A.DismissPerson(person["post"]), window="house")
             elif person is not None and char.lower() in household_page.POST_KEYS:
-                index = household_page.POST_KEYS.index(char.lower())
-                institutions = self.belief.get("institutions", [])
-                if index < len(institutions):
+                posts = collection.page(
+                    len(institutions), 9, self.scroll_of("house_post_scroll"))
+                index = posts.absolute(
+                    household_page.POST_KEYS.index(char.lower()) + 1)
+                if index >= 0:
                     self.do(A.PlacePerson(
                         person["id"], institutions[index]["id"]),
                         window="house")

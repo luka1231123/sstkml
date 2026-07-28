@@ -15,15 +15,19 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import art, render, style
+from tui import art, collection, render, style
 from tui.grid import INDEX, InteractiveScreen, Screen, Surface
 
 C = INDEX
 
 
+RESULT_ROOM = 9          # the nine digits that open a result
+
+
 def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             summary: str = "", typing: bool = False,
-            width: int = 84, height: int = 32) -> InteractiveScreen:
+            width: int = 84, height: int = 32,
+            notice: str = "", scroll: int = 0) -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE TABLET HOUSE",
                 focus=typing, drop=False)
@@ -65,7 +69,13 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
         surface.text(3, y, "nothing in this house answers to that.",
                      C["ash"], C["ink"])
         y += 1
-    for index, hit in enumerate(hits[:9], 1):
+    # Results scroll. A search that found forty tablets and offered nine was
+    # answering a different question than the one the hour was spent on.
+    # Nine at a time, because the nine digits are how a result is opened. The
+    # rest are a scroll away rather than absent.
+    room = max(1, min(RESULT_ROOM, (height - 6 - y) // 2))
+    visible = collection.page(len(hits), room, scroll)
+    for index, _absolute, hit in visible.rows(hits):
         if y >= height - 6:
             break
         # The sender, then his own dating, and never a conversion of it: the
@@ -94,8 +104,13 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
         style.FooterAction("/", "new search"),
         style.FooterAction("enter", "search — one hour"),
         style.FooterAction("1-9", "open result", enabled=bool(hits)),
+        style.FooterAction("up/down", "scroll", enabled=visible.partial),
         style.FooterAction("esc", "leave"),
     ], y=height - 2, x=2, width=width - 4)
+    if visible.partial:
+        surface.text(3, height - 3, f"↑↓ results {visible.label()}"[:field],
+                     C["dim"], C["ink"])
+    style.notice(surface, 3, height - 4, field, notice)
     return surface.interactive()
 
 

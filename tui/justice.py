@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import art, render, style
+from tui import art, collection, render, style
 from tui.grid import INDEX, Screen, Surface
 
 C = INDEX
@@ -27,12 +27,17 @@ def _wrap(surface: Surface, x: int, y: int, text: str, width: int,
     return y
 
 
+def docket_room(height: int) -> int:
+    """Petitions visible at once. Shared with the controller (see city)."""
+    return max(1, min(9, height - 19))
+
+
 def compose(b: dict, selected: str = "", width: int = 90,
-            height: int = 34, notice: str = "") -> Screen:
+            height: int = 34, notice: str = "", scroll: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height,
                 title="THE COURT OF JUSTICE", drop=False)
-    petitions = b.get("justice", {}).get("petitions", [])
+    petitions = list(b.get("justice", {}).get("petitions", []))
     petition = next(
         (item for item in petitions if item["id"] == selected),
         petitions[0] if petitions else None)
@@ -72,14 +77,24 @@ def compose(b: dict, selected: str = "", width: int = 90,
     if not petitions:
         surface.text(4, top + 2, "no one waits for a judgement.",
                      C["ash"], C["ink"])
-    for index, item in enumerate(petitions[:8]):
-        row = top + 2 + index
+    # The docket scrolls. An eighth petition used to be the last one the court
+    # could see, which meant a ninth petitioner waited for ever.
+    room = docket_room(height)
+    chosen_index = (petitions.index(petition)
+                    if petition in petitions else -1)
+    visible = collection.page(len(petitions), room, scroll, chosen_index)
+    for number, _absolute, item in visible.rows(petitions):
+        row = top + 1 + number
         mark = ">" if petition is item else " "
         surface.text(3, row, mark, C["flame"], C["ink"])
-        style.keycap(surface, 5, row, str(index + 1),
-                     item["kind"][:12])
+        style.keycap(surface, 5, row, str(number),
+                     item["kind"][:12], command=f"petition:{item['id']}")
         waited = f"{item['waiting']} fn"
         surface.text(list_width - len(waited), row, waited,
+                     C["dim"], C["ink"])
+    if visible.partial:
+        surface.text(3, top + 2 + (visible.end - visible.start),
+                     f"↑↓ {visible.label()}"[:list_width - 1],
                      C["dim"], C["ink"])
 
     divider = list_width + 2

@@ -15,7 +15,7 @@ half later (6.21), and the game does not grade bets (D19).
 """
 from __future__ import annotations
 
-from tui import art, style
+from tui import art, collection, style
 from tui.grid import INDEX, Screen, Surface
 
 C = INDEX
@@ -30,8 +30,14 @@ def _bar(surface: Surface, x: int, y: int, width: int,
     style.meter(surface, x, y, width, filled, fg=C["barley"])
 
 
+def project_room(height: int) -> int:
+    """Works in hand visible at once; three rows apiece."""
+    return max(1, min(len(PICK), (height - 16) // 3))
+
+
 def compose(b: dict, selected: str = "", width: int = 82,
-            height: int = 32, notice: str = "") -> Screen:
+            height: int = 32, notice: str = "",
+            scroll: int = 0, plan_scroll: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE WORKS",
                 note="[esc] close", drop=False)
@@ -50,8 +56,10 @@ def compose(b: dict, selected: str = "", width: int = 82,
     if not projects:
         surface.text(4, y, "nobody is building anything.", C["ash"], C["ink"])
         y += 2
-    for index, project in enumerate(projects[:len(PICK)]):
-        key = PICK[index]
+    # Three rows a project, so the page is what the window can actually hold.
+    out = collection.page(len(projects), project_room(height), scroll)
+    for number, _absolute, project in out.rows(projects):
+        key = PICK[number - 1]
         chosen = key == selected
         style.keycap(surface, 3, y, key, "")
         surface.text(8, y, project["what"][:26],
@@ -74,6 +82,9 @@ def compose(b: dict, selected: str = "", width: int = 82,
                      f"{project['days_done']:,} of {project['days_needed']:,} days",
                      C["dim"], C["ink"])
         y += 3
+    if out.partial:
+        surface.text(4, y, f"↑↓ men out {out.label()}", C["dim"], C["ink"])
+        y += 1
 
     # The pool. Both numbers, because the difference between them is the thing
     # the player is actually spending and it is nowhere else in the game.
@@ -91,10 +102,12 @@ def compose(b: dict, selected: str = "", width: int = 82,
               fg=C["bone"], bg=C["faint"])
     y += 2
     per = b.get("works_materials") or {}
-    for index, plan in enumerate(plans):
+    plan_room = max(1, min(len(ORDER), height - 4 - y))
+    buildable = collection.page(len(plans), plan_room, plan_scroll)
+    for number, _absolute, plan in buildable.rows(plans):
         if y >= height - 4:
             break
-        style.keycap(surface, 3, y, ORDER[index] if index < 9 else " ", "")
+        style.keycap(surface, 3, y, ORDER[number - 1], "")
         surface.text(8, y, plan["name"][:24], C["clay"], C["ink"])
         surface.text(33, y, f"{plan['days']:,} days", C["dim"], C["ink"])
         cost = ", ".join(
@@ -103,6 +116,9 @@ def compose(b: dict, selected: str = "", width: int = 82,
         surface.text(44, y, cost[: width - 47], C["ash"], C["ink"])
         y += 1
 
+    if buildable.partial:
+        surface.text(8, min(height - 4, y), f"↑↓ plans {buildable.label()}",
+                     C["dim"], C["ink"])
     note = (" [x] call them off — what they have eaten is eaten"
             if selected else
             " [1-9] set it in hand   [a-h] a work already out   [esc] close")
