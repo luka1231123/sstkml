@@ -93,6 +93,7 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("counsel", "Counsel", "document", (64, 22), (50, 17)),
         _spec("fortnight", "The Fortnight", "document", (66, 22), (50, 17)),
         _spec("help", "Help", "utility"),
+        _spec("palette", "Command", "palette"),
         _spec("switcher", "Windows", "utility", (42, 17), (40, 15)),
         _spec("institution:", "Institution", "document", (62, 24), (46, 18)),
         _spec("letter:", "Tablet", "document", (60, 25), (46, 18)),

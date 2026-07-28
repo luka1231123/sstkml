@@ -42,9 +42,11 @@ from tui import household as household_page
 from tui import plague as plague_page
 from tui import relations as relations_page
 from tui import works as works_page
-from tui import (altar, archive, city, composer, counsel, desktop, document,
-                 hall, help as help_page, render, style, switcher, worldmap)
+from tui import (altar, archive, city, command as command_page, composer,
+                 counsel, desktop, document, hall, help as help_page, render,
+                 style, switcher, worldmap)
 import manual
+import palette as command_palette
 from tui.grid import Screen
 
 # Costs are the registry's, never this file's. These two names survive only
@@ -238,6 +240,11 @@ class Game:
 
         self.switcher_pick = ""
         self.switcher_notice = ""
+        # The command palette. Session state: a line, and what has been typed
+        # before it. Neither is a fact about the kingdom, so neither is saved.
+        self.command_line = ""
+        self.command_history: list[str] = []
+        self.command_recall = 0
         self.app.desktop_bindings = self._desktop_bindings()
 
         hall_width, hall_height = desktop.default_size("hall")
@@ -614,6 +621,12 @@ class Game:
                                    width, height, suggestions,
                                    (self.counsel_pending["descriptions"]
                                     if self.counsel_pending else None))
+        if key == "palette":
+            return command_page.compose(
+                self.command_line,
+                command_palette.parse(self.command_line, b),
+                self.hours, width, height,
+                tuple(self.command_history), notice=notice)
         if key == "help":
             return help_page.compose(
                 width, height, self.help_query, self.help_pick,
@@ -670,6 +683,8 @@ class Game:
             "<F1>": bind(self.open_help),
             "<F2>": bind(self.raise_hall),
             "<F6>": bind(self.open_switcher),
+            "<colon>": bind(self.open_palette),
+            "<grave>": bind(self.open_palette),
             "<F8>": bind(self.tile_windows),
             "<Shift-F8>": bind(self.cascade_windows),
             "<Control-Tab>": bind(self.cycle_windows),
@@ -1027,6 +1042,107 @@ class Game:
     def help_topics(self) -> tuple:
         """The topics Help is currently showing, in order."""
         return manual.search(self.help_query, self.help_screen)
+
+    # --- the command palette (UI/UX spec 10) ----------------------------------
+
+    def open_palette(self) -> None:
+        """`:` or a backtick, from anywhere. Free, and never a model call."""
+        width, height = desktop.default_size("palette")
+        window = self.app.window(
+            "palette", "Command", width, height,
+            on_key=self.on_palette_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("palette"))
+        self.repaint()
+        window.focus()
+
+    def close_palette(self) -> None:
+        self.command_line = ""
+        self.command_recall = 0
+        self.app.close("palette")
+        self.repaint()
+
+    def run_command(self) -> None:
+        """Do what the line says, or explain why it cannot be done.
+
+        The palette gives orders through the same `do` as every key and every
+        click, so a typed `repair the granary` costs what the button costs,
+        logs what the button logs, and refuses in the same words.
+        """
+        line = self.command_line.strip()
+        if not line:
+            return
+        result = command_palette.parse(line, self.belief)
+        if result.status != "ok":
+            self.notify(result.message or "that is not an order",
+                        registry.REFUSAL, window="palette")
+            self.repaint()
+            return
+        self.command_history.append(line)
+        self.command_recall = 0
+
+        # Some forms are a workflow rather than an action. `answer <tablet>`
+        # opens the Desk, where a reply is actually written.
+        opens = command_palette.handoff(result)
+        if opens == "desk":
+            self.command_line = ""
+            self.app.close("palette")
+            self.open_desk(result.values["tablet"])
+            return
+
+        action = command_palette.build(result)
+        if action is None:
+            self.notify("that order could not be assembled",
+                        registry.REFUSAL, window="palette")
+            self.repaint()
+            return
+        outcome = self.do(action, window="palette")
+        if outcome.ok:
+            self.command_line = ""
+        self.repaint()
+
+    def on_palette_key(self, event) -> None:
+        """Typing, completion, history, and one Enter that gives the order."""
+        keysym = event.keysym
+        if keysym == "Escape":
+            self.close_palette()
+            return
+        command = getattr(event, "command", "")
+        if command.startswith("complete:"):
+            offer = command.split(":", 1)[1]
+            words = self.command_line.split()
+            if words and not self.command_line.endswith(" ") and \
+                    offer.startswith(words[-1].lower()):
+                self.command_line = " ".join(words[:-1] + [offer])
+            else:
+                self.command_line = (
+                    self.command_line.rstrip() + " " + offer).strip()
+            self.repaint()
+            return
+        if keysym == "Return":
+            self.run_command()
+            return
+        if keysym == "Tab":
+            self.command_line = command_palette.complete(
+                self.command_line, self.belief)
+            self.repaint()
+            return
+        if keysym in ("BackSpace", "Delete"):
+            self.command_line = self.command_line[:-1]
+            self.repaint()
+            return
+        if keysym in ("Up", "Down") and self.command_history:
+            # Walk back through what was typed before, newest first.
+            step = 1 if keysym == "Up" else -1
+            self.command_recall = max(
+                0, min(len(self.command_history), self.command_recall + step))
+            self.command_line = (
+                "" if not self.command_recall
+                else self.command_history[-self.command_recall])
+            self.repaint()
+            return
+        if event.char and event.char.isprintable():
+            self.command_line += event.char
+            self.repaint()
 
     def open_help(self, screen: str = "") -> None:
         """Raise the manual, set to the screen the player came from (spec 11).

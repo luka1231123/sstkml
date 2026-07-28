@@ -1,0 +1,239 @@
+"""What the player may legally name, read from Belief alone (UI/UX spec 10).
+
+Every typed surface needs the same answer to the same question: given what the
+king believes right now, which formations, oaths, places, and posts can he
+actually refer to? The optional parser had that knowledge as private helpers,
+which meant the deterministic command palette either had to import from `ai/`
+-- a package the game must run entirely without -- or grow a second copy that
+would drift from the first.
+
+So it lives here instead: no model, no engine, no toolkit, and no World. Every
+function takes a Belief dictionary and returns ids or names that are already
+visible to the player. Nothing here can widen what he knows; a domain that is
+empty because he has not been told is empty here too, which is the point.
+
+`ai/parser.py` now reads these rather than its own, so the typed path and the
+palette resolve `chariotry` to the same formation or fail in the same way.
+"""
+from __future__ import annotations
+
+import re
+
+# How the correspondence pile is numbered when spoken about.
+ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
+         "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx")
+
+# Closed vocabularies. These are the engine's, not the player's, so they are
+# constants rather than projections.
+TROOP_TASKS = ("garrison", "watch", "harvest", "campaign")
+LEDGERS = ("granary", "seed")
+VERDICTS = ("for", "against", "split", "defer")
+QUESTIONS = ("harvest", "sickness", "war", "voyage", "death")
+
+
+def normal(value: str) -> str:
+    """Casefold, strip punctuation, and drop a leading article."""
+    words = re.sub(r"[^a-z0-9]+", " ", str(value).casefold()).strip().split()
+    while words and words[0] in {"a", "an", "the"}:
+        words.pop(0)
+    return " ".join(words)
+
+
+def letters(belief: dict) -> dict[str, str]:
+    return {(ROMAN[i] if i < len(ROMAN) else str(i + 1)): item["id"]
+            for i, item in enumerate(belief.get("stack", []))}
+
+
+def resolve_letter(value: str, belief: dict) -> str | None:
+    ids = {item["id"] for item in belief.get("stack", [])}
+    return letters(belief).get(
+        str(value).lower(), value if value in ids else None)
+
+
+def resolve_named(value: str, rows: list[dict], id_key: str = "id",
+                  name_key: str = "name") -> str | None:
+    """Resolve an exact ID or an unambiguous player-facing name.
+
+    Returns None when two things match, never a guess: the specification's
+    fourth palette rule is that the game must not silently choose among
+    matches, because an order given to the wrong formation is worse than an
+    order refused.
+    """
+    wanted = normal(value)
+    exact: list[str] = []
+    partial: list[str] = []
+    for row in rows:
+        item_id = row[id_key]
+        names = {
+            normal(item_id),
+            normal(str(row.get(name_key, ""))),
+            normal(str(row.get(name_key, "")).split(",", 1)[0]),
+        }
+        if wanted in names:
+            exact.append(item_id)
+        elif len(wanted) >= 4 and any(
+                name.startswith(wanted) or wanted.startswith(name)
+                for name in names if name):
+            partial.append(item_id)
+    matches = list(dict.fromkeys(exact or partial))
+    return matches[0] if len(matches) == 1 else None
+
+
+def matches_for(value: str, rows: list[dict], id_key: str = "id",
+                name_key: str = "name") -> list[str]:
+    """Every id a partial word could mean. What completion offers."""
+    wanted = normal(value)
+    found = []
+    for row in rows:
+        item_id = row[id_key]
+        names = [normal(item_id), normal(str(row.get(name_key, "")))]
+        if not wanted or any(name.startswith(wanted) for name in names if name):
+            found.append(item_id)
+    return list(dict.fromkeys(found))
+
+
+# --- the domains --------------------------------------------------------------
+
+def groups(belief: dict) -> list[dict]:
+    return list(belief.get("groups", []))
+
+
+def formations(belief: dict) -> list[dict]:
+    return list(belief.get("troops", {}).get("formations", []))
+
+
+def institutions(belief: dict) -> list[dict]:
+    return list(belief.get("institutions", []))
+
+
+def plans(belief: dict) -> list[dict]:
+    return list(belief.get("plans", []))
+
+
+def projects(belief: dict) -> list[dict]:
+    return list(belief.get("projects", []))
+
+
+def people(belief: dict) -> list[dict]:
+    return [person for person in belief.get("house", {}).get("members", [])
+            if person.get("alive")]
+
+
+def estates(belief: dict) -> list[dict]:
+    return list(belief.get("land", {}).get("estates", []))
+
+
+def oaths(belief: dict) -> list[dict]:
+    return list(belief.get("oaths", []))
+
+
+def omens(belief: dict) -> list[dict]:
+    return list(belief.get("house", {}).get("omens", []))
+
+
+def petitions(belief: dict) -> list[dict]:
+    return list(belief.get("justice", {}).get("petitions", []))
+
+
+def actors(belief: dict) -> list[dict]:
+    return [{"id": relation["other"], "name": relation["other"]}
+            for relation in belief.get("relations", [])]
+
+
+def goods(belief: dict) -> list[dict]:
+    return list(belief.get("gift_goods", []))
+
+
+def tablets(belief: dict) -> list[dict]:
+    return list(belief.get("stack", []))
+
+
+def places(belief: dict) -> list[dict]:
+    found = {str(belief.get("seat", "seat"))}
+    found.update(str(relation["place"]) for relation
+                 in belief.get("relations", []) if relation.get("place"))
+    found.update(str(inst["place"]) for inst in institutions(belief)
+                 if inst.get("place"))
+    found.update(str(estate["place"]) for estate in estates(belief)
+                 if estate.get("place"))
+    return [{"id": place, "name": place} for place in sorted(found)]
+
+
+def posts(belief: dict) -> list[dict]:
+    found = [inst["id"] for inst in institutions(belief)]
+    found += [f"governor:{place['id']}" for place in places(belief)]
+    found += [f"command:{formation['id']}" for formation in formations(belief)]
+    found += [f"court:{relation['other']}"
+              for relation in belief.get("relations", [])]
+    return [{"id": post, "name": post.replace(":", " of ")} for post in found]
+
+
+def _closed(values) -> list[dict]:
+    return [{"id": value, "name": value} for value in values]
+
+
+# Field domain -> the rows it may be drawn from. `registry.Field.domain` names
+# one of these; anything not listed is free text and is not completed.
+DOMAINS = {
+    "group": groups,
+    "formation": formations,
+    "institution": institutions,
+    "plan": plans,
+    "project": projects,
+    "person": people,
+    "estate": estates,
+    "oath": oaths,
+    "omen": omens,
+    "petition": petitions,
+    "actor": actors,
+    "good": goods,
+    "tablet": tablets,
+    "place": places,
+    "post": posts,
+    "task": lambda b: _closed(TROOP_TASKS),
+    "ledger": lambda b: _closed(LEDGERS),
+    "verdict": lambda b: _closed(VERDICTS),
+    "question": lambda b: _closed(QUESTIONS),
+}
+
+
+def rows_for(domain: str, belief: dict) -> list[dict]:
+    """Everything the player may legally name in this domain, right now."""
+    source = DOMAINS.get(domain)
+    return [] if source is None else list(source(belief))
+
+
+def resolve(domain: str, value: str, belief: dict) -> str | None:
+    """One id, or None when the word is unknown or means more than one thing."""
+    if domain == "quantity":
+        text = normal(value).replace(",", "")
+        return text if text.isdigit() else None
+    if domain == "text":
+        return value or None
+    if domain == "tablet":
+        return resolve_letter(value, belief)
+    rows = rows_for(domain, belief)
+    if not rows:
+        return None
+    if domain == "plan":
+        return resolve_named(value, rows, "kind", "name")
+    if domain == "post":
+        wanted = normal(value).replace(" of ", " ")
+        found = [row["id"] for row in rows
+                 if normal(row["id"]).replace(" of ", " ") == wanted]
+        if len(found) == 1:
+            return found[0]
+    return resolve_named(value, rows)
+
+
+def completions(domain: str, prefix: str, belief: dict) -> list[str]:
+    """Legal values beginning with what has been typed, for Tab and the list."""
+    if domain in ("quantity", "text"):
+        return []
+    if domain == "tablet":
+        wanted = normal(prefix)
+        return [item["id"] for item in tablets(belief)
+                if not wanted or normal(item["id"]).startswith(wanted)]
+    rows = rows_for(domain, belief)
+    key = "kind" if domain == "plan" else "id"
+    return matches_for(prefix, rows, key, "name")

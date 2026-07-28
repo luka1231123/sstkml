@@ -17,10 +17,21 @@ keys = ["?", "enter", "ctrl-u", "esc", "F1", "F2", "F3"]
 verbs = []
 
 [[command]]
+id = "palette"
+category = "interface"
+title = "The command line"
+syntax = "[:] or [`] Command; type an order; [Tab] complete; [Enter] give it"
+answer = "Press colon or backtick anywhere to open the command line. Type an order in plain words and it shows the form it matched, what each word resolved to, and what it will cost before anything happens. Tab completes when there is only one answer, Up walks back through what you have typed, and Escape closes it. It knows every order the buttons know and costs the same hours; it never asks a model anything, so it answers at once whether or not one is running."
+examples = ["repair the great granary", "assign chariotry to campaign at ma_hadu", "quarantine ma_hadu"]
+keywords = ["command", "type", "typing", "line", "palette", "colon", "backtick", "order", "complete", "tab", "history", "text"]
+keys = [":", "`", "tab", "enter", "esc", "up"]
+verbs = []
+
+[[command]]
 id = "hall"
 category = "interface"
 title = "Hall and navigation"
-syntax = "[s] Inbox [d] Desk [t] Stores [r] Roll [c] Counsel [m] Muster [o] Oaths [l] Land [y] City [v] Altar [a] Archive [j] Justice [h] House [w] World [f] Relations [p] Sickness"
+syntax = "[s] Inbox [d] Desk [t] Stores [r] Roll [c] Counsel [m] Muster [o] Oaths [l] Land [y] City [v] Altar [a] Archive [j] Justice [h] House [w] World [f] Relations [p] Sickness [:] Command"
 answer = "The Hall is home. Numbered matters open their evidence or prepare an order. Its letter keys open every place; D opens the Desk when a read letter is available, Space ends the fortnight, backslash reads the open windows to the terminal, and Q leaves the game. Printed controls can also be clicked."
 examples = ["Press c for Counsel.", "Click a numbered concern to follow it."]
 keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit"]

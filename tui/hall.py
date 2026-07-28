@@ -240,6 +240,7 @@ def compose(b: dict, width: int = 104, height: int = 36,
         style.FooterAction("SPACE", "end the fortnight", command="space"),
         style.FooterAction("ctrl-s", "save"),
         style.FooterAction("ctrl-o", "reload"),
+        style.FooterAction(":", "command"),
         style.FooterAction("\\", "read out"),
         style.FooterAction("Q", "leave the hall", command="q"),
     ])

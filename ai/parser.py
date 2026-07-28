@@ -5,6 +5,7 @@ import dataclasses
 import json
 import re
 
+import affordances
 import registry
 from ai.numeric_guard import extract_numerals_and_number_words, guard
 from engine import actions as A
@@ -45,74 +46,39 @@ class ParseResult:
     unavailable: bool = False
 
 
-def _letters(belief: dict) -> dict[str, str]:
-    return {(_ROMAN[i] if i < len(_ROMAN) else str(i + 1)): item["id"]
-            for i, item in enumerate(belief["stack"])}
+# The deterministic Belief readers live in `affordances`, which the palette
+# and the terminal game also use. Aliased rather than re-implemented: two
+# answers to "which formation is `chariotry`?" is exactly the drift the action
+# registry exists to prevent.
+_ROMAN = affordances.ROMAN
+_letters = affordances.letters
+_resolve_letter = affordances.resolve_letter
+_normal = affordances.normal
+_resolve_named = affordances.resolve_named
 
 
-def _resolve_letter(value: str, belief: dict) -> str | None:
-    ids = {item["id"] for item in belief["stack"]}
-    return _letters(belief).get(value.lower(), value if value in ids else None)
+def _resolve_group(value, belief):
+    return _resolve_named(value, affordances.groups(belief))
 
 
-def _normal(value: str) -> str:
-    words = re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip().split()
-    while words and words[0] in {"a", "an", "the"}:
-        words.pop(0)
-    return " ".join(words)
+def _resolve_formation(value, belief):
+    return _resolve_named(value, affordances.formations(belief))
 
 
-def _resolve_named(value: str, rows: list[dict], id_key: str = "id",
-                   name_key: str = "name") -> str | None:
-    """Resolve an exact ID or an unambiguous player-facing name."""
-    wanted = _normal(value)
-    exact: list[str] = []
-    partial: list[str] = []
-    for row in rows:
-        item_id = row[id_key]
-        names = {
-            _normal(item_id),
-            _normal(str(row.get(name_key, ""))),
-            _normal(str(row.get(name_key, "")).split(",", 1)[0]),
-        }
-        if wanted in names:
-            exact.append(item_id)
-        elif len(wanted) >= 4 and any(
-                name.startswith(wanted) or wanted.startswith(name)
-                for name in names if name):
-            partial.append(item_id)
-    matches = list(dict.fromkeys(exact or partial))
-    return matches[0] if len(matches) == 1 else None
+def _resolve_institution(value, belief):
+    return _resolve_named(value, affordances.institutions(belief))
 
 
-def _resolve_group(value: str, belief: dict) -> str | None:
-    return _resolve_named(value, belief.get("groups", []))
+def _resolve_plan(value, belief):
+    return _resolve_named(value, affordances.plans(belief), "kind", "name")
 
 
-def _resolve_formation(value: str, belief: dict) -> str | None:
-    return _resolve_named(
-        value, belief.get("troops", {}).get("formations", []))
+def _resolve_person(value, belief):
+    return _resolve_named(value, affordances.people(belief))
 
 
-def _resolve_institution(value: str, belief: dict) -> str | None:
-    return _resolve_named(value, belief.get("institutions", []))
-
-
-def _resolve_plan(value: str, belief: dict) -> str | None:
-    return _resolve_named(value, belief.get("plans", []), "kind", "name")
-
-
-def _resolve_person(value: str, belief: dict) -> str | None:
-    rows = [person for person in belief.get("house", {}).get("members", [])
-            if person["alive"]]
-    return _resolve_named(value, rows)
-
-
-def _resolve_place(value: str, belief: dict) -> str | None:
-    wanted = _normal(value)
-    matches = [place for place in _place_ids(belief)
-               if _normal(place) == wanted]
-    return matches[0] if len(matches) == 1 else None
+def _resolve_place(value, belief):
+    return affordances.resolve("place", value, belief)
 
 
 def preparse(line: str, belief: dict) -> ParseResult | None:
@@ -312,70 +278,58 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     return None
 
 
-def _formation_ids(belief: dict) -> set:
-    return {f["id"] for f in belief.get("troops", {}).get("formations", [])}
+def _ids(rows, key="id"):
+    return {row[key] for row in rows}
 
 
-def _house_ids(belief: dict) -> set:
-    return {p["id"] for p in belief.get("house", {}).get("members", [])
-            if p["alive"]}
+def _formation_ids(belief):
+    return _ids(affordances.formations(belief))
 
 
-def _estate_ids(belief: dict) -> set:
-    return {estate["id"] for estate in belief.get("land", {}).get("estates", [])}
+def _house_ids(belief):
+    return _ids(affordances.people(belief))
 
 
-def _plan_ids(belief: dict) -> set:
-    return {plan["kind"] for plan in belief.get("plans", [])}
+def _estate_ids(belief):
+    return _ids(affordances.estates(belief))
 
 
-def _institution_ids(belief: dict) -> set:
-    return {inst["id"] for inst in belief.get("institutions", [])}
+def _plan_ids(belief):
+    return _ids(affordances.plans(belief), "kind")
 
 
-def _project_ids(belief: dict) -> set:
-    return {project["id"] for project in belief.get("projects", [])}
+def _institution_ids(belief):
+    return _ids(affordances.institutions(belief))
 
 
-def _petition_ids(belief: dict) -> set:
-    return {petition["id"] for petition
-            in belief.get("justice", {}).get("petitions", [])}
+def _project_ids(belief):
+    return _ids(affordances.projects(belief))
 
 
-def _omen_ids(belief: dict) -> set:
-    return {omen["id"] for omen in belief.get("house", {}).get("omens", [])}
+def _petition_ids(belief):
+    return _ids(affordances.petitions(belief))
 
 
-def _oath_ids(belief: dict) -> set:
-    return {oath["id"] for oath in belief.get("oaths", [])}
+def _omen_ids(belief):
+    return _ids(affordances.omens(belief))
 
 
-def _place_ids(belief: dict) -> set:
-    places = {belief.get("seat", "seat")}
-    places.update(relation["place"] for relation in belief.get("relations", []))
-    places.update(inst["place"] for inst in belief.get("institutions", []))
-    places.update(estate["place"] for estate
-                  in belief.get("land", {}).get("estates", []))
-    return places
+def _oath_ids(belief):
+    return _ids(affordances.oaths(belief))
 
 
-def _post_ids(belief: dict) -> set:
-    posts = _institution_ids(belief)
-    posts.update(f"governor:{place}" for place in _place_ids(belief))
-    posts.update(f"command:{formation}" for formation in _formation_ids(belief))
-    posts.update(f"court:{relation['other']}"
-                 for relation in belief.get("relations", []))
-    return posts
+def _place_ids(belief):
+    return _ids(affordances.places(belief))
 
 
-def _resolve_post(value: str, belief: dict) -> str | None:
+def _post_ids(belief):
+    return _ids(affordances.posts(belief))
+
+
+def _resolve_post(value, belief):
     if institution := _resolve_institution(value, belief):
         return institution
-    wanted = _normal(value).replace(" of ", " ")
-    matches = [
-        post for post in _post_ids(belief)
-        if _normal(post).replace(" of ", " ") == wanted]
-    return matches[0] if len(matches) == 1 else None
+    return affordances.resolve("post", value, belief)
 
 
 def _affordances(belief: dict, hours_left: int) -> str:
