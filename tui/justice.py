@@ -28,7 +28,7 @@ def _wrap(surface: Surface, x: int, y: int, text: str, width: int,
 
 
 def compose(b: dict, selected: str = "", width: int = 90,
-            height: int = 34) -> Screen:
+            height: int = 34, notice: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height,
                 title="THE COURT OF JUSTICE", drop=False)
@@ -39,6 +39,7 @@ def compose(b: dict, selected: str = "", width: int = 90,
 
     # The court: two equal figures on one floor, with the king's dais between.
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
+    style.notice(surface, 2, 1, width - 4, notice)
     left_x, right_x = 8, width - 23
     art.draw(surface, left_x, 2, art.LITIGANT_LEFT,
              lit=C["bone"], mid=C["clay"], dark=C["faint"])

@@ -218,9 +218,7 @@ def compose(b: dict, width: int = 108, height: int = 36,
                                  C["bone"], C["ink"])
                     y += 1
 
-    if notice:
-        surface.text(right, 7, _trunc(notice, right_width),
-                     C["flame"], C["ink"])
+    style.notice(surface, right, 7, right_width, notice)
 
     available = b["attention"] if hours_left is None else hours_left
     is_outbox = filter_name == "outbox"

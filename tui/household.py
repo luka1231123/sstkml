@@ -9,10 +9,11 @@ POST_KEYS = "abcdefghijklmnopqrstuvwxyz"
 
 
 def compose(b: dict, picked: str = "", width: int = 86,
-            height: int = 34) -> InteractiveScreen:
+            height: int = 34, notice: str = "") -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 1, 1, width - 3, height - 3,
                 "THE HOUSE", "an office gives a man interests", focus=True)
+    style.notice(surface, 3, 2, width - 7, notice)
     house = b.get("house", {})
     members = [p for p in house.get("members", [])
                if p["alive"] and p["id"] != house.get("ruler")]

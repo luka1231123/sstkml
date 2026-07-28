@@ -13,10 +13,12 @@ C = INDEX
 
 
 def compose(b: dict, selected: str = "", scroll: int = 0,
-            width: int = 92, height: int = 32) -> InteractiveScreen:
+            width: int = 92, height: int = 32,
+            notice: str = "") -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="RELATIONS",
                 note="[esc] close", drop=False)
+    style.notice(surface, 2, 1, width - 4, notice)
     relations = list(b.get("relations", []))
     if not any(item["other"] == selected for item in relations):
         selected = relations[0]["other"] if relations else ""

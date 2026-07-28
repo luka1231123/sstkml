@@ -88,6 +88,15 @@ class ActionResult:
     def ok(self) -> bool:
         return self.status == SUCCESS
 
+    def __bool__(self) -> bool:
+        """A result is truthy exactly when the order went through.
+
+        Callers written against the older `-> bool` reading of "did it work"
+        keep their meaning; a refusal must never read as success merely because
+        an object was returned.
+        """
+        return self.ok
+
 
 def _d(*args, **kwargs) -> ActionDescriptor:
     return ActionDescriptor(*args, **kwargs)

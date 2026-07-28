@@ -168,9 +168,7 @@ def compose(b: dict, selected_place: str = "", width: int = 78,
         surface.text(x, 24, "not a live view"[:available],
                      C["ash"], C["ink"])
 
-    if notice:
-        surface.text(3, height - 3, notice[:width - 6],
-                     C["flame"], C["ink"])
+    style.notice(surface, 3, height - 3, width - 6, notice)
 
     style.footer(surface, (
         style.FooterAction(

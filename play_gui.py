@@ -43,7 +43,7 @@ from tui import plague as plague_page
 from tui import relations as relations_page
 from tui import works as works_page
 from tui import (altar, archive, city, composer, counsel, desktop, document,
-                 hall, help as help_page, render, switcher, worldmap)
+                 hall, help as help_page, render, style, switcher, worldmap)
 import manual
 from tui.grid import Screen
 
@@ -96,8 +96,42 @@ assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
     | {window_key for window_key, _t, _h in ROOMS.values()} | {"desk"})
 
 
+# Windows that manage the game rather than the kingdom. An order given while
+# one of these has focus belongs to the window underneath it, so they are never
+# the target of an outcome (UI/UX spec 5, "utilities").
+UTILITIES = frozenset({"help", "switcher", "palette"})
+
+
+def _window_notice(window_key: str) -> property:
+    """A `*_notice` attribute backed by the one outcome table.
+
+    The controller grew a separate notice string per screen, each rendered by
+    exactly one composer and cleared by hand in several places. They are one
+    thing -- what came of the last order in that window -- so they are stored
+    once and these properties keep the readable old names at the call sites.
+    """
+
+    def get(self) -> style.Notice:
+        return self.notices.get(window_key, style.Notice(""))
+
+    def set(self, message) -> None:
+        if message:
+            self.notices[window_key] = style.Notice(
+                message, getattr(message, "kind", "info"))
+        else:
+            self.notices.pop(window_key, None)
+
+    return property(get, set)
+
+
 class Game:
     """World, Belief, the fortnight's hours, and the windows open on them."""
+
+    inbox_notice = _window_notice("stack")
+    plague_notice = _window_notice("plague")
+    city_notice = _window_notice("city")
+    altar_notice = _window_notice("altar")
+    switcher_notice = _window_notice("switcher")
 
     def __init__(self, scenario: str = "ugarit", seed: int | None = None) -> None:
         from tui.backend_tk import App
@@ -251,7 +285,79 @@ class Game:
     def belief(self) -> dict:
         return project(self.world)
 
-    def do(self, action, cost: int | None = None) -> bool:
+    # --- outcomes -------------------------------------------------------------
+
+    @property
+    def notices(self) -> dict:
+        """Window key -> the outcome of the last order given in that window.
+
+        Created on first use rather than in `__init__`, because the headless
+        tests drive the controller through `Game.__new__` and set only the few
+        attributes the path under test reads. Feedback is exactly the thing
+        those tests assert on, so it must not depend on a constructor they
+        deliberately skip.
+        """
+        table = self.__dict__.get("_notices")
+        if table is None:
+            table = self.__dict__["_notices"] = {}
+        return table
+
+    def active_window(self) -> str:
+        """The window the order was given in, which is where it must answer.
+
+        Utilities are skipped: pressing a key in Help or the palette is still
+        an order given *from* the screen underneath, and reporting the result
+        into a window that is about to close would lose it.
+        """
+        app = getattr(self, "app", None)
+        if app is None:                 # headless: the Hall is the only record
+            return "hall"
+        for key in app.live():
+            if key not in UTILITIES:
+                return key
+        return "hall"
+
+    def notify(self, message: str, kind: str = registry.SUCCESS,
+               window: str | None = None) -> None:
+        """Post one outcome to the window that caused it, and to the Hall.
+
+        Both, deliberately. The initiating window is where the player is
+        looking and is the specification's requirement (spec 21, "show
+        success/refusal in the initiating window"); the Hall is the session's
+        record, and a player who has since moved on can still find out what
+        happened to the last thing they ordered.
+        """
+        line = style.Notice(message, kind)
+        target = self.active_window() if window is None else window
+        self.notices[target] = line
+        self.notices["hall"] = line
+
+    def notice_for(self, key: str) -> style.Notice:
+        return self.notices.get(key, style.Notice(""))
+
+    def clear_notice(self, key: str) -> None:
+        self.notices.pop(key, None)
+
+    @property
+    def session_notice(self) -> str:
+        """The Hall's line. A property so the whole controller keeps one path.
+
+        Every `self.session_notice = ...` in this file used to be a private
+        string that only the Hall rendered. They now all route through
+        `notify`, which means an assignment made anywhere lands in the window
+        the player is actually in as well.
+        """
+        return self.notices.get("hall", style.Notice(""))
+
+    @session_notice.setter
+    def session_notice(self, message: str) -> None:
+        if message:
+            self.notify(message, getattr(message, "kind", "info"))
+        else:
+            self.notices.pop("hall", None)
+
+    def do(self, action, cost: int | None = None,
+           window: str | None = None) -> registry.ActionResult:
         """Apply an action if the hours are there. Logged the same way the
         headless driver logs it, so a session here saves and replays.
 
@@ -259,28 +365,43 @@ class Game:
         the same number the typed path charges. Passing one explicitly is for
         the rare case where a screen genuinely charges something else; it is
         not a place to restate a constant that already exists (UI/UX spec 19).
+
+        Returns an `ActionResult` rather than a bare bool, so that a refusal
+        carries *why* -- the missing hours, the engine's own complaint -- to
+        whichever surface asked. It is still truthy on success, so the existing
+        `if self.do(...)` callers read the same.
         """
+        descriptor = registry.describe(action)
+        action_id = descriptor.id if descriptor else ""
         if cost is None:
             cost = registry.cost_of(action)
+        target = self.active_window() if window is None else window
         if cost > self.hours:
             unit = "hour" if cost == 1 else "hours"
-            self.session_notice = (
-                f"That requires {cost} {unit}; {self.hours} remain.")
-            self.repaint()
-            return False
-        try:
-            self.world, _ = apply(self.world, action)
-        except (ValueError, TypeError, KeyError) as error:
-            self.session_notice = f"That order was refused: {error}."
-            self.repaint()
-            return False
-        self.hours -= cost
-        self.log.append({"turn": self.world.date.absolute,
-                         "action": A.to_dict(action)})
-        self.load_armed = False
-        self.session_notice = "Entered: " + self._describe_order(action) + "."
+            result = registry.ActionResult(
+                registry.REFUSAL, action_id,
+                f"That requires {cost} {unit}; {self.hours} remain.",
+                cost, self.hours, missing="attention")
+        else:
+            try:
+                self.world, _ = apply(self.world, action)
+            except (ValueError, TypeError, KeyError) as error:
+                result = registry.ActionResult(
+                    registry.REFUSAL, action_id,
+                    f"That order was refused: {error}.",
+                    cost, self.hours, missing=str(error))
+            else:
+                self.hours -= cost
+                self.log.append({"turn": self.world.date.absolute,
+                                 "action": A.to_dict(action)})
+                self.load_armed = False
+                result = registry.ActionResult(
+                    registry.SUCCESS, action_id,
+                    "Entered: " + self._describe_order(action) + ".",
+                    cost, self.hours)
+        self.notify(result.message, result.status, window=target)
         self.repaint()
-        return True
+        return result
 
     def save_current(self, automatic: bool = False) -> bool:
         """Atomically save the replayable campaign at its current turn."""
@@ -405,44 +526,47 @@ class Game:
     def compose(self, key: str) -> Screen | None:
         b = self.belief
         width, height = self._size(key)
+        # Every screen is handed the outcome of the last order given in it.
+        # One lookup rather than a differently-named attribute per window.
+        notice = self.notice_for(key)
         if key == "hall":
             return hall.compose(
-                b, width, height, hours_left=self.hours,
-                notice=getattr(self, "session_notice", ""))
+                b, width, height, hours_left=self.hours, notice=notice)
         if key == "stack":
             return inbox_page.compose(
                 b, width, height, self.stack_order, self.inbox_pick,
                 self.inbox_filter, self.inbox_scroll, self.hours,
-                self.inbox_delegate_pick,
-                notice=getattr(self, "inbox_notice", ""))
+                self.inbox_delegate_pick, notice=notice)
         if key == "switcher":
             return switcher.compose(
                 self.switcher_entries(), self.switcher_pick, width, height,
-                notice=self.switcher_notice)
+                notice=notice)
         if key == "fortnight":
             return document.fortnight(b, self.events, width, height)
         if key == "world":
             return worldmap.compose(
                 b, width, height, self.world_place_scroll,
-                self.world_route_scroll, self.world_place_pick)
+                self.world_route_scroll, self.world_place_pick,
+                notice=notice)
         if key == "city":
-            return city.compose(
-                b, None, width, height,
-                notice=getattr(self, "city_notice", ""))
+            return city.compose(b, None, width, height, notice=notice)
         if key == "works":
-            return works_page.compose(b, self.works_pick, width, height)
+            return works_page.compose(
+                b, self.works_pick, width, height, notice=notice)
         if key == "justice":
-            return justice_page.compose(b, self.justice_pick, width, height)
+            return justice_page.compose(
+                b, self.justice_pick, width, height, notice=notice)
         if key == "house":
-            return household_page.compose(b, self.house_pick, width, height)
+            return household_page.compose(
+                b, self.house_pick, width, height, notice=notice)
         if key == "relations":
             return relations_page.compose(
-                b, self.relation_pick, self.relation_scroll, width, height)
+                b, self.relation_pick, self.relation_scroll, width, height,
+                notice=notice)
         if key == "plague":
             return plague_page.compose(
                 b, self.plague_pick, width, height,
-                scroll=getattr(self, "plague_scroll", 0),
-                notice=getattr(self, "plague_notice", ""))
+                scroll=getattr(self, "plague_scroll", 0), notice=notice)
         if key.startswith("institution:"):
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
@@ -744,15 +868,15 @@ class Game:
              if candidate["id"] == letter_id),
             None)
         if item is None:
-            self.inbox_notice = "That tablet is no longer in correspondence."
-            self.session_notice = self.inbox_notice
+            self.notify("That tablet is no longer in correspondence.",
+                        registry.REFUSAL, window="stack")
             self.repaint()
             return
         if self.hours < REPLY_COST:
-            self.inbox_notice = (
+            self.notify(
                 f"Answering requires {REPLY_COST} hours; "
-                f"{self.hours} remain.")
-            self.session_notice = self.inbox_notice
+                f"{self.hours} remain.",
+                registry.REFUSAL, window="stack")
             self.repaint()
             return
         self.inbox_notice = ""
@@ -852,7 +976,8 @@ class Game:
             letter_id = desk["letter_id"]
             sealed = self.do(A.DictateReply(
                 letter_id, desk["intent"], draft.text, draft.profile,
-                draft.score.total, draft.score.violations), REPLY_COST)
+                draft.score.total, draft.score.violations), REPLY_COST,
+                window="desk")
             if sealed:
                 self.desk = None
                 self.app.close("desk")
@@ -1443,7 +1568,7 @@ class Game:
         if char == "x" and self.works_pick:
             index = works_page.PICK.index(self.works_pick)
             if index < len(projects):
-                self.do(A.AbandonWork(projects[index]["id"]))
+                self.do(A.AbandonWork(projects[index]["id"]), window="works")
             self.works_pick = ""
             self.repaint()
             return
@@ -1464,11 +1589,11 @@ class Game:
             self.app.close(key)
             return
         if (event.char or "").lower() == "r":
-            self.order(A.BeginRepair(institution))
+            self.order(A.BeginRepair(institution), window=key)
 
-    def order(self, action) -> None:
+    def order(self, action, window: str | None = None) -> None:
         """Issue one direct order and leave a visible receipt or refusal."""
-        self.do(action)
+        self.do(action, window=window)
         self.repaint()
 
     def on_city_key(self, event) -> None:
@@ -1493,9 +1618,7 @@ class Game:
             if not inst["inspected"]:
                 if not self.do(
                         A.InspectLedger(f"institution:{inst['id']}"),
-                        ):
-                    self.city_notice = self.session_notice
-                    self.repaint()
+                        window="city"):
                     return
             self.city_notice = ""
             key = f"institution:{inst['id']}"
@@ -1572,13 +1695,13 @@ class Game:
         self.justice_pick = petition["id"]
         try:
             if char == "h" and not petition["heard"]:
-                self.do(A.HearPetition(petition["id"]))
+                self.do(A.HearPetition(petition["id"]), window="justice")
                 return
             verdict = {"f": "for", "a": "against", "s": "split",
                        "d": "defer"}.get(char)
             if verdict is None:
                 return
-            self.do(A.RulePetition(petition["id"], verdict))
+            self.do(A.RulePetition(petition["id"], verdict), window="justice")
             remaining = self.belief.get("justice", {}).get("petitions", [])
             if verdict != "defer":
                 self.justice_pick = remaining[0]["id"] if remaining else ""
@@ -1609,26 +1732,27 @@ class Game:
         try:
             if char == "[":
                 self.do(A.SetLandDue(max(
-                    0, revenue.get("land_rate", 300) - 50)))
+                    0, revenue.get("land_rate", 300) - 50)), window="house")
             elif char == "]":
                 self.do(A.SetLandDue(min(
-                    1000, revenue.get("land_rate", 300) + 50)))
+                    1000, revenue.get("land_rate", 300) + 50)), window="house")
             elif char == "<":
                 self.do(A.SetHarbourDue(max(
-                    0, revenue.get("harbour_rate", 100) - 50)))
+                    0, revenue.get("harbour_rate", 100) - 50)), window="house")
             elif char == ">":
                 self.do(A.SetHarbourDue(min(
-                    1000, revenue.get("harbour_rate", 100) + 50)))
+                    1000, revenue.get("harbour_rate", 100) + 50)), window="house")
             elif person is not None and char.lower() == "n":
-                self.do(A.NameHeir(person["id"]))
+                self.do(A.NameHeir(person["id"]), window="house")
             elif person is not None and char.lower() == "d" and person["post"]:
-                self.do(A.DismissPerson(person["post"]))
+                self.do(A.DismissPerson(person["post"]), window="house")
             elif person is not None and char.lower() in household_page.POST_KEYS:
                 index = household_page.POST_KEYS.index(char.lower())
                 institutions = self.belief.get("institutions", [])
                 if index < len(institutions):
                     self.do(A.PlacePerson(
-                        person["id"], institutions[index]["id"]))
+                        person["id"], institutions[index]["id"]),
+                        window="house")
         except ValueError:
             pass
         self.repaint()
@@ -1738,19 +1862,15 @@ class Game:
             return
         if char == "q" and self.plague_pick:
             closed = set(self.belief.get("plague", {}).get("quarantined", []))
-            if not self.do(
-                    A.Quarantine(
-                        self.plague_pick, lift=self.plague_pick in closed),
-                    ):
-                self.plague_notice = self.session_notice
-            else:
-                self.plague_notice = ""
+            self.do(A.Quarantine(
+                self.plague_pick, lift=self.plague_pick in closed),
+                window="plague")
             self.repaint()
 
     def search_archive(self) -> None:
         """One hour per query (spec 6.17), and the hour is the mechanic."""
         query = self.archive_query.strip().lower()
-        if not query or not self.do(A.SearchArchive(query)):
+        if not query or not self.do(A.SearchArchive(query), window="archive"):
             self.repaint()
             return
         hits = self.belief.get("archive_index", {}).get("hits", {}).get(query, [])
@@ -1818,7 +1938,7 @@ class Game:
                 None)
             if item is not None and item["read"]:
                 archived = mode == "archive"
-                if self.do(A.ArchiveLetter(letter_id, archived)):
+                if self.do(A.ArchiveLetter(letter_id, archived), window="stack"):
                     self.stack_order = document.order_of(
                         self.belief, self.stack_order)
                     self.inbox_filter = "archived" if archived else "all"
@@ -1834,7 +1954,7 @@ class Game:
                 None)
             if item is not None and item["read"]:
                 self.do(
-                    A.DelegateLetter(letter_id, person_id))
+                    A.DelegateLetter(letter_id, person_id), window="stack")
             return
 
         char = (event.char or "").lower()
@@ -1881,13 +2001,14 @@ class Game:
                 and self.inbox_filter != "outbox"
                 and selected_item["read"] and self.inbox_delegate_pick):
             self.do(A.DelegateLetter(
-                selected_item["id"], self.inbox_delegate_pick))
+                selected_item["id"], self.inbox_delegate_pick),
+                window="stack")
             return
         if (char == "x" and selected_item is not None
                 and self.inbox_filter != "outbox"
                 and selected_item["read"]):
             archived = not bool(selected_item.get("archived"))
-            if self.do(A.ArchiveLetter(selected_item["id"], archived)):
+            if self.do(A.ArchiveLetter(selected_item["id"], archived), window="stack"):
                 self.stack_order = document.order_of(
                     self.belief, self.stack_order)
                 self.inbox_filter = "archived" if archived else "all"
@@ -1930,7 +2051,7 @@ class Game:
                 else items[current_index or 0])
             self.inbox_pick = item["id"]
             if not item["read"]:
-                self.do(A.ReadLetter(item["id"]))
+                self.do(A.ReadLetter(item["id"]), window="stack")
             else:
                 self.repaint()
 

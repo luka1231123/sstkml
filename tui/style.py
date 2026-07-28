@@ -167,6 +167,64 @@ def footer(surface: Surface,
             action.command, bg=C["lapis"]) + 3
 
 
+# What an outcome looks like, in one place (UI/UX spec 8, "feedback"; 21).
+#
+# Every window that can refuse an order draws the refusal with this, so a
+# refusal in the Roll and a refusal in the Muster are the same shape and the
+# player learns to read one thing rather than nine. The glyph is the point: the
+# specification requires that every colour-coded state also carry a glyph or a
+# word, because a player on the monochrome path or with no red vision must
+# still be able to tell "it worked" from "it did not".
+NOTICE_MARKS = {
+    "success": ("✓", "verdigris"),
+    "refusal": ("✗", "flame"),
+    "preview": ("?", "gold"),
+    "cancelled": ("·", "ash"),
+    "info": ("·", "bone"),
+}
+
+
+class Notice(str):
+    """Feedback text that remembers which kind of outcome it reports.
+
+    A `str` subclass rather than a pair, so that every screen already written
+    against a plain `notice: str` keeps working unchanged -- it truncates and
+    tests it exactly as before -- while screens that draw it through `notice()`
+    below get the right mark and colour for free. The controller sets the kind
+    once, where the outcome is known, and no composer has to be told.
+    """
+
+    kind: str
+
+    def __new__(cls, text: str = "", kind: str = "info") -> "Notice":
+        made = super().__new__(cls, text)
+        made.kind = kind
+        return made
+
+
+def notice(surface: Surface, x: int, y: int, width: int,
+           text: str, kind: str | None = None) -> None:
+    """One line saying what came of the last order, marked by kind.
+
+    Drawn where the order was given rather than only in the Hall: the audit
+    found refusals reported into a window the player was not looking at, which
+    is indistinguishable from the game ignoring the key.
+    """
+    if not text or width <= 2:
+        return
+    if kind is None:
+        kind = getattr(text, "kind", "info")
+    mark, colour = NOTICE_MARKS.get(kind, NOTICE_MARKS["info"])
+    # Clear the span first. Several screens spend this row on a frieze, and a
+    # refusal printed through decoration is worse than no decoration: what the
+    # player must not miss takes the row for as long as it has something to say.
+    surface.fill(x, y, width, 1, " ", C["clay"], C["ink"])
+    surface.text(x, y, mark, C[colour], C["ink"])
+    room = width - 2
+    body = text if len(text) <= room else text[:max(0, room - 1)] + "…"
+    surface.text(x + 2, y, body, C[colour], C["ink"])
+
+
 def rule(surface: Surface, x: int, y: int, width: int,
          fg: int | None = None) -> None:
     surface.text(x, y, "─" * width, C["faint"] if fg is None else fg, C["ink"])

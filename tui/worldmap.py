@@ -188,6 +188,7 @@ def compose(
     place_scroll: int = 0,
     route_scroll: int = 0,
     selected_place: str = "",
+    notice: str = "",
 ) -> InteractiveScreen:
     """Compose a page of the projected graph.
 
@@ -198,6 +199,7 @@ def compose(
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE KNOWN WORLD",
                 note="[esc] close", drop=False)
+    style.notice(surface, 2, 1, width - 4, notice)
 
     graph = b.get("world_graph") or {}
     seat_id = str(b.get("seat", ""))

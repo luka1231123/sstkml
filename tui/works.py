@@ -31,11 +31,12 @@ def _bar(surface: Surface, x: int, y: int, width: int,
 
 
 def compose(b: dict, selected: str = "", width: int = 82,
-            height: int = 32) -> Screen:
+            height: int = 32, notice: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE WORKS",
                 note="[esc] close", drop=False)
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
+    style.notice(surface, 2, 1, width - 4, notice)
 
     projects = b.get("projects") or []
     plans = b.get("plans") or []

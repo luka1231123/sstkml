@@ -124,6 +124,9 @@ _ASCII_FOLD = {
     **{block: plain for block, plain in zip(BLOCKS, BLOCKS_ASCII)},
     "·": ".", "—": "-", "–": "-", "…": ".", "▓": "#", "░": ".", "▒": "+",
     "•": "*", "→": ">", "←": "<", "↑": "^", "↓": "v", "×": "x",
+    # Outcome marks (tui/style.notice). They carry the meaning a colour is not
+    # allowed to carry alone, so they must survive the fold.
+    "✓": "+", "✗": "x",
     # The drawn things (tui/art.py). Quadrants and half blocks lose their
     # handedness here; what survives is the silhouette, which is the part
     # carrying the meaning.

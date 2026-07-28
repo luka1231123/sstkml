@@ -141,9 +141,7 @@ def compose(b: dict, width: int = 104, height: int = 36,
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     hours = b["attention"] if hours_left is None else max(0, hours_left)
     _header(surface, b, hours)
-    if notice:
-        surface.text(3, 4, _trunc(notice, width - 6),
-                     C["flame"], C["ink"])
+    style.notice(surface, 3, 4, width - 6, notice)
 
     right_width = 31 if width >= 90 else 27
     divider = width - right_width - 2

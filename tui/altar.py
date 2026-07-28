@@ -103,11 +103,14 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             surface.text(column + len(key) + 4 + len(label), foot + 6, "◄",
                          C["flame"], C["ink"])
         column += len(key) + 8 + len(label)
-    guidance = (
-        notice if notice else
-        "a larger offering does not buy a truer answer. it buys a readier one.")
-    surface.text(3, foot + 7, guidance[:width - 6],
-                 C["flame"] if notice else C["ash"], C["ink"])
+    if notice:
+        style.notice(surface, 3, foot + 7, width - 6, notice)
+    else:
+        surface.text(
+            3, foot + 7,
+            "a larger offering does not buy a truer answer. "
+            "it buys a readier one."[:width - 6],
+            C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
               " [enter] put the question   ·   two hours, and what you laid down",
               fg=C["clay"], bg=C["lapis"])

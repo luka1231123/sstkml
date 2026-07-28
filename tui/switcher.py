@@ -81,8 +81,7 @@ def compose(entries, pick: str = "", width: int = DEFAULT_WIDTH,
         # The whole row is a target, and activating it focuses that window.
         surface.link(1, y, width - 2, 1, f"switch:{entry.key}")
 
-    if notice:
-        surface.text(2, height - 3, notice[: width - 4], C["flame"], C["ink"])
+    style.notice(surface, 2, height - 3, width - 4, notice)
 
     selected_entry = next((e for e in listed if e.key == pick), None)
     # Five controls do not fit on one 42-column footer, and `style.footer`

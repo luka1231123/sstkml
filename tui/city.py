@@ -288,14 +288,16 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     foot = height - 4
     _divider(surface, 3, foot, width - 6)
     revenue = b.get("revenue", {})
-    footnote = (
-        notice if notice else
-        "the figure is what he reports; ! is one you saw; "
-        f"harbour due {revenue.get('harbour_rate', 0)}/1000, "
-        f"last took {revenue.get('last_harbour_due', 0)} "
-        f"{revenue.get('harbour_good', 'oil')}.")
-    surface.text(3, foot + 1, footnote[: width - 6],
-                 C["flame"] if notice else C["ash"], C["ink"])
+    if notice:
+        style.notice(surface, 3, foot + 1, width - 6, notice)
+    else:
+        surface.text(
+            3, foot + 1,
+            ("the figure is what he reports; ! is one you saw; "
+             f"harbour due {revenue.get('harbour_rate', 0)}/1000, "
+             f"last took {revenue.get('last_harbour_due', 0)} "
+             f"{revenue.get('harbour_good', 'oil')}.")[: width - 6],
+            C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
               " [1-9] go and look for yourself — one hour"
               "   [n] the works   [esc] close",
