@@ -78,17 +78,42 @@ def affordable(control: Control, hours: int) -> Control:
     return control
 
 
+def tabs(surface: Surface, x: int, y: int, width: int,
+         choices: tuple[tuple[str, str], ...], chosen: str) -> None:
+    """A row of named views over the same window.
+
+    Tabs are a promise that the window keeps its identity while the player
+    looks at it from another side -- so the strip is always drawn in full, and
+    the unchosen tabs stay legible rather than fading to decoration. Each is
+    clickable and each answers to its own number.
+    """
+    for index, (key, label) in enumerate(choices, 1):
+        if x >= width - 2:
+            break
+        here = key == chosen
+        text = f" {index} {label} "
+        surface.text(x, y, text[:max(0, width - x - 1)],
+                     C["ink"] if here else C["clay"],
+                     C["sand"] if here else C["faint"])
+        surface.link(x, y, len(text), 1, f"tab:{key}")
+        x += len(text) + 1
+
+
 def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             rows: list[Row], selected: str, detail: list[tuple[str, str]],
             controls: list[Control], hours: int,
             width: int, height: int, scroll: int = 0,
             notice: str = "", empty: str = "nothing here.",
-            note: str = "") -> InteractiveScreen:
+            note: str = "",
+            views: tuple[tuple[str, str], ...] = (),
+            view: str = "") -> InteractiveScreen:
     """The whole screen: list left, detail right, controls along the bottom."""
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title=title,
                 note="[esc] close", drop=False)
     style.notice(surface, 2, 1, width - 4, notice)
+    if views:
+        tabs(surface, 2, 2, width, views, view)
 
     # The list gets the width its columns actually need, and the detail takes
     # what is left -- rather than a fixed share, which cut the last column off

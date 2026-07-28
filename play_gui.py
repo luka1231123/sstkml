@@ -43,6 +43,7 @@ from tui import inbox as inbox_page
 from tui import household as household_page
 from tui import plague as plague_page
 from tui import relations as relations_page
+from tui import orders as orders_page
 from tui import works as works_page
 from tui import (altar, archive, city, command as command_page, composer,
                  counsel, desktop, document, hall, help as help_page, render,
@@ -94,6 +95,7 @@ ROOMS: dict[str, tuple[str, str, str]] = {
     "h": ("house", "The House", "on_house_key"),
     "f": ("relations", "Relations", "on_relations_key"),
     "p": ("plague", "Sickness and Closures", "on_plague_key"),
+    "g": ("orders", "Orders", "on_orders_key"),
     "?": ("help", "Help", "on_help_key"),
 }
 
@@ -674,6 +676,13 @@ class Game:
                     item, self.desk["draft"], self.desk["intent"],
                     self.desk["dictating"], house=b.get("house"),
                     width=width, height=height)
+        if key == "orders":
+            state = self.orders_state
+            return orders_page.compose(
+                b, self.log, self.world.date.absolute, self.hours,
+                view=state["view"], selected=state["pick"],
+                scroll=state["scroll"], notice=notice,
+                width=width, height=height)
         if key in {w for w, _t, _h in LEDGERS.values()}:
             return self.compose_ledger(key, b, width, height, notice)
         for _, (window_key, _title, how) in TABLETS.items():
@@ -887,6 +896,20 @@ class Game:
         self.repaint()
         window.focus()
 
+    def open_door(self, char: str) -> None:
+        """Open whatever kind of window this key opens.
+
+        The hall knows the three kinds apart because it has to draw them in
+        groups; nothing else should have to. Anywhere that wants to send the
+        player to a screen -- Orders, the adviser, Help -- names the key.
+        """
+        if char in TABLETS:
+            self.open_tablet(char)
+        elif char in LEDGERS:
+            self.open_ledger(char)
+        elif char in ROOMS:
+            self.open_room(char)
+
     def open_room(self, char: str) -> None:
         """A conversation window. It binds its own handler and never shares."""
         window_key, title, handler = ROOMS[char]
@@ -1086,6 +1109,121 @@ class Game:
             state["muster"]["place"] = ""
         return state
 
+    # --- the Orders workbench (UI/UX spec 13) ---------------------------------
+
+    @property
+    def orders_state(self) -> dict:
+        state = self.__dict__.get("_orders_state")
+        if state is None:
+            state = self.__dict__["_orders_state"] = {
+                "view": orders_page.VIEWS[0][0], "pick": "", "scroll": 0}
+        return state
+
+    def on_orders_key(self, event) -> None:
+        """Choose a view, choose an order, and countermand what can be.
+
+        Countermanding is not an undo: it gives the inverse order, which the
+        engine charges for and the log records beside the first. Both stay
+        visible here afterwards, because both happened.
+        """
+        state = self.orders_state
+        command = getattr(event, "command", "")
+        char = (event.char or "").lower()
+        if event.keysym == "Escape":
+            self.app.close("orders")
+            return
+        if command.startswith("tab:"):
+            state["view"] = command.split(":", 1)[1]
+            state["pick"] = ""
+            state["scroll"] = 0
+            self.repaint()
+            return
+        if char.isdigit() and 1 <= int(char) <= len(orders_page.VIEWS):
+            state["view"] = orders_page.VIEWS[int(char) - 1][0]
+            state["pick"] = ""
+            state["scroll"] = 0
+            self.repaint()
+            return
+        if command.startswith("pick:"):
+            state["pick"] = command.split(":", 1)[1]
+            self.repaint()
+            return
+        rows = self.window_rows("orders")
+        if event.keysym in ("Up", "Down"):
+            if rows:
+                here = rows.index(state["pick"]) if state["pick"] in rows else 0
+                state["pick"] = rows[collection.step(
+                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+            self.repaint()
+            return
+        if event.keysym in ("Prior", "Next", "Home", "End"):
+            state["scroll"] = max(0, min(
+                state["scroll"] + self.STEPS[event.keysym],
+                max(0, len(rows) - 1)))
+            self.repaint()
+            return
+
+        chosen = self.chosen_order()
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        if char == "o" or wanted == "open":
+            self.open_where_given(chosen)
+            return
+        if char == "u" or (wanted and wanted != "open"):
+            self.countermand(chosen)
+
+    def chosen_order(self):
+        state = self.orders_state
+        given = orders_page.visible(
+            orders_page.history(self.log), state["view"],
+            self.world.date.absolute)
+        return next((order for order in given if order.id == state["pick"]),
+                    given[0] if given else None)
+
+    def countermand(self, order) -> None:
+        """Give the inverse order, or say plainly that there is not one."""
+        if order is None:
+            self.notify("choose an order first.", registry.REFUSAL,
+                        window="orders")
+            self.repaint()
+            return
+        reversal = orders_page.countermand(order)
+        if reversal is None:
+            self.notify("that order cannot be unsaid.", registry.REFUSAL,
+                        window="orders")
+            self.repaint()
+            return
+        if self.do(reversal, window="orders"):
+            self.orders_state["pick"] = ""
+
+    def open_where_given(self, order) -> None:
+        """Open the screen this order belongs to, so the evidence is at hand."""
+        descriptor = order.descriptor if order is not None else None
+        if descriptor is None:
+            self.notify("there is no screen for that order.",
+                        registry.REFUSAL, window="orders")
+            self.repaint()
+            return
+        doors = ({window: char for char, (window, _t, _h) in LEDGERS.items()}
+                 | {window: char for char, (window, _t, _h) in ROOMS.items()}
+                 | {window: char for char, (window, _t, _h) in TABLETS.items()})
+        for context in descriptor.contexts:
+            char = doors.get(context)
+            if char is None:
+                continue
+            self.open_door(char)
+            return
+        self.notify(f"{descriptor.label} has no window of its own.",
+                    registry.REFUSAL, window="orders")
+        self.repaint()
+
+    def window_rows(self, key: str) -> list[str]:
+        """The ids a window is listing, in the order it lists them."""
+        screen = self.compose(key)
+        if screen is None:
+            return []
+        return [hit.command.split(":", 1)[1] for hit in screen.hits
+                if hit.command.startswith("pick:")]
+
     def compose_ledger(self, key: str, b: dict, width: int, height: int,
                        notice) -> Screen:
         state = self.ledger_state[key]
@@ -1111,11 +1249,7 @@ class Game:
         recomputed here: two ideas about what row three is, is exactly the bug
         the City had, and the screen is the one that knows.
         """
-        screen = self.compose(key)
-        if screen is None:
-            return []
-        return [hit.command.split(":", 1)[1] for hit in screen.hits
-                if hit.command.startswith("pick:")]
+        return self.window_rows(key)
 
     def open_ledger(self, char: str) -> None:
         window_key, title, handler = LEDGERS[char]
@@ -2615,12 +2749,8 @@ class Game:
             self.activate_concern(int(char) - 1)
         elif char == "?":
             self.open_help()
-        elif char in TABLETS:
-            self.open_tablet(char)
-        elif char in LEDGERS:
-            self.open_ledger(char)
-        elif char in ROOMS:
-            self.open_room(char)
+        elif char in TABLETS or char in LEDGERS or char in ROOMS:
+            self.open_door(char)
         elif char == "d":
             # The desk without a letter chosen answers the oldest thing on the
             # pile, which is what a king with a stack in front of him does.

@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import desktop, household, inbox, justice, ledgers, works
+from tui import desktop, household, inbox, justice, ledgers, orders, works
 from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
@@ -75,6 +75,9 @@ SCREENS = {
     "archive": ("THE TABLET HOUSE", lambda b: archive.compose(
         b, "oath", b.get("archive_index", {}).get("hits", {}).get("oath", []),
         "", False, 84, 32)),
+    "orders": ("ORDERS", lambda b: orders.compose(
+        b, _LOG, max((r["turn"] for r in _LOG), default=0),
+        hours=8, view="all", width=88, height=30)),
     "desk": ("THE DESK", lambda b: _desk(b)),
 }
 
@@ -122,7 +125,26 @@ def read_nth(world, index: int):
 # actually be in.
 PREPARE = {
     "archive": lambda world: apply(world, A.SearchArchive("oath"))[0],
+    "orders": lambda world: _give_orders(world),
 }
+
+# Orders reads the session log rather than the world, so the reader has to have
+# given some. It gives them through the ordinary reducer and records them the
+# way the game does, so what prints is a history that could really exist.
+_LOG: list[dict] = []
+
+
+def _give_orders(world):
+    b = project(world)
+    said = [A.Quarantine(b["world_graph"]["places"][1]["id"], False),
+            A.SendToHarvest(b["groups"][0]["id"], True),
+            A.InspectLedger("granary"),
+            A.SetLandDue(400)]
+    _LOG.clear()
+    for action in said:
+        world, _ = apply(world, action)
+        _LOG.append({"turn": world.date.absolute, "action": A.to_dict(action)})
+    return world
 
 
 def show(screen: Screen, colour: bool = False, ascii_only: bool = False) -> str:

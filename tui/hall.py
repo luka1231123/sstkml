@@ -8,6 +8,7 @@ C = INDEX
 
 DOORS = (
     ("s", "Inbox", "stack"),
+    ("g", "Orders", "orders"),
     ("c", "Counsel", "counsel"),
     ("t", "Stores", "stores"),
     ("r", "Roll", "roll"),
@@ -28,12 +29,14 @@ DOORS = (
 
 BUILT = frozenset({
     "stack", "roll", "stores", "muster", "oaths", "land", "house", "help",
+    "orders",
     "desk", "archive", "altar", "world", "relations", "plague", "counsel",
     "city", "justice",
 })
 
 GROUPS = (
-    ("CORRESPONDENCE", (("s", "Inbox"), ("c", "Counsel"), ("d", "Desk"))),
+    ("CORRESPONDENCE", (("s", "Inbox"), ("g", "Orders"), ("c", "Counsel"),
+                        ("d", "Desk"))),
     ("KINGDOM", (("t", "Stores"), ("r", "Roll"), ("l", "Land"),
                  ("y", "City"))),
     ("OBLIGATIONS", (("m", "Muster"), ("o", "Oaths"))),

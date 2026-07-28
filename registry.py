@@ -247,6 +247,23 @@ def cost_of(action) -> int:
     return 0 if descriptor is None else descriptor.cost
 
 
+def argument_names(descriptor: ActionDescriptor) -> dict[str, str]:
+    """Which engine field each descriptor field fills.
+
+    The two lists are positional: `Field("group", "group")` fills `group_id`
+    because it comes first in both. That contract was already load-bearing --
+    the command palette builds actions by position -- but it was written down
+    nowhere, so the second reader of a logged action had to guess. It reads the
+    engine dataclass rather than restating its field names, so renaming one
+    cannot leave a stale copy here.
+    """
+    engine = [field.name
+              for field in dataclasses.fields(descriptor.action_type)]
+    return {field.name: engine[index]
+            for index, field in enumerate(descriptor.fields)
+            if index < len(engine)}
+
+
 def in_context(context: str) -> tuple[ActionDescriptor, ...]:
     """Every action a given window can offer, in declaration order."""
     return tuple(d for d in DESCRIPTORS if context in d.contexts)

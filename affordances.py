@@ -156,7 +156,14 @@ def places(belief: dict) -> list[dict]:
                  if inst.get("place"))
     found.update(str(estate["place"]) for estate in estates(belief)
                  if estate.get("place"))
-    return [{"id": place, "name": place} for place in sorted(found)]
+    # The route tablet is the one place Belief spells a place the way the court
+    # says it. Without this the game answers "akko" when it means Akko, both
+    # here and in anything that reads an order back.
+    named = {str(place["id"]): str(place.get("name") or place["id"])
+             for place in belief.get("world_graph", {}).get("places", [])}
+    found.update(named)
+    return [{"id": place, "name": named.get(place, place)}
+            for place in sorted(found)]
 
 
 def posts(belief: dict) -> list[dict]:
@@ -224,6 +231,21 @@ def resolve(domain: str, value: str, belief: dict) -> str | None:
         if len(found) == 1:
             return found[0]
     return resolve_named(value, rows)
+
+
+def name_in(domain: str, value: str, belief: dict) -> str:
+    """The player-facing name of an id, or the id spoken as words.
+
+    The reverse of `resolve`, and needed wherever the game has to read an
+    order back to the player -- the Orders workbench most of all, since a
+    record of intent written in engine ids is a record nobody can audit.
+    """
+    text = str(value)
+    key = "kind" if domain == "plan" else "id"
+    for row in rows_for(domain, belief):
+        if row.get(key) == text:
+            return str(row.get("name") or text).replace("_", " ")
+    return text.replace("_", " ")
 
 
 def completions(domain: str, prefix: str, belief: dict) -> list[str]:

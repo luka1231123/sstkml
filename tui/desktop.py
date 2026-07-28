@@ -76,6 +76,7 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("hall", "The Hall", "anchor"),
         _spec("stack", "The Inbox", "workbench", (90, 30), (66, 22)),
         _spec("city", "The City", "workbench", (96, 34), (70, 24)),
+        _spec("orders", "Orders", "workbench", (88, 30), (66, 22)),
         _spec("world", "The Known World", "workbench", (90, 30), (68, 22)),
         _spec("justice", "The Court of Justice", "workbench", (84, 29), (64, 22)),
         _spec("house", "The House", "workbench", (82, 29), (62, 22)),
