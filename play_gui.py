@@ -28,6 +28,7 @@ if sys.version_info < (3, 12):
         "the game needs 3.12 or newer -- /usr/bin/python3 is Apple's and is "
         "too old.\nuse the project's own interpreter:  ./run.sh")
 
+import affordances
 import registry
 from belief.project import project
 from engine import actions as A
@@ -37,6 +38,7 @@ from load import load_scenario
 from session import load_session, new_seed, save as save_session
 from ai import counsel as ai_counsel, help_agent, librarian, parser as ai_parser
 from tui import advice, collection, justice as justice_page
+from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
 from tui import household as household_page
 from tui import plague as plague_page
@@ -66,11 +68,17 @@ DUMP = Path(__file__).parent / "saves" / "screens.txt"
 # per window and is the only place either number appears (UI/UX spec 6).
 TABLETS: dict[str, tuple[str, str, object]] = {
     "s": ("stack", "The Inbox", inbox_page.compose),
-    "t": ("stores", "The Stores", document.stores),
-    "r": ("roll", "The Roll", document.roll),
-    "m": ("muster", "The Muster", document.muster),
-    "o": ("oaths", "The Oaths", document.oaths),
-    "l": ("land", "The Land", document.land),
+}
+
+# The five ledgers. They were tablets -- read and closed, with every order they
+# described given through Counsel -- and are now workbenches with their own key
+# handler, like the City (UI/UX spec 15, phase 4).
+LEDGERS: dict[str, tuple[str, str, str]] = {
+    "t": ("stores", "The Stores", "on_stores_key"),
+    "r": ("roll", "The Roll", "on_roll_key"),
+    "m": ("muster", "The Muster", "on_muster_key"),
+    "o": ("oaths", "The Oaths", "on_oaths_key"),
+    "l": ("land", "The Land", "on_land_key"),
 }
 
 # The windows that hold a conversation: they own their own keys, because most
@@ -95,6 +103,7 @@ ROOMS: dict[str, tuple[str, str, str]] = {
 # letter rather than from a key of its own, so it is listed by hand.
 assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
     {window_key for window_key, _t, _how in TABLETS.values()}
+    | {window_key for window_key, _t, _h in LEDGERS.values()}
     | {window_key for window_key, _t, _h in ROOMS.values()} | {"desk"})
 
 
@@ -102,6 +111,16 @@ assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
 # one of these has focus belongs to the window underneath it, so they are never
 # the target of an outcome (UI/UX spec 5, "utilities").
 UTILITIES = frozenset({"help", "switcher", "palette"})
+
+
+def _key(action_id: str) -> str:
+    """The key that gives this order, from the registry and nowhere else.
+
+    The handlers used to spell their letters out, which meant a mnemonic could
+    be changed in the registry and documented in the manual while the window
+    went on listening for the old one.
+    """
+    return ledger_page.key_for(action_id)
 
 
 def _window_notice(window_key: str) -> property:
@@ -655,6 +674,8 @@ class Game:
                     item, self.desk["draft"], self.desk["intent"],
                     self.desk["dictating"], house=b.get("house"),
                     width=width, height=height)
+        if key in {w for w, _t, _h in LEDGERS.values()}:
+            return self.compose_ledger(key, b, width, height, notice)
         for _, (window_key, _title, how) in TABLETS.items():
             if key == window_key:
                 return how(b, width, height)
@@ -1042,6 +1063,289 @@ class Game:
     def help_topics(self) -> tuple:
         """The topics Help is currently showing, in order."""
         return manual.search(self.help_query, self.help_screen)
+
+    # --- the five ledgers (UI/UX spec 15, phase 4) ----------------------------
+
+    @property
+    def ledger_state(self) -> dict:
+        """Selection, scroll, and the amount in hand, per ledger window.
+
+        Lazily made for the same reason the notice table is: the headless tests
+        drive these handlers through `Game.__new__`, and a workbench that only
+        works after a constructor they skip is a workbench that is not tested.
+        """
+        state = self.__dict__.get("_ledger_state")
+        if state is None:
+            state = self.__dict__["_ledger_state"] = {
+                key: {"pick": "", "scroll": 0, "amount": 0}
+                for key in ("stores", "roll", "land", "muster", "oaths")
+            }
+            state["roll"]["priority"] = []
+            state["land"]["group"] = ""
+            state["muster"]["task"] = ledger_page.TASKS[0]
+            state["muster"]["place"] = ""
+        return state
+
+    def compose_ledger(self, key: str, b: dict, width: int, height: int,
+                       notice) -> Screen:
+        state = self.ledger_state[key]
+        common = dict(selected=state["pick"], width=width, height=height,
+                      scroll=state["scroll"], notice=notice, hours=self.hours)
+        if key == "stores":
+            return ledger_page.stores(b, amount=state["amount"], **common)
+        if key == "roll":
+            return ledger_page.roll(b, amount=state["amount"],
+                                    priority=tuple(state["priority"]), **common)
+        if key == "land":
+            return ledger_page.land(b, days=state["amount"],
+                                    group=state.get("group", ""), **common)
+        if key == "muster":
+            return ledger_page.muster(b, task=state["task"],
+                                      place=state["place"], **common)
+        return ledger_page.oaths(b, amount=state["amount"], **common)
+
+    def ledger_rows(self, key: str) -> list[str]:
+        """The ids the window is listing, in the order it lists them.
+
+        Read back off the composed screen's own hit regions rather than
+        recomputed here: two ideas about what row three is, is exactly the bug
+        the City had, and the screen is the one that knows.
+        """
+        screen = self.compose(key)
+        if screen is None:
+            return []
+        return [hit.command.split(":", 1)[1] for hit in screen.hits
+                if hit.command.startswith("pick:")]
+
+    def open_ledger(self, char: str) -> None:
+        window_key, title, handler = LEDGERS[char]
+        width, height = desktop.default_size(window_key)
+        window = self.app.window(
+            window_key, title, width, height,
+            on_key=getattr(self, handler), on_resize=self.on_resize,
+            on_close=lambda k=window_key: self.app.close(k))
+        self.repaint()
+        window.focus()
+
+    def ledger_key(self, key: str, event, step: int) -> bool:
+        """The parts every ledger shares: close, choose, scroll, set an amount.
+
+        Returns True when it handled the key, so each screen's own handler is
+        only the orders that are actually its own.
+        """
+        state = self.ledger_state[key]
+        if event.keysym == "Escape":
+            self.app.close(key)
+            return True
+        command = getattr(event, "command", "")
+        if command.startswith("pick:"):
+            state["pick"] = command.split(":", 1)[1]
+            self.repaint()
+            return True
+        rows = self.ledger_rows(key)
+        if event.keysym in ("Up", "Down"):
+            if rows:
+                here = rows.index(state["pick"]) if state["pick"] in rows else 0
+                state["pick"] = rows[collection.step(
+                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+                self.repaint()
+            return True
+        if event.keysym in ("Prior", "Next", "Home", "End"):
+            self.scrolled_ledger(key, len(rows), self.STEPS[event.keysym])
+            self.repaint()
+            return True
+        char = event.char or ""
+        if char in ("[", "]") and step:
+            # The amount in hand. Never below nothing: an order for minus two
+            # hundred qa of grain is not a thing a king can give.
+            state["amount"] = max(
+                0, state["amount"] + (step if char == "]" else -step))
+            self.repaint()
+            return True
+        return False
+
+    def scrolled_ledger(self, key: str, total: int, by: int) -> None:
+        state = self.ledger_state[key]
+        state["scroll"] = max(0, min(state["scroll"] + by, max(0, total - 1)))
+
+    def on_stores_key(self, event) -> None:
+        state = self.ledger_state["stores"]
+        if self.ledger_key("stores", event, ledger_page.STEPS["stores"]):
+            return
+        char = (event.char or "").lower()
+        command = getattr(event, "command", "")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        ledger = ledger_page.LEDGER_OF.get(state["pick"], "")
+        if (char == _key("inspect_ledger") or wanted == "inspect_ledger") \
+                and ledger:
+            self.do(A.InspectLedger(ledger), window="stores")
+        elif char == _key("eat_seed") or wanted == "eat_seed":
+            if state["pick"] != "seed_grain" or state["amount"] <= 0:
+                self.notify(
+                    "choose the seed grain and an amount to open.",
+                    registry.REFUSAL, window="stores")
+                self.repaint()
+                return
+            if self.do(A.EatSeed(state["amount"]), window="stores"):
+                state["amount"] = 0
+
+    def on_roll_key(self, event) -> None:
+        state = self.ledger_state["roll"]
+        if self.ledger_key("roll", event, ledger_page.STEPS["roll"]):
+            return
+        char = (event.char or "").lower()
+        command = getattr(event, "command", "")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        pick = state["pick"]
+        if char == _key("allocate") or wanted == "allocate":
+            if not pick or state["amount"] <= 0:
+                self.notify("choose a group and an amount.",
+                            registry.REFUSAL, window="roll")
+                self.repaint()
+                return
+            self.do(A.Allocate(pick, state["amount"]), window="roll")
+        elif char == _key("set_priority") or wanted == "set_priority":
+            # Marking is free and reversible; the order is given by Enter, so
+            # a priority list is composed before it costs anything.
+            if pick in state["priority"]:
+                state["priority"].remove(pick)
+            elif pick:
+                state["priority"].append(pick)
+            self.repaint()
+        elif event.keysym == "Return":
+            if not state["priority"]:
+                self.notify("mark the groups to be paid first, then enter.",
+                            registry.REFUSAL, window="roll")
+                self.repaint()
+                return
+            if self.do(A.SetPriority(tuple(state["priority"])), window="roll"):
+                state["priority"] = []
+        elif char == _key("send_to_harvest") or wanted == "send_to_harvest":
+            if not pick:
+                return
+            self.do(A.SendToHarvest(pick, True), window="roll")
+
+    def on_land_key(self, event) -> None:
+        state = self.ledger_state["land"]
+        if self.ledger_key("land", event, ledger_page.STEPS["corvee"]):
+            return
+        char = event.char or ""
+        command = getattr(event, "command", "")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        data = self.belief.get("land") or {}
+        rate = data.get("land_due_rate", 0)
+        step = ledger_page.STEPS["land_due"]
+        if char == "<":
+            self.do(A.SetLandDue(max(0, rate - step)), window="land")
+        elif char == ">":
+            self.do(A.SetLandDue(min(1000, rate + step)), window="land")
+        elif char.lower() == _key("raise_corvee") or wanted == "raise_corvee":
+            if state["amount"] <= 0:
+                self.notify("choose how many days to call up.",
+                            registry.REFUSAL, window="land")
+                self.repaint()
+                return
+            if self.do(A.RaiseCorvee(state["amount"]), window="land"):
+                state["amount"] = 0
+        elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
+            estate = next(
+                (e for e in data.get("estates", [])
+                 if e["id"] == state["pick"]), None)
+            if estate is None or not estate.get("irrigated") \
+                    or state["amount"] <= 0:
+                self.notify(
+                    "choose an estate with a canal, and days to spend on it.",
+                    registry.REFUSAL, window="land")
+                self.repaint()
+                return
+            if self.do(A.DredgeCanal(estate["id"], state["amount"]),
+                       window="land"):
+                state["amount"] = 0
+        elif char.lower() == "g":
+            groups = [item["id"] for item in self.belief.get("groups", [])]
+            if groups:
+                here = (groups.index(state["group"])
+                        if state.get("group") in groups else -1)
+                state["group"] = groups[(here + 1) % len(groups)]
+                self.repaint()
+        elif char.lower() == _key("send_to_harvest") or wanted == "send_to_harvest":
+            if not state.get("group"):
+                self.notify("[g] chooses which hands go to the fields.",
+                            registry.REFUSAL, window="land")
+                self.repaint()
+                return
+            self.do(A.SendToHarvest(state["group"], True), window="land")
+        elif char.lower() == _key("inspect_ledger") or wanted == "inspect_ledger":
+            self.do(A.InspectLedger("seed"), window="land")
+        elif char.lower() == _key("set_land_due") or wanted == "set_land_due":
+            self.notify(f"[<] and [>] move the land due, now {rate}/1000.",
+                        registry.PREVIEW, window="land")
+            self.repaint()
+
+    def on_muster_key(self, event) -> None:
+        state = self.ledger_state["muster"]
+        if self.ledger_key("muster", event, 0):
+            return
+        char = (event.char or "").lower()
+        command = getattr(event, "command", "")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        b = self.belief
+        formations = b.get("troops", {}).get("formations", [])
+        formation = next(
+            (f for f in formations if f["id"] == state["pick"]), None)
+        places = [place["id"] for place in affordances.places(b)]
+        if char == "t":
+            tasks = ledger_page.TASKS
+            state["task"] = tasks[
+                (tasks.index(state["task"]) + 1) % len(tasks)]
+            self.repaint()
+        elif char == "l" and places:
+            here = places.index(state["place"]) if state["place"] in places \
+                else -1
+            state["place"] = places[(here + 1) % len(places)]
+            self.repaint()
+        elif char == _key("assign_troops") or wanted == "assign_troops":
+            if formation is None or not state["place"]:
+                self.notify(
+                    "choose a formation, then a task and a place with [t]"
+                    " and [l].", registry.REFUSAL, window="muster")
+                self.repaint()
+                return
+            self.do(A.AssignTroops(formation["id"], state["task"],
+                                   state["place"]), window="muster")
+        elif char in (_key("place_person"), _key("dismiss_person")) \
+                or wanted in ("place_person", "dismiss_person"):
+            # A formation's command is a post like any other, and the House is
+            # where the people to fill it are. Say so rather than refusing.
+            self.notify(
+                "a commander is appointed in the House, where the people are.",
+                registry.PREVIEW, window="muster")
+            self.repaint()
+
+    def on_oaths_key(self, event) -> None:
+        state = self.ledger_state["oaths"]
+        if self.ledger_key("oaths", event, ledger_page.STEPS["expiate"]):
+            return
+        char = (event.char or "").lower()
+        command = getattr(event, "command", "")
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        oath = next((o for o in self.belief.get("oaths", [])
+                     if o["id"] == state["pick"]), None)
+        if char == _key("swear_oath") or wanted == "swear_oath":
+            if oath is None or not oath.get("lapsed"):
+                self.notify("only an oath that has lapsed is sworn again.",
+                            registry.REFUSAL, window="oaths")
+                self.repaint()
+                return
+            self.do(A.SwearOath(oath["id"]), window="oaths")
+        elif char == _key("expiate") or wanted == "expiate":
+            if oath is None or state["amount"] <= 0:
+                self.notify("choose an oath, and what you would lay down.",
+                            registry.REFUSAL, window="oaths")
+                self.repaint()
+                return
+            if self.do(A.Expiate(oath["id"], state["amount"]), window="oaths"):
+                state["amount"] = 0
 
     # --- the command palette (UI/UX spec 10) ----------------------------------
 
@@ -2313,6 +2617,8 @@ class Game:
             self.open_help()
         elif char in TABLETS:
             self.open_tablet(char)
+        elif char in LEDGERS:
+            self.open_ledger(char)
         elif char in ROOMS:
             self.open_room(char)
         elif char == "d":

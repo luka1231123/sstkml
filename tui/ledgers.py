@@ -1,0 +1,409 @@
+"""Stores, Roll, Land, Muster, and Oaths as workbenches (UI/UX spec 15).
+
+These five were read-only tablets. Every order they described -- the ration, the
+seed opened for food, the formation sent to a place, the oath re-sworn -- had to
+be given through Counsel, which is the optional model layer. With the model off
+or absent, half the game's mechanics had no route at all, and the specification
+is explicit that the complete game must be usable with AI disabled.
+
+So each is now a list, the selected thing's detail, and the orders that belong
+to it, laid out by `tui/workbench.py`. What is here is the *reading*: which rows
+a screen has, what the detail of one says, and which of the registry's actions
+apply to what is currently selected.
+
+Quantities are stepped with `[` and `]` rather than typed. A ration is chosen by
+feel against a figure on the same screen, and stepping keeps the whole screen
+operable from the keyboard and the mouse alike; the command palette is there for
+the player who knows the exact number he wants.
+"""
+from __future__ import annotations
+
+import registry
+from tui import render, style
+from tui.grid import InteractiveScreen, sparkline
+from tui.workbench import Control, Row, affordable, compose
+
+# What `[` and `]` move by on each screen. Coarse enough to reach a useful
+# figure in a few presses, and never so fine that stepping is a chore.
+STEPS = {"roll": 50, "stores": 50, "corvee": 5, "dredge": 5,
+         "land_due": 25, "expiate": 10}
+
+TASKS = ("garrison", "watch", "harvest", "campaign")
+
+# Which store rows are a ledger the king can have counted. `inspect_ledger`
+# takes `granary` or `seed` and nothing else, so the control is offered on
+# exactly those two rows and is plainly absent on the others.
+LEDGER_OF = {"grain": "granary", "seed_grain": "seed"}
+
+
+def key_for(action_id: str) -> str:
+    """The key a control prints, which is the registry's mnemonic and no other.
+
+    Taken from the registry rather than typed here, so the Field Manual cannot
+    document one key while the screen prints another -- the fifth of the
+    audit's systemic problems, where help, labels, and handlers had already
+    drifted apart because each was authored separately.
+    """
+    descriptor = registry.BY_ID.get(action_id)
+    return descriptor.mnemonic if descriptor else "?"
+
+
+def _spoken(value: str) -> str:
+    return str(value).replace("_", " ")
+
+
+# --- the stores ---------------------------------------------------------------
+
+def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
+           scroll: int = 0, amount: int = 0, notice: str = "",
+           hours: int = 0) -> InteractiveScreen:
+    goods = sorted(b.get("stores", {}).items())
+    rows = [
+        Row(good, (
+            (_spoken(good), "clay"),
+            (render.fmt_good(good, held),
+             "gold" if good in ("bronze", "copper", "tin") else "barley"),
+            (sparkline(b.get("store_history", {}).get(good, []), 12), "dim"),
+        ), mark="·" if good in LEDGER_OF else "")
+        for good, held in goods
+    ]
+    # The two records that say whether the bronze in service is being eaten.
+    metal = b.get("metal", {})
+    rows.append(Row("bronze_in_use", (
+        ("bronze in use", "clay"),
+        (render.fmt_good("bronze", metal.get("bronze_in_circulation", 0)),
+         "gold"), ("equipment", "dim"))))
+    rows.append(Row("melt_ledger", (
+        ("melt ledger", "clay"),
+        (render.fmt_good("bronze", metal.get("melt_ledger", 0)), "blood"),
+        ("taken back", "dim"))))
+
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    held = dict(goods).get(selected)
+    ledger = LEDGER_OF.get(selected, "")
+    inspected = set(b.get("inspected", []))
+
+    detail: list[tuple[str, str]] = [(_spoken(selected).upper(), "gold"), ("", "ink")]
+    if held is not None:
+        detail.append((f"counted at {render.fmt_good(selected, held)}", "clay"))
+        detail.append(
+            ("you have had this counted" if ledger in inspected
+             else "this is what the keeper says", "dim"))
+    if ledger:
+        detail += [
+            ("", "ink"),
+            (f"[i] have the {ledger} counted, and see", "sand"),
+            ("    what is really on the floor", "sand"),
+        ]
+    if selected == "seed_grain":
+        detail += [
+            ("", "ink"),
+            (f"open {amount:,} qa for food", "flame"),
+            ("[ and ] change the amount; [e] opens it", "dim"),
+            ("what is eaten is not sown", "ash"),
+        ]
+
+    controls = [
+        affordable(Control("inspect_ledger", key_for("inspect_ledger"), enabled=bool(ledger),
+                           why="not a ledger" if not ledger else ""), hours),
+        Control("eat_seed", key_for("eat_seed"), label=f"open {amount:,} qa for food",
+                enabled=selected == "seed_grain" and amount > 0,
+                why="choose seed, and an amount"),
+    ]
+    return compose(
+        "THE STORES", ("", "counted", "these twelve"), (18, -22, 12),
+        rows, selected, detail, controls, hours, width, height, scroll,
+        notice, empty="the storehouse is empty.",
+        note="[ ] set an amount   ↑↓ choose")
+
+
+# --- the roll -----------------------------------------------------------------
+
+def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
+         scroll: int = 0, amount: int = 0, priority: tuple = (),
+         notice: str = "", hours: int = 0) -> InteractiveScreen:
+    groups = list(b.get("groups", []))
+    rows = []
+    for group in groups:
+        weeks = group["arrears_weeks"]
+        rows.append(Row(group["id"], (
+            (group["name"], "clay"),
+            (str(group["size"]), "dim"),
+            (f"{group['allocated']:,}", "dim"),
+            (f"{weeks}" if weeks else "—",
+             "blood" if weeks >= 4 else ("flame" if weeks else "ash")),
+            (group["loyalty"], "blood" if weeks >= 4 else "dim"),
+        ), mark="!" if group["id"] in priority else ""))
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    group = next((g for g in groups if g["id"] == selected), None)
+
+    detail: list[tuple[str, str]] = []
+    if group is not None:
+        weeks = group["arrears_weeks"]
+        detail = [
+            (group["name"][:34], "gold"), ("", "ink"),
+            (f"{group['size']} heads", "clay"),
+            (f"allocated {group['allocated']:,} qa", "clay"),
+            (f"unpaid {weeks} fortnight{'s' if weeks != 1 else ''}"
+             if weeks else "paid in full",
+             "blood" if weeks >= 4 else ("flame" if weeks else "dim")),
+            (f"they are {group['loyalty']}", "dim"),
+            ("", "ink"),
+            (f"allocate {amount:,} qa", "flame"),
+            ("[ and ] change it; [a] enters it", "dim"),
+        ]
+        if group["id"] in priority:
+            detail += [("", "ink"), ("marked first in a short fortnight", "sand")]
+        if group.get("function"):
+            detail += [("", "ink"),
+                       (f"they are the {_spoken(group['function'])}", "sand")]
+
+    marked = len(priority)
+    controls = [
+        affordable(Control("allocate", key_for("allocate"), label=f"allocate {amount:,} qa",
+                           enabled=group is not None and amount > 0,
+                           why="choose a group and an amount"), hours),
+        Control("set_priority", key_for("set_priority"),
+                label=(f"priority: {marked} marked, [enter] to order"
+                       if marked else "mark for priority"),
+                enabled=group is not None),
+        affordable(Control("send_to_harvest", key_for("send_to_harvest"),
+                           label="send to the fields",
+                           enabled=group is not None), hours),
+    ]
+    return compose(
+        "THE ROLL — what is owed and what was paid",
+        ("group", "heads", "allocated qa", "unpaid", "they are"),
+        (26, -5, -13, -6, 12),
+        rows, selected, detail, controls, hours, width, height, scroll,
+        notice, empty="nobody is on the roll.",
+        note="[ ] set an amount   ↑↓ choose   [enter] order the priority")
+
+
+# --- the land -----------------------------------------------------------------
+
+def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
+         scroll: int = 0, days: int = 0, notice: str = "",
+         hours: int = 0, group: str = "") -> InteractiveScreen:
+    data = b.get("land") or {}
+    estates = list(data.get("estates", []))
+    rows = []
+    for estate in estates:
+        canal = estate.get("canal_condition")
+        water = (f"canal {canal}" if estate.get("irrigated")
+                 and canal is not None else "rain-fed")
+        rows.append(Row(estate["id"], (
+            (estate["name"], "sand"),
+            (_spoken(estate["place"]), "dim"),
+            (water, "sky" if estate.get("irrigated") else "ash"),
+            (f"{estate['hands'] // 10}%", "clay"),
+        )))
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    estate = next((e for e in estates if e["id"] == selected), None)
+
+    rate = data.get("land_due_rate", 0)
+    detail: list[tuple[str, str]] = [
+        (f"the river gauge stands at {data.get('gauge', 0)}", "sky"),
+        ("", "ink"),
+        (f"last year's floor  "
+         f"{render.fmt_good('grain', data.get('last_harvest', 0))}", "barley"),
+        (f"the year before    "
+         f"{render.fmt_good('grain', data.get('previous_harvest', 0))}", "dim"),
+        (f"land due ordered   {rate}/1000", "gold"),
+        (f"last taken         "
+         f"{render.fmt_good('grain', data.get('last_land_due', 0))}", "dim"),
+        ("", "ink"),
+        (f"seed in store      "
+         f"{render.fmt_good('grain', data.get('seed_in_store', 0))}", "sand"),
+        (f"seed in the ground "
+         f"{render.fmt_good('grain', data.get('seed_in_ground', 0))}", "sand"),
+        (f"the sowing asks    "
+         f"{render.fmt_good('grain', data.get('seed_recommended', 0))}", "dim"),
+        ("", "ink"),
+        (f"hands this fortnight {data.get('labour_days_this_turn', 0):,} days",
+         "clay"),
+        (f"the work asks for    {data.get('labour_days_needed', 0):,} days",
+         "dim"),
+        (f"corvée called        {data.get('corvee_days', 0):,} days", "dim"),
+        ("", "ink"),
+        (f"{days} days in hand", "flame"),
+        ("[ and ] change it", "dim"),
+        ("[< >] move the land due by 25", "dim"),
+    ]
+
+    # Hands come from the Roll, but the decision to send them belongs here,
+    # where the gauge and the sowing are on the same screen. The group is
+    # cycled rather than typed, so the whole order is one screen's work.
+    hands = [g for g in b.get("groups", [])]
+    chosen_group = next((g for g in hands if g["id"] == group), None)
+    if hands:
+        detail += [
+            ("", "ink"),
+            ("HANDS TO THE FIELDS", "gold"),
+            (f"[g] {chosen_group['name'][:26] if chosen_group else 'choose a group'}",
+             "flame" if chosen_group else "ash"),
+        ]
+
+    controls = [
+        affordable(Control("raise_corvee", key_for("raise_corvee"), label=f"raise corvée {days}d",
+                           enabled=days > 0, why="choose days"), hours),
+        affordable(Control("dredge_canal", key_for("dredge_canal"), label=f"dredge {days}d",
+                           enabled=bool(estate) and days > 0
+                           and bool(estate.get("irrigated")),
+                           why="an irrigated estate, and days"), hours),
+        affordable(Control("inspect_ledger", key_for("inspect_ledger"), label="count the seed"),
+                   hours),
+        Control("set_land_due", key_for("set_land_due"), label=f"land due {rate}/1000"),
+        affordable(Control("send_to_harvest", key_for("send_to_harvest"),
+                           label=("send " + chosen_group["name"][:18]
+                                  if chosen_group else "send hands"),
+                           enabled=chosen_group is not None,
+                           why="[g] chooses a group"), hours),
+    ]
+    return compose(
+        "THE LAND", ("estate", "place", "water", "hands"),
+        (22, -10, 10, -5),
+        rows, selected, detail, controls, hours, width, height, scroll,
+        notice, empty="this house holds no estates.",
+        note="[ ] set days   [< >] land due   [g] group   ↑↓ choose")
+
+
+# --- the muster ---------------------------------------------------------------
+
+def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
+           scroll: int = 0, task: str = "garrison", place: str = "",
+           notice: str = "", hours: int = 0) -> InteractiveScreen:
+    troops = b.get("troops", {})
+    formations = list(troops.get("formations", []))
+    rows = [
+        Row(f["id"], (
+            (f["name"], "clay"),
+            (str(f["strength"]), "dim"),
+            (f["task"], "flame" if f["task"] == "campaign" else "clay"),
+            (_spoken(f["place"]), "dim"),
+        ))
+        for f in formations
+    ]
+    for holding, men in sorted(troops.get("garrisons", {}).items()):
+        rows.append(Row(f"garrison:{holding}", (
+            ("holding " + _spoken(holding), "ash"), (str(men), "ash"),
+            ("", "ash"), ("men", "ash"))))
+    for summons in troops.get("summons", []):
+        due = (f"OVERDUE {summons['due_turn']}" if summons["overdue"]
+               else f"due {summons['due_turn']}")
+        rows.append(Row(f"summons:{summons['place']}", (
+            ("summons · " + _spoken(summons["place"]),
+             "blood" if summons["overdue"] else "flame"),
+            (f"{summons['mustered']}/{summons['required']}",
+             "blood" if summons["mustered"] < summons["required"] else "clay"),
+            (due, "blood" if summons["overdue"] else "dim"),
+            (_spoken(summons["oath_id"]), "dim"),
+        ), mark="!" if summons["overdue"] else ""))
+
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    formation = next((f for f in formations if f["id"] == selected), None)
+
+    detail: list[tuple[str, str]] = []
+    if formation is not None:
+        detail = [
+            (formation["name"][:30], "gold"), ("", "ink"),
+            (f"{formation['strength']} men", "clay"),
+            (f"now {formation['task']} at {_spoken(formation['place'])}",
+             "clay"),
+            ("", "ink"),
+            ("SEND THEM", "gold"),
+            (f"task   {task}", "flame"),
+            (f"place  {_spoken(place) or 'choose one'}",
+             "flame" if place else "ash"),
+            ("[t] next task   [l] next place", "dim"),
+            ("[a] gives the order", "dim"),
+        ]
+    elif selected.startswith("summons:"):
+        detail = [("A SUMMONS", "gold"), ("", "ink"),
+                  ("choose a formation above, then send it", "dim")]
+
+    controls = [
+        affordable(Control("assign_troops", key_for("assign_troops"),
+                           label=f"send to {task}"
+                                 + (f" at {_spoken(place)}" if place else ""),
+                           enabled=formation is not None and bool(place),
+                           why="choose a formation and a place"), hours),
+        Control("place_person", key_for("place_person"), label="give it a commander",
+                enabled=formation is not None),
+        Control("dismiss_person", key_for("dismiss_person"), label="take the command away",
+                enabled=formation is not None),
+    ]
+    return compose(
+        "THE MUSTER", ("formation / summons", "men", "order", "place"),
+        (24, -5, 10, 14),
+        rows, selected, detail, controls, hours, width, height, scroll,
+        notice, empty="no one is under arms.",
+        note="[t] task   [l] place   ↑↓ choose")
+
+
+# --- the oaths ----------------------------------------------------------------
+
+def oaths(b: dict, selected: str = "", width: int = 78, height: int = 28,
+          scroll: int = 0, amount: int = 0, notice: str = "",
+          hours: int = 0) -> InteractiveScreen:
+    held = list(b.get("oaths", []))
+    rows = []
+    for oath in held:
+        state = ("dissolved" if oath["dissolved"] else
+                 "LAPSED" if oath["lapsed"] else "sworn")
+        rows.append(Row(oath["id"], (
+            (_spoken(oath["id"]), "ash" if oath["dissolved"] else
+             ("wine" if oath["lapsed"] else "clay")),
+            (state, "wine" if oath["lapsed"] else "dim"),
+            (", ".join(_spoken(god) for god in oath["gods"]), "wine"),
+        ), mark="!" if oath["lapsed"] else ""))
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    oath = next((o for o in held if o["id"] == selected), None)
+
+    detail: list[tuple[str, str]] = []
+    if oath is not None:
+        detail = [(_spoken(oath["id"])[:32], "gold"), ("", "ink")]
+        detail.append(("before " + ", ".join(
+            _spoken(god) for god in oath["gods"]), "wine"))
+        detail.append(("between " + ", ".join(
+            render.actor_name(party, b.get("house"))
+            for party in oath["parties"]), "dim"))
+        if oath["lapsed"]:
+            detail += [
+                ("", "ink"),
+                ("sworn by " + render.actor_name(
+                    oath["sworn_by"], b.get("house")) + ", who is dead",
+                 "wine"),
+                ("nobody is bound until it is sworn again", "wine"),
+            ]
+        detail.append(("", "ink"))
+        for clause in oath.get("clauses", []):
+            detail.append(("· " + _clause(clause), "bone"))
+        detail += [("", "ink"), (f"lay down {amount:,}", "flame"),
+                   ("[ and ] change it", "dim")]
+
+    controls = [
+        affordable(Control("swear_oath", key_for("swear_oath"),
+                           enabled=bool(oath) and oath.get("lapsed", False),
+                           why="only a lapsed oath is re-sworn"), hours),
+        affordable(Control("expiate", key_for("expiate"), label=f"expiate with {amount:,}",
+                           enabled=bool(oath) and amount > 0,
+                           why="choose an oath and an amount"), hours),
+    ]
+    return compose(
+        "THE OATHS", ("tablet", "standing", "before"), (26, -12, 20),
+        rows, selected, detail, controls, hours, width, height, scroll,
+        notice, empty="no oath tablet is held in this archive.",
+        note="[ ] set an amount   ↑↓ choose")
+
+
+def _clause(clause: dict) -> str:
+    """A clause in the words the tablet uses. Kept identical to `document`."""
+    from tui.document import _clause as spoken
+    return spoken(clause)
+

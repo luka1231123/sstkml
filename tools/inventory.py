@@ -123,13 +123,87 @@ def faults() -> list[str]:
     built = {target for _k, _l, target in hall.DOORS if target in hall.BUILT}
     import play_gui
     openable = ({k for k, _t, _h in play_gui.TABLETS.values()}
+                | {k for k, _t, _h in play_gui.LEDGERS.values()}
                 | {k for k, _t, _h in play_gui.ROOMS.values()} | {"desk"})
     for target in sorted(built - openable):
         found.append(f"unreachable room: hall advertises '{target}'")
     for target in sorted(openable - built):
         found.append(f"undocumented room: '{target}' has no hall door")
 
+    # 7. The phase 4 exit gate: Counsel is unnecessary for every implemented
+    #    action. Counsel is the optional model layer, so an action reachable
+    #    only through it does not exist at all when the model is off -- which
+    #    the specification names as the reference configuration.
+    for descriptor in registry.DESCRIPTORS:
+        routes = [context for context in descriptor.contexts
+                  if context != "counsel"]
+        if not routes:
+            found.append(
+                f"only through Counsel: {descriptor.id} has no direct screen")
+            continue
+        if not any(context in DIRECT_CONTEXTS for context in routes):
+            found.append(
+                f"no direct route: {descriptor.id} is offered in "
+                f"{', '.join(routes)}, none of which handles keys")
+
+    # 8. Every workbench must actually print the controls its context claims.
+    #    The registry saying an action belongs to the Roll means nothing if the
+    #    Roll does not draw it, and that gap is invisible in a screenshot of a
+    #    screen where the row happens to be unselected.
+    found.extend(_workbench_gaps())
+
     return found
+
+
+# Contexts with a key handler behind them: a screen the player can open and
+# give this order on. `counsel` is deliberately absent -- it is the thing every
+# action must not depend on.
+DIRECT_CONTEXTS = frozenset({
+    "hall", "stack", "letter", "desk", "stores", "roll", "land", "muster",
+    "oaths", "works", "city", "institution", "justice", "house", "altar",
+    "archive", "relations", "world", "plague",
+})
+
+
+def _workbench_gaps() -> list[str]:
+    """Compose each ledger and check it offers every action of its context."""
+    from belief.project import project
+    from engine.tick import advance
+    from load import load_scenario
+    from tui import ledgers
+
+    world = load_scenario("ugarit", 8814402919)
+    for _ in range(8):
+        world, _ = advance(world)
+    belief = project(world)
+
+    screens = {
+        "stores": ledgers.stores(belief, hours=8, width=80, height=28),
+        "roll": ledgers.roll(belief, hours=8, width=88, height=28),
+        "land": ledgers.land(belief, hours=8, width=84, height=28),
+        "muster": ledgers.muster(belief, hours=8, width=84, height=28),
+        "oaths": ledgers.oaths(belief, hours=8, width=82, height=28),
+    }
+    gaps = []
+    for context, screen in screens.items():
+        offered = {hit.command.split(":", 1)[1] for hit in screen.hits
+                   if hit.command.startswith("do:")}
+        for descriptor in registry.in_context(context):
+            if descriptor.id not in offered:
+                gaps.append(
+                    f"{context} does not offer {descriptor.id}, which the "
+                    f"registry says belongs to it")
+    # And the printed key must be the registry's own mnemonic. `ledgers.key_for`
+    # is the only source the screens use, so this checks the source rather than
+    # every call site.
+    for descriptor in registry.DESCRIPTORS:
+        if not descriptor.mnemonic:
+            continue
+        if ledgers.key_for(descriptor.id) != descriptor.mnemonic:
+            gaps.append(
+                f"the workbenches print [{ledgers.key_for(descriptor.id)}] "
+                f"for {descriptor.id}, not [{descriptor.mnemonic}]")
+    return gaps
 
 
 def _sample(cls: type):

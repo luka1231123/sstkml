@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
-from tui import household, inbox, justice, works
+from tui import desktop, household, inbox, justice, ledgers, works
 from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
@@ -40,17 +40,25 @@ from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
 SEED = 8814402919
 DUMP = ROOT / "saves" / "screens.txt"
 
+
+def _ledger(key: str) -> dict:
+    """The size and hours a workbench opens at, so the dump is what is played."""
+    width, height = desktop.default_size(key)
+    return {"width": width, "height": height, "hours": 8}
+
 # name -> (title, how to compose it from Belief). The sizes are the ones
 # `play_gui.TABLETS` opens the real windows at, so the wrapping read here is
 # the wrapping the player gets.
 SCREENS = {
     "hall": ("THE HALL", lambda b: hall.compose(b, 104, 36)),
     "stack": ("THE INBOX", lambda b: inbox.compose(b, 108, 36)),
-    "stores": ("THE STORES", lambda b: document.stores(b, 62, 22)),
-    "roll": ("THE ROLL", lambda b: document.roll(b, 78, 22)),
-    "muster": ("THE MUSTER", lambda b: document.muster(b, 62, 18)),
-    "oaths": ("THE OATHS", lambda b: document.oaths(b, 76, 28)),
-    "land": ("THE LAND", lambda b: document.land(b, 70, 24)),
+    # The five workbenches, at the sizes `tui.desktop` opens them.
+    "stores": ("THE STORES",
+               lambda b: ledgers.stores(b, **_ledger("stores"))),
+    "roll": ("THE ROLL", lambda b: ledgers.roll(b, **_ledger("roll"))),
+    "muster": ("THE MUSTER", lambda b: ledgers.muster(b, **_ledger("muster"))),
+    "oaths": ("THE OATHS", lambda b: ledgers.oaths(b, **_ledger("oaths"))),
+    "land": ("THE LAND", lambda b: ledgers.land(b, **_ledger("land"))),
     "house": ("THE HOUSE", lambda b: household.compose(
         b, width=86, height=34)),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
