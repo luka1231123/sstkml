@@ -142,8 +142,14 @@ _ASCII_FOLD = {
     # the only non-ASCII things left on it.
     "╠": "+", "╣": "+", "╦": "+", "╩": "+", "╬": "+", "╤": "+", "╧": "+",
     "╟": "+", "╢": "+", "╪": "+", "├": "+", "┤": "+", "┬": "+", "┴": "+",
+    "╞": "+", "╡": "+", "╘": "+", "╛": "+", "╒": "+", "╕": "+", "╙": "+",
+    "╜": "+", "╓": "+", "╖": "+", "╨": "+", "╥": "+", "╚": "+", "╝": "+",
     "┼": "+", "∙": ".", "▬": "-", "◆": "*", "◇": "o", "○": "o", "●": "*",
     "□": "o", "■": "*", "▼": "v",
+    # The throne's own furniture: rounded corners fold with the square ones,
+    # and the inlays and the finial fold to the marks that read as ornament in
+    # a monospace terminal that has nothing else.
+    "╭": "+", "╮": "+", "╰": "+", "╯": "+", "◈": "*", "◙": "o", "✦": "*",
 }
 
 

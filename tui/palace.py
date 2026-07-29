@@ -49,7 +49,11 @@ DUE_STEP = 25
 # from the bottom -- the dais goes, the king stays -- and below the second
 # there is no room at all, which the specification's contraction order asks
 # for: decorative art is the first thing to go (spec 6, "responsive tiers").
-FULL_SCENE = len(art.THRONE) + 2
+# The last two rows of the drawing are its floor, and the room has a floor of
+# its own, so the throne is set on the room's rather than carrying a rug that
+# stops after twenty-five columns.
+SEAT = art.THRONE[:-2]
+FULL_SCENE = len(SEAT) + 3
 SHORT_SCENE = 8
 
 
@@ -75,6 +79,8 @@ def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
     bottom = y + rows - 1
     surface.text(x, y, art.band(art.CORNICE, width), C["gold"], C["ink"])
     surface.text(x, bottom, art.floor(width, 2), C["faint"], C["ink"])
+    if rows > SHORT_SCENE:
+        surface.text(x, bottom - 1, art.band("▚▞", width), C["wine"], C["ink"])
 
     body = rows - 2
     pillar_rows = art.pillar(body)
@@ -86,7 +92,7 @@ def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
     # The throne, cropped from the bottom when the room is short: losing the
     # dais keeps the king, and losing the king would leave a picture of a chair.
     throne_x = x + 6
-    art.paint(surface, throne_x, y + 1, art.THRONE[:body], art.THRONE_PAINT)
+    art.paint(surface, throne_x, y + 1, SEAT[:body - 1], art.THRONE_PAINT)
 
     # The floor, and the men on it. One per row of the list, in the same order
     # and with the same number, so a figure and a line are two views of one
@@ -106,6 +112,9 @@ def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
     for number, row in enumerate(queue[:room], 1):
         at = floor_x + (number - 1) * step
         bowed = row.mark == "✓"
+        # A man blocks the floor he is standing on. Without this the weave of
+        # the last course shows through the gap between his feet.
+        surface.fill(at, stand, art.FIGURE_WIDTH, len(figure), " ")
         art.paint(surface, at, stand + (1 if bowed else 0),
                   art.BOWED if bowed else figure,
                   art.BOWED_PAINT if bowed else mask)
@@ -413,6 +422,21 @@ HEADERS = {
 }
 
 
+LISTINGS = {"court": _court, "house": _house, "relations": _relations,
+            "post": _posts}
+
+
+def listing_rows(b: dict, listing: str) -> list[workbench.Row]:
+    """Everything a view lists, whether or not it fits on the screen.
+
+    The controller needs this and not the rows it can see: arrow keys that walk
+    only the visible rows cannot reach a man below the fold, which is the same
+    complaint whether the list is short because the window is small or because
+    the throne behind it got taller.
+    """
+    return LISTINGS.get(listing, _court)(b)
+
+
 def compose(b: dict, view: str = "court", selected: str = "",
             scroll: int = 0, hours: int = 0, choosing: str = "",
             person: str = "", amount: int = 0, good: str = "copper",
@@ -421,8 +445,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
     """`selected` is the row of whatever is listed; `person` is the man being
     placed, which is a different thing the moment the list turns to posts."""
     listing = "post" if (view == "house" and choosing == "post") else view
-    rows = {"court": _court, "house": _house, "relations": _relations,
-            "post": _posts}[listing](b)
+    rows = listing_rows(b, listing)
     chosen = next((row.id for row in rows if row.id == selected),
                   rows[0].id if rows else "")
 

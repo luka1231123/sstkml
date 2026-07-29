@@ -1195,12 +1195,26 @@ class Game:
         self.repaint()
 
     def window_rows(self, key: str) -> list[str]:
-        """The ids a window is listing, in the order it lists them."""
+        """The ids a window is listing, in the order it lists them.
+
+        One id however many times it can be clicked. The palace draws each
+        matter twice on purpose -- once as a man standing on the floor and
+        once as a line in the list -- and both are selectable. Counting both
+        made the arrow keys walk a list with the first few ids repeated at the
+        front, so pressing Down cycled among the men who happened to fit in
+        the room and never reached the rest.
+        """
         screen = self.compose(key)
         if screen is None:
             return []
-        return [hit.command.split(":", 1)[1] for hit in screen.hits
-                if hit.command.startswith("pick:")]
+        rows: list[str] = []
+        for hit in screen.hits:
+            if not hit.command.startswith("pick:"):
+                continue
+            row = hit.command.split(":", 1)[1]
+            if row not in rows:
+                rows.append(row)
+        return rows
 
     def compose_ledger(self, key: str, b: dict, width: int, height: int,
                        notice) -> Screen:
@@ -2331,11 +2345,20 @@ class Game:
 
         rows = self.window_rows("palace")
         if event.keysym in ("Up", "Down"):
-            if rows:
-                here = (rows.index(self.palace_pick())
-                        if self.palace_pick() in rows else 0)
-                state["pick"][listing] = rows[collection.step(
-                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+            # Walked over everything the view lists, not over the rows that
+            # happen to fit: a man below the fold is still a man in the queue,
+            # and the scroll follows the selection rather than the other way
+            # about.
+            everything = [row.id for row in
+                          palace.listing_rows(self.belief, listing)]
+            if everything:
+                here = (everything.index(self.palace_pick())
+                        if self.palace_pick() in everything else 0)
+                index = collection.step(
+                    len(everything), here, 1 if event.keysym == "Down" else -1)
+                state["pick"][listing] = everything[index]
+                if everything[index] not in rows:
+                    state["scroll"] = index
             self.repaint()
             return
         if event.keysym in self.STEPS:

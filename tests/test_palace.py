@@ -249,3 +249,21 @@ def test_a_digit_chooses_a_view_and_the_views_keep_their_own_selection() -> None
     assert game.palace_state["view"] == "relations"
     game.on_palace_key(_Key("2"))
     assert game.palace_pick("house") == palace._people(game.belief)[1]["id"]
+
+
+def test_the_arrows_reach_every_person_not_only_the_ones_on_the_floor() -> None:
+    """The men are drawn twice -- on the floor and in the list -- and both are
+    clickable. Counting both made Down cycle among the few who fit in the room
+    and never reach the rest, which is a list the player cannot get to the end
+    of."""
+    for view in ("court", "house", "relations"):
+        game = _game()
+        game.palace_state["view"] = view
+        everyone = [row.id for row in palace.listing_rows(game.belief, view)]
+        assert len(game.window_rows("palace")) <= len(everyone)
+
+        seen = {everyone[0]}
+        for _ in range(len(everyone) + 2):
+            game.on_palace_key(_Key(keysym="Down"))
+            seen.add(game.palace_pick(view))
+        assert seen == set(everyone), f"{view}: every row must be reachable"
