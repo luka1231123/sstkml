@@ -398,6 +398,14 @@ class Place:
     """
     id: PlaceId
     name: str
+    # Where the place is, in hundredths of a degree north and east. Authored
+    # court knowledge, like the name: it is drawn on the World tablet and is
+    # never read by any rule. Distance in this game is counted in courier legs
+    # and nothing else, so a coordinate can be wrong by a day's walk without a
+    # single number in the simulation changing. Integers, because everything in
+    # engine/ is -- a float here would be the one place a replay could drift.
+    lat: int = 0
+    lon: int = 0
     population: int = 0            # authored opening size; S is seeded from it
     susceptible: int = 0
     infected: int = 0

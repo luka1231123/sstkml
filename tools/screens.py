@@ -68,7 +68,7 @@ SCREENS = {
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
     "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
-    "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 86, 30)),
+    "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 104, 32)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(
         b, _talk(b), 6, "", False, 92, 36)),
     "altar": ("THE ALTAR", lambda b: altar.compose(

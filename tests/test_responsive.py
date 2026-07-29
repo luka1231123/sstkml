@@ -41,7 +41,7 @@ def _screens(world, b):
         "oaths": lambda w, h: document.oaths(b, w, h),
         "land": lambda w, h: document.land(b, w, h),
         "world": lambda w, h: worldmap.compose(
-            b, w, h, 0, 0, world.court.seat),
+            b, w, h, 0, world.court.seat),
         "city": lambda w, h: city.compose(b, None, w, h),
         "works": lambda w, h: works.compose(b, "", w, h),
         "palace": lambda w, h: palace.compose(b, view="court", width=w,

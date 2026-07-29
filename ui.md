@@ -963,8 +963,14 @@ primary record.
 ### World
 
 **Purpose:** spatially relate last-known places, routes, correspondence,
-orders, obligations, and sickness reports. **Default:** 90 × 30. **Minimum:**
+orders, obligations, and sickness reports. **Default:** 104 × 32. **Minimum:**
 68 × 22.
+
+The map is drawn from coordinates authored in `content/` and carried across the
+Belief boundary with the place's name, not from anything `tui/` knows: a
+scenario on a different sea draws a different map from the same code, and a
+place the tablet cannot locate is named beside the chart rather than dropped
+from it. `tui/chart.py` holds the projection and nothing else.
 
 Keep the ASCII map, but make its selection and layers operational:
 

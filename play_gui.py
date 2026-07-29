@@ -212,7 +212,6 @@ class Game:
         self.plague_notice = ""
         self.city_notice = ""
         self.world_place_pick = self.world.court.seat
-        self.world_place_scroll = 0
         self.world_route_scroll = 0
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
@@ -581,9 +580,8 @@ class Game:
             return document.fortnight(b, self.events, width, height)
         if key == "world":
             return worldmap.compose(
-                b, width, height, self.world_place_scroll,
-                self.world_route_scroll, self.world_place_pick,
-                notice=notice)
+                b, width, height, self.world_route_scroll,
+                self.world_place_pick, notice=notice)
         if key == "city":
             return city.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("city_scroll"))
@@ -2521,25 +2519,43 @@ class Game:
             self.do(A.MarryAbroad(person, other), window="palace")
 
     def on_world_key(self, event) -> None:
-        """Navigate both collections on the projected route tablet."""
+        """Move about the chart, read the tablet, and shut a road.
+
+        The map and the tablet beside it are one selection, not two: clicking a
+        mark, clicking a line, and walking with the arrows all set the same
+        place, and the routes re-sort under it.
+        """
         if event.keysym == "Escape":
             self.app.close("world")
             return
         command = getattr(event, "command", "")
-        graph = self.belief.get("world_graph", {})
-        place_count = len(graph.get("places", []))
-        route_count = len(graph.get("routes", []))
-        place_page = 19
-        route_page = 9
-        if command.startswith("world:place:"):
-            self.world_place_pick = command.split(":", 2)[2]
-        elif command == "world:places:previous" or event.keysym == "Up":
-            self.world_place_scroll = max(
-                0, self.world_place_scroll - place_page)
-        elif command == "world:places:next" or event.keysym == "Down":
-            self.world_place_scroll = min(
-                max(0, place_count - place_page),
-                self.world_place_scroll + place_page)
+        places = [str(place.get("id", ""))
+                  for place in worldmap.places_in_order(self.belief)]
+        routes = worldmap.routes_of(self.belief, self.world_place_pick)
+        route_page = 6
+        if self.world_place_pick not in places:
+            self.world_place_pick = places[0] if places else ""
+        here = places.index(self.world_place_pick) if places else 0
+
+        if command.startswith("world:open:"):
+            self.open_door_for(command.split(":", 2)[2])
+            return
+        if command.startswith("world:route:"):
+            # Clicking a road selects the far end of it, which is what a
+            # player pointing at a line is asking about.
+            _prefix, _kind, a, z = command.split(":", 3)
+            self.world_place_pick = z if a == self.world_place_pick else a
+        elif command.startswith("world:place:"):
+            picked = command.split(":", 2)[2]
+            if picked == "next" or picked == "previous":
+                step = 1 if picked == "next" else -1
+                self.world_place_pick = places[(here + step) % len(places)] \
+                    if places else ""
+            elif picked in places:
+                self.world_place_pick = picked
+        elif event.keysym in ("Up", "Down") and places:
+            step = 1 if event.keysym == "Down" else -1
+            self.world_place_pick = places[(here + step) % len(places)]
         elif command == "world:routes:previous" or (
                 getattr(event, "state", 0) & 4
                 and event.keysym.lower() == "u"):
@@ -2549,10 +2565,36 @@ class Game:
                 getattr(event, "state", 0) & 4
                 and event.keysym.lower() == "d"):
             self.world_route_scroll = min(
-                max(0, route_count - route_page),
+                max(0, len(routes) - route_page),
                 self.world_route_scroll + route_page)
+        elif (event.char or "").lower() == "q" or command.startswith(
+                "do:quarantine:"):
+            place = self.world_place_pick
+            if not place or place == self.belief.get("seat"):
+                self.notify("The seat is not a road you can close.",
+                            registry.REFUSAL, window="world")
+                self.repaint()
+                return
+            closed = set(self.belief.get("plague", {}).get("quarantined", []))
+            self.do(A.Quarantine(place, lift=place in closed), window="world")
+            self.repaint()
+            return
         else:
             return
+        if command.startswith(("world:place:", "world:route:")) or \
+                event.keysym in ("Up", "Down"):
+            self.world_route_scroll = 0
+        self.repaint()
+
+    def open_door_for(self, room: str) -> None:
+        """Open the window that takes an order this one only lists."""
+        for char, (key, _title, _handler) in {
+                **LEDGERS, **ROOMS, **TABLETS}.items():
+            if key == room:
+                self.open_door(char)
+                return
+        self.notify(f"There is no {room} to open.",
+                    registry.REFUSAL, window="world")
         self.repaint()
 
     def on_plague_key(self, event) -> None:

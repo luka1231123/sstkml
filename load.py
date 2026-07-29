@@ -85,7 +85,11 @@ def load_scenario(name: str, seed: int) -> World:
     places = {}
     for p in cfg.get("places", []):
         pop = int(p.get("population", 0))
+        # Authored in degrees because that is how a place is looked up in an
+        # atlas; carried in hundredths because engine/ holds no floats.
         places[p["id"]] = Place(id=p["id"], name=p["name"],
+                                lat=round(float(p.get("lat", 0)) * 100),
+                                lon=round(float(p.get("lon", 0)) * 100),
                                 population=pop, susceptible=pop)
     routes = tuple(
         Route(a=r["a"], b=r["b"], legs=int(r["legs"]), mode=r["mode"],

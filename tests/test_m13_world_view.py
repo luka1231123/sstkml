@@ -6,16 +6,18 @@ import dataclasses
 from belief.project import project
 from load import load_scenario
 from tui.grid import InteractiveScreen, plain_text
-from tui import worldmap
+from tui import chart, worldmap
 
 SEED = 8814402919
 
 
 def _place(place_id: str, name: str, age: int = 0,
-           certainty: str = "charted") -> dict:
+           certainty: str = "charted", lat: int = 0, lon: int = 0) -> dict:
     return {
         "id": place_id,
         "name": name,
+        "lat": lat,
+        "lon": lon,
         "source": "test tablet",
         "as_of_turn": 0,
         "age_turns": age,
@@ -133,14 +135,15 @@ def test_arbitrary_nodes_and_routes_appear_and_old_named_places_do_not() -> None
 
 def test_uncertainty_staleness_and_missing_knowledge_are_written_out() -> None:
     places = [
-        _place("home", "Home"),
-        _place("rumour", "Rumoured Haven", 15, "rumoured"),
+        _place("home", "Home", lat=3500, lon=3500),
+        _place("rumour", "Rumoured Haven", 15, "rumoured", 3400, 3600),
     ]
     route = _route(
         "home", "rumour", "sea", 15, "uncertain", "unknown")
     unknown = {"a": "rumour", "b": "beyond", "mode": "unknown"}
     text = plain_text(
-        worldmap.compose(_belief(places, [route, unknown]), 116, 26))
+        worldmap.compose(_belief(places, [route, unknown]), 116, 26,
+                         selected_place="rumour"))
 
     assert "uncertain" in text
     assert "stale 15f" in text
@@ -149,30 +152,81 @@ def test_uncertainty_staleness_and_missing_knowledge_are_written_out() -> None:
     assert "beyond" in text
 
 
-def test_both_collections_scroll_and_publish_navigation_hits() -> None:
-    places = [_place(f"p{index:02}", f"Place {index:02}")
+def test_the_route_tablet_scrolls_and_every_place_stays_clickable() -> None:
+    places = [_place(f"p{index:02}", f"Place {index:02}",
+                     lat=3000 + index * 30, lon=3000 + (index % 7) * 40)
               for index in range(30)]
     routes = [_route(f"p{index:02}", f"p{index + 1:02}")
               for index in range(29)]
     belief = _belief(places, routes)
 
     first = worldmap.compose(belief, 92, 18)
-    last = worldmap.compose(
-        belief, 92, 18, place_scroll=999, route_scroll=999)
-    first_text = plain_text(first)
-    last_text = plain_text(last)
+    last = worldmap.compose(belief, 92, 18, route_scroll=999)
 
     assert isinstance(first, InteractiveScreen)
-    assert "Place 29" not in first_text
-    assert "Place 29" in last_text
-    assert "Place 28 > Place 29" in last_text
+    assert "Place 28 > Place 29" in plain_text(last)
+    assert "Place 28 > Place 29" not in plain_text(first)
 
-    first_commands = {hit.command for hit in first.hits if hit.enabled}
-    last_commands = {hit.command for hit in last.hits if hit.enabled}
-    assert "world:places:next" in first_commands
-    assert "world:routes:next" in first_commands
-    assert "world:places:previous" in last_commands
-    assert "world:routes:previous" in last_commands
+    # A name that will not fit on the chart is dropped; the place never is.
+    commands = {hit.command for hit in first.hits if hit.enabled}
+    for place in places:
+        assert f"world:place:{place['id']}" in commands, place["id"]
+    assert "world:routes:next" in commands
+
+
+def test_the_chart_marks_and_names_places_where_the_tablet_locates_them() -> None:
+    places = [
+        _place("home", "Home", lat=3500, lon=3500),
+        _place("north", "North Quay", lat=3900, lon=3500),
+        _place("east", "East Ford", lat=3500, lon=4000),
+    ]
+    screen = worldmap.compose(
+        _belief(places, [_route("home", "north"), _route("home", "east")]),
+        100, 28)
+    text = plain_text(screen)
+    commands = {hit.command for hit in screen.hits if hit.enabled}
+
+    for place in places:
+        assert f"world:place:{place['id']}" in commands, place["id"]
+    assert "North Quay" in text and "East Ford" in text
+    assert worldmap.SEAT_MARK in text
+
+    # North is up and east is right: it is a map, not a list in a box.
+    at = chart.project(places, 40, 12)
+    assert at["north"][1] < at["home"][1]
+    assert at["east"][0] > at["home"][0]
+    assert "world:route:home:north" in commands
+
+
+def test_a_place_the_tablet_cannot_locate_is_named_rather_than_dropped() -> None:
+    """A scenario that authors no coordinates loses no place."""
+    places = [_place("home", "Home", lat=3500, lon=3500),
+              _place("nowhere", "Nowhere")]
+    del places[1]["lat"]
+    del places[1]["lon"]
+    screen = worldmap.compose(_belief(places, []), 100, 28)
+
+    assert "not located on this tablet" in plain_text(screen)
+    assert "Nowhere" in plain_text(screen)
+    assert "world:place:nowhere" in {
+        hit.command for hit in screen.hits if hit.enabled}
+
+
+def test_the_orders_beside_the_map_name_the_window_that_takes_them() -> None:
+    """Every order that names a place is offered here, working or not."""
+    places = [_place("home", "Home", lat=3500, lon=3500),
+              _place("emar", "Emar", lat=3600, lon=3800)]
+    belief = _belief(places, [_route("home", "emar")])
+    text = plain_text(worldmap.compose(belief, 104, 30, selected_place="emar"))
+
+    assert "ORDERS" in text
+    assert "Close" in text                  # the one this window takes itself
+    assert "in the Muster" in text          # and the ones it only lists
+    assert "in the Works" in text
+    assert "no court there" in text         # inapplicable, and says why
+
+    seat = plain_text(worldmap.compose(belief, 104, 30, selected_place="home"))
+    assert "your own seat" in seat          # the seat cannot be shut off
 
 
 def test_frieze_variant_keeps_the_graph_hit_regions() -> None:
@@ -184,3 +238,75 @@ def test_frieze_variant_keeps_the_graph_hit_regions() -> None:
     commands = {hit.command for hit in screen.hits if hit.enabled}
     assert "world:place:home" in commands
     assert "world:route:home:away" in commands
+
+
+# --- the controller -----------------------------------------------------------
+
+class _Key:
+    def __init__(self, char: str = "", keysym: str = "",
+                 command: str = "", state: int = 0) -> None:
+        self.char = char
+        self.keysym = keysym or char
+        self.command = command
+        self.state = state
+
+
+def _game():
+    import play_gui
+    from engine.tick import advance
+
+    world = load_scenario("ugarit", SEED)
+    for _ in range(6):
+        world, _ = advance(world)
+    game = play_gui.Game.__new__(play_gui.Game)
+    game.seed = SEED
+    game.world = world
+    game.hours = project(world)["attention"]
+    game.log = []
+    game.client = None
+    game.repaint = lambda: None
+    game.world_place_pick = world.court.seat
+    game.world_route_scroll = 0
+    return game
+
+
+def test_the_arrows_walk_every_place_on_the_chart() -> None:
+    """The map, the tablet and the keyboard share one order and one selection."""
+    game = _game()
+    everywhere = [str(place["id"])
+                  for place in worldmap.places_in_order(game.belief)]
+    seen = {game.world_place_pick}
+    for _ in range(len(everywhere) + 2):
+        game.on_world_key(_Key(keysym="Down"))
+        seen.add(game.world_place_pick)
+    assert seen == set(everywhere)
+
+
+def test_clicking_a_mark_or_a_road_selects_a_place() -> None:
+    game = _game()
+    game.on_world_key(_Key(command="world:place:hattusa"))
+    assert game.world_place_pick == "hattusa"
+
+    # Clicking a road selects the far end of it, whichever way it is written.
+    game.on_world_key(_Key(command="world:route:hattusa:carchemish"))
+    assert game.world_place_pick == "carchemish"
+    game.on_world_key(_Key(command="world:route:hattusa:carchemish"))
+    assert game.world_place_pick == "hattusa"
+
+
+def test_the_closure_is_ordered_from_the_map_and_the_seat_refuses() -> None:
+    game = _game()
+    game.on_world_key(_Key(command="world:place:ma_hadu"))
+    game.on_world_key(_Key(char="q"))
+    assert [entry["action"]["_t"] for entry in game.log] == ["Quarantine"]
+    assert "ma_hadu" in project(game.world)["plague"]["quarantined"]
+
+    # And pressing it again lifts it rather than repeating it.
+    game.on_world_key(_Key(char="q"))
+    assert "ma_hadu" not in project(game.world)["plague"]["quarantined"]
+
+    # The seat is not a road, and says so instead of doing nothing.
+    game.on_world_key(_Key(command=f"world:place:{game.world.court.seat}"))
+    before = len(game.log)
+    game.on_world_key(_Key(char="q"))
+    assert len(game.log) == before

@@ -428,149 +428,228 @@ loyalty = 700
 faction = "temple"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# THE CORRESPONDENCE GRAPH (spec 6.6). No map, no scale, no coordinates -- only
-# who is how many courier-legs away, and whether the sea lies between you. This
-# is the Late Bronze Age eastern Mediterranean seen from Ugarit: the Levantine
-# coast, the Syrian interior, the Hittite plateau, Cyprus and the Aegean, the
-# long fragile eastern road that brings the tin, and Egypt.
+# THE CORRESPONDENCE GRAPH (spec 6.6). What governs is who is how many
+# courier-legs away, and whether the sea lies between you: a letter's journey is
+# counted in legs, never in distance, and no coordinate below is ever consulted
+# by the engine. This is the Late Bronze Age eastern Mediterranean seen from
+# Ugarit: the Levantine coast, the Syrian interior, the Hittite plateau, Cyprus
+# and the Aegean, the long fragile eastern road that brings the tin, and Egypt.
+#
+# `lat` and `lon` are where the place actually is, in degrees north and east of
+# the modern reckoning, so the World tablet can be drawn in the shape of the
+# real coast instead of an invented one. They are authored court knowledge of
+# the same kind as the name -- a king who has sent letters to Byblos for
+# thirty years knows it lies south of Arwad and north of Sidon -- and they are
+# scenario content rather than anything the UI knows, which is the whole reason
+# they are written here. Identifications for the sites whose location is argued
+# over are given beside each; Tarhuntassa in particular is a guess, and is
+# marked as one on the map.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[places]]
 id = "seat"
 name = "Ugarit"
 population = 7000
+lat = 35.6
+lon = 35.78   # Ras Shamra, on its own tell a little back from the shore
 [[places]]
 id = "ma_hadu"
 name = "Ma'hadu"
 population = 2200
+lat = 35.58
+lon = 35.75   # Minet el-Beida, the white harbour, an hour's walk west
 [[places]]
 id = "gibala"
 name = "Gib'ala"
 population = 900
+lat = 35.32
+lon = 35.92   # Tell Sukas, the southern port of the kingdom
 [[places]]
 id = "mukish"
 name = "Alalakh"
 population = 3000
+lat = 36.24
+lon = 36.38   # Tell Atchana in the Amuq, on the Orontes
 [[places]]
 id = "halab"
 name = "Halab"
 population = 4000
+lat = 36.2
+lon = 37.16   # Aleppo, the Storm-god's city inland
 [[places]]
 id = "carchemish"
 name = "Carchemish"
 population = 5000
+lat = 36.83
+lon = 38.02   # the Euphrates crossing, seat of the Hittite viceroy
 [[places]]
 id = "emar"
 name = "Emar"
 population = 2500
+lat = 35.98
+lon = 38.12   # Tell Meskene, where the river bends south
 [[places]]
 id = "tunip"
 name = "Tunip"
 population = 1800
+lat = 35.28
+lon = 36.55   # in the Orontes valley, south of the Amuq
 [[places]]
 id = "qadesh"
 name = "Qadesh"
 population = 2000
+lat = 34.57
+lon = 36.52   # Tell Nebi Mend, on the Orontes above the lake
 [[places]]
 id = "amurru"
 name = "Sumur"
 population = 2600
+lat = 34.71
+lon = 35.99   # Sumur, Tell Kazel on the coastal plain
 [[places]]
 id = "arwad"
 name = "Arwad"
 population = 1400
+lat = 34.86
+lon = 35.86   # the island, a bowshot off its own coast
 [[places]]
 id = "byblos"
 name = "Gubla"
 population = 3200
+lat = 34.12
+lon = 35.65   # Gubla, oldest of the timber ports
 [[places]]
 id = "beirut"
 name = "Beirut"
 population = 1500
+lat = 33.9
+lon = 35.5   # on its promontory
 [[places]]
 id = "sidon"
 name = "Sidon"
 population = 1200
+lat = 33.56
+lon = 35.37   # the purple city
 [[places]]
 id = "tyre"
 name = "Tyre"
 population = 1200
+lat = 33.27
+lon = 35.2   # the island fortress
 [[places]]
 id = "akko"
 name = "Akko"
 population = 1200
+lat = 32.93
+lon = 35.08   # the bay under the Carmel
 [[places]]
 id = "ashkelon"
 name = "Ashkelon"
 population = 1200
+lat = 31.67
+lon = 34.55   # an Egyptian harbour on the Canaanite coast
 [[places]]
 id = "gaza"
 name = "Gaza"
 population = 1200
+lat = 31.5
+lon = 34.45   # where the Way of Horus leaves for the Delta
 [[places]]
 id = "damascus"
 name = "Upe"
 population = 1200
+lat = 33.51
+lon = 36.29   # Upe, the oasis behind the mountains
 [[places]]
 id = "hattusa"
 name = "Hattusa"
 population = 1200
+lat = 40.02
+lon = 34.62   # Bogazkoy on the Anatolian plateau, the Sun's own city
 [[places]]
 id = "tarhuntassa"
 name = "Tarhuntassa"
 population = 1200
+lat = 36.9
+lon = 33.6   # the southern Hittite seat, its site not certainly known
 [[places]]
 id = "ura"
 name = "Ura"
 population = 1200
+lat = 36.38
+lon = 33.93   # the Cilician grain port
 [[places]]
 id = "mira"
 name = "Mira"
 population = 1200
+lat = 38.2
+lon = 29.5   # in the western Anatolian river valleys
 [[places]]
 id = "millawanda"
 name = "Millawanda"
 population = 1200
+lat = 37.53
+lon = 27.28   # Miletus, the Ahhiyawan foothold on the Aegean
 [[places]]
 id = "lukka"
 name = "the Lukka lands"
 population = 1200
+lat = 36.6
+lon = 29.8   # the broken Lycian coast, which owns no king
 [[places]]
 id = "alashiya"
 name = "Alashiya"
 population = 1200
+lat = 35.17
+lon = 33.87   # Enkomi, the copper island's port
 [[places]]
 id = "kition"
 name = "Kition"
 population = 1200
+lat = 34.92
+lon = 33.63   # the island's southern harbour
 [[places]]
 id = "kaphtor"
 name = "Kaphtor"
 population = 1200
+lat = 35.3
+lon = 25.16   # Crete, eight days' sail west with the wind
 [[places]]
 id = "rhodes"
 name = "Rhodes"
 population = 1200
+lat = 36.17
+lon = 28.0   # the island on the sea road to the Aegean
 [[places]]
 id = "mari"
 name = "Mari"
 population = 1200
+lat = 34.55
+lon = 40.89   # Tell Hariri on the middle Euphrates
 [[places]]
 id = "assur"
 name = "Assur"
 population = 1200
+lat = 35.46
+lon = 43.26   # on the Tigris, the Assyrian seat
 [[places]]
 id = "babylon"
 name = "Babylon"
 population = 1200
+lat = 32.54
+lon = 44.42   # the Kassite seat on the Euphrates
 [[places]]
 id = "egypt"
 name = "the Delta"
 population = 1200
+lat = 30.8
+lon = 31.83   # Pi-Ramesses, the Delta residence
 [[places]]
 id = "memphis"
 name = "Memphis"
 population = 1200
+lat = 29.85
+lon = 31.25   # the balance of the two lands
 
 # ── Routes. legs = fortnights. Sea legs are seasonal; land and river stay open
 # all winter -- so in winter the Hittite and Syrian letters keep coming and the

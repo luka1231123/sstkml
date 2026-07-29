@@ -581,6 +581,11 @@ def _world_graph(world) -> dict:
             {
                 "id": place.id,
                 "name": place.name,
+                # Where it lies, in hundredths of a degree. This is the same
+                # inherited tablet the name comes from and crosses on the same
+                # terms; it says nothing about the place's condition now.
+                "lat": place.lat,
+                "lon": place.lon,
                 "source": source,
                 "as_of_turn": 0,
                 "age_turns": max(0, now),

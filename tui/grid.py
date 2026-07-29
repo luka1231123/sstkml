@@ -150,6 +150,9 @@ _ASCII_FOLD = {
     # and the inlays and the finial fold to the marks that read as ornament in
     # a monospace terminal that has nothing else.
     "╭": "+", "╮": "+", "╰": "+", "╯": "+", "◈": "*", "◙": "o", "✦": "*",
+    # The map's own marks (tui/worldmap.py): a walled seat, and the dashed rule
+    # the legend uses for a sea lane.
+    "▣": "#", "╌": "-",
 }
 
 
