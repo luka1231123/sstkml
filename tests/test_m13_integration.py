@@ -47,7 +47,7 @@ def test_m13_save_boundary_is_versioned_and_round_trips() -> None:
         save(path, SEED, "ugarit", world.date.absolute, [], world,
              hours_left=7)
         payload = json.loads(path.read_text())
-        assert payload["version"] == SAVE_VERSION == 13
+        assert payload["version"] == SAVE_VERSION == 14
         loaded, metadata = load_session(path)
         assert loaded == world
         assert metadata["scenario"] == "ugarit"

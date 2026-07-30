@@ -182,12 +182,14 @@ def test_the_map_places_every_correspondent_somewhere() -> None:
 
 
 def test_the_map_greys_the_sea_when_the_sea_is_shut() -> None:
+    """On the layer the sea lanes are drawn on, where the season bites."""
     b = dict(_belief())
     b["sea_open"] = False
-    text = plain_text(worldmap.compose(b, 86, 30))
+    text = plain_text(worldmap.compose(b, 86, 30, layer="trade"))
     assert "the sea is shut" in text
     b["sea_open"] = True
-    assert "the sea lanes are open" in plain_text(worldmap.compose(b, 86, 30))
+    assert "the sea lanes are open" in plain_text(
+        worldmap.compose(b, 86, 30, layer="trade"))
 
 
 def test_the_route_tablet_names_nodes_and_the_kind_of_link() -> None:

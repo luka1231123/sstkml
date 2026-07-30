@@ -43,9 +43,9 @@ from tui import inbox as inbox_page
 from tui import plague as plague_page
 from tui import orders as orders_page
 from tui import works as works_page
-from tui import (altar, archive, city, command as command_page, composer,
-                 counsel, desktop, document, hall, help as help_page, render,
-                 style, switcher, worldmap)
+from tui import (altar, archive, atlas, city, command as command_page,
+                 composer, counsel, desktop, document, hall,
+                 help as help_page, render, style, switcher, worldmap)
 import manual
 import palette as command_palette
 from tui.grid import Screen
@@ -213,6 +213,18 @@ class Game:
         self.city_notice = ""
         self.world_place_pick = self.world.court.seat
         self.world_route_scroll = 0
+        # How much ground one character stands for. One setting for the whole
+        # window rather than one per place, so walking the shore at a given
+        # magnification keeps it.
+        self.world_wide = 3
+        # Where the window is looking, in cells of the authored map. None means
+        # "wherever the selected place is", which is what it goes back to the
+        # moment another place is chosen: panning is for looking around, and
+        # choosing a place is for going somewhere.
+        self.world_focus: tuple[int, int] | None = None
+        # Which of the map's layers is on top. The shape of the world first:
+        # it is the one that answers "where am I looking".
+        self.world_layer = worldmap.LAYERS[0]
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
         self.counsel_typing = False
@@ -581,7 +593,8 @@ class Game:
         if key == "world":
             return worldmap.compose(
                 b, width, height, self.world_route_scroll,
-                self.world_place_pick, notice=notice)
+                self.world_place_pick, notice=notice, wide=self.world_wide,
+                layer=self.world_layer, focus=self.world_focus)
         if key == "city":
             return city.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("city_scroll"))
@@ -2553,9 +2566,26 @@ class Game:
                     if places else ""
             elif picked in places:
                 self.world_place_pick = picked
-        elif event.keysym in ("Up", "Down") and places:
-            step = 1 if event.keysym == "Down" else -1
+        elif command.startswith("world:pan:") or event.keysym in (
+                "Up", "Down", "Left", "Right"):
+            # The arrows move the window over the map. They are the only way to
+            # look at ground nobody has a court on, which on a map this size is
+            # most of it.
+            way = (command.split(":", 2)[2] if command.startswith("world:pan:")
+                   else {"Up": "north", "Down": "south",
+                         "Left": "west", "Right": "east"}[event.keysym])
+            spot = self.world_focus or worldmap.focus_of(
+                self.belief, self.world_place_pick) or (0, 0)
+            step = self.world_wide
+            across, down = {"north": (0, -1), "south": (0, 1),
+                            "west": (-1, 0), "east": (1, 0)}.get(way, (0, 0))
+            self.world_focus = (
+                spot[0] + across * worldmap.PAN_ACROSS * step,
+                spot[1] + down * worldmap.PAN_DOWN * step)
+        elif (event.char or "") in ("]", "[") and places:
+            step = 1 if event.char == "]" else -1
             self.world_place_pick = places[(here + step) % len(places)]
+            self.world_focus = None
         elif command == "world:routes:previous" or (
                 getattr(event, "state", 0) & 4
                 and event.keysym.lower() == "u"):
@@ -2567,6 +2597,19 @@ class Game:
             self.world_route_scroll = min(
                 max(0, len(routes) - route_page),
                 self.world_route_scroll + route_page)
+        elif command.startswith("world:layer:") or event.keysym == "Tab":
+            asked = (command.split(":", 2)[2]
+                     if command.startswith("world:layer:") else "next")
+            if asked in worldmap.LAYERS:
+                self.world_layer = asked
+            else:
+                here = worldmap.LAYERS.index(self.world_layer)
+                self.world_layer = worldmap.LAYERS[
+                    (here + 1) % len(worldmap.LAYERS)]
+        elif command == "world:zoom:in" or (event.char or "") in ("+", "="):
+            self.world_wide = max(1, self.world_wide - 1)
+        elif command == "world:zoom:out" or (event.char or "") in ("-", "_"):
+            self.world_wide = min(atlas.MAX_WIDE, self.world_wide + 1)
         elif (event.char or "").lower() == "q" or command.startswith(
                 "do:quarantine:"):
             place = self.world_place_pick
@@ -2581,9 +2624,10 @@ class Game:
             return
         else:
             return
-        if command.startswith(("world:place:", "world:route:")) or \
-                event.keysym in ("Up", "Down"):
+        if command.startswith(("world:place:", "world:route:")):
+            # A new place is a new list of roads, and a new place to look at.
             self.world_route_scroll = 0
+            self.world_focus = None
         self.repaint()
 
     def open_door_for(self, room: str) -> None:

@@ -966,11 +966,66 @@ primary record.
 orders, obligations, and sickness reports. **Default:** 104 × 32. **Minimum:**
 68 × 22.
 
-The map is drawn from coordinates authored in `content/` and carried across the
+The map is drawn from ground authored in `content/` and carried across the
 Belief boundary with the place's name, not from anything `tui/` knows: a
 scenario on a different sea draws a different map from the same code, and a
-place the tablet cannot locate is named beside the chart rather than dropped
-from it. `tui/chart.py` holds the projection and nothing else.
+place the tablet cannot locate is named beside the map rather than dropped from
+it. `tui/atlas.py` holds the window and nothing else.
+
+The ground is a block of characters. `[terrain]` in the scenario carries
+`rows` — one character per cell of ground, three hundred columns by a hundred
+and nineteen rows for Ugarit — with `west`/`north` and `step_lon`/`step_lat`
+saying what a cell covers, so a real latitude can be turned into a column once,
+by hand, and then left alone. The glyphs are `~` sea, `≈` river, `^` upland,
+`,` sown, `.` dry, `:` desert, `;` marsh. It crosses the Belief boundary as
+scenery: no rule reads it, and a scenario that authors none draws a map of
+marks with no ground under them. Editing the map is editing those rows.
+
+The map is bigger than the window on purpose. The arrows pan it; `+` and `-`
+change how much ground one character stands for, up to `atlas.MAX_WIDE`; `[`
+and `]` walk the places, and choosing a place hands the window back to it. A
+place off the window is named under the map, with the count first, and stays
+clickable there. Held back from, the ground is sampled in favour of the land: a
+coastline that thins out and vanishes as you pull back lies about where the
+islands are.
+
+A place is drawn as one letter in brackets that say what it is: `{U}` your own
+seat, `[H]` an imperial capital, `(C)` a royal seat, a bare letter for a town.
+The letter is authored, the colour is whose empire answers for the place, and
+two marks never share a cell — one of them steps aside, because a mark drawn
+over a mark is a place that has silently vanished.
+
+Behind the hubs is the hinterland: `[[sites]]` blocks, each a `kind` belonging
+to a `hub`, with no names. A small palace is a holding, counted, not a town the
+king writes to. They are drawn only on the layer that asks about them, they are
+never clickable — no order in this game names one — and the tablet beside the
+map counts them by kind.
+
+The tablet is split into seven layers, reached by tabs across the top and by
+`tab`: **Land**, the ground and the hubs standing on it; **Roads**, the land
+and river routes with the fortnights written on them; **Trade**, the sea lanes
+and where the metal comes from; **Farms**, the sown ground and the estates that
+work it; **Holds**, the small palaces; **Courts**, who writes to you and how
+they hold you; **Plague**, the roads you have shut. Land is the one the window
+opens on. Every other layer dims the ground underneath itself so the player can
+see where he is looking. The tabs wrap onto a second row rather than running
+off the edge.
+
+In a season that has shut the sea, a closed lane is drawn only when it is one
+of the selected place's own: the route tablet lists all of them and says which
+are closed, and a dotted line for every lane that is not there covers the map
+in debris the player cannot act on.
+
+One mark per place on the general map. What a place *also* is — a court with an
+opinion of you, a road closed against the plague — belongs to the layer that is
+about it, because a legend the player has to learn before he can read anything
+is not a map.
+
+Still to come, and deliberately left out for now: the small palaces are drawn
+and counted but cannot yet be built, granted or lost; agricultural capacity is
+shown as sown ground and estates rather than as a number the land phase reads;
+and the roads are straight lines between hubs rather than tracks that follow
+the ground.
 
 Keep the ASCII map, but make its selection and layers operational:
 

@@ -28,7 +28,7 @@ def new_seed() -> int:
     return secrets.randbits(48)
 
 
-SAVE_VERSION = 13     # M13.0: causal-foundation and GUI workflow boundary
+SAVE_VERSION = 14     # the world redrawn: new hubs, new roads, new ground
 
 
 def _verify_protocol(world, action):
