@@ -189,9 +189,12 @@ def _draw_stacked(surface: Surface, selected: dict | None,
         names = ", ".join(
             render.actor_name(actor, b.get("house"))
             for actor in correspondents) if correspondents else "none recorded"
+        prefix = "known hands · "
+        suffix = " · not a live view"
+        names = _fit(names, max(1, text_width - len(prefix) - len(suffix)))
         surface.text(
             3, 12,
-            _fit(f"known hands · {names} · not a live view", text_width),
+            _fit(f"{prefix}{names}{suffix}", text_width),
             C["clay"], C["ink"])
     _draw_places(
         surface, dossiers, closed, selected_place, scroll, room,

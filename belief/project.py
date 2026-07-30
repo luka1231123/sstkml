@@ -735,11 +735,15 @@ def _world_graph(world) -> dict:
             {
                 "id": place.id,
                 "name": place.name,
-                # Where it lies, in hundredths of a degree. This is the same
-                # inherited tablet the name comes from and crosses on the same
-                # terms; it says nothing about the place's condition now.
-                "lat": place.lat,
-                "lon": place.lon,
+                # Where it stands on the inherited tablet, and what the
+                # tablet says it is. All of it comes across on the same terms
+                # as the name and says nothing about the place's condition now.
+                "col": place.col,
+                "row": place.row,
+                "power": place.power,
+                "rank": place.rank,
+                "glyph": place.glyph,
+                "role": place.role,
                 "source": source,
                 "as_of_turn": 0,
                 "age_turns": max(0, now),
@@ -769,6 +773,22 @@ def _world_graph(world) -> dict:
                     min(item.a, item.b), max(item.a, item.b),
                     item.mode, item.legs),
             )
+        ],
+        # The ground, drawn on the same inherited tablet as the place names,
+        # and the holdings standing on it. Both are scenery: no condition, no
+        # age of their own worth quoting, and nothing live behind them to leak.
+        "terrain": {
+            "rows": list(world.terrain.rows),
+            "west": world.terrain.west,
+            "north": world.terrain.north,
+            "step_lon": world.terrain.step_lon,
+            "step_lat": world.terrain.step_lat,
+            "legend": world.terrain.legend,
+        },
+        "sites": [
+            {"kind": site.kind, "hub": site.hub,
+             "col": site.col, "row": site.row}
+            for site in world.sites
         ],
     }
 

@@ -408,14 +408,20 @@ class Place:
     """
     id: PlaceId
     name: str
-    # Where the place is, in hundredths of a degree north and east. Authored
-    # court knowledge, like the name: it is drawn on the World tablet and is
-    # never read by any rule. Distance in this game is counted in courier legs
-    # and nothing else, so a coordinate can be wrong by a day's walk without a
-    # single number in the simulation changing. Integers, because everything in
-    # engine/ is -- a float here would be the one place a replay could drift.
-    lat: int = 0
-    lon: int = 0
+    # Where the place stands on the authored map: a column and a row into
+    # World.terrain. Court knowledge of the same kind as the name, drawn on the
+    # World tablet and read by no rule -- distance in this game is counted in
+    # courier legs and in nothing else, so a place can be a cell out of true
+    # without one number in the simulation changing.
+    col: int = 0
+    row: int = 0
+    # Whose empire answers for it, what it is (an imperial seat, a royal seat,
+    # a town, and "seat" for your own), the letter drawn inside its brackets,
+    # and the line the tablet writes about it. All four are authored.
+    power: str = ""
+    rank: str = "town"
+    glyph: str = ""
+    role: str = ""
     population: int = 0            # authored opening size; S is seeded from it
     susceptible: int = 0
     infected: int = 0
@@ -487,6 +493,44 @@ class Route:
     mode: str          # "sea" | "land" | "river"
     seasonal: bool     # sea legs shut outside the sailing window
     risk: int          # 0..1000 base interception/loss weight
+
+
+@dataclasses.dataclass(frozen=True)
+class Terrain:
+    """The ground itself: one character per cell, authored in `content/`.
+
+    Scenery for the World tablet, and nothing more. No rule reads it, nothing
+    is calculated from it, and a scenario that authors none simply draws a map
+    of marks with no ground under them. It lives on World because `content/` is
+    where it is authored and Belief is the only way anything authored reaches
+    the screen.
+
+    `west` and `north` are hundredths of a degree at column 0 and row 0, and
+    `step_lon`/`step_lat` how much ground one cell covers, in the same units.
+    Nothing in the engine uses them; they are carried so that a tool can turn a
+    real latitude into a column once, and so that a reader of the scenario can
+    tell what he is looking at.
+    """
+    rows: tuple[str, ...] = ()
+    west: int = 0
+    north: int = 0
+    step_lon: int = 0
+    step_lat: int = 0
+    legend: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class Site:
+    """One holding in a hub's hinterland: a small palace, an estate, a mine.
+
+    It has no name on purpose. This is what the hinterland of a great house
+    looks like from the capital -- a count of holdings, each of a kind, each
+    answering to one hub -- and not a second list of towns to write letters to.
+    """
+    kind: str            # "palace" | "grain" | "copper" | "tin" | ...
+    hub: PlaceId         # whose hinterland it lies in
+    col: int = 0
+    row: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -715,6 +759,8 @@ class World:
     # Mail (spec 6.6). Places/routes/correspondents authored; the rest is live.
     places: Mapping[PlaceId, Place] = dataclasses.field(default_factory=dict)
     routes: tuple[Route, ...] = ()
+    terrain: Terrain = Terrain()             # authored ground; no rule reads it
+    sites: tuple[Site, ...] = ()             # the hinterland of the hubs
     correspondents: tuple[Correspondent, ...] = ()
     season: Mapping[str, tuple[int, ...]] = dataclasses.field(default_factory=dict)
     letters_in_transit: tuple[Letter, ...] = ()

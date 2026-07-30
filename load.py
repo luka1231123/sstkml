@@ -15,8 +15,8 @@ from engine.state import (Clause, Correspondent, Court, DependentGroup,
                           Document, Estate, ForeignCourt, Formation,
                           HarbourCargoLot,
                           HouseMember, Institution, MetalState, Oath, Petition,
-                          Place, PlagueState,
-                          Relation, Rite, Route, Workshop, World)
+                          Place, PlagueState, Relation, Rite, Route, Site,
+                          Terrain, Workshop, World)
 
 CONTENT = Path(__file__).parent / "content"
 
@@ -86,16 +86,38 @@ def load_scenario(name: str, seed: int) -> World:
     places = {}
     for p in cfg.get("places", []):
         pop = int(p.get("population", 0))
-        # Authored in degrees because that is how a place is looked up in an
-        # atlas; carried in hundredths because engine/ holds no floats.
+        # A column and a row into the authored terrain, plus what the place is
+        # to the map: whose empire, what rank, which letter, and the one line
+        # the tablet writes about it. None of it is read by a rule.
         places[p["id"]] = Place(id=p["id"], name=p["name"],
-                                lat=round(float(p.get("lat", 0)) * 100),
-                                lon=round(float(p.get("lon", 0)) * 100),
+                                col=int(p.get("col", 0)),
+                                row=int(p.get("row", 0)),
+                                power=str(p.get("power", "")),
+                                rank=str(p.get("rank", "town")),
+                                glyph=str(p.get("glyph", "")),
+                                role=str(p.get("role", "")),
                                 population=pop, susceptible=pop)
     routes = tuple(
         Route(a=r["a"], b=r["b"], legs=int(r["legs"]), mode=r["mode"],
               seasonal=bool(r["seasonal"]), risk=int(r["risk"]))
         for r in cfg.get("routes", [])
+    )
+    # The ground, and the holdings standing on it. Scenery on the same terms as
+    # the coordinates above: authored in `content/`, carried through Belief,
+    # read by nobody but the tablet that draws it. Degrees are authored as
+    # decimals and carried in hundredths, because engine/ holds no floats.
+    ground = cfg.get("terrain", {})
+    terrain = Terrain(
+        rows=tuple(str(row) for row in ground.get("rows", [])),
+        west=round(float(ground.get("west", 0)) * 100),
+        north=round(float(ground.get("north", 0)) * 100),
+        step_lon=round(float(ground.get("step_lon", 0)) * 100),
+        step_lat=round(float(ground.get("step_lat", 0)) * 100),
+        legend=str(ground.get("legend", "")))
+    sites = tuple(
+        Site(kind=str(s.get("kind", "")), hub=str(s.get("hub", "")),
+             col=int(s.get("col", 0)), row=int(s.get("row", 0)))
+        for s in cfg.get("sites", [])
     )
     correspondents = tuple(
         Correspondent(
@@ -323,7 +345,8 @@ def load_scenario(name: str, seed: int) -> World:
         seed=seed, scenario=cfg["scenario"],
         date=Date(year=1, fortnight=0, absolute=0),   # turn 1 begins with an advance
         court=court,
-        places=places, routes=routes, correspondents=correspondents, season=season,
+        places=places, routes=routes, terrain=terrain, sites=sites,
+        correspondents=correspondents, season=season,
         relations=relations, oaths=oaths, foreign_courts=foreign_courts,
         plague=plague_state,
         documents=load_predecessor_archive(cfg["scenario"]),
