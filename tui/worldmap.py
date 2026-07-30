@@ -832,6 +832,58 @@ def _draw_tabs(surface: Surface, x: int, y: int, room: int,
     return rows
 
 
+def _map_panel_size(width: int, height: int) -> tuple[int, int]:
+    """The map's drawable panel, shared by composition and key handling."""
+    split = max(30, min(width - 34, (width * 3) // 5))
+    map_width = max(1, split - 3)
+    left, tab_rows = 2, 1
+    for name in LAYERS:
+        text = f" {LAYER_NAME[name]} "
+        if left + len(text) > 2 + map_width and left > 2:
+            left, tab_rows = 2, tab_rows + 1
+            if tab_rows > 2:
+                tab_rows = 2
+                break
+        left += len(text) + 1
+    map_top = 3 + tab_rows
+    return map_width, max(1, height - 6 - map_top)
+
+
+def map_view(b: dict, width: int, height: int, selected_place: str,
+             wide: int, focus: tuple[int, int] | None) -> atlas.View | None:
+    """The exact clamped viewport used to draw the map."""
+    rows = atlas.ground_rows(b)
+    if not rows:
+        return None
+    map_width, map_height = _map_panel_size(width, height)
+    if focus is None:
+        focus = focus_of(b, selected_place)
+    return atlas.frame_for(
+        rows, map_width, map_height, focus=focus, wide=wide)
+
+
+def pan_focus(b: dict, width: int, height: int, selected_place: str,
+              wide: int, focus: tuple[int, int] | None,
+              across: int = 0, down: int = 0) -> tuple[int, int] | None:
+    """Move the visible viewport and return its real, clamped centre.
+
+    Storing the requested off-map focus made repeated keys accumulate invisible
+    movement at an edge. Reversing direction then appeared broken until those
+    hidden steps had been unwound. The viewport is the authority here: move
+    it, let ``atlas.View`` clamp it, and remember only the centre it can show.
+    """
+    view = map_view(b, width, height, selected_place, wide, focus)
+    if view is None:
+        return focus
+    moved = view.moved(
+        across=across * PAN_ACROSS,
+        down=down * PAN_DOWN)
+    return (
+        moved.corner[0] + moved.span[0] // 2,
+        moved.corner[1] + moved.span[1] // 2,
+    )
+
+
 def compose(b: dict, width: int = 90, height: int = 30,
             route_scroll: int = 0, selected_place: str = "",
             notice: str = "", wide: int = 3,
@@ -868,11 +920,10 @@ def compose(b: dict, width: int = 90, height: int = 30,
     for y in range(4, max(4, height - 2)):
         surface.put(split, y, "│", C["faint"], C["ink"])
 
-    map_width = max(1, split - 3)
+    map_width, map_height = _map_panel_size(width, height)
     tab_rows = _draw_tabs(surface, 2, 3, map_width, layer)
     map_top = 3 + tab_rows
     map_bottom = height - 6
-    map_height = max(1, map_bottom - map_top)
     wide = max(1, min(atlas.MAX_WIDE, wide))
     if focus is None:
         focus = focus_of(b, selected_place)

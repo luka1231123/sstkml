@@ -3423,14 +3423,12 @@ class Game:
             way = (command.split(":", 2)[2] if command.startswith("world:pan:")
                    else {"Up": "north", "Down": "south",
                          "Left": "west", "Right": "east"}[event.keysym])
-            spot = self.world_focus or worldmap.focus_of(
-                self.belief, self.world_place_pick) or (0, 0)
-            step = self.world_wide
             across, down = {"north": (0, -1), "south": (0, 1),
                             "west": (-1, 0), "east": (1, 0)}.get(way, (0, 0))
-            self.world_focus = (
-                spot[0] + across * worldmap.PAN_ACROSS * step,
-                spot[1] + down * worldmap.PAN_DOWN * step)
+            width, height = self._size("world")
+            self.world_focus = worldmap.pan_focus(
+                self.belief, width, height, self.world_place_pick,
+                self.world_wide, self.world_focus, across, down)
         elif (event.char or "") in ("]", "[") and places:
             step = 1 if event.char == "]" else -1
             self.world_place_pick = places[(here + step) % len(places)]

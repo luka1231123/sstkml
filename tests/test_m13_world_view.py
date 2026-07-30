@@ -532,6 +532,20 @@ def test_the_arrows_move_the_window_and_choosing_a_place_gives_it_back() -> None
     assert game.world_focus is None
 
 
+def test_arrows_do_not_bank_invisible_steps_at_the_map_edge() -> None:
+    game = _game()
+    for _ in range(100):
+        game.on_world_key(_Key(keysym="Left"))
+    edge = game.world_focus
+
+    game.on_world_key(_Key(keysym="Left"))
+    assert game.world_focus == edge
+
+    game.on_world_key(_Key(keysym="Right"))
+    assert game.world_focus is not None
+    assert game.world_focus[0] > edge[0]
+
+
 def test_holding_the_tablet_closer_and_wider() -> None:
     game = _game()
     game.on_world_key(_Key(char="+"))
