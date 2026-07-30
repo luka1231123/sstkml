@@ -170,12 +170,42 @@ def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
     assert _kinds(game) == ["SendToHarvest"]
 
 
-# --- the muster ---------------------------------------------------------------
+# --- the corvée and muster ----------------------------------------------------
+
+def test_the_corvee_window_holds_labour_and_military_evidence_together() -> None:
+    game = _game()
+    formation = game.belief["troops"]["formations"][0]
+    screen = ledgers.muster(
+        game.belief, selected=formation["id"], amount=10,
+        place=game.belief["seat"],
+        width=72, height=24, hours=game.hours)
+    text = plain_text(screen)
+    actions = {hit.command for hit in screen.hits if hit.enabled}
+
+    assert "THE CORVÉE — LEVY AND SPEAR" in text
+    assert "corvée called" in text
+    assert "hands ·" in text
+    assert formation["name"] in text
+    assert "SPEAR-BEARER OF THE LEVY" in text
+    assert "════▷" in text
+    assert {"do:raise_corvee", "do:assign_troops"} <= actions
+
+
+def test_the_corvee_window_can_call_person_days() -> None:
+    game = _game()
+    state = game.ledger_state["muster"]
+    game.on_muster_key(_Key("]"))
+    assert state["amount"] == ledgers.STEPS["corvee"]
+    game.on_muster_key(_Key("c"))
+    assert _kinds(game) == ["RaiseCorvee"]
+    assert game.log[0]["action"]["days"] == ledgers.STEPS["corvee"]
+    assert state["amount"] == 0
 
 def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game = _game()
     state = game.ledger_state["muster"]
-    state["pick"] = game.ledger_rows("muster")[0]
+    formation = game.belief["troops"]["formations"][0]
+    state["pick"] = formation["id"]
     game.on_muster_key(_Key("a"))
     assert not game.log, "no place is chosen yet"
     assert game.notices["muster"].kind == registry.REFUSAL
@@ -223,9 +253,20 @@ def test_no_control_is_ever_dropped_for_want_of_room() -> None:
         assert printed == [c.action_id for c in controls], width
 
 
-def test_a_disabled_control_says_why_and_stays_on_screen() -> None:
+def test_irrelevant_zero_value_controls_are_removed_but_cost_refusals_remain() -> None:
     belief = project(_world())
-    text = plain_text(ledgers.oaths(belief, hours=0, width=82, height=28))
+    ordinary = plain_text(
+        ledgers.oaths(belief, hours=0, width=82, height=28))
+    assert "expiate with 0" not in ordinary
+    assert "only a lapsed oath" not in ordinary
+
+    oaths = list(belief["oaths"])
+    lapsed = {
+        **belief,
+        "oaths": [{**oaths[0], "lapsed": True}] + oaths[1:],
+    }
+    text = plain_text(ledgers.oaths(
+        lapsed, amount=50, hours=0, width=82, height=28))
     assert "Swear" in text or "swear" in text
     assert "2h" in text
 

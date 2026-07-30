@@ -25,7 +25,7 @@ ever-growing log inside World.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from engine.entity import BadId, EntityId, GoodId, parse
 
@@ -43,6 +43,27 @@ MOVES = frozenset({"sold", "paid", "delivered", "levied", "gifted", "lent",
                    "repaid", "seized", "loaded", "unloaded", "carried",
                    "stored", "split", "merged", "reserved", "released"})
 REASONS = SOURCES | SINKS | MOVES
+
+
+def _provenance(*marks: Sequence[str]) -> tuple[str, ...]:
+    """Join histories, keeping first appearance and dropping repeats.
+
+    Splitting copies a lot's history into the part that leaves, and merging
+    copies it back. A store that is split and consolidated every fortnight
+    would otherwise carry the same marks hundreds of times over -- one lot in a
+    six-year run reached nine thousand of them -- which is growth without
+    information: a mark says "this came through here", and saying it twice says
+    nothing the first one did not. Order is first-appearance, so the deep
+    origin stays at the front where a reader looks for it.
+    """
+    seen: set[str] = set()
+    kept: list[str] = []
+    for group in marks:
+        for mark in group:
+            if mark not in seen:
+                seen.add(mark)
+                kept.append(mark)
+    return tuple(kept)
 
 
 class LedgerError(ValueError):
@@ -149,9 +170,30 @@ class Book:
 
     def create(self, lot_id: EntityId, good: GoodId, quantity: int,
                owner: EntityId, holder: EntityId, location: EntityId,
-               reason: str, quality: int = 1000,
-               authority: EntityId = "") -> "Book":
-        """Goods enter the world: a harvest, a smelt, a scenario's opening store."""
+               reason: str, quality: int = 1000, authority: EntityId = "",
+               from_lots: Sequence[EntityId] = (),
+               marks: Sequence[str] = ()) -> "Book":
+        """Goods enter the world: a harvest, a smelt, a scenario's opening store.
+
+        `marks` is for a caller that knows something about where this came from
+        that the reason cannot say. The seam in `engine.kernel.seat_goods` uses
+        it: a lot whose only mark is `authored@0` is indistinguishable from a
+        scenario's opening store, and the migration in spec 6.2 has to be able
+        to tell a lot that began life as a flat court figure from one the
+        content authored, or "where did this grain come from" has a worse answer
+        after the migration than before it.
+
+        `from_lots` names what was drawn down to make this, where anything was.
+        A conversion is a source and a sink standing side by side -- sheaves are
+        consumed and grain is created -- and without the link the two are only
+        adjacent in the ledger rather than connected in it. Naming them is what
+        lets an inspector walk a household's ration back to the furrow instead
+        of inferring the join from a shared turn and phase.
+
+        It is provenance and not a transfer: nothing moved between the old lots
+        and the new one. The old goods left the world and different goods
+        entered it, which is exactly what a threshing floor does.
+        """
         if reason not in SOURCES:
             raise LedgerError(f"{reason!r} does not bring goods into the world")
         if quantity <= 0:
@@ -161,7 +203,10 @@ class Book:
         parse(lot_id)
         lot = GoodsLot(id=lot_id, good=good, quantity=quantity, owner=owner,
                        holder=holder, location=location, quality=quality,
-                       provenance=(f"{reason}@{self.turn}",))
+                       provenance=_provenance(
+                           (f"{reason}@{self.turn}",),
+                           tuple(f"from:{i}" for i in from_lots),
+                           tuple(marks)))
         lots = dict(self.lots)
         lots[lot_id] = lot
         return self._with(lots, self._record(
@@ -198,7 +243,8 @@ class Book:
         lots[lot_id] = dataclasses.replace(lot, quantity=lot.quantity - quantity)
         lots[new_id] = dataclasses.replace(
             lot, id=new_id, quantity=quantity, reserved=0,
-            provenance=lot.provenance + (f"split:{lot_id}@{self.turn}",))
+            provenance=_provenance(
+                lot.provenance, (f"split:{lot_id}@{self.turn}",)))
         return self._with(lots, self._record(
             lots[new_id], quantity, "split", lot.owner, lot.holder, ""))
 
@@ -214,9 +260,15 @@ class Book:
         if lot.reserved:
             raise LedgerError(f"{lot_id} is reserved and cannot be merged away")
         lots = dict(self.lots)
+        # The lot that goes in is named, not just its history. A store is a
+        # mixture, and "this granary contains the cargo that landed on the
+        # eleventh" is the thing an inspector is asked and the thing that is
+        # lost if only the ancestors survive the merge.
         lots[into_id] = dataclasses.replace(
             into, quantity=into.quantity + lot.quantity,
-            provenance=into.provenance + lot.provenance)
+            provenance=_provenance(
+                into.provenance, (f"merged:{lot_id}@{self.turn}",),
+                lot.provenance))
         lots[lot_id] = dataclasses.replace(lot, quantity=0)
         return self._with(lots, self._record(
             lot, lot.quantity, "merged", into.owner, into.holder, ""))

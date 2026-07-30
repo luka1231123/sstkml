@@ -67,6 +67,18 @@ class Intent:
     # The exclusive pool this intent will draw from, if any. Empty means the
     # intent competes for nothing and needs no allocation.
     resource: EntityId = ""
+    # Which named process within the kind, where the kind alone does not say.
+    # Sowing, reaping, and threshing are all `produce` drawing on person-days,
+    # and the allocator prices them identically; only the system that issues
+    # them cares which is which, so the vocabulary belongs to that system rather
+    # than here. KINDS stays closed; this does not.
+    task: str = ""
+    # What the actor says a thousand units are worth, in the payment good's own
+    # unit. Spec 6.6 makes the unit price part of what a quote *is*, and both
+    # sides of a bargain state one -- a seller's ask and a buyer's ceiling -- so
+    # it belongs on the intent rather than being recomputed by whoever matches
+    # them. Zero on every intent that is not a quote or an acceptance.
+    unit_price: int = 0
     # The office, obligation, or order relied on. Empty is legal only for an
     # actor acting on its own account, over its own goods.
     authority: EntityId = ""

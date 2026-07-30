@@ -73,15 +73,17 @@ def add(world: World, doc: Document) -> World:
 def file_letter(world: World, letter, dated_as: str = "") -> World:
     """File an arrived or sent letter into the permanent record (6.17).
 
-    The body is not stored, because the engine never holds letter text (8.7) --
-    what is stored is the topic and the asserted figures, which is what a real
-    tablet is: a record of claims. The prose is rendered on demand from these
-    exactly as the Stack renders it.
+    Accepted outgoing text is immutable engine evidence and is stored exactly.
+    Older/authored incoming letters still render their topic and asserted
+    figures when no accepted text exists.
     """
     kind = "letter_out" if letter.outgoing else "letter_in"
     facts = ", ".join(f"{key} {value}" for key, value in letter.facts)
-    body = f"{letter.topic.replace('_', ' ')}. {facts}" if facts else \
-        letter.topic.replace("_", " ")
+    rendered = (
+        f"{letter.topic.replace('_', ' ')}. {facts}"
+        if facts else letter.topic.replace("_", " ")
+    )
+    body = letter.text if letter.text else rendered
     return add(world, Document(
         ref=f"L-{letter.id}",
         kind=kind,
@@ -93,6 +95,12 @@ def file_letter(world: World, letter, dated_as: str = "") -> World:
         body=body,
         title=f"{letter.sender}: {letter.topic.replace('_', ' ')}",
         tags=(letter.topic, letter.sender, kind),
+        terms=letter.terms,
+        path=letter.path,
+        reply_to=letter.reply_to,
+        scribe_id=letter.scribe_id,
+        seal=letter.seal,
+        courier_id=letter.courier_id,
     ))
 
 
@@ -116,10 +124,11 @@ def file_letters(world: World, letters) -> World:
             continue
         kind = "letter_out" if letter.outgoing else "letter_in"
         facts = ", ".join(f"{key} {value}" for key, value in letter.facts)
-        body = (
+        rendered = (
             f"{letter.topic.replace('_', ' ')}. {facts}"
             if facts else letter.topic.replace("_", " ")
         )
+        body = letter.text if letter.text else rendered
         documents.append(Document(
             ref=ref,
             kind=kind,
@@ -133,6 +142,12 @@ def file_letters(world: World, letters) -> World:
             body=body,
             title=f"{letter.sender}: {letter.topic.replace('_', ' ')}",
             tags=(letter.topic, letter.sender, kind),
+            terms=letter.terms,
+            path=letter.path,
+            reply_to=letter.reply_to,
+            scribe_id=letter.scribe_id,
+            seal=letter.seal,
+            courier_id=letter.courier_id,
         ))
         existing.add(ref)
     if len(documents) == len(world.documents):

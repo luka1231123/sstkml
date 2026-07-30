@@ -203,29 +203,30 @@ def test_naming_a_man_who_cannot_inherit_says_the_engines_reason() -> None:
 
 # --- relations ----------------------------------------------------------------
 
-def test_a_gift_needs_a_court_and_an_amount_and_says_which_is_missing() -> None:
+def test_a_gift_opens_a_letter_without_mutating_the_world() -> None:
     game = _game()
     state = game.palace_state
     state["view"] = "relations"
-    state["pick"]["relations"] = game.belief["relations"][0]["other"]
-    game.on_palace_key(_Key("i"))
-    assert not game.log
-    assert "amount" in game.notices["palace"]
-
-    game.on_palace_key(_Key("]"))
-    assert state["amount"] == palace.GIFT_STEP
-    game.on_palace_key(_Key("i"))
-    assert _kinds(game) == ["SendGift"]
-    assert game.log[0]["action"]["quantity"] == palace.GIFT_STEP
-    assert state["amount"] == 0, "the amount is spent, not left standing"
-
-
-def test_the_good_being_given_can_be_changed() -> None:
-    game = _game()
-    game.palace_state["view"] = "relations"
-    first = game.palace_state["good"]
+    relation = game.belief["relations"][0]
+    state["pick"]["relations"] = relation["other"]
     game.on_palace_key(_Key("g"))
-    assert game.palace_state["good"] != first
+
+    assert not game.log
+    assert game.desk["recipient"] == relation["other"]
+    assert game.desk["target_place"] == relation["place"]
+    assert game.desk["term_builder"]["kind"] == "gift"
+
+
+def test_marriage_from_the_house_opens_a_proposal_letter() -> None:
+    game = _game()
+    game.palace_state["view"] = "house"
+    person = palace._people(game.belief)[0]
+    game.palace_state["pick"]["house"] = person["id"]
+    game.on_palace_key(_Key("m"))
+
+    assert not game.log
+    assert game.desk["term_builder"]["kind"] == "marriage_proposal"
+    assert game.desk["term_builder"]["person_id"] == person["id"]
 
 
 def test_the_harbour_due_is_set_where_the_harbour_is() -> None:

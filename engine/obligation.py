@@ -127,6 +127,81 @@ class Obligation:
         return max(0, self.owed(measure) - self.rendered)
 
 
+# --- letter-carried terms ----------------------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class GoodsReservation:
+    """Goods removed from a sender's stores when a tablet is dispatched."""
+
+    id: str
+    source_letter: str
+    term_index: int
+    party: EntityId
+    beneficiary: EntityId
+    authority: EntityId
+    good: GoodId
+    quantity: int
+    created_turn: int
+    due_turn: int
+    status: str = "reserved"
+    history: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class LetterObligation:
+    """A promise recorded by a letter; it is not a transfer of goods."""
+
+    id: str
+    source_letter: str
+    term_index: int
+    party: EntityId
+    beneficiary: EntityId
+    authority: EntityId
+    kind: str
+    good: GoodId
+    quantity: int
+    destination: EntityId
+    created_turn: int
+    due_turn: int
+    status: str = "promised"
+    history: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class RequestClaim:
+    """A request becomes a claim only when its tablet reaches the addressee."""
+
+    id: str
+    source_letter: str
+    term_index: int
+    party: EntityId
+    beneficiary: EntityId
+    authority: EntityId
+    good: GoodId
+    quantity: int
+    created_turn: int
+    due_turn: int
+    status: str = "claimed"
+    history: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class MarriageProposal:
+    """A delivered proposal concerning a living person, never a marriage."""
+
+    id: str
+    source_letter: str
+    term_index: int
+    party: EntityId
+    beneficiary: EntityId
+    authority: EntityId
+    person_id: EntityId
+    created_turn: int
+    due_turn: int
+    status: str = "pending"
+    history: tuple[str, ...] = ()
+
+
 def falls_due(obligation: Obligation, date: Date,
               seasons: dict, trigger: str = "") -> bool:
     """Whether the calendar (or an event) puts this clause in hand this turn."""

@@ -2,10 +2,10 @@
 
 The Stores, the Roll, the Land, the Muster and the Oaths were tablets: framed
 tables that could be read and closed. Everything they described was changed
-somewhere else, and in practice that somewhere else was Counsel -- which is to
-say the only route to half the game's mechanics ran through the optional model
-layer. That is the audit's fourth systemic problem and the thing this module
-exists to end.
+somewhere else, and in practice that somewhere else was Counsel. That made the
+language interpreter the only route to half the game's mechanics, despite its
+lack of simulation authority. This module exists to put exact actions beside
+their evidence while the required model remains the court's language.
 
 The shape is the City's, because the City is the screen that already works: a
 thing to look at, a table to compare it against, and the exact order beside the
@@ -252,6 +252,8 @@ def _lay_out(controls: list[Control], hours: int,
     caption shortens to the registry's own short label, and only then does a
     second row open.
     """
+    if not controls:
+        return []
     rows: list[list[tuple[Control, str]]] = [[]]
     column = 3
     for control in controls:

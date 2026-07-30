@@ -137,8 +137,8 @@ def test_correspondence_ui_exposes_outbox_compare_delegate_and_filing() -> None:
 
     sent = inbox.compose(belief, filter_name="outbox")
     text = plain_text(sent)
-    assert "OUTBOX" in text
-    assert "IN TRANSIT" in text
+    assert "3 SENT" in text
+    assert "ON THE ROAD" in text
     assert "My retained answer." in text
 
 
@@ -160,6 +160,8 @@ def test_inbox_controller_executes_compare_delegate_and_archive_paths() -> None:
     game.inbox_pick = item["id"]
     game.inbox_filter = "all"
     game.inbox_scroll = 0
+    game.inbox_body_scroll = 0
+    game.inbox_pane = "rack"
     game.inbox_delegate_pick = "ehli_nikkalu"
     game.repaint = lambda: None
     compared: list[str] = []
@@ -189,6 +191,99 @@ def test_inbox_controller_executes_compare_delegate_and_archive_paths() -> None:
     assert item["id"] in {
         letter["id"]
         for letter in project(game.world)["correspondence_archive"]}
+
+
+def test_scribes_room_can_leave_records_with_numbers_or_station_arrows() -> None:
+    import play_gui
+
+    world = _world()
+    game = play_gui.Game.__new__(play_gui.Game)
+    game.world = world
+    game.hours = project(world)["attention"]
+    game.stack_order = [
+        letter["id"] for letter in project(world)["stack"]]
+    game.inbox_pick = game.stack_order[0]
+    game.inbox_filter = "all"
+    game.inbox_scroll = 0
+    game.inbox_body_scroll = 0
+    game.inbox_pane = "rack"
+    game.desk = None
+    game.archive_typing = False
+    game.archive_open_ref = ""
+    game.repaint = lambda: None
+
+    class Key:
+        def __init__(self, char: str = "", keysym: str = "",
+                     command: str = "", state: int = 0) -> None:
+            self.char = char
+            self.keysym = keysym or char
+            self.command = command
+            self.state = state
+
+    game.on_inbox_key(Key("4"))
+    assert game.inbox_filter == "records"
+    game.on_inbox_key(Key("1"))
+    assert game.inbox_filter == "all"
+    game.on_inbox_key(Key(keysym="Left"))
+    assert game.inbox_filter == "records"
+    game.on_inbox_key(Key(keysym="Right"))
+    assert game.inbox_filter == "all"
+
+
+def test_desk_stylus_undo_and_laid_aside_draft_are_real_state() -> None:
+    import play_gui
+    from tui import composer
+
+    world = _world()
+    item = _unread(world)
+    world, _ = apply(world, A.ReadLetter(item["id"]))
+    matter = "I cannot grant what you ask."
+    blocks = composer.default_blocks()
+    draft = composer.assemble(item["sender"], blocks, matter)
+    game = play_gui.Game.__new__(play_gui.Game)
+    game.world = world
+    game.desk_drafts = {}
+    game.repaint = lambda: None
+    game.desk = {
+        "letter_id": item["id"],
+        "intent": "reply",
+        "dictating": False,
+        "dictated": True,
+        "buffer": matter,
+        "matter": matter,
+        "cursor": len(matter),
+        "history": [],
+        "future": [],
+        "source_scroll": 0,
+        "terms": (),
+        "blocks": blocks,
+        "block_focus": "matter",
+        "generation": 0,
+        "composing": False,
+        "draft": draft,
+    }
+
+    class Key:
+        def __init__(self, char: str = "", keysym: str = "",
+                     command: str = "", state: int = 0) -> None:
+            self.char = char
+            self.keysym = keysym or char
+            self.command = command
+            self.state = state
+
+    game.on_desk_key(Key("e"))
+    assert game.desk["dictating"]
+    original = game.desk["buffer"]
+    game.on_desk_key(Key("!", "!"))
+    assert game.desk["buffer"] == original + "!"
+    game.on_desk_key(Key(char="\x1a", keysym="z", state=4))
+    assert game.desk["buffer"] == original
+    game.on_desk_key(Key(char="\x04", keysym="d", state=4))
+    assert not game.desk["dictating"]
+    game.on_desk_key(Key(keysym="Escape"))
+    assert game.desk is None
+    assert game.desk_drafts[item["id"]]["matter"] == original
+    assert original in game.desk_drafts[item["id"]]["draft"].text
 
 
 def test_archive_hit_projects_and_scrolls_the_complete_body() -> None:

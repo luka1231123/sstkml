@@ -191,6 +191,18 @@ class Site:
     function: str                # "harbour" | "estate" | "mine" | "pasture" ...
     region: EntityId = ""
     capacity: int = 0            # meaning is the function's; 0 = unmodelled
+    # How much the place will take, as opposed to how well it repays. For an
+    # estate: qa of seed the ground holds in a year, which is the land itself
+    # and the reason a settlement cannot sow its way out of a famine. Two
+    # numbers rather than one because good ground and much ground are different
+    # things, and a settlement can be short of either.
+    extent: int = 0              # 0 = unmodelled
+    # The organization that works this place, where one does. A temple estate
+    # and the town's fields are different ground with different owners, which
+    # is how the records have them; modelling them as one field would invent a
+    # scramble for furrows that nobody in the period was having. What the two
+    # do compete for is hands, and that contest is the allocator's.
+    holder: EntityId = ""
 
 
 @dataclasses.dataclass(frozen=True)

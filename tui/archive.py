@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import art, collection, render, style
+from tui import collection, render, style
 from tui.grid import INDEX, InteractiveScreen, Screen, Surface
 
 C = INDEX
@@ -27,41 +27,74 @@ RESULT_ROOM = 9          # the nine digits that open a result
 def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             summary: str = "", typing: bool = False,
             width: int = 84, height: int = 32,
-            notice: str = "", scroll: int = 0) -> InteractiveScreen:
+            notice: str = "", scroll: int = 0,
+            embedded: bool = False) -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
-    style.panel(surface, 0, 0, width, height, title="THE TABLET HOUSE",
-                focus=typing, drop=False)
-
-    # The shelves, and how much is on them.
-    art.draw(surface, width - 36, 2, art.SHELVES,
-             lit=C["sand"], mid=C["dim"], dark=C["faint"], edge=C["faint"])
     size = b.get("archive_index", {}).get("size", 0)
-    surface.text(width - 36, 13, f"{size} tablets are shelved here",
-                 C["ash"], C["ink"])
+    style.panel(
+        surface, 0, 0, width, height,
+        title=(
+            f"SCRIBES' ROOM — {size} RECORDS ON THE SHELVES"
+            if embedded else
+            f"THE TABLET HOUSE — {size} tablets are shelved here"),
+        note="[esc] return to the Hall" if embedded else "",
+        focus=typing, drop=False)
+    top = 2
+    if embedded:
+        # Import locally to keep the archive usable as a standalone pure
+        # document while sharing the room's one navigation strip.
+        from tui.inbox import draw_views
+        draw_views(surface, "records", width)
+        top = 4
+
+    # A compact shelf register replaces the large fixed illustration. Its fill
+    # changes with the actual index, so the room keeps its physical identity
+    # without surrendering half the window to furniture.
     searched = b.get("archive_index", {}).get("searched", [])
-    if searched:
-        surface.text(width - 36, 14, "you have asked for:", C["dim"], C["ink"])
-        for offset, past in enumerate(searched[-6:]):
-            surface.text(width - 34, 15 + offset, f"· {past}"[:32],
-                         C["ash"], C["ink"])
+    aside = 24 if width >= 70 else 0
+    if aside:
+        divider = width - aside
+        for row in range(2, height - 1):
+            surface.put(divider, row, "│", C["faint"], C["ink"])
+        shelf_x = divider + 3
+        shelf_room = aside - 6
+        surface.text(shelf_x, top, "SHELVES", C["bone"], C["ink"])
+        capacity = max(1, shelf_room * 4)
+        fill = min(capacity, max(0, int(size)))
+        for shelf in range(4):
+            used = max(0, min(shelf_room, fill - shelf * shelf_room))
+            tablets = "▤" * used + "·" * (shelf_room - used)
+            surface.text(shelf_x, top + 2 + shelf * 2, tablets,
+                         C["sand"] if used else C["faint"], C["ink"])
+            surface.text(shelf_x, top + 3 + shelf * 2, "─" * shelf_room,
+                         C["faint"], C["ink"])
+        if searched:
+            surface.text(shelf_x, top + 11, "LAST REQUESTS",
+                         C["dim"], C["ink"])
+            for offset, past in enumerate(searched[-4:]):
+                surface.text(
+                    shelf_x, top + 12 + offset,
+                    ("· " + str(past))[:shelf_room],
+                    C["ash"], C["ink"])
 
     # --- the query -----------------------------------------------------------
-    surface.text(3, 2, "you are looking for", C["dim"], C["ink"])
-    field = width - 42
-    style.bar(surface, 3, 3, field, " " + query[: field - 2],
+    surface.text(3, top, "LOOK FOR", C["dim"], C["ink"])
+    field = width - aside - 6
+    style.bar(surface, 3, top + 1, field, " " + query[: field - 2],
               fg=C["bone"], bg=C["faint"])
     if typing:
-        surface.put(4 + min(len(query), field - 3), 3, "█", C["flame"],
+        surface.put(4 + min(len(query), field - 3), top + 1, "█", C["flame"],
                     C["faint"])
-    surface.text(3, 4, "─" * field, C["faint"], C["ink"])
+    surface.text(3, top + 2, "─" * field, C["faint"], C["ink"])
 
     # --- what came back ------------------------------------------------------
-    y = 6
+    y = top + 4
     hits = hits or []
     if summary:
-        for line in textwrap.wrap(summary, field - 2):
-            if y >= height - 8:
-                break
+        surface.text(3, y, "KEEPER'S COLLATION", C["dim"], C["ink"])
+        y += 1
+        summary_lines = textwrap.wrap(" ".join(summary.split()), field - 2)
+        for line in summary_lines[:4]:
             surface.text(3, y, line, C["bone"], C["ink"])
             y += 1
         y += 1
@@ -115,7 +148,8 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
 
 
 def tablet(hit: dict, b: dict, width: int = 72,
-           height: int = 24, scroll: int = 0) -> Screen:
+           height: int = 24, scroll: int = 0,
+           embedded: bool = False) -> Screen:
     """Open one projected archive record.
 
     The hit carries the complete projected body as well as its short finding
@@ -124,8 +158,12 @@ def tablet(hit: dict, b: dict, width: int = 72,
     """
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     ref = str(hit.get("ref", "unmarked tablet"))
-    style.panel(surface, 0, 0, width, height,
-                title=f"TABLET {ref}", drop=False)
+    style.panel(
+        surface, 0, 0, width, height,
+        title=(f"SCRIBES' ROOM — RECORD {ref}"
+               if embedded else f"TABLET {ref}"),
+        note="[esc] back to the shelves" if embedded else "",
+        drop=False)
 
     title = str(hit.get("title") or "untitled record")
     sender = str(hit.get("sender") or "")
@@ -165,6 +203,7 @@ def tablet(hit: dict, b: dict, width: int = 72,
         position = f" · lines {scroll + 1}–{min(len(lines), scroll + room)} of {len(lines)}"
     style.bar(
         surface, 2, height - 2, width - 4,
-        f" [↑/↓] read{position}  ·  [esc] return to the Tablet House",
+        f" [↑/↓] read{position}  ·  "
+        f"[esc] {'back to the shelves' if embedded else 'return to the Tablet House'}",
         fg=C["clay"], bg=C["lapis"])
     return surface.freeze()

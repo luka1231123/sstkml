@@ -10,6 +10,8 @@ answers them from the record rather than from a reading of the code:
     belief ACTOR         Which observation supported that belief?
     authority ID         Which order or obligation authorized this act?
     short                Who asked for something and did not get it?
+    chain PLACE|LOT      Where did this household's food come from?
+    weather              What did the climate do, and to whom?
 
 Nothing here is player-facing. The player's court sees evidence available to
 it, dated and sourced and often wrong; this sees the world.
@@ -22,6 +24,8 @@ so the transfers this replays are the transfers that happened.
     python3 tools/kernel_inspect.py where grain
     python3 tools/kernel_inspect.py why-lot settlement:mahadu/8/lot/0
     python3 tools/kernel_inspect.py why-choice org:mahadu_council --turns 9
+    python3 tools/kernel_inspect.py chain settlement:alashiya_port --turns 60
+    python3 tools/kernel_inspect.py weather --turns 72
 """
 from __future__ import annotations
 
@@ -42,6 +46,22 @@ def replay(turns: int) -> tuple[Kernel, list]:
         kernel, _events, log = advance_logged(kernel)
         logs.append(log)
     return kernel, logs
+
+
+def _lot_history(turns: int) -> dict:
+    """Every lot the run ever held, as it last stood.
+
+    Replayed separately from `replay` and kept out of it deliberately: a lot
+    that is emptied leaves the book, so a question about where a household's
+    bread came from is a question about lots that mostly no longer exist. This
+    is the only query that needs them, and it pays for them itself.
+    """
+    kernel = load_kernel()
+    seen = dict(kernel.book.lots)
+    for _ in range(turns):
+        kernel, _events, _log = advance_logged(kernel)
+        seen.update(kernel.book.lots)
+    return seen
 
 
 def _rule(title: str) -> None:
@@ -154,6 +174,215 @@ def authority(kernel: Kernel, logs: list, wanted: str) -> None:
         print("  nothing was done under it")
 
 
+def _parents(lot) -> tuple[str, ...]:
+    """The lots this one came out of, newest link first.
+
+    Three kinds of link and one meaning. `from:` is a conversion -- sheaves
+    drawn down, grain created. `split:` is the same goods in two lots, because
+    part of a store was sold or sailed. `merged:` is the reverse: another lot
+    folded into this one, which is how a cargo becomes part of a granary. All
+    three say "to explain this, go and look at that".
+
+    Conversions and handovers are interleaved rather than listed in turn, and
+    that ordering is the difference between a tree that reaches a field and one
+    that does not. The walk narrows as it goes back, so whatever is at the
+    front of this list is what survives the narrowing. A granary lot has one
+    `from:` parent and dozens of `merged:` ones: take the conversions first and
+    the trail skips the bargains, take the handovers first and it walks
+    sideways through a year of bookkeeping without ever leaving the store. One
+    of each, alternating, keeps both threads alive.
+    """
+    kinds: dict[str, list[str]] = {"from:": [], "split:": [], "merged:": []}
+    for mark in reversed(lot.provenance):
+        for prefix, found in kinds.items():
+            if mark.startswith(prefix):
+                found.append(mark[len(prefix):].split("@")[0])
+    made = kinds["from:"]
+    passed = kinds["split:"] + kinds["merged:"]
+
+    seen, unique = {lot.id}, []
+    for step in range(max(len(made), len(passed))):
+        for queue in (made, passed):
+            lot_id = queue[step] if step < len(queue) else None
+            if lot_id and lot_id not in seen:
+                seen.add(lot_id)
+                unique.append(lot_id)
+    return tuple(unique)
+
+
+# The transfers worth printing when a lot's whole life would drown the tree.
+# A source, a sink, and anything that changed whose it was or where it was --
+# which is exactly the set a "how did this get here" question is asking about.
+TELLING = frozenset({"harvested", "produced", "authored", "mined", "sold",
+                     "paid", "levied", "carried", "unloaded", "loaded",
+                     "sown", "lost", "seized", "gifted"})
+
+# How many parents to follow at the top of the tree; one fewer at each step down.
+BRANCH = 4
+
+
+def ancestry(seen: dict, lot_id: str, depth: int = 12) -> tuple[str, ...]:
+    """Every lot this one came out of, as far back as the record goes.
+
+    Unbounded in width where `chain` below is bounded, because this answers
+    "is that in here at all" rather than "read me the story". Depth-bounded and
+    cycle-safe: provenance only ever points backwards, but a walk that trusted
+    that and was wrong would not stop.
+    """
+    found: list[str] = []
+    frontier = [(lot_id, 0)]
+    while frontier:
+        current, step = frontier.pop(0)
+        if current in found or step > depth:
+            continue
+        found.append(current)
+        lot = seen.get(current)
+        if lot is not None:
+            frontier.extend((parent, step + 1) for parent in _parents(lot))
+    return tuple(found)
+
+
+def eaten_at(logs: list, seen: dict, place: str) -> tuple[str, ...]:
+    """The lots households at a place drew their rations out of, newest first."""
+    found: list[str] = []
+    for log in reversed(logs):
+        for transfer in log.transfers:
+            if (transfer.reason == "consumed" and transfer.lot in seen
+                    and seen[transfer.lot].location == place
+                    and transfer.lot not in found):
+                found.append(transfer.lot)
+    return tuple(found)
+
+
+def chain(kernel: Kernel, logs: list, seen: dict, target: str,
+          depth: int = 6) -> None:
+    """Walk a household's food back to the ground it grew in (spec 7.5, M13.2).
+
+    The milestone's exit gate is not that the chain exists -- conservation
+    already says that much -- but that it can be *explained*, link by link, out
+    of records rather than out of a reading of the code. Every line below is a
+    transfer or a provenance mark, and where the trail runs past the replayed
+    window it says so rather than interpolating.
+
+    It branches, because a granary is a mixture and saying otherwise would be a
+    lie told for tidiness. A fortnight's bread on Alashiya came partly off the
+    estate outside the wall and partly out of a cargo that crossed from Ma'hadu,
+    which came off a road from Ari; the tree is what that sentence looks like
+    when every clause of it has to be a record.
+    """
+    moves: dict[str, list] = {}
+    for log in logs:
+        for transfer in log.transfers:
+            moves.setdefault(transfer.lot, []).append(transfer)
+
+    roots = [target]
+    if target not in seen:
+        # Every distinct lot the households there ate out of, newest first. Not
+        # only the last one: a place that eats out of two granaries in the same
+        # fortnight has two answers, and one of them may be the imported one.
+        eaten = eaten_at(logs, seen, target)
+        if not eaten:
+            _rule(f"where the food at {target} came from")
+            print("  nothing was eaten there in this window")
+            return
+        roots = eaten[:3]
+
+    _rule(f"where the food at {target} came from")
+    walked: set[str] = set()
+
+    def ledger(lot_id: str, pad: str) -> None:
+        for transfer in moves.get(lot_id, []):
+            if transfer.reason not in TELLING:
+                continue
+            under = f" under {transfer.authority}" if transfer.authority else ""
+            print(f"  {pad}    t{transfer.turn:>3} {transfer.reason:<10}"
+                  f" {transfer.quantity:>8,}  {transfer.from_owner}"
+                  f" -> {transfer.to_owner}{under}")
+
+    def walk(lot_id: str, step: int) -> None:
+        pad = "  " * step
+        lot = seen.get(lot_id)
+        if lot is None:
+            # Created and emptied inside one turn, so it never appears in a
+            # between-turn snapshot: a sheaf lot threshed the fortnight it was
+            # cut, most often. Its ledger survives; its ancestry is reachable
+            # down the branch that outlived it.
+            print(f"  {pad}{lot_id}: emptied within a turn, ledger only")
+            ledger(lot_id, pad)
+            return
+        if lot_id in walked:
+            print(f"  {pad}{lot.good} · {lot_id} (already followed above)")
+            return
+        walked.add(lot_id)
+        print(f"  {pad}{lot.good} · {lot_id}")
+        ledger(lot_id, pad)
+
+        parents = _parents(lot)
+        if not parents:
+            origin = next((m for m in lot.provenance if not m.startswith(
+                ("from:", "split:", "merged:"))), "unknown")
+            print(f"  {pad}    and before that: {origin}")
+            return
+        if step + 1 >= depth:
+            print(f"  {pad}    out of {len(parents)} earlier lot(s); "
+                  f"pass --depth to follow them")
+            return
+        # Widest at the root and narrower as it goes back, because a granary
+        # holds dozens of merged lots and following every one of them prints a
+        # year of bookkeeping rather than an explanation. What is dropped is
+        # counted out loud: a truncated tree that looks complete is worse than
+        # no tree.
+        width = max(1, BRANCH - step)
+        for parent in parents[:width]:
+            walk(parent, step + 1)
+        if len(parents) > width:
+            print(f"  {pad}    ({len(parents) - width} further lot(s) went into "
+                  f"this one, not followed)")
+
+    for root in roots:
+        walk(root, 0)
+
+
+def weather(kernel: Kernel, logs: list) -> None:
+    """What the climate did, and which estate paid for it (spec 6.2).
+
+    The other half of the exit gate. A drought is not a scripted event here: it
+    is one integer per turn, the same for every settlement in the region, and
+    what it costs each of them depends on how much ground they had and what
+    they decided to do with their hands.
+    """
+    _rule("what the weather did")
+    years: dict[int, dict] = {}
+    for log in logs:
+        year = years.setdefault((log.turn - 1) // 24 + 1,
+                                {"climate": [], "withered": {}, "reaped": {},
+                                 "neglect": 0})
+        for event in log.events:
+            if event[0] == "withered":
+                _, actor, gone, neglect, climate = event
+                year["climate"].append(climate)
+                year["withered"][actor] = year["withered"].get(actor, 0) + gone
+                year["neglect"] = max(year["neglect"], neglect)
+            elif event[0] == "reaped":
+                _, actor, _place, cut = event
+                year["reaped"][actor] = year["reaped"].get(actor, 0) + cut
+
+    if not years:
+        print("  no growing season fell inside this window")
+        return
+    for number in sorted(years):
+        year = years[number]
+        climate = min(year["climate"]) if year["climate"] else 100
+        neglect = (f", worst neglect {year['neglect']}/1000"
+                   if year["neglect"] else "")
+        print(f"\n  year {number} · climate {climate}{neglect}")
+        actors = sorted(set(year["withered"]) | set(year["reaped"]))
+        for actor in actors:
+            lost = year["withered"].get(actor, 0)
+            cut = year["reaped"].get(actor, 0)
+            print(f"    {actor:<24} withered {lost:>9,}   reaped {cut:>9,}")
+
+
 def short(kernel: Kernel, logs: list) -> None:
     _rule("who asked for something and did not get it")
     any_short = False
@@ -164,8 +393,9 @@ def short(kernel: Kernel, logs: list) -> None:
                   f"short {grant.short:,} of {grant.asked:,}")
     if not any_short:
         print("  nobody: every claim on every pool was met in full")
-    print("\n  (M13.1 has no shipments; 'why is this shipment blocked' arrives")
-    print("   with movement in M13.3.)")
+    print("\n  (A `#cargo` pool short here is 'why is this shipment blocked':")
+    print("   the crossing's hold ran out and somebody's grain stayed ashore.")
+    print("   Named vessels, so the answer can be a particular hull, are M13.3's.)")
 
 
 def main(argv: list[str]) -> int:
@@ -173,11 +403,13 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0
 
-    turns = 24
-    if "--turns" in argv:
-        at = argv.index("--turns")
-        turns = int(argv[at + 1])
-        argv = argv[:at] + argv[at + 2:]
+    turns, depth = 24, 6
+    for flag in ("--turns", "--depth"):
+        if flag in argv:
+            at = argv.index(flag)
+            value = int(argv[at + 1])
+            turns, depth = (value, depth) if flag == "--turns" else (turns, value)
+            argv = argv[:at] + argv[at + 2:]
 
     command, *rest = argv
     kernel, logs = replay(turns)
@@ -194,6 +426,10 @@ def main(argv: list[str]) -> int:
         belief(kernel, rest[0])
     elif command == "authority" and rest:
         authority(kernel, logs, rest[0])
+    elif command == "chain" and rest:
+        chain(kernel, logs, _lot_history(turns), rest[0], depth)
+    elif command == "weather":
+        weather(kernel, logs)
     elif command == "short":
         short(kernel, logs)
     else:

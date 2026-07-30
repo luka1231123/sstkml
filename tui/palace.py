@@ -8,12 +8,13 @@ had a different idea of how you chose a thing and acted on it: Justice numbered
 petitions, the House wanted a digit for a person and then a letter for a post,
 Relations offered no orders at all.
 
-So this is one room with three views of it. The picture at the top is not
-decoration and not a portrait: **the figures on the floor are the queue**. One
-man per row of the list, the selected row's man marked at his feet, and
-clicking a man selects his business. What changes between the views is who is
-standing there -- petitioners, the king's own household, the envoys of foreign
-courts -- and what may be ordered.
+So this is one room with three views and an office arrangement. The picture at
+the top is not decoration: **the figures on the floor are who is present**.
+The list below is the complete record, so a relative abroad or a distant court
+does not acquire a body merely because the king can select its row. A selected
+person at court is marked at their feet; a selected absence says AWAY.
+Audience, Household, Envoys and Offices each move different furniture onto the
+same floor.
 
 Appointing was the worst of the three and is worth stating separately. It used
 to be a digit for a person and then one of twenty-six letters for a post, with
@@ -24,14 +25,18 @@ placed or the choice is abandoned.
 """
 from __future__ import annotations
 
+import dataclasses
+import textwrap
+
 import registry
 from tui import art, render, style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 
-VIEWS = (("court", "THE COURT"), ("house", "THE HOUSE"),
-         ("relations", "RELATIONS"))
+VIEWS = (("court", "THE COURT · AUDIENCE"),
+         ("house", "THE HOUSEHOLD"),
+         ("relations", "ENVOYS · RELATIONS"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -45,23 +50,18 @@ VERDICTS = (("f", "for", "for the petitioner"),
 GIFT_STEP = 10
 DUE_STEP = 25
 
-# How tall the room may be drawn. Below the first band the throne is cropped
-# from the bottom -- the dais goes, the king stays -- and below the second
-# there is no room at all, which the specification's contraction order asks
-# for: decorative art is the first thing to go (spec 6, "responsive tiers").
-# The last two rows of the drawing are its floor, and the room has a floor of
-# its own, so the throne is set on the room's rather than carrying a rug that
-# stops after twenty-five columns.
-SEAT = art.THRONE[:-2]
-FULL_SCENE = len(SEAT) + 3
-SHORT_SCENE = 8
+# The old room spent twenty rows drawing the same throne before it disclosed
+# whether anybody was there. Eleven rows are enough for architecture, a
+# state-line and actual figures. At the minimum window size those eleven rows
+# are still surrendered before controls are: below this threshold the room
+# contracts to the workbench, not to a useless miniature.
+FULL_SCENE = 11
+SHORT_SCENE = FULL_SCENE
 
 
 def scene_rows(height: int) -> int:
-    if height >= FULL_SCENE + 14:
+    if height >= FULL_SCENE + 12:
         return FULL_SCENE
-    if height >= SHORT_SCENE + 12:
-        return SHORT_SCENE
     return 0
 
 
@@ -71,16 +71,195 @@ PAINT_OF = {"court": art.PETITIONER_PAINT, "house": art.KIN_PAINT,
             "relations": art.BEARER_PAINT}
 
 
+# Furniture is deliberately small. The room is recognizable, but its mode is
+# carried by the things placed on the floor instead of one immutable palace
+# picture looming over every decision.
+JUDGEMENT_SEAT = (
+    "    ◈        ",
+    "  ╭───╮      ",
+    "  │░▓░│      ",
+    "  ╰─┬─╯      ",
+    "  ══╧══      ",
+    "             ",
+    "             ",
+)
+
+HOUSE_STATIONS = (
+    " OFFICES     ",
+    " ┌─┐   ┌─┐  ",
+    " │■│   │□│  ",
+    " └┬┘   └┬┘  ",
+    " ═╧═════╧═  ",
+    "             ",
+    "             ",
+)
+
+ENVOY_GATE = (
+    " TABLETS     ",
+    " ╔═╤═══╤═╗  ",
+    " ║ ▤   ▤ ║  ",
+    " ║ ▤   ▤ ║  ",
+    " ╚═╧═══╧═╝  ",
+    "             ",
+    "             ",
+)
+
+
+def _court_place(b: dict) -> str:
+    """The place in which the ruler's audience room physically stands."""
+    house = b.get("house", {})
+    ruler = house.get("ruler")
+    person = next((member for member in house.get("members", [])
+                   if member.get("id") == ruler), None)
+    return str((person or {}).get("location") or b.get("seat") or "seat")
+
+
+def _present_rows(b: dict, listing: str,
+                  rows: list[workbench.Row]) -> list[tuple[int, workbench.Row]]:
+    """Rows whose people are actually standing in the room.
+
+    The full list remains available below. Presence is intentionally a stricter
+    claim: correspondence with a court does not conjure its envoy onto the
+    floor, and a prince posted abroad is recorded but absent.
+    """
+    by_id = {row.id: row for row in rows}
+    present: set[str]
+    if listing == "court":
+        present = {
+            item["id"] for item in b.get("justice", {}).get("petitions", [])
+            if item.get("present", True)
+        }
+    elif listing == "house":
+        place = _court_place(b)
+        present = {
+            person["id"] for person in _people(b)
+            if person.get("at_court",
+                          str(person.get("location", "")) == place)
+        }
+    elif listing == "relations":
+        present = {
+            relation["other"] for relation in b.get("relations", [])
+            if relation.get("envoy_present") or relation.get("at_court")
+        }
+    else:
+        present = set(by_id)
+    return [(number, row) for number, row in enumerate(rows, 1)
+            if row.id in present and row.id in by_id]
+
+
+def _scene_caption(b: dict, listing: str, rows: list[workbench.Row],
+                   standing: list[tuple[int, workbench.Row]]) -> str:
+    present = len(standing)
+    if listing == "court":
+        heard = sum(1 for item in b.get("justice", {}).get("petitions", [])
+                    if item.get("heard"))
+        advisers = len(_advisers(b))
+        return (f"AUDIENCE · {_count(present, 'MATTER')} PRESENT · "
+                f"{heard} HEARD · {_count(advisers, 'ADVISER')}")
+    if listing == "house":
+        vacant = sum(not institution.get("head")
+                     for institution in b.get("institutions", []))
+        away = max(0, len(rows) - present)
+        return (f"HOUSEHOLD · {present} AT COURT · {away} AWAY · "
+                f"{_count(vacant, 'OFFICE')} VACANT")
+    if listing == "relations":
+        return (f"ENVOYS · {present} PRESENT · "
+                f"{_count(max(0, len(rows) - present), 'COURT')} BY TABLET")
+    vacant = sum(row.mark == "!" for row in rows)
+    return (f"OFFICES · {_count(vacant, 'VACANCY', 'VACANCIES')} · "
+            f"{len(rows) - vacant} HELD")
+
+
+def _count(number: int, singular: str, plural: str = "") -> str:
+    return f"{number} {singular if number == 1 else plural or singular + 'S'}"
+
+
+def _advisers(b: dict) -> list[dict]:
+    """Model-backed court characters exposed across the Belief boundary.
+
+    This surface never calls a model and never invents a judgement. It renders
+    only the identities/presence supplied by the controller's Belief-grounded
+    adviser layer, keeping generated interpretation visibly separate from
+    engine facts.
+    """
+    raw = b.get("court_advisers", [])
+    if not isinstance(raw, list):
+        return []
+    advisers = []
+    for entry in raw:
+        if isinstance(entry, str):
+            advisers.append({"id": entry, "name": entry, "present": True})
+        elif isinstance(entry, dict) and entry.get("present", True):
+            advisers.append(entry)
+    return advisers
+
+
+def _adviser_voice(b: dict, subject: str) -> tuple[str, str, str] | None:
+    """Return an already-generated voice for this subject, never hidden fact."""
+    raw = b.get("court_advice", [])
+    if isinstance(raw, dict):
+        raw = raw.get(subject, raw if raw.get("subject") == subject else {})
+        raw = [raw] if isinstance(raw, dict) and raw else []
+    if not isinstance(raw, list):
+        return None
+    voice = next((entry for entry in raw
+                  if isinstance(entry, dict)
+                  and entry.get("subject") in (None, "", subject)
+                  and entry.get("text")), None)
+    if voice is None:
+        return None
+    name = str(voice.get("adviser_name") or voice.get("name") or "An adviser")
+    return name, str(voice["text"]), str(voice.get("basis") or "")
+
+
+def _draw_furniture(surface: Surface, x: int, y: int, listing: str) -> None:
+    furniture = {
+        "court": JUDGEMENT_SEAT,
+        "house": HOUSE_STATIONS,
+        "relations": ENVOY_GATE,
+    }.get(listing, JUDGEMENT_SEAT)
+    art.draw(surface, x, y, furniture, lit=C["bone"], mid=C["sand"],
+             dark=C["faint"], edge=C["gold"])
+
+
+def _draw_stations(surface: Surface, x: int, y: int, width: int, bottom: int,
+                   numbered: list[tuple[int, workbench.Row]],
+                   selected: str) -> None:
+    """Office stools: occupied is solid, vacant is a visible empty station."""
+    step = 9
+    room = max(0, width // step)
+    visible = numbered[:room]
+    for place, (number, row) in enumerate(visible):
+        at = x + place * step
+        vacant = row.mark == "!"
+        here = row.id == selected
+        surface.text(at + 1, y, f"[{number}]", C["bone"] if here else C["dim"],
+                     C["ink"])
+        surface.text(at, y + 1, "┌─────┐", C["gold"], C["ink"])
+        surface.text(at, y + 2, "│  □  │" if vacant else "│  ■  │",
+                     C["blood"] if vacant else C["clay"], C["ink"])
+        surface.text(at, y + 3, "└──┬──┘", C["sand"], C["ink"])
+        surface.text(at, y + 4, " VACANT" if vacant else "  HELD ",
+                     C["blood"] if vacant else C["dim"], C["ink"])
+        if here:
+            surface.text(at, bottom, "▀" * 7, C["flame"], C["ink"])
+        surface.link(at, y, 7, 5, f"pick:{row.id}")
+    if len(numbered) > room:
+        surface.text(x + room * step, y + 2, f"+{len(numbered) - room}",
+                     C["dim"], C["ink"])
+
+
 def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
-                view: str, queue: list[workbench.Row], selected: str) -> None:
-    """Cornice, pillars, throne, and the queue standing on the floor."""
+                view: str, queue: list[workbench.Row], selected: str,
+                b: dict | None = None, listing: str = "") -> None:
+    """A compact audience room whose occupants and furniture are the state."""
     if rows <= 0:
         return
+    b = b or {}
+    listing = listing or view
     bottom = y + rows - 1
     surface.text(x, y, art.band(art.CORNICE, width), C["gold"], C["ink"])
     surface.text(x, bottom, art.floor(width, 2), C["faint"], C["ink"])
-    if rows > SHORT_SCENE:
-        surface.text(x, bottom - 1, art.band("▚▞", width), C["wine"], C["ink"])
 
     body = rows - 2
     pillar_rows = art.pillar(body)
@@ -89,33 +268,40 @@ def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
     art.paint(surface, right_pillar, y + 1, pillar_rows,
               art.pillar_paint(body))
 
-    # The throne, cropped from the bottom when the room is short: losing the
-    # dais keeps the king, and losing the king would leave a picture of a chair.
-    throne_x = x + 6
-    art.paint(surface, throne_x, y + 1, SEAT[:body - 1], art.THRONE_PAINT)
+    standing = _present_rows(b, listing, queue)
+    caption = _scene_caption(b, listing, queue, standing)
+    surface.text(x + 7, y + 1, caption[:max(0, width - 14)],
+                 C["bone"], C["ink"])
+    selected_here = any(row.id == selected for _number, row in standing)
+    if selected and not selected_here and listing != "post":
+        flag = "CHOSEN: AWAY"
+        surface.text(x + width - len(flag) - 7, y + 2, flag,
+                     C["blood"], C["ink"])
 
-    # The floor, and the men on it. One per row of the list, in the same order
-    # and with the same number, so a figure and a line are two views of one
-    # matter rather than two lists that might disagree.
+    floor_x = x + 22
+    if listing == "post":
+        _draw_furniture(surface, x + 7, y + 3, "court")
+        _draw_stations(surface, floor_x, y + 2,
+                       max(0, right_pillar - 2 - floor_x), bottom,
+                       list(enumerate(queue, 1)), selected)
+        return
+
+    _draw_furniture(surface, x + 7, y + 3, listing)
+
+    # One standing figure per listed matter, retaining the list's absolute
+    # number even when people before it are away.
     figure = FIGURE_OF.get(view, art.PETITIONER)
     mask = PAINT_OF.get(view, art.PETITIONER_PAINT)
     step = art.FIGURE_WIDTH + 1
-    floor_x = throne_x + len(art.THRONE[0]) + 3
     room = max(0, (right_pillar - 2 - floor_x) // step)
-    if len(queue) > room and room:
+    if len(standing) > room and room:
         room -= 1       # the last standing place goes to saying who is missing
-    # The men stand on the course above the paving, so the paving row is free
-    # to be lit under whichever of them is selected. They are numbered above
-    # their heads with the number the list gives the row, so a player can point
-    # at a man and type his number without counting twice.
     stand = bottom - len(figure)
-    for number, row in enumerate(queue[:room], 1):
-        at = floor_x + (number - 1) * step
+    for place, (number, row) in enumerate(standing[:room]):
+        at = floor_x + place * step
         bowed = row.mark == "✓"
-        # A man blocks the floor he is standing on. Without this the weave of
-        # the last course shows through the gap between his feet.
         surface.fill(at, stand, art.FIGURE_WIDTH, len(figure), " ")
-        art.paint(surface, at, stand + (1 if bowed else 0),
+        art.paint(surface, at, stand,
                   art.BOWED if bowed else figure,
                   art.BOWED_PAINT if bowed else mask)
         here = row.id == selected
@@ -127,13 +313,18 @@ def _draw_scene(surface: Surface, x: int, y: int, width: int, rows: int,
                      label, C["bone"] if here else C["dim"], C["ink"])
         surface.link(at, stand - 1, art.FIGURE_WIDTH, len(figure) + 1,
                      f"pick:{row.id}")
-    if len(queue) > room:
+    if len(standing) > room:
         surface.text(floor_x + room * step, stand + 2,
-                     f"+{len(queue) - room}", C["dim"], C["ink"])
+                     f"+{len(standing) - room}", C["dim"], C["ink"])
         surface.text(floor_x + room * step, stand + 3, "more",
                      C["dim"], C["ink"])
-    if not queue:
-        surface.text(floor_x, stand + 3, "the floor is empty.",
+    if not standing:
+        empty = {
+            "court": "no petitioner stands before you.",
+            "house": "no one of the house is at court.",
+            "relations": "no envoy is in the room.",
+        }.get(listing, "the floor is empty.")
+        surface.text(floor_x, stand + 3, empty[:max(0, width - 30)],
                      C["ash"], C["ink"])
     if room:
         art.paint(surface, right_pillar - 7, bottom - len(art.BRAZIER),
@@ -160,18 +351,68 @@ def _court(b: dict) -> list[workbench.Row]:
     return rows
 
 
-def _court_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
+def _court_item(b: dict, chosen: str) -> dict | None:
+    return next((petition
+                 for petition in b.get("justice", {}).get("petitions", [])
+                 if petition["id"] == chosen), None)
+
+
+def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
+    """The complete heard claim and answer, compact enough for stacked Court."""
+    width = max(12, width)
+    lines: list[tuple[str, str]] = [
+        (f"{item['kind']} · heard · waiting {item['waiting']} fn", "bone"),
+        (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
+    ]
+    lines.extend(
+        (line, "clay")
+        for line in textwrap.wrap(
+            item["claim_text"] or "—", width,
+            break_long_words=False, break_on_hyphens=False)
+    )
+    lines.append((f"ANSWER · {_name(item['against'], b)}", "wine"))
+    lines.extend(
+        (line, "clay")
+        for line in textwrap.wrap(
+            item["counter_text"] or "—", width,
+            break_long_words=False, break_on_hyphens=False)
+    )
+    return lines
+
+
+def _court_detail(b: dict, chosen: str,
+                  width: int = 44) -> list[tuple[str, str]]:
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
     if item is None:
         return [("Nobody waits for a judgement.", "ash")]
-    lines = [
-        (f"{item['kind']} · waiting {item['waiting']} fortnights", "bone"),
-        ("", "clay"),
-        (f"{_name(item['petitioner'], b)} petitions", "barley"),
-        (f"against {_name(item['against'], b)}", "wine"),
-        ("", "clay"),
-    ]
+    if item["heard"]:
+        # Evidence comes before commentary, precedent, or room atmosphere.
+        # These are the words the verdict acts upon and may not be below a
+        # clipped detail pane while its keys remain live.
+        lines = _evidence_lines(b, item, width)
+        lines.append(("", "clay"))
+    else:
+        lines = [
+            (f"{item['kind']} · waiting {item['waiting']} fortnights", "bone"),
+            (f"{_name(item['petitioner'], b)} petitions against "
+             f"{_name(item['against'], b)}", "clay"),
+            ("", "clay"),
+        ]
+    voice = _adviser_voice(b, chosen)
+    if voice:
+        name, words, basis = voice
+        lines.append((f"{name}, at the dais:", "gold"))
+        lines.extend(_wrapped(words, 3, 30))
+        if basis:
+            lines.extend(_wrapped(f"heard from: {basis}", 2, 30))
+        lines.append(("", "clay"))
+    elif _advisers(b):
+        names = ", ".join(str(adviser.get("name") or adviser.get("id"))
+                          for adviser in _advisers(b))
+        lines.append((f"at the dais: {names}", "gold"))
+        lines.append(("They have not yet spoken.", "ash"))
+        lines.append(("", "clay"))
     precedent = item.get("precedent")
     if precedent:
         lines.append((f"They cite {precedent['document_ref']}:", "sand"))
@@ -181,17 +422,10 @@ def _court_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
     if not item["heard"]:
         lines.append(("You know their names and the nature of", "ash"))
         lines.append(("the quarrel. Neither man has been heard.", "ash"))
-    else:
-        lines.append((f"{_name(item['petitioner'], b)} says:", "barley"))
-        lines.extend(_wrapped(item["claim_text"], 3))
-        lines.append(("", "clay"))
-        lines.append((f"{_name(item['against'], b)} answers:", "wine"))
-        lines.extend(_wrapped(item["counter_text"], 3))
     return lines
 
 
 def _wrapped(text: str, rows: int, width: int = 44) -> list[tuple[str, str]]:
-    import textwrap
     return [(line, "clay")
             for line in textwrap.wrap(text or "—", width)[:rows]]
 
@@ -320,9 +554,10 @@ def _house_controls(b: dict, chosen: str, hours: int,
         workbench.affordable(workbench.Control(
             "name_heir", registry.BY_ID["name_heir"].mnemonic,
             enabled=person is not None, why="choose a man first"), hours),
-        workbench.affordable(workbench.Control(
-            "marry_abroad", registry.BY_ID["marry_abroad"].mnemonic,
-            enabled=person is not None, why="choose a man first"), hours),
+        workbench.Control(
+            "dispatch_letter", "m", label="propose marriage by letter",
+            enabled=person is not None, why="choose a person first",
+            command="letter-marriage"),
     ]
 
 
@@ -368,8 +603,8 @@ def _relations_detail(b: dict, chosen: str, amount: int,
     if relation.get("seeking_patron"):
         lines.append(("They are seeking another patron.", "blood"))
     lines.append(("", "clay"))
-    lines.append((f"in hand: {amount:,} {good}", "gold"))
-    lines.append(("[ and ] change it · [g] the good", "ash"))
+    lines.append(("Gifts and marriage proposals are written at the Desk.",
+                  "gold"))
     lines.append((f"harbour due {revenue.get('harbour_rate', 0)}/1000"
                   "   [<] [>]", "sand"))
     return lines
@@ -378,15 +613,14 @@ def _relations_detail(b: dict, chosen: str, amount: int,
 def _relations_controls(b: dict, chosen: str, hours: int, amount: int,
                         good: str) -> list[workbench.Control]:
     return [
-        workbench.affordable(workbench.Control(
-            "send_gift", registry.BY_ID["send_gift"].mnemonic,
-            label=f"send {amount:,} {good}",
-            enabled=bool(chosen) and amount > 0,
-            why="set an amount first" if chosen else "choose a court"), hours),
-        workbench.affordable(workbench.Control(
-            "marry_abroad", registry.BY_ID["marry_abroad"].mnemonic,
-            label="marry into this court", enabled=bool(chosen),
-            why="choose a court"), hours),
+        workbench.Control(
+            "dispatch_letter", "g", label="offer a gift by letter",
+            enabled=bool(chosen), why="choose a court",
+            command="letter-gift"),
+        workbench.Control(
+            "dispatch_letter", "m", label="propose marriage by letter",
+            enabled=bool(chosen), why="choose a court",
+            command="letter-marriage"),
         workbench.Control(
             "set_harbour_due", registry.BY_ID["set_harbour_due"].mnemonic,
             label="harbour due · [<] [>]", command="due"),
@@ -437,6 +671,33 @@ def listing_rows(b: dict, listing: str) -> list[workbench.Row]:
     return LISTINGS.get(listing, _court)(b)
 
 
+def _detail_geometry(width: int, widths: tuple[int, ...],
+                     detail_min: int = 30) -> tuple[bool, int]:
+    """Mirror the workbench split so evidence wraps to its actual pane."""
+    natural = sum(abs(spec) for spec in widths) + 2 * len(widths) + 2
+    stacked = width < 68 or natural > width - detail_min - 6
+    if stacked:
+        return True, max(12, width - 5)
+    list_width = max(30, min(natural, width - detail_min - 6))
+    return False, max(12, width - (list_width + 4) - 2)
+
+
+def _detail_capacity(rows: list[workbench.Row],
+                     controls: list[workbench.Control],
+                     widths: tuple[int, ...], width: int, height: int,
+                     scene: int, note: str, detail_min: int = 30) -> int:
+    """Rows the workbench will actually expose in its detail pane."""
+    stacked, _detail_width = _detail_geometry(width, widths, detail_min)
+    top = 3 + scene
+    footer_rows = workbench.rows_needed(controls, 0, width)
+    available = height - top - 4 - footer_rows - (2 if note else 0)
+    if stacked:
+        room = max(1, min(available - 4, max(available // 3, 5)))
+        return max(0, available - room - 1)
+    detail_floor = height - 2 - footer_rows - (1 if note else 0)
+    return max(0, detail_floor - (top + 1))
+
+
 def compose(b: dict, view: str = "court", selected: str = "",
             scroll: int = 0, hours: int = 0, choosing: str = "",
             person: str = "", amount: int = 0, good: str = "copper",
@@ -450,8 +711,10 @@ def compose(b: dict, view: str = "court", selected: str = "",
                   rows[0].id if rows else "")
 
     who = person if choosing == "post" else chosen
+    headers, widths = HEADERS[listing]
+    _stacked, detail_width = _detail_geometry(width, widths)
     if view == "court":
-        detail = _court_detail(b, chosen)
+        detail = _court_detail(b, chosen, detail_width)
     elif view == "house":
         detail = _house_detail(b, who)
     else:
@@ -459,19 +722,47 @@ def compose(b: dict, view: str = "court", selected: str = "",
     controls = controls_for(b, view, chosen, hours, choosing, person=who,
                             amount=amount, good=good)
 
-    headers, widths = HEADERS[listing]
     band = scene_rows(height)
-    queue = rows if listing != "post" else []
+    queue = rows
 
     title = "THE PALACE"
-    note = "the men on the floor are the men in the list"
+    note = {
+        "court": "each figure on the floor is a matter in the audience",
+        "house": "the list is the house; only those at court stand here",
+        "relations": "the list is correspondence; only present envoys stand",
+        "post": "a hollow station is vacant; a filled station is held",
+    }[listing]
     if choosing == "post":
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
         title = f"THE PALACE — A POST FOR {named.upper()}"
         note = "choose a post, or [esc] to think better of it"
 
+    # Once testimony is heard, the room yields architecture before it yields
+    # the words a verdict acts upon. Supported sizes fit ordinary cases in a
+    # compact stacked pane; exceptionally long evidence leaves verdicts
+    # visibly disabled rather than asking the king to judge hidden text.
+    if view == "court":
+        petition = _court_item(b, chosen)
+        if petition is not None and petition["heard"]:
+            evidence_rows = len(_evidence_lines(b, petition, detail_width))
+            capacity = _detail_capacity(
+                rows, controls, widths, width, height, band, note)
+            if band and evidence_rows > capacity:
+                band = 0
+                capacity = _detail_capacity(
+                    rows, controls, widths, width, height, band, note)
+            if evidence_rows > capacity:
+                controls = [
+                    dataclasses.replace(
+                        control, enabled=False,
+                        why="enlarge the Court to see all evidence")
+                    if control.action_id == "rule_petition" else control
+                    for control in controls
+                ]
+
     def draw(surface, x, y, room, rows_available):
-        _draw_scene(surface, x, y, room, rows_available, view, queue, chosen)
+        _draw_scene(surface, x, y, room, rows_available, view, queue, chosen,
+                    b=b, listing=listing)
 
     return workbench.compose(
         title, headers, widths, rows, chosen, detail, controls, hours,

@@ -17,15 +17,44 @@ from engine.entity import EntityId
 
 # What a controller counts at home each fortnight. Attributes, not values: the
 # values come from the world, and the list is what "looking around" means.
-LOCAL = ("stores_grain", "people", "labour")
+#
+# The farming readings are here because they pass the same test as the granary:
+# could this actor learn it by walking round its own place in a fortnight? The
+# extent of the fields and how much of them is under crop, yes -- you can see a
+# sown field from its edge. Its own seed, its own standing crop, and its own
+# stacked sheaves, yes -- they are its property and it counts them. What the
+# temple across the square is holding, no: that arrives as a report or not at
+# all, and there is no attribute here that would let a policy help itself to it.
+# The market readings pass it too, and it is worth saying why, because "the
+# price of grain" sounds like the sort of thing only a market institution would
+# know. There is no such institution and no posted price: what an actor sees is
+# how full its own stores are against how many mouths it feeds, and what that
+# has done to what people will give. Anyone standing in a small port for a
+# fortnight knows all of it. What nobody standing there knows is the same
+# figures for a port across the water -- those arrive by ship, as `report`
+# below, or not at all.
+LOCAL = ("stores_grain", "people", "labour",
+         "extent", "under_crop",          # the ground, and how much of it is sown
+         "own_grain", "own_seed", "own_standing", "own_sheaves",
+         "own_copper",                    # the purse, counted like any other store
+         "price_grain", "market_grain",   # what it costs, and what is on the quay
+         "season",                        # which moment of the farming year
+         "home")                          # and that this is where the actor is
 
 
 def observe_local(observer: EntityId, place: EntityId, turn: int,
                   readings: dict[str, int]) -> tuple[Observation, ...]:
-    """Everything the observer can count where it is standing."""
+    """Everything the observer can count where it is standing.
+
+    The place is part of the id because an actor is not always in one place. A
+    merchant counts its own grain on a foreign quay the same way it counts the
+    grain at home, and both are `own_grain` on the same turn: without the place
+    the two observations would be one, and the second would silently be taken
+    for the first.
+    """
     return tuple(
         Observation(
-            id=f"{observer}|{turn}|{attribute}", observer=observer,
+            id=f"{observer}|{turn}|{place}|{attribute}", observer=observer,
             subject=place, attribute=attribute, value=readings[attribute],
             turn=turn, method="counted", place=place)
         for attribute in LOCAL if attribute in readings)

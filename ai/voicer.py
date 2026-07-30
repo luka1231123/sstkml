@@ -13,9 +13,10 @@ module, and every prompt field passes `ai.client.safe_fields` on the way in.
 
 On scheduling (8.7): thirty letters generated synchronously would cost minutes
 of a turn nobody asked to spend. Instead a background worker fills bodies in
-Stack order, top item first, capped per turn. Asking for a body that is not
-ready returns the authored template at once, and the player is never made to
-wait. None of this can affect replay: text never enters World.
+Stack order, top item first, capped per turn. The lightweight local model is
+the normal voice; the authored template is runtime recovery while a voice is
+not ready or a guarded request fails. None of this can affect replay: text
+never enters World.
 """
 from __future__ import annotations
 
@@ -142,8 +143,12 @@ def build_prompt(item: dict) -> list[dict]:
 
 
 def fallback_body(item: dict) -> str:
-    """The authored template (spec 8.7). Always available, always correct, and
-    the reason the game plays with the model off."""
+    """The authored emergency reading when the required local voice fails."""
+    from ai import replier
+    if replier.is_reply(item):
+        # A foreign court's answer has no authored template and must not get
+        # one: its words are built from the decision the engine wrote.
+        return replier.recovery_text(item)
     from tui import render
     return render.letter_body(item["sender"], item["topic"], item.get("facts", {}))
 
@@ -152,9 +157,19 @@ def voice(item: dict, seed: int, turn: int, client=None) -> tuple[str, str]:
     """Return (text, source) where source is 'model' or 'fallback'.
 
     One regeneration on a guard failure, naming the stray numbers, then the
-    template. A model that keeps inventing figures simply stops being used, and
-    every failure is flagged in `ai_log` so the prompts can be tuned against it.
+    recovery template. A model that keeps inventing figures simply stops being
+    used for that tablet, and every failure is flagged in `ai_log` so the
+    prompts can be tuned against it.
+
+    A foreign court's answer goes to `ai/replier.py` instead. It is voiced from
+    a decision rather than from an assertion, and it is guarded against
+    inventing an answer as well as against inventing a figure. Dispatching here
+    means every caller that already schedules the Stack -- the desktop and the
+    command line both -- voices replies without knowing they exist.
     """
+    from ai import replier
+    if replier.is_reply(item):
+        return replier.voice_reply(item, seed, turn, client)
     if client is None:
         return fallback_body(item), "fallback"
     allowed = _allowed_numbers(
@@ -207,7 +222,12 @@ class Voicer:
         if self.client is None:
             self.skipped = 0
             return
-        pending = [it for it in items if it["id"] not in self._bodies]
+        # A tablet whose accepted words are already stored is not work: Belief
+        # projects them as `body`, and asking a model again would be the one
+        # thing spec 2.6 forbids.
+        pending = [it for it in items
+                   if it["id"] not in self._bodies
+                   and not str(it.get("body") or "").strip()]
         self.skipped = max(0, len(pending) - self.cap)
         batch = pending[:self.cap]
         if not batch:
@@ -236,7 +256,14 @@ class Voicer:
 
     def body(self, item: dict) -> tuple[str, str]:
         """The text to show right now. Never blocks, never spins: if the worker
-        has not reached this item, the player reads the template instead."""
+        has not reached this item, the player reads the template instead.
+
+        Stored words come first and are never regenerated: they are what this
+        tablet says (spec 2.6).
+        """
+        stored = str(item.get("body") or "").strip()
+        if stored:
+            return stored, "stored"
         with self._lock:
             ready = self._bodies.get(item["id"])
         if ready is not None:

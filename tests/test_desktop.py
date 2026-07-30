@@ -35,8 +35,8 @@ def test_a_window_refuses_to_shrink_below_its_minimum_rather_than_clipping():
 def test_an_entity_window_takes_its_size_from_its_kind():
     assert desktop.family("letter:tablet_12") == "letter:"
     assert desktop.family("hall") == "hall"
-    assert desktop.default_size("letter:tablet_12") == (60, 25)
-    assert desktop.default_size("institution:tablet_house") == (62, 24)
+    assert desktop.default_size("letter:tablet_12") == (50, 20)
+    assert desktop.default_size("institution:tablet_house") == (50, 19)
 
 
 def test_an_unknown_window_is_treated_as_a_document():
@@ -157,6 +157,29 @@ def test_a_missing_or_corrupt_settings_file_yields_defaults():
         assert desktop.Preferences.load(wrong).ascii_only is False
 
 
+def test_old_standalone_room_geometry_compacts_once_but_world_does_not() -> None:
+    with TemporaryDirectory() as folder:
+        path = Path(folder) / "settings.json"
+        path.write_text(json.dumps({
+            "geometry": {
+                "altar": {"x": 1, "y": 2, "columns": 79, "rows": 32},
+                "city": {"x": 3, "y": 4, "columns": 117, "rows": 37},
+                "counsel": {"x": 5, "y": 6, "columns": 64, "rows": 52},
+                "world": {"x": 7, "y": 8, "columns": 158, "rows": 32},
+            },
+        }))
+        prefs = desktop.Preferences.load(path)
+
+    assert (prefs.recall("altar")["columns"],
+            prefs.recall("altar")["rows"]) == desktop.default_size("altar")
+    assert (prefs.recall("city")["columns"],
+            prefs.recall("city")["rows"]) == desktop.default_size("city")
+    assert (prefs.recall("counsel")["columns"],
+            prefs.recall("counsel")["rows"]) == desktop.default_size("counsel")
+    assert (prefs.recall("world")["columns"],
+            prefs.recall("world")["rows"]) == (158, 32)
+
+
 def test_a_settings_file_cannot_smuggle_in_an_unsupported_font_size():
     with TemporaryDirectory() as folder:
         path = Path(folder) / "settings.json"
@@ -168,7 +191,7 @@ def test_recalled_geometry_is_never_below_the_class_minimum():
     prefs = desktop.Preferences()
     prefs.remember("hall", 0, 0, 10, 10)
     assert prefs.recall("hall") == {
-        "x": 0, "y": 0, "columns": 72, "rows": 26}
+        "x": 0, "y": 0, "columns": 84, "rows": 26}
 
 
 def test_recalling_a_window_that_was_never_saved_is_none():

@@ -1,8 +1,9 @@
-"""Interactive controller (command mode). The M1+M2 game, playable end to end.
+"""Interactive terminal controller for the same model-backed court.
 
 Holds the World, drives the turn pipeline, projects Belief, renders it, and
 turns typed commands into Actions. Everything reachable here is reachable
-headlessly (session.play), so the game plays with no model and no GUI.
+headlessly through structured actions, while the playable court requires the
+same lightweight local language model as the windowed desktop.
 
 Attention is enforced here, in Phase C: reading a letter costs hours, and the
 pile is longer than the budget. Triage is the game.
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import sys
 
+from ai.parser import LETTER_ONLY_DIPLOMACY
 from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
@@ -23,7 +25,6 @@ READ_COST = 2
 REPLY_COST = 2
 INSPECT_COST = 1
 SEARCH_COST = 1
-GIFT_COST = 1
 
 HARVEST_COST = 1
 CORVEE_COST = 1
@@ -31,13 +32,19 @@ WORKS_COST = 1
 ASSIGN_COST = 1
 DREDGE_COST = 1
 OMEN_COST = 2
-MARRY_COST = 2
 SWEAR_COST = 2
 SEARCH_COST = 1       # spec 6.17: one hour per query, and it is a real hour
 EXPIATE_COST = 2
 QUARANTINE_COST = 1
 SUPPRESS_COST = 2
 HEAR_COST = 1
+
+
+def _guard_player_action(action) -> None:
+    """Keep compatibility actions out of every live terminal mutation path."""
+    if isinstance(action, (A.SendGift, A.MarryAbroad)):
+        raise ValueError(LETTER_ONLY_DIPLOMACY)
+
 
 HELP = """  commands (a leading ':' is optional)
     stack | lists | stores | archive | relations | oaths | land | house
@@ -50,7 +57,7 @@ HELP = """  commands (a leading ':' is optional)
     alloc <group> <qa>       set what a group is paid  (effect next turn)
     pri <group> <group>..    set the pay-down order
     eat <qa>                 move seed grain into the granary now
-    gift <actor> <good> <n>  send goods to a correspondent        (1 hour)
+    gift | marry             write these as terms at World → Desk
     harvest <group>          order a group to the fields          (1 hour)
     recall <group>           send it back to its own work         (1 hour)
     corvee <days>            levy labour outside the lists; costs unrest (1 hour)
@@ -72,7 +79,6 @@ HELP = """  commands (a leading ':' is optional)
     omen death <person>      ask whether a man has long           (2 hours)
     hush <omen>              keep an omen off the record; it may leak (2 hours)
     defy <omen>              act against it; costs legitimacy either way
-    marry <person> <actor>   send a daughter to a foreign court   (2 hours)
     swear <oath>             re-swear an oath that lapsed on a death (2 hours)
     tablets <word>..         search the tablet house, incl. what your
                              predecessors left                    (1 hour)
@@ -84,8 +90,8 @@ HELP = """  commands (a leading ':' is optional)
     save <path>              write a save file
     help  |  quit
 
-  Plain English is tried through the deterministic pre-parser, then Ollama.
-  Run with --no-ai to keep command mode only."""
+  Plain English goes to the local court-language model, then through the
+  exact action validator. Colon commands remain the direct structured path."""
 
 
 def _resolve(token: str, stack: list) -> str | None:
@@ -124,21 +130,25 @@ def _raw_tablet() -> str:
         lines.append(line)
 
 
-def run(scenario: str = "ugarit", seed: int | None = None,
-        no_ai: bool = False) -> None:
-    from ai.client import OllamaClient
+def run(scenario: str = "ugarit", seed: int | None = None) -> None:
+    from ai.client import (
+        OllamaClient, model_status, required_model_message)
     from ai.composer import compose, raw_draft, split_draft
     from ai.parser import action_cost, parse
     from ai.voicer import Voicer
 
     if seed is None:
         seed = new_seed()
+    ready, detail = model_status()
+    if not ready:
+        print(required_model_message(detail))
+        return
     print(f"  seed {seed} — replay this same world with:  "
           f"./run.sh --cli {scenario} {seed}\n")
     world = load_scenario(scenario, seed)
     log: list[dict] = []
     ai_log: list[dict] = []
-    client = None if no_ai else OllamaClient(ai_log, f"saves/{scenario}/ai_cache")
+    client = OllamaClient(ai_log, f"saves/{scenario}/ai_cache")
     voicer = Voicer(client, seed)
     turns = 0
     screen = "stack"
@@ -162,6 +172,7 @@ def run(scenario: str = "ugarit", seed: int | None = None,
 
         def commit(action):
             nonlocal world
+            _guard_player_action(action)
             world, evs = apply(world, action)
             log.append({"turn": world.date.absolute, "action": A.to_dict(action)})
             return evs
@@ -527,20 +538,8 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                               "nothing, and says it loudly.")
                 except ValueError as ex:
                     print(f"  {ex}")
-            elif verb == "marry" and len(args) == 2:
-                if left < MARRY_COST:
-                    print("  a marriage is not arranged in the hours left.")
-                else:
-                    try:
-                        evs = commit(A.MarryAbroad(args[0], args[1]))
-                        spent += MARRY_COST
-                        wed = next(
-                            (e for e in evs if isinstance(e, A.MarriedAbroad)), None)
-                        if wed:
-                            print(f"  {wed.name} goes to the house of "
-                                  f"{render.actor_name(wed.actor)}. She will write.")
-                    except ValueError as ex:
-                        print(f"  {ex}")
+            elif verb == "marry":
+                print(f"  {LETTER_ONLY_DIPLOMACY}")
             elif verb == "tablets" and args:
                 # Spec 6.17: keyword and tag, one hour per query. The hour is
                 # the mechanic -- a king hunting a broken oath during an
@@ -596,29 +595,16 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                         print("  the gods are named again, and the tablet is sealed.")
                     except ValueError as ex:
                         print(f"  {ex}")
-            elif verb == "gift" and len(args) == 3:
-                if left < GIFT_COST:
-                    print("  no hour remains to seal and dispatch a gift.")
-                else:
-                    try:
-                        events = commit(A.SendGift(
-                            args[0], args[1], int(args[2])))
-                        spent += GIFT_COST
-                        sent = next(
-                            (e for e in events if isinstance(e, A.GiftSent)), None)
-                        if sent:
-                            print(
-                                f"  gift {sent.gift_id} leaves; expected turn "
-                                f"{sent.arrival_turn}.")
-                    except (ValueError, TypeError) as ex:
-                        print(f"  {ex}")
+            elif verb == "gift":
+                print(f"  {LETTER_ONLY_DIPLOMACY}")
             else:
                 if command_mode:
                     print(f"  don't understand command: {line!r}  (try ':help')")
                     continue
                 result = parse(line, b, left, seed, world.date.absolute, client)
                 if result.unavailable:
-                    print("  the model is unavailable. use ':' commands (try ':help').")
+                    print("  the court voice failed. retry, or use an exact ':' "
+                          "command while the scribe recovers.")
                 elif result.question:
                     if left:
                         spent += 1
@@ -626,6 +612,11 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                     else:
                         print("  Yabninu has no audience hour left to clarify.")
                 else:
+                    if any(isinstance(
+                            action, (A.SendGift, A.MarryAbroad))
+                           for action in result.actions):
+                        print(f"  {LETTER_ONLY_DIPLOMACY}")
+                        continue
                     cost = sum(action_cost(action) for action in result.actions)
                     proceed = cost <= left
                     if proceed and cost > 3:
@@ -660,12 +651,6 @@ def run(scenario: str = "ugarit", seed: int | None = None,
                             else:
                                 evs = commit(action)
                                 used += action_cost(action)
-                                if isinstance(action, A.SendGift):
-                                    sent = next(
-                                        (e for e in evs if isinstance(e, A.GiftSent)),
-                                        None)
-                                    if sent:
-                                        print(f"  gift {sent.gift_id} is dispatched.")
                                 if isinstance(action, A.InspectLedger):
                                     event = next((e for e in evs if isinstance(e, A.LedgerInspected)), None)
                                     if event:
@@ -677,7 +662,7 @@ def run(scenario: str = "ugarit", seed: int | None = None,
 
 
 if __name__ == "__main__":
-    argv = [arg for arg in sys.argv[1:] if arg != "--no-ai"]
+    argv = sys.argv[1:]
     sc = argv[0] if argv else "ugarit"
     sd = int(argv[1]) if len(argv) > 1 else None
-    run(sc, sd, "--no-ai" in sys.argv)
+    run(sc, sd)

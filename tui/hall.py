@@ -1,45 +1,40 @@
-"""The Hall / Home dashboard: what matters, who waits, and where to go."""
+"""The Hall: a palace threshold for triage, attendance, and passage."""
 from __future__ import annotations
 
-from tui import advice, render, style
+from tui import advice, art, render, style
 from tui.grid import INDEX, InteractiveScreen, sparkline, Surface
 
 C = INDEX
 
 DOORS = (
-    ("s", "Inbox", "stack"),
+    ("s", "Scribes", "stack"),
     ("g", "Orders", "orders"),
     ("c", "Counsel", "counsel"),
-    ("t", "Stores", "stores"),
-    ("r", "Roll", "roll"),
-    ("l", "Land", "land"),
+    ("t", "Storehouse", "stores"),
     ("y", "City", "city"),
-    ("m", "Muster", "muster"),
+    ("m", "Corvee", "muster"),
     ("o", "Oaths", "oaths"),
-    ("j", "Palace", "palace"),
-    ("v", "Altar", "altar"),
-    ("a", "Archive", "archive"),
+    ("j", "Court", "palace"),
+    ("v", "Shrine", "altar"),
     ("w", "World", "world"),
     ("p", "Sickness", "plague"),
     ("?", "Help", "help"),
-    ("d", "Desk", "desk"),
 )
 
 BUILT = frozenset({
-    "stack", "roll", "stores", "muster", "oaths", "land", "help",
-    "orders", "desk", "archive", "altar", "world", "plague", "counsel",
+    "stack", "stores", "muster", "oaths", "help",
+    "orders", "altar", "world", "plague", "counsel",
     "city", "palace",
 })
 
 GROUPS = (
-    ("CORRESPONDENCE", (("s", "Inbox"), ("g", "Orders"), ("c", "Counsel"),
-                        ("d", "Desk"))),
-    ("KINGDOM", (("t", "Stores"), ("r", "Roll"), ("l", "Land"),
-                 ("y", "City"))),
-    ("OBLIGATIONS", (("m", "Muster"), ("o", "Oaths"))),
-    ("COURT", (("j", "Palace"), ("v", "Altar"), ("a", "Archive"))),
-    ("WORLD", (("w", "World"), ("p", "Sickness"), ("?", "Help"))),
+    ("KINGDOM", (("t", "Storehouse"), ("y", "City"))),
+    ("DUTY", (("m", "Corvee"), ("o", "Oaths"))),
+    ("COURT", (("j", "Court"), ("v", "Shrine"), ("c", "Counsel"))),
+    ("BEYOND", (("w", "World"), ("p", "Sickness"), ("?", "Help"))),
 )
+
+_TARGET_OF = {key: target for key, _label, target in DOORS}
 
 
 def _trunc(text: str, width: int) -> str:
@@ -78,12 +73,14 @@ def waiting(b: dict) -> list[dict]:
                     else "barley",
         })
     for petition in b.get("justice", {}).get("petitions", []):
+        waiting = petition["waiting"]
         people.append({
             "who": render.actor_name(petition["petitioner"], b.get("house")),
             "for": f"{petition['kind']} claim",
-            "fact": f"{petition['waiting']} fortnights waiting",
-            "weight": petition["waiting"],
-            "tone": "blood" if petition["waiting"] >= 6 else "clay",
+            "fact": (
+                f"{waiting} fortnight{'s' if waiting != 1 else ''} waiting"),
+            "weight": waiting,
+            "tone": "blood" if waiting >= 6 else "clay",
         })
     plague = b.get("plague", {})
     if plague.get("sickness_at_seat"):
@@ -111,29 +108,100 @@ def waiting(b: dict) -> list[dict]:
 
 def _header(surface: Surface, b: dict, hours_left: int) -> None:
     width = surface.width
-    title = f" {render.actor_name(b['actor'], b.get('house')).upper()} OF {b['scenario'].upper()}"
-    style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
-    surface.text(width - 2 - len(b["date"]), 0, b["date"], C["sky"], C["lapis"])
+    title = (
+        f" {render.actor_name(b['actor'], b.get('house')).upper()}"
+        f" OF {b['scenario'].upper()}")
+    date = b["date"]
+    date_x = max(1, width - len(date) - 2)
+    style.bar(surface, 0, 0, width, _trunc(title, max(0, date_x - 2)),
+              fg=C["bone"], bg=C["lapis"])
+    surface.text(date_x, 0, date, C["sky"], C["lapis"])
+    surface.text(1, 1, art.band(art.CORNICE, max(0, width - 2)),
+                 C["gold"], C["ink"])
 
     base = b["attention_base"]
-    lit = 0 if base <= 0 else min(12, hours_left * 12 // base)
+    meter_width = 10 if width >= 84 else 6
+    lit = 0 if base <= 0 else min(
+        meter_width, hours_left * meter_width // base)
     surface.text(3, 2, "the lamp", C["dim"], C["ink"])
-    style.meter(surface, 13, 2, 12, lit)
-    surface.text(27, 2, f"{hours_left} of {base} hours", C["clay"], C["ink"])
+    style.meter(surface, 12, 2, meter_width, lit)
+    hour_x = 14 + meter_width
+    surface.text(hour_x, 2, f"{hours_left} of {base} hours",
+                 C["clay"], C["ink"])
     sea = "the sea is open" if b["sea_open"] else "the sea is shut"
     surface.text(width - 3 - len(sea), 2, sea, C["sky"], C["ink"])
 
     grain = render.fmt_good("grain", b["stores"].get("grain", 0))
-    surface.text(3, 3, f"granary {grain}", C["barley"], C["ink"])
-    surface.text(42, 3, f"unrest {b['unrest']}", C["clay"], C["ink"])
-    surface.text(57, 3, f"legitimacy {b['legitimacy']}", C["clay"], C["ink"])
     series = b.get("store_history", {}).get("grain", [])
-    if series:
-        line = sparkline(series, min(18, max(0, width - 80)))
+    spark_width = min(14, max(0, width - 80)) if series else 0
+    facts = (
+        f"granary {grain} · unrest {b['unrest']}"
+        f" · legitimacy {b['legitimacy']}")
+    facts_width = max(0, width - 6 - spark_width)
+    surface.text(3, 3, _trunc(facts, facts_width), C["clay"], C["ink"])
+    if spark_width:
+        line = sparkline(series, spark_width)
         surface.text(width - 3 - len(line), 3, line, C["barley"], C["ink"])
 
 
-def compose(b: dict, width: int = 104, height: int = 36,
+def _architecture(surface: Surface, rail_x: int) -> tuple[int, int]:
+    """Draw the passage between audience floor and palace doors.
+
+    At ordinary sizes it is a five-cell palm pillar. At the minimum it
+    contracts to a carved jamb, returning those four cells to information.
+    """
+    if surface.width >= 84:
+        pillar_x = rail_x - 7
+        rows = tuple(
+            row.replace("▓", "▒")
+            for row in art.pillar(max(7, surface.height - 7))
+        )
+        art.paint(surface, pillar_x, 5, rows, art.pillar_paint(len(rows)))
+        return pillar_x - 1, rail_x
+    divider = rail_x - 2
+    for row in range(5, surface.height - 2):
+        glyph = "╫" if (row - 5) % 4 == 0 else "│"
+        surface.put(divider, row, glyph, C["sand"], C["ink"])
+    return divider - 1, rail_x
+
+
+def _matter_mark(severity: int) -> tuple[str, int]:
+    if severity >= 9:
+        return "▲", C["blood"]
+    if severity >= 6:
+        return "◆", C["flame"]
+    return "◇", C["gold"]
+
+
+def _visitor_mark(person: dict) -> tuple[str, int]:
+    if person["tone"] == "blood":
+        return "▲", C["blood"]
+    if person["tone"] in {"flame", "wine"}:
+        return "◆", C[person["tone"]]
+    return "○", C["dim"]
+
+
+def _door_group(surface: Surface, x: int, y: int, width: int,
+                heading: str, entries: tuple[tuple[str, str], ...]) -> int:
+    """Draw one lintel and pack its doors onto the rows beneath it."""
+    label = f"╞ {heading} "
+    surface.text(x, y, label + "─" * max(0, width - len(label)),
+                 C["gold"], C["ink"])
+    y += 1
+    column = x + 1
+    right = x + width
+    for key, name in entries:
+        needed = len(key) + len(name) + 4
+        if column > x + 1 and column + needed > right:
+            y += 1
+            column = x + 1
+        column += style.keycap(
+            surface, column, y, key, name,
+            enabled=_TARGET_OF.get(key, "") in BUILT) + 1
+    return y + 1
+
+
+def compose(b: dict, width: int = 84, height: int = 28,
             hours_left: int | None = None,
             notice: str = "") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
@@ -142,97 +210,94 @@ def compose(b: dict, width: int = 104, height: int = 36,
     style.notice(surface, 3, 4, width - 6, notice)
 
     right_width = 31 if width >= 90 else 27
-    divider = width - right_width - 2
-    left_width = divider - 5
-    for row in range(5, height - 2):
-        surface.put(divider, row, "│", C["faint"], C["ink"])
+    rx = width - right_width
+    left_edge, rx = _architecture(surface, rx)
+    left_x = 2
+    left_width = max(0, left_edge - left_x)
+    rw = max(0, width - rx - 2)
 
-    # Matters: the exception, then the man who raised it and what he is going
-    # on. The title and the reason are facts and may be stated flatly; the
-    # third line is advice, and advice is only allowed to appear in somebody's
-    # mouth (UI/UX spec 20: never an unattributed `Do: send grain`).
-    style.bar(surface, 2, 5, left_width + 2, " MATTERS BEFORE THE KING",
+    # Raised seals are the triage hierarchy: the shape is visible without
+    # colour, and the attributed evidence remains the substance of each row.
+    style.bar(surface, left_x, 5, left_width, " MATTERS BEFORE THE KING",
               fg=C["bone"], bg=C["faint"])
-    matters = advice.concerns(b, 4)
+    matter_limit = 4 if height >= 30 else 3
+    matters = advice.concerns(b, matter_limit)
     if not matters:
         surface.text(4, 7, "Yabninu has put no immediate concern before you.",
                      C["ash"], C["ink"])
-    # Four rows apiece where there is room for the basis, three where there is
-    # not: the attribution is not optional, but the grounds for it are the
-    # first thing to go when the Hall is short (spec 6, order of contraction).
-    # `floor` is where the hall's own people start; a matter may not run under
-    # them, so a matter that does not fit whole is not drawn at all.
-    floor = min(height - 9, 20)
-    pitch = 4 if (floor - 7) >= len(matters) * 4 else 3
     for index, concern in enumerate(matters):
-        row = 7 + index * pitch
-        if row + pitch > floor:
+        row = 7 + index * 2
+        if row + 1 >= height - 7:
             break
-        style.keycap(surface, 4, row, str(index + 1),
-                     _trunc(concern.title, left_width - 10),
+        mark, tone = _matter_mark(concern.severity)
+        surface.text(4, row, mark, tone, C["ink"])
+        style.keycap(surface, 6, row, str(index + 1),
+                     _trunc(concern.title, max(0, left_width - 12)),
                      command=str(index + 1))
-        surface.text(7, row + 1, _trunc(concern.reason, left_width - 6),
+        report = f"{concern.speaker}: {concern.reason}"
+        surface.text(7, row + 1, _trunc(report, max(0, left_width - 7)),
                      C["ash"], C["ink"])
-        surface.text(7, row + 2, _trunc(concern.said(), left_width - 6),
-                     C["bone"], C["ink"])
-        if pitch >= 4 and concern.basis:
-            surface.text(9, row + 3,
-                         _trunc("— " + concern.basis, left_width - 8),
-                         C["dim"], C["ink"])
 
-    # The physical hall remains visible beneath the advice.
-    waiting_top = min(height - 9, 20)
+    # The audience floor rises when there are fewer matters; blank rows do not
+    # masquerade as atmosphere. Every visitor carries both business and age.
+    waiting_top = min(height - 7, 8 + max(1, len(matters)) * 2)
     people = waiting(b)
-    style.bar(surface, 2, waiting_top, left_width + 2,
-              f" WAITING ON YOU · IN THE HALL"
-              f"{'  ' + str(len(people)) if people else ''}",
+    style.bar(surface, left_x, waiting_top, left_width,
+              f" AUDIENCE FLOOR · {len(people)} WAITING ON YOU",
               fg=C["bone"], bg=C["faint"])
     room = max(0, height - waiting_top - 3)
     if not people:
-        surface.text(4, waiting_top + 2, "Nobody; the hall is empty.",
+        surface.text(4, waiting_top + 2, "Nobody waits; the hall is empty.",
                      C["ash"], C["ink"])
-    for offset, person in enumerate(people[:room]):
+    shown = min(len(people), room)
+    if len(people) > room and room:
+        shown -= 1
+    for offset, person in enumerate(people[:shown]):
         row = waiting_top + 1 + offset
-        who_width = max(14, left_width // 2 - 2)
-        surface.text(4, row, _trunc(person["who"], who_width),
+        mark, tone = _visitor_mark(person)
+        surface.text(4, row, mark, tone, C["ink"])
+        who_width = min(22, max(12, left_width // 3))
+        surface.text(6, row, _trunc(person["who"], who_width),
                      C["clay"], C["ink"])
-        fact = _trunc(person["fact"], max(10, left_width - who_width - 7))
-        surface.text(6 + who_width, row, fact, C["dim"], C["ink"])
+        detail = f"{person['fact']} · {person['for']}"
+        detail_width = max(0, left_width - who_width - 6)
+        surface.text(7 + who_width, row, _trunc(detail, detail_width),
+                     C["dim"], C["ink"])
+    if len(people) > room and room:
+        rest = len(people) - shown
+        surface.text(4, waiting_top + room,
+                     _trunc(f"+ {rest} wait beyond the doors", left_width - 2),
+                     C["ash"], C["ink"])
 
-    # Inbox and navigation rail.
-    rx = divider + 2
-    rw = width - rx - 2
+    # Tablet wing and palace passages. Scribes and Orders live together at the
+    # top rather than being repeated again in a generic navigation group.
     unread = [item for item in b.get("stack", []) if not item["read"]]
-    style.bar(surface, rx, 5, rw, " INBOX", fg=C["bone"], bg=C["faint"])
-    surface.text(rx + 1, 7,
-                 f"{len(unread)} unread · {len(b.get('stack', []))} on the pile",
-                 C["clay"], C["ink"])
+    style.bar(surface, rx, 5, rw, f" INBOX · {len(unread)} UNREAD",
+              fg=C["bone"], bg=C["faint"])
     if unread:
         oldest = max(unread, key=lambda item: item["age"])
-        surface.text(rx + 1, 8, _trunc(
-            "oldest: " + render.actor_name(oldest["sender"], b.get("house")), rw - 2),
+        age = "new" if oldest["age"] == 0 else f"{oldest['age']} fn"
+        surface.text(rx + 1, 6, _trunc(
+            f"oldest · {render.actor_name(oldest['sender'], b.get('house'))}"
+            f" · {age}", rw - 2),
             C["ash"], C["ink"])
-    style.keycap(surface, rx + 1, 9, "s", "Open Inbox")
+    else:
+        surface.text(rx + 1, 6, "no unread tablets", C["ash"], C["ink"])
+    column = rx + 1
+    column += style.keycap(surface, column, 7, "s", "Scribes") + 1
+    style.keycap(surface, column, 7, "g", "Orders")
+    surface.text(rx, 8, "─" * rw, C["faint"], C["ink"])
 
-    y = 11
+    y = 9
     for heading, entries in GROUPS:
-        if y >= height - 3:
+        if y >= height - 4:
             break
-        surface.text(rx, y, heading, C["dim"], C["ink"])
-        y += 1
-        column = rx + 1
-        for key, label in entries:
-            if y >= height - 2:
-                break
-            target = next((target for door_key, _name, target in DOORS
-                           if door_key == key), "")
-            needed = len(key) + len(label) + 4
-            if column + needed > rx + rw:
-                y += 1
-                column = rx + 1
-            column += style.keycap(surface, column, y, key, label,
-                                   enabled=target in BUILT) + 2
-        y += 1
+        y = _door_group(surface, rx, y, rw, heading, entries)
+
+    # The paving belongs to the room, but also gives the audience and passages
+    # a common ground instead of two dashboard columns floating in black.
+    surface.text(1, height - 2, art.floor(max(0, width - 2), 2),
+                 C["faint"], C["ink"])
 
     style.footer(surface, [
         style.FooterAction("SPACE", "end the fortnight", command="space"),

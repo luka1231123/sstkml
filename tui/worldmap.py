@@ -13,13 +13,18 @@ dropped from it.
 Three things are on the screen at once, because they are three views of one
 question -- who can I reach, how, and what can I do about it:
 
-* the chart, with a mark per place and a line per route, both clickable
-* the route tablet, which is the same edges written out with their legs,
-  their season and how old the record is
-* the orders that apply to whatever is selected, including the ones that
-  belong to another window, which say so and open it
+* the chart, with every known place and a stable, quiet copy of every road
+* the route tablet, which opens on the roads from that place but can still be
+  turned over to read every known road
+* the communication instruments intended for the selected court
+
+The restraint is deliberate. Thirty-four places joined by forty-three solid
+lines is not a map in a character grid; it is a knot. The complete network is
+there in sparse marks and does not redraw itself when a place is chosen.
 """
 from __future__ import annotations
+
+import heapq
 
 from tui import art, chart, style
 from tui.grid import INDEX, InteractiveScreen, Surface
@@ -39,11 +44,10 @@ ESTEEM_TONE = {
     "hostile": "blood",
 }
 
-# How often a route lays down a glyph. A road is solid, a sea lane is a dashed
-# track, a lane the season has shut is a few dots -- so the three read apart in
-# a monochrome terminal, where the mode colours are not there to help.
-STRIDE = {"land": 1, "river": 2, "sea": 2, "unknown": 3}
+# How often the stable chart lays down a glyph. Sparse tracks keep the complete
+# network present without letting forty-three routes turn into a black knot.
 CLOSED_STRIDE = 3
+MAP_STRIDE = {"land": 3, "river": 3, "sea": 4, "unknown": 5}
 
 # What a place is, in one glyph. The seat is a walled city, a court you write
 # to is a diamond, anywhere else is a ring, and a place you have shut the road
@@ -124,6 +128,19 @@ def routes_of(b: dict, place: str = "") -> list[dict]:
     ))
 
 
+def routes_from(b: dict, place: str) -> list[dict]:
+    """The roads that actually touch the chosen place."""
+    return [
+        route for route in routes_of(b, place)
+        if place in {str(route.get("a", "")), str(route.get("b", ""))}
+    ]
+
+
+def tablet_routes(b: dict, place: str, all_routes: bool = False) -> list[dict]:
+    """The focused leaf of the route tablet, or its complete reverse."""
+    return routes_of(b, place) if all_routes else routes_from(b, place)
+
+
 def _relations_by_place(b: dict) -> dict[str, dict]:
     found: dict[str, dict] = {}
     for relation in b.get("relations", []):
@@ -131,6 +148,59 @@ def _relations_by_place(b: dict) -> dict[str, dict]:
         if place and place not in found:
             found[str(place)] = relation
     return found
+
+
+def court_at(b: dict, place: str) -> str:
+    """The correspondent known at a place, if the map names one."""
+    relation = _relations_by_place(b).get(place) or {}
+    return str(relation.get("other") or "")
+
+
+def route_path(b: dict, origin: str, destination: str) -> tuple[str, ...]:
+    """The shortest known courier path, weighted by projected route legs."""
+    if not origin or not destination:
+        return ()
+    if origin == destination:
+        return (origin,)
+    adjacent: dict[str, list[tuple[int, str]]] = {}
+    for route in routes_of(b):
+        a, z = str(route.get("a", "")), str(route.get("b", ""))
+        if not a or not z:
+            continue
+        legs = max(1, _number(route.get("legs"), 1))
+        adjacent.setdefault(a, []).append((legs, z))
+        adjacent.setdefault(z, []).append((legs, a))
+    queue: list[tuple[int, tuple[str, ...], str]] = [(0, (origin,), origin)]
+    best: dict[str, int] = {}
+    while queue:
+        distance, path, here = heapq.heappop(queue)
+        if distance >= best.get(here, distance + 1):
+            continue
+        best[here] = distance
+        if here == destination:
+            return path
+        for legs, there in sorted(adjacent.get(here, ())):
+            heapq.heappush(
+                queue, (distance + legs, path + (there,), there))
+    return ()
+
+
+def path_legs(b: dict, path: tuple[str, ...]) -> int:
+    """Known travel time along a path; zero means no complete known route."""
+    if len(path) < 2:
+        return 0
+    edges = {
+        frozenset((str(route.get("a", "")), str(route.get("b", "")))):
+        max(1, _number(route.get("legs"), 1))
+        for route in routes_of(b)
+    }
+    total = 0
+    for a, z in zip(path, path[1:]):
+        legs = edges.get(frozenset((a, z)))
+        if legs is None:
+            return 0
+        total += legs
+    return total
 
 
 def _shut(b: dict) -> set[str]:
@@ -156,16 +226,21 @@ def _mark_of(place_id: str, b: dict, courts: dict[str, dict],
 
 # --- the chart ----------------------------------------------------------------
 
+def _near(cell: tuple[int, int], other: tuple[int, int]) -> bool:
+    return max(abs(cell[0] - other[0]), abs(cell[1] - other[1])) <= 1
+
+
 def _draw_chart(surface: Surface, b: dict, x: int, y: int,
                 width: int, height: int, selected: str) -> dict[str, tuple[int, int]]:
-    """Routes, then marks, then as many names as will fit. Returns the marks.
+    """Stable sparse routes, then marks, then a useful number of names.
 
     Drawn in that order because each layer may be written over by the next: a
     road runs behind a city rather than through its name, which is the same
-    order a scribe would have drawn it in.
+    order a scribe would have drawn it in. Selection never changes route ink
+    or label placement: a map that rearranges when touched cannot be learned.
     """
     places = places_in_order(b)
-    at = chart.project(places, width, height)
+    at = chart.project(places, width, height, spacing=1)
     if not at:
         surface.text(x, y, "this tablet locates no place it names.",
                      C["ash"], C["ink"])
@@ -173,29 +248,45 @@ def _draw_chart(surface: Surface, b: dict, x: int, y: int,
 
     courts = _relations_by_place(b)
     seat = str(b.get("seat", ""))
-    used: set[tuple[int, int]] = set()
+    routes = routes_of(b)
+    marks = set(at.values())
+    # Names may not touch another city's mark. This small breathing space is
+    # what stops strings such as "○Alalakh" and "◇▣Ugarit" reading as one
+    # invented symbol when several ports project onto neighbouring cells.
+    used: set[tuple[int, int]] = {
+        (px + dx, py + dy)
+        for px, py in marks
+        for dx in (-1, 0, 1)
+        for dy in (-1, 0, 1)
+        if 0 <= px + dx < width and 0 <= py + dy < height
+    }
 
-    for route in routes_of(b):
+    for route in routes:
         a, z = str(route.get("a", "")), str(route.get("b", ""))
         if a not in at or z not in at:
             continue          # a road to a place the tablet cannot locate
         mode = str(route.get("mode") or "unknown").lower()
         closed = str(route.get("availability") or "").lower() == "closed"
-        glyph = "·" if closed else chart.slope_glyph(at[a], at[z])
-        stride = CLOSED_STRIDE if closed else STRIDE.get(mode, 3)
-        incident = selected in (a, z)
-        tone = ("faint" if closed
-                else "bone" if incident
-                else MODE_TONE.get(mode, "clay"))
+        glyph = (
+            "·" if closed else
+            "~" if mode == "sea" else
+            "≈" if mode == "river" else
+            chart.slope_glyph(at[a], at[z])
+        )
+        stride = CLOSED_STRIDE if closed else MAP_STRIDE.get(mode, 5)
         cells = chart.line(at[a], at[z])
         for step, (cx, cy) in enumerate(cells):
             if (cx, cy) in at.values():
                 continue      # a city is not a milestone on its own road
-            surface.link(x + cx, y + cy, 1, 1, f"world:route:{a}:{z}")
             if step % stride:
                 continue
-            surface.put(x + cx, y + cy, glyph, C[tone], C["ink"])
-            used.add((cx, cy))
+            # A route may meet its own ends. It may not run through the halo of
+            # an unrelated city and visually weld that city's mark to a road.
+            if ((cx, cy) in used
+                    and not _near((cx, cy), at[a])
+                    and not _near((cx, cy), at[z])):
+                continue
+            surface.put(x + cx, y + cy, glyph, C["faint"], C["ink"])
 
     for place in places:
         place_id = str(place.get("id", ""))
@@ -206,39 +297,60 @@ def _draw_chart(surface: Surface, b: dict, x: int, y: int,
         if place_id == selected and place_id != seat:
             tone = "bone"
         surface.put(x + cx, y + cy, glyph, C[tone], C["ink"])
-        used.add((cx, cy))
+        surface.link(x + cx, y + cy, 1, 1,
+                     f"world:place:{place_id}")
 
-    # Names, in the order of who most needs one. Whoever is left over keeps his
-    # mark and his place in the tablet beside the map: a name that will not fit
-    # is dropped, never the place.
+    # The label set is stable. Selection changes a mark and the inspector, not
+    # which other names happen to survive collision placement.
+    anchor_ids: set[str] = set()
+    if at:
+        anchor_ids.update((
+            min(at, key=lambda place_id: at[place_id][0]),
+            max(at, key=lambda place_id: at[place_id][0]),
+            min(at, key=lambda place_id: at[place_id][1]),
+            max(at, key=lambda place_id: at[place_id][1]),
+        ))
+
+    def label_rank(place: dict) -> tuple[int, str]:
+        place_id = str(place.get("id", ""))
+        rank = (
+            0 if place_id == seat else
+            1 if place_id in anchor_ids else
+            2 if place_id in courts else
+            3
+        )
+        return rank, _spoken(place.get("name") or "").lower()
+
     order = sorted(
         (place for place in places if str(place.get("id", "")) in at),
-        key=lambda place: (
-            str(place.get("id", "")) != selected,
-            str(place.get("id", "")) != seat,
-            str(place.get("id", "")) not in courts,
-            _spoken(place.get("name") or "").lower(),
-        ))
+        key=label_rank)
+    label_limit = (
+        len(order) if len(order) <= 12
+        else max(5, min(12, (width * height) // 80))
+    )
+    labels_drawn = 0
     for place in order:
+        if labels_drawn >= label_limit:
+            break
         place_id = str(place.get("id", ""))
         name = _spoken(place.get("name") or place_id)[:13]
         cell = at[place_id]
         spot = _label_spot(cell, len(name), width, height, used)
         chosen = place_id == selected
         if spot is None:
-            surface.link(x + cell[0], y + cell[1], 1, 1,
-                         f"world:place:{place_id}")
             continue
         lx, ly = spot
         surface.text(x + lx, y + ly, name,
                      C["bone"] if chosen else
                      C["gold"] if place_id == seat else C["dim"], C["ink"])
-        for step in range(len(name)):
-            used.add((lx + step, ly))
-        left = min(lx, cell[0])
-        surface.link(x + left, y + min(ly, cell[1]),
-                     max(len(name) + 1, abs(cell[0] - lx) + 1),
-                     abs(cell[1] - ly) + 1, f"world:place:{place_id}")
+        # One blank cell between labels makes short port names read as
+        # separate annotations rather than a single long place name.
+        for step in range(-1, len(name) + 1):
+            if 0 <= lx + step < width:
+                used.add((lx + step, ly))
+        surface.link(x + lx, y + ly, len(name), 1,
+                     f"world:place:{place_id}")
+        labels_drawn += 1
     return at
 
 
@@ -251,12 +363,19 @@ def _label_spot(cell: tuple[int, int], length: int, width: int, height: int,
     the map has room for it.
     """
     cx, cy = cell
-    candidates = (
-        (cx + 2, cy), (cx - length - 1, cy),
-        (cx + 2, cy - 1), (cx + 2, cy + 1),
-        (cx - length - 1, cy - 1), (cx - length - 1, cy + 1),
-        (cx - length // 2, cy - 1), (cx - length // 2, cy + 1),
-    )
+    candidates = []
+    for distance in range(0, 4):
+        rows = (0,) if distance == 0 else (-distance, distance)
+        for dy in rows:
+            candidates.extend((
+                (cx + 2, cy + dy),
+                (cx - length - 1, cy + dy),
+            ))
+        if distance:
+            candidates.extend((
+                (cx - length // 2, cy - distance),
+                (cx - length // 2, cy + distance),
+            ))
     for lx, ly in candidates:
         if lx < 0 or ly < 0 or ly >= height or lx + length > width:
             continue
@@ -317,53 +436,19 @@ def _route_rows(surface: Surface, routes: list[dict], names: dict[str, str],
 
 
 def orders_for(b: dict, place: str) -> list[tuple[str, str, str, bool, str]]:
-    """What can be done about the selected place, and where it is done.
-
-    Every order that names a place anywhere in the registry appears here,
-    whichever window owns it, because the question "what can I do about Emar"
-    is asked while looking at Emar. The ones this window does not own say which
-    window does and open it; the ones that do not apply stay on the list,
-    greyed, with the reason -- a door that vanishes is a lie about the shape of
-    the game (spec 9.5).
-
-    Returns (key, label, note, enabled, command).
-    """
-    import registry
-
-    name = _name_of(b, place) or "there"
-    shut = place in _shut(b)
-    courts = _relations_by_place(b)
-    seat = str(b.get("seat", ""))
-
-    close = registry.BY_ID["quarantine"]
-    if not place or place == seat:
-        orders = [(close.mnemonic or "q", close.label,
-                   "your own seat", False, "")]
-    elif shut:
-        orders = [(close.mnemonic or "q", "Open",
-                   "the road is shut", True, f"do:quarantine:{place}")]
-    else:
-        orders = [(close.mnemonic or "q", close.label,
-                   "shut the road", True, f"do:quarantine:{place}")]
-
-    # Orders this window does not own. They are listed because the question
-    # "what can I do about Emar" is asked while looking at Emar, and they name
-    # the window that takes them rather than pretending to take them here.
-    elsewhere = (
-        ("t", "assign_troops", "muster", "in the Muster", True),
-        ("b", "begin_build", "works", "in the Works", True),
-        ("m", "marry_abroad", "relations", "in Relations", place in courts),
-    )
-    for key, action_id, room, where, applies in elsewhere:
-        descriptor = registry.BY_ID[action_id]
-        if not applies:
-            orders.append((key, descriptor.label, "no court there", False, ""))
-            continue
-        orders.append((key, descriptor.label, where,
-                       bool(place), f"world:open:{room}"))
-    orders.append(("p", "The sickness", "in Sickness", bool(place),
-                   "world:open:plague"))
-    return orders
+    """Communication leaves this map as writing, not immediate world mutation."""
+    recipient = court_at(b, place)
+    can_write = bool(recipient and place != str(b.get("seat", "")))
+    stem = f"world:letter:{recipient}:" if can_write else ""
+    return [
+        ("w", "Letter", "at the Scribe's Desk", can_write,
+         stem + "letter" if can_write else ""),
+        ("e", "Envoy", "not yet wired", False, ""),
+        ("g", "Gift", "by letter", can_write,
+         stem + "gift" if can_write else ""),
+        ("m", "Marriage", "by letter", can_write,
+         stem + "marriage_proposal" if can_write else ""),
+    ]
 
 
 def _name_of(b: dict, place: str) -> str:
@@ -404,8 +489,7 @@ def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
     _freshness, age = _age(entry)
     lines.append((f"{'charted' if certain else 'uncertain'} · {age}",
                   "dim" if certain else "ash"))
-    legs = [route for route in routes_of(b, place)
-            if place in {str(route.get("a", "")), str(route.get("b", ""))}]
+    legs = routes_from(b, place)
     open_legs = sum(1 for route in legs
                     if str(route.get("availability", "")).lower() != "closed")
     lines.append((f"{len(legs)} roads, {open_legs} open this season", "dim"))
@@ -414,9 +498,26 @@ def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
 
 # --- the window ---------------------------------------------------------------
 
+def _right_layout(b: dict, place: str, height: int,
+                  right_room: int) -> tuple[list[tuple[str, str]], int, int, int]:
+    """Description and row budgets shared by drawing and key handling."""
+    described = _describe(b, place, right_room)
+    orders_top = height - 2 - len(orders_for(b, place))
+    while len(described) > 2 and (orders_top - 7 - len(described)) // 2 < 1:
+        described.pop()
+    routes_top = 6 + len(described)
+    route_room = max(0, (orders_top - 1 - routes_top) // 2)
+    return described, orders_top, routes_top, route_room
+
+
+def route_page_size(b: dict, place: str, height: int) -> int:
+    """How many two-row route entries the current window can really show."""
+    return max(1, _right_layout(b, place, height, 40)[3])
+
+
 def compose(b: dict, width: int = 90, height: int = 30,
             route_scroll: int = 0, selected_place: str = "",
-            notice: str = "") -> InteractiveScreen:
+            notice: str = "", all_routes: bool = False) -> InteractiveScreen:
     """Compose the tablet: chart on the left, routes and orders on the right."""
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE KNOWN WORLD",
@@ -430,7 +531,7 @@ def compose(b: dict, width: int = 90, height: int = 30,
     if selected_place not in place_ids:
         selected_place = (seat_id if seat_id in place_ids
                           else place_ids[0] if place_ids else "")
-    routes = routes_of(b, selected_place)
+    routes = tablet_routes(b, selected_place, all_routes)
 
     split = max(30, min(width - 34, (width * 3) // 5))
     right = split + 2
@@ -469,14 +570,16 @@ def compose(b: dict, width: int = 90, height: int = 30,
             surface.link(2 + index, chart_bottom, 1, 1,
                          f"world:place:{place.get('id', '')}")
 
-    legend = "─ road  ╌ sea lane  · shut  ▣ seat  ◇ a court"
+    legend = "─ land  ~ sea  ≈ river  · shut"
     surface.text(2, chart_bottom + 1, legend[:max(0, chart_width)],
                  C["faint"], C["ink"])
     sea = ("the sea lanes are open" if b.get("sea_open") is True
            else "the sea is shut; seasonal lanes are closed"
            if b.get("sea_open") is False
            else "seasonal state is not recorded")
-    surface.text(2, chart_bottom + 2, f"~ {sea}"[:max(0, chart_width)],
+    surface.text(2, chart_bottom + 2,
+                 f"~ {sea} · ▣ seat  ◇ court  ○ place"
+                 [:max(0, chart_width)],
                  C["lapis"] if b.get("sea_open") is True else C["ash"],
                  C["ink"])
 
@@ -486,15 +589,11 @@ def compose(b: dict, width: int = 90, height: int = 30,
     # because it ran out of rows is the fault this whole layout exists to
     # avoid -- so a short window spends what is left on the description, then
     # on the routes, and drops the route list last of all.
-    described = _describe(b, selected_place, right_room)
     orders = orders_for(b, selected_place)
-    orders_top = height - 3 - len(orders) + 1
-    while len(described) > 2 and (orders_top - 7 - len(described)) // 2 < 1:
-        described.pop()
-    routes_top = 6 + len(described)
-    route_room = max(0, (orders_top - 1 - routes_top) // 2)
+    described, orders_top, routes_top, route_room = _right_layout(
+        b, selected_place, height, right_room)
 
-    surface.text(right, 4, "THIS PLACE"[:right_room], C["gold"], C["ink"])
+    surface.text(right, 4, "CHOSEN PLACE"[:right_room], C["gold"], C["ink"])
     for offset, (text, tone) in enumerate(described):
         if 5 + offset < orders_top - 1:
             surface.text(right, 5 + offset, text, C[tone], C["ink"])
@@ -504,9 +603,21 @@ def compose(b: dict, width: int = 90, height: int = 30,
         place.get("name") or place.get("id", "")) for place in places}
     if route_room:
         route_range = f"{route_start + 1}-{route_end}" if routes else "0"
-        surface.text(right, routes_top - 1,
-                     f"ROUTES  {route_range} OF {len(routes)}"[:right_room],
+        scope_label = "[a] here" if all_routes else "[a] all"
+        heading = (
+            f"ALL ROADS {route_range}/{len(routes)}"
+            if all_routes else
+            f"ROADS HERE {route_range}/{len(routes)}"
+        )
+        heading_room = max(0, right_room - len(scope_label) - 1)
+        surface.text(right, routes_top - 1, heading[:heading_room],
                      C["gold"], C["ink"])
+        if len(scope_label) <= right_room:
+            scope_x = right + right_room - len(scope_label)
+            surface.text(scope_x, routes_top - 1, scope_label,
+                         C["flame"], C["ink"])
+            surface.link(scope_x, routes_top - 1, len(scope_label), 1,
+                         "world:routes:scope")
         if routes:
             _route_rows(surface, routes, names, route_start, route_end,
                         selected_place, right, right_room, routes_top)
@@ -517,7 +628,7 @@ def compose(b: dict, width: int = 90, height: int = 30,
     else:
         route_start, route_end = 0, 0
 
-    surface.text(right, orders_top - 1, "ORDERS"[:right_room],
+    surface.text(right, orders_top - 1, "CORRESPONDENCE"[:right_room],
                  C["gold"], C["ink"])
     for offset, (key, label, note, enabled, command) in enumerate(orders):
         y = orders_top + offset
@@ -526,21 +637,30 @@ def compose(b: dict, width: int = 90, height: int = 30,
                      note[:max(0, right_room - written - 1)],
                      C["dim"] if enabled else C["ash"], C["ink"])
 
-    style.footer(surface, (
-        style.FooterAction("↑", "north", bool(places), "world:place:previous"),
-        style.FooterAction("↓", "south", bool(places), "world:place:next"),
-        style.FooterAction("ctrl-d", "more routes", route_end < len(routes),
-                           "world:routes:next"),
-        style.FooterAction("esc", "close"),
-    ), y=height - 2, x=2, width=width - 4)
+    actions = [
+        style.FooterAction("↑", "previous", bool(places),
+                           "world:place:previous"),
+        style.FooterAction("↓", "next", bool(places), "world:place:next"),
+    ]
+    if route_start:
+        actions.append(style.FooterAction(
+            "ctrl-u", "earlier", True, "world:routes:previous"))
+    if route_end < len(routes):
+        actions.append(style.FooterAction(
+            "ctrl-d", "more", True, "world:routes:next"))
+    actions.append(style.FooterAction("esc", "close"))
+    style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()
 
 
 def compose_with_frieze(b: dict, width: int = 90, height: int = 30,
                         route_scroll: int = 0,
-                        selected_place: str = "") -> InteractiveScreen:
+                        selected_place: str = "",
+                        all_routes: bool = False) -> InteractiveScreen:
     """The same tablet under a seal frieze, retaining every hit region."""
-    screen = compose(b, width, height, route_scroll, selected_place)
+    screen = compose(
+        b, width, height, route_scroll, selected_place,
+        all_routes=all_routes)
     surface = Surface(width, height)
     for y, row in enumerate(screen):
         for x, (glyph, fg, bg) in enumerate(row):

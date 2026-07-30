@@ -39,6 +39,9 @@ DOMAINS: frozenset[str] = frozenset({
     # M13.1 kernel (spec 10.10). Its own domain, so that adding a draw to the
     # kernel cannot perturb any of the single-city systems above.
     "kernel.hunger",
+    # M13.2: whether a crossing arrives. Keyed by the voyage, so that adding a
+    # second ship in a fortnight does not change what happened to the first.
+    "kernel.voyage",
 })
 
 

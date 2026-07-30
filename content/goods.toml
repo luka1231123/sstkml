@@ -25,6 +25,36 @@ per_display = 60
 spoilage_per_1000 = 4
 is_seed_capable = true
 
+# The three states grain passes through between the sowing and the granary
+# (spec 6.2, M13.2). All three are counted in qa of the grain they stand for, so
+# that the chain reads as one quantity changing form rather than four unrelated
+# stocks: what is sown becomes what is standing, what is standing becomes what
+# is cut, and what is cut becomes what is eaten. The losses at each step are
+# real and are recorded as sinks; they are not rounding.
+
+[standing_grain]
+unit = "qa"
+display_unit = "parisu"
+per_display = 60
+# A crop in the ground does not spoil at a rate. It is lost to want of tending
+# and to the weather, which engine/kernel/farm.py accounts for by name.
+
+[sheaves]
+unit = "qa"
+display_unit = "parisu"
+per_display = 60
+# Cut and stacked, still in the ear. Safer than standing and worse than
+# threshed: a stack takes the weather until someone has the hands to thresh it.
+spoilage_per_1000 = 12
+
+[fodder]
+unit = "qa"
+display_unit = "parisu"
+per_display = 60
+# The straw off the threshing floor. Not human food, which is the whole of its
+# interest: it feeds the oxen that plough and the donkeys that carry.
+spoilage_per_1000 = 8
+
 [copper]
 unit = "shekel"
 display_unit = "talent"

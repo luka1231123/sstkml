@@ -65,6 +65,7 @@ DEFAULT_HUE = (C["sand"], C["clay"], C["faint"], C["dim"])
 SLOT = art.BUILDING_WIDTH          # 13
 PITCH = SLOT + 2
 DRAWN = 6                          # how many will stand in the skyline
+COMPACT_HEIGHT = 33                # full Works précis first fits with four rows
 
 
 # What to write under a building. The kind, not the name: `walls` under the
@@ -217,7 +218,11 @@ def table_room(height: int) -> int:
     the screen drew. Two independent calculations of "which row is the third
     one" is exactly how a number key comes to open the wrong building.
     """
-    # ground 14, table 17, rows from 19, and the works band takes height - 9.
+    # A reduced window is a four-house street: all four drawn buildings also
+    # get a row and a number key. The full composition spends nine lines on the
+    # Works précis, and can therefore grow its table one row at a time.
+    if height < COMPACT_HEIGHT:
+        return max(1, min(4, height - 20))
     return max(1, min(9, (height - 9) - 20))
 
 
@@ -236,9 +241,10 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     projects = b.get("projects") or []
     under_work = frozenset(p["institution"] for p in projects if p["institution"])
 
-    ground = 14
-    sky(surface, b, width, horizon=ground - 6)
-    lower_town(surface, width, base=ground - 7)
+    compact = height < COMPACT_HEIGHT
+    ground = 12 if compact else 14
+    sky(surface, b, width, horizon=ground - 3 if compact else ground - 6)
+    lower_town(surface, width, base=ground - 4 if compact else ground - 7)
     standing = collection.page(
         len(institutions), table_room(height), scroll)
     shown = standing.slice(institutions)
@@ -251,16 +257,32 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         surface.text(3, ground, "▒" * (width - 6), C["ash"], C["ink"])
 
     table = ground + 3
-    style.bar(surface, 2, table, width - 4,
-              "  what stands             it              he has been saying"
-              "   now   kept by"
-              + (f"   {standing.label()}" if standing.partial else ""),
-              fg=C["bone"], bg=C["faint"])
+    if compact:
+        # At the window's reduced height the skyline is the primary report.
+        # Keep its full-size, weathered buildings, then give each one a terse
+        # ledger row. The Works précis is available through [n] and is omitted
+        # here so it cannot cover the labels or make the numbered houses false.
+        style.bar(surface, 2, table, width - 4, "",
+                  fg=C["bone"], bg=C["faint"])
+        surface.text(3, table, "what stands", C["bone"], C["faint"])
+        surface.text(22, table, "it does", C["bone"], C["faint"])
+        surface.text(37, table, "report", C["bone"], C["faint"])
+        surface.text(53, table, "kept by", C["bone"], C["faint"])
+        if standing.partial:
+            label = "↑↓ " + standing.label()
+            surface.text(max(3, width - 3 - len(label)), table - 1, label,
+                         C["ash"], C["ink"])
+    else:
+        style.bar(surface, 2, table, width - 4,
+                  "  what stands             it              he has been saying"
+                  "   now   kept by"
+                  + (f"   {standing.label()}" if standing.partial else ""),
+                  fg=C["bone"], bg=C["faint"])
 
     works_top = height - 9
-    y = table + 2
+    y = table + (1 if compact else 2)
     for number, _absolute, inst in standing.rows(institutions):
-        if y >= works_top - 1:
+        if not compact and y >= works_top - 1:
             break
         # Vacant posts are marked with a word, never with a colour alone.
         vacancy = "" if inst["head"] else "no one minds it"
@@ -268,43 +290,60 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         # skyline only has room for six; the table can show more, and every
         # row it shows must be openable by the key printed on it.
         surface.text(1, y, str(number), C["flame"], C["ink"])
-        surface.link(1, y, 24, 1, str(number))
-        surface.text(3, y, inst["name"][:22], C["clay"], C["ink"])
-        surface.text(27, y, DOES.get(inst["kind"], inst["kind"])[:16],
-                     C["dim"], C["ink"])
+        if compact:
+            surface.link(1, y, 20, 1, str(number))
+            surface.text(3, y, inst["name"][:18], C["clay"], C["ink"])
+            surface.text(22, y, DOES.get(inst["kind"], inst["kind"])[:13],
+                         C["dim"], C["ink"])
+        else:
+            surface.link(1, y, 24, 1, str(number))
+            surface.text(3, y, inst["name"][:22], C["clay"], C["ink"])
+            surface.text(27, y, DOES.get(inst["kind"], inst["kind"])[:16],
+                         C["dim"], C["ink"])
 
         series = history.get(inst["id"]) or inst.get("history") or [
             inst["condition"]]
-        surface.text(45, y, sparkline(series, 12), C["sand"], C["ink"])
-
-        figure = str(inst["condition"])
-        surface.text(64 - len(figure), y, figure,
-                     C["bone"] if inst["inspected"] else C["dim"], C["ink"])
-        surface.text(65, y, "!" if inst["inspected"] else " ",
-                     C["barley"], C["ink"])
-
         staff = vacancy or inst["group_name"] or "—"
-        surface.text(67, y, staff[: width - 70],
-                     C["blood"] if vacancy else C["dim"], C["ink"])
+        figure = str(inst["condition"])
+        if compact:
+            surface.text(37, y, sparkline(series, 8), C["sand"], C["ink"])
+            surface.text(50 - len(figure), y, figure,
+                         C["bone"] if inst["inspected"] else C["dim"], C["ink"])
+            surface.text(51, y, "!" if inst["inspected"] else " ",
+                         C["barley"], C["ink"])
+            surface.text(53, y, staff[:max(0, width - 56)],
+                         C["blood"] if vacancy else C["dim"], C["ink"])
+        else:
+            surface.text(45, y, sparkline(series, 12), C["sand"], C["ink"])
+            surface.text(64 - len(figure), y, figure,
+                         C["bone"] if inst["inspected"] else C["dim"], C["ink"])
+            surface.text(65, y, "!" if inst["inspected"] else " ",
+                         C["barley"], C["ink"])
+            surface.text(67, y, staff[: width - 70],
+                         C["blood"] if vacancy else C["dim"], C["ink"])
         y += 1
 
     # Work in hand, stated and not judged. Three lines at most: the rest is on
     # the WORKS screen, which is where anything can be done about it.
-    style.bar(surface, 2, works_top, width - 4,
-              "  the men are out on", fg=C["bone"], bg=C["faint"])
-    if not projects:
-        surface.text(3, works_top + 1, "nothing. the city is as you found it.",
-                     C["ash"], C["ink"])
-    for index, project in enumerate(projects[:3]):
-        row = works_top + 1 + index
-        surface.text(3, row, project["what"][:26], C["clay"], C["ink"])
-        surface.text(31, row, "making it whole" if project["repair"]
-                     else "putting it up", C["dim"], C["ink"])
-        share = project["days_done"] * 12 // max(1, project["days_needed"])
-        style.meter(surface, 48, row, 12, share, fg=C["barley"])
-        surface.text(62, row,
-                     f"{project['days_done']:,} of {project['days_needed']:,} days",
-                     C["dim"], C["ink"])
+    if not compact:
+        style.bar(surface, 2, works_top, width - 4,
+                  "  the men are out on", fg=C["bone"], bg=C["faint"])
+        if not projects:
+            surface.text(3, works_top + 1,
+                         "nothing. the city is as you found it.",
+                         C["ash"], C["ink"])
+        for index, project in enumerate(projects[:3]):
+            row = works_top + 1 + index
+            surface.text(3, row, project["what"][:26], C["clay"], C["ink"])
+            surface.text(31, row, "making it whole" if project["repair"]
+                         else "putting it up", C["dim"], C["ink"])
+            share = project["days_done"] * 12 // max(
+                1, project["days_needed"])
+            style.meter(surface, 48, row, 12, share, fg=C["barley"])
+            surface.text(
+                62, row,
+                f"{project['days_done']:,} of {project['days_needed']:,} days",
+                C["dim"], C["ink"])
 
     foot = height - 4
     _divider(surface, 3, foot, width - 6)
@@ -319,9 +358,16 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
              f"last took {revenue.get('last_harbour_due', 0)} "
              f"{revenue.get('harbour_good', 'oil')}.")[: width - 6],
             C["ash"], C["ink"])
-    style.bar(surface, 2, height - 2, width - 4,
-              " [1-9] go and look for yourself — one hour"
-              "   [n] the works   [esc] close",
+    if compact:
+        if shown:
+            footer = (f" [1-{len(shown)}] go and look — one hour"
+                      "   [n] the works   [esc] close")
+        else:
+            footer = " no houses stand here   [n] the works   [esc] close"
+    else:
+        footer = (" [1-9] go and look for yourself — one hour"
+                  "   [n] the works   [esc] close")
+    style.bar(surface, 2, height - 2, width - 4, footer,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()
 

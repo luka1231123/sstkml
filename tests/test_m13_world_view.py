@@ -121,7 +121,8 @@ def test_arbitrary_nodes_and_routes_appear_and_old_named_places_do_not() -> None
         "esteem": "warm",
         "unanswered": 7,
     }]
-    text = plain_text(worldmap.compose(belief, 100, 26))
+    text = plain_text(
+        worldmap.compose(belief, 100, 26, all_routes=True))
 
     assert "Ember Quay" in text
     assert "Glass Hill" in text
@@ -161,7 +162,8 @@ def test_the_route_tablet_scrolls_and_every_place_stays_clickable() -> None:
     belief = _belief(places, routes)
 
     first = worldmap.compose(belief, 92, 18)
-    last = worldmap.compose(belief, 92, 18, route_scroll=999)
+    last = worldmap.compose(
+        belief, 92, 18, route_scroll=999, all_routes=True)
 
     assert isinstance(first, InteractiveScreen)
     assert "Place 28 > Place 29" in plain_text(last)
@@ -171,7 +173,33 @@ def test_the_route_tablet_scrolls_and_every_place_stays_clickable() -> None:
     commands = {hit.command for hit in first.hits if hit.enabled}
     for place in places:
         assert f"world:place:{place['id']}" in commands, place["id"]
-    assert "world:routes:next" in commands
+    assert "world:routes:scope" in commands
+
+
+def test_the_route_tablet_opens_locally_and_keeps_the_whole_graph_one_key_away():
+    places = [
+        _place("home", "Home", lat=3500, lon=3500),
+        _place("near", "Near", lat=3600, lon=3600),
+        _place("far", "Far", lat=3700, lon=3700),
+        _place("beyond", "Beyond", lat=3800, lon=3800),
+    ]
+    belief = _belief(
+        places,
+        [_route("home", "near"), _route("near", "far"),
+         _route("far", "beyond")],
+    )
+
+    local = worldmap.compose(belief, 104, 30, selected_place="home")
+    complete = worldmap.compose(
+        belief, 104, 30, selected_place="home", all_routes=True)
+
+    assert "ROADS HERE" in plain_text(local)
+    assert "Home > Near" in plain_text(local)
+    assert "Far > Beyond" not in plain_text(local)
+    assert "ALL ROADS" in plain_text(complete)
+    assert "Far > Beyond" in plain_text(complete)
+    assert "world:routes:scope" in {
+        hit.command for hit in local.hits if hit.enabled}
 
 
 def test_the_chart_marks_and_names_places_where_the_tablet_locates_them() -> None:
@@ -198,6 +226,22 @@ def test_the_chart_marks_and_names_places_where_the_tablet_locates_them() -> Non
     assert "world:route:home:north" in commands
 
 
+def test_the_crowded_chart_keeps_place_marks_visually_separate() -> None:
+    places = [
+        _place(f"port-{index}", f"Port {index}",
+               lat=3500 + index, lon=3500 + index)
+        for index in range(8)
+    ]
+    at = chart.project(places, 32, 12, spacing=1)
+
+    for place, cell in at.items():
+        assert all(
+            max(abs(cell[0] - other[0]), abs(cell[1] - other[1])) > 1
+            for other_place, other in at.items()
+            if other_place != place
+        )
+
+
 def test_a_place_the_tablet_cannot_locate_is_named_rather_than_dropped() -> None:
     """A scenario that authors no coordinates loses no place."""
     places = [_place("home", "Home", lat=3500, lon=3500),
@@ -212,21 +256,42 @@ def test_a_place_the_tablet_cannot_locate_is_named_rather_than_dropped() -> None
         hit.command for hit in screen.hits if hit.enabled}
 
 
-def test_the_orders_beside_the_map_name_the_window_that_takes_them() -> None:
-    """Every order that names a place is offered here, working or not."""
+def test_world_communication_is_an_honest_inert_placeholder() -> None:
     places = [_place("home", "Home", lat=3500, lon=3500),
               _place("emar", "Emar", lat=3600, lon=3800)]
     belief = _belief(places, [_route("home", "emar")])
-    text = plain_text(worldmap.compose(belief, 104, 30, selected_place="emar"))
+    screen = worldmap.compose(belief, 104, 30, selected_place="emar")
+    text = plain_text(screen)
 
-    assert "ORDERS" in text
-    assert "Close" in text                  # the one this window takes itself
-    assert "in the Muster" in text          # and the ones it only lists
-    assert "in the Works" in text
-    assert "no court there" in text         # inapplicable, and says why
+    assert "CORRESPONDENCE" in text
+    assert "Letter" in text and "Envoy" in text and "Gift" in text
+    assert "Marriage" in text and "by letter" in text
+    assert "not yet wired" in text
+    assert not {
+        hit.command for hit in screen.hits
+        if hit.command.startswith(("do:", "world:open:"))
+    }
 
-    seat = plain_text(worldmap.compose(belief, 104, 30, selected_place="home"))
-    assert "your own seat" in seat          # the seat cannot be shut off
+
+def test_selection_does_not_rearrange_the_map_ink_or_labels() -> None:
+    places = [
+        _place("home", "Home", lat=3500, lon=3500),
+        _place("near", "Near", lat=3600, lon=3600),
+        _place("far", "Far", lat=3700, lon=3500),
+    ]
+    belief = _belief(
+        places, [_route("home", "near"), _route("near", "far", "river")])
+
+    def chart_text(selected: str) -> str:
+        surface = worldmap.Surface(40, 14)
+        at = worldmap._draw_chart(
+            surface, belief, 0, 0, 40, 14, selected)
+        rows = [list(row) for row in plain_text(surface.freeze()).splitlines()]
+        for x, y in at.values():
+            rows[y][x] = " "
+        return "\n".join("".join(row) for row in rows)
+
+    assert chart_text("home") == chart_text("far")
 
 
 def test_frieze_variant_keeps_the_graph_hit_regions() -> None:
@@ -293,20 +358,28 @@ def test_clicking_a_mark_or_a_road_selects_a_place() -> None:
     game.on_world_key(_Key(command="world:route:hattusa:carchemish"))
     assert game.world_place_pick == "hattusa"
 
+    # An onward leg chooses its farther endpoint rather than its authored
+    # first endpoint.
+    game.on_world_key(_Key(command="world:place:seat"))
+    game.on_world_key(_Key(command="world:route:ma_hadu:alashiya"))
+    assert game.world_place_pick == "alashiya"
 
-def test_the_closure_is_ordered_from_the_map_and_the_seat_refuses() -> None:
+
+def test_the_route_tablet_turns_between_local_and_complete_views() -> None:
+    game = _game()
+    assert not getattr(game, "world_all_routes", False)
+
+    game.on_world_key(_Key(char="a"))
+    assert game.world_all_routes
+
+    # Choosing a place returns to the useful local leaf.
+    game.on_world_key(_Key(command="world:place:hattusa"))
+    assert not game.world_all_routes
+
+
+def test_world_placeholders_do_not_issue_hidden_hotkey_orders() -> None:
     game = _game()
     game.on_world_key(_Key(command="world:place:ma_hadu"))
     game.on_world_key(_Key(char="q"))
-    assert [entry["action"]["_t"] for entry in game.log] == ["Quarantine"]
-    assert "ma_hadu" in project(game.world)["plague"]["quarantined"]
-
-    # And pressing it again lifts it rather than repeating it.
-    game.on_world_key(_Key(char="q"))
-    assert "ma_hadu" not in project(game.world)["plague"]["quarantined"]
-
-    # The seat is not a road, and says so instead of doing nothing.
-    game.on_world_key(_Key(command=f"world:place:{game.world.court.seat}"))
-    before = len(game.log)
-    game.on_world_key(_Key(char="q"))
-    assert len(game.log) == before
+    game.on_world_key(_Key(char="m"))
+    assert game.log == []

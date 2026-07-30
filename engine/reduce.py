@@ -37,6 +37,25 @@ def apply(world: World, action) -> tuple[World, list]:
         stores["grain"] = stores.get("grain", 0) + moved
         return replace_court(world, stores=stores), [A.SeedEaten(moved)]
 
+    if isinstance(action, A.RecordReplyText):
+        # A reading is kept against the case that produced the answer, because
+        # the case is what the archive explains the answer from. Silent where
+        # there is nothing to attach it to: a tablet that never arrived, or one
+        # already read, is not an error the player can do anything about.
+        text = action.text.strip()
+        if not text:
+            return world, []
+        cases = tuple(
+            dataclasses.replace(case, reply_text=text)
+            if (case.reply_letter_id == action.letter_id
+                and not case.reply_text)
+            else case
+            for case in world.correspondence
+        )
+        if cases == world.correspondence:
+            return world, []
+        return dataclasses.replace(world, correspondence=cases), []
+
     if isinstance(action, A.ReadLetter):
         letter = next(
             (item for item in world.inbox if item.id == action.letter_id),
@@ -305,6 +324,10 @@ def apply(world: World, action) -> tuple[World, list]:
         if isinstance(action, A.DismissPerson):
             return appointments.dismiss(world, action.post)
         return appointments.name_heir(world, action.person_id)
+
+    if isinstance(action, A.DispatchLetter):
+        from engine import mail
+        return mail.apply_dispatch(world, action)
 
     if isinstance(action, A.DictateReply):
         from engine import mail

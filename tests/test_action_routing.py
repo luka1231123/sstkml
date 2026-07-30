@@ -162,3 +162,15 @@ def test_the_hall_attributes_every_matter_it_draws() -> None:
     assert drawn, "the fixture must put something on the Hall"
     for concern in drawn:
         assert f"{concern.speaker}:"[:24] in text, concern.id
+
+
+def test_judgement_matters_route_to_the_court_door() -> None:
+    from tui import advice, hall
+
+    belief = project(_world())
+    judgement = next(
+        concern for concern in advice.concerns(belief, 9)
+        if concern.id == "justice")
+    assert judgement.destination == "palace"
+    assert any(target == judgement.destination
+               for _key, _label, target in hall.DOORS)

@@ -2,8 +2,9 @@
 
 The tutor knows the game, not the kingdom.  Its knowledge is the authored
 command corpus in ``content/help_commands.toml``; retrieval chooses the small
-part relevant to a question before an optional model phrases the answer.  With
-no model, the same retrieved records produce a complete deterministic answer.
+part relevant to a question. Help itself remains an exact software manual,
+while a named court speaker may use the required model to phrase those
+retrieved records without changing them.
 """
 from __future__ import annotations
 
@@ -281,7 +282,7 @@ def _retrieval_question(
 
 def speak(question: str, said: list[tuple[str, str]], belief: dict,
           seed: int, turn: int, client=None) -> tuple[str, str, tuple[Hit, ...]]:
-    """Retrieve, then answer through the optional model or exact fallback."""
+    """Retrieve exact help records, then phrase them through the court voice."""
     hits = retrieve(_retrieval_question(question, said))
     authored = fallback_answer(question, hits)
     if client is None:

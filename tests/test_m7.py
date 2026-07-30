@@ -13,8 +13,10 @@ from ai.composer import compose
 from ai.numeric_guard import guard
 from ai.parser import parse
 from belief.project import project
+from engine import actions as A
 from engine import report
 from engine.core import state_hash
+from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import replay, save
@@ -31,6 +33,13 @@ def _run(turns: int, seed: int = SEED, scenario: str = "ugarit"):
 
 def _letters_from(world, sender: str):
     return [L for L in world.inbox if L.sender == sender]
+
+
+def _read_all(world):
+    for letter in tuple(world.inbox):
+        if not letter.read:
+            world, _ = apply(world, A.ReadLetter(letter.id))
+    return world
 
 
 # --- the sender's lie (spec 6.8) ---------------------------------------------
@@ -89,6 +98,9 @@ def test_bias_directions_and_edges():
 
 def test_belief_shows_the_assertion_and_never_the_truth():
     world = _run(14)
+    sealed = project(world)
+    assert all(not item["facts"] for item in sealed["stack"])
+    world = _read_all(world)
     belief = project(world)
     letters = {L.id: L for L in world.inbox}
     for item in belief["stack"]:
@@ -150,7 +162,7 @@ def test_safe_fields_is_a_type_boundary_not_a_convention():
 
 def test_no_prompt_any_role_builds_ever_contains_a_forbidden_key():
     """Spec 8.9, stated as a test: the model must never see these."""
-    world = _run(14)
+    world = _read_all(_run(14))
     assert "liability" not in {
         field.name for field in dataclasses.fields(type(world.court))}
     belief = project(world)
@@ -199,7 +211,7 @@ def test_the_voicer_is_told_the_lie_and_never_the_truth():
     the collisions were routine -- the governor's asserted ships coming out at
     30 while his true garrison was also 30 is a coincidence, not a leak.
     """
-    world = _run(14)
+    world = _read_all(_run(14))
     letters = {L.id: L for L in world.inbox}
     lies = 0
     for item in project(world)["stack"]:
@@ -230,7 +242,7 @@ def test_every_correspondent_has_a_persona_and_it_shapes_the_prompt():
         assert card["who"] and card["tone"] and card["wants"] and card["address"]
         assert len(card["lines"]) == 2 and card["lines"][0] <= card["lines"][1]
 
-    world = _run(14)
+    world = _read_all(_run(14))
     belief = project(world)
     item = next(it for it in belief["stack"] if it["sender"] == "alashiya_gov")
     text = " ".join(m["content"] for m in V.build_prompt(item))
@@ -298,7 +310,7 @@ class FakeClient:
 
 
 def _item(world=None):
-    world = world or _run(14)
+    world = _read_all(world or _run(14))
     return next(it for it in project(world)["stack"]
                 if it["sender"] == "alashiya_gov")
 

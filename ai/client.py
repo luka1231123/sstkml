@@ -1,4 +1,11 @@
-"""Small, optional Ollama transport. Nothing here is required for command mode."""
+"""Required lightweight local-language transport.
+
+The simulation owns facts and consequences; the model is the court's language
+layer. The windowed product requires the supported local model at startup, then
+uses this transport for compact tablets, scribes, advisers, and interpretation.
+Fallback text remains crash recovery and a headless-test aid, not the reference
+player experience.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -10,12 +17,82 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-MODEL = "qwen3:4b"
+MODEL = "qwen3:4b-instruct"
+COMPATIBLE_MODELS = (MODEL, "qwen3:14b")
 OLLAMA = "http://127.0.0.1:11434/api/chat"
 
 
 class ModelUnavailable(RuntimeError):
     pass
+
+
+def _ollama_root(host: str | None = None) -> str:
+    endpoint = (host or os.environ.get("OLLAMA_HOST", OLLAMA)).rstrip("/")
+    return endpoint[:-len("/api/chat")] if endpoint.endswith("/api/chat") \
+        else endpoint
+
+
+def _installed_models(timeout_s: float = 1.0) -> set[str]:
+    request = urllib.request.Request(_ollama_root() + "/api/tags")
+    with urllib.request.urlopen(request, timeout=timeout_s) as response:
+        payload = json.loads(response.read())
+    return {
+        str(item.get("name") or item.get("model") or "")
+        for item in payload.get("models", [])
+        if isinstance(item, dict)
+    }
+
+
+def _select_model(names: set[str]) -> str:
+    configured = os.environ.get("STTKML_MODEL")
+    if configured:
+        return configured
+    return next((name for name in COMPATIBLE_MODELS if name in names), MODEL)
+
+
+def model_status(timeout_s: float = 1.0) -> tuple[bool, str]:
+    """Return whether Ollama and the configured required model are ready.
+
+    This is a startup/product check, not a generation request. It never pulls a
+    model implicitly: installation is visible, can be large, and belongs to the
+    user's machine rather than a hidden background download.
+    """
+    try:
+        names = _installed_models(timeout_s)
+    except (OSError, KeyError, ValueError, urllib.error.URLError) as exc:
+        return False, (
+            "the local language service is not available at "
+            f"{_ollama_root()}: {type(exc).__name__}"
+        )
+    model = _select_model(names)
+    if model not in names:
+        thinking_note = (
+            "; qwen3:4b is installed, but that tag is the thinking-only "
+            "variant and cannot satisfy the court's short-output contract"
+            if "qwen3:4b" in names else ""
+        )
+        return False, (
+            f"the required lightweight model {model!r} is not installed"
+            f"{thinking_note}"
+        )
+    if model != MODEL and not os.environ.get("STTKML_MODEL"):
+        return True, (
+            f"{model} is ready as a compatibility model; "
+            f"{MODEL} remains the preferred lightweight model"
+        )
+    return True, f"{model} is ready"
+
+
+def required_model_message(detail: str) -> str:
+    model = os.environ.get("STTKML_MODEL") or MODEL
+    return (
+        "the court requires its lightweight local language model.\n"
+        f"{detail}.\n\n"
+        "Start Ollama, then install the supported model:\n"
+        f"  ollama pull {model}\n\n"
+        "The engine keeps facts and outcomes authoritative; the model supplies "
+        "the scribes, tablets, advisers, and interpretations."
+    )
 
 
 # --- the prompt boundary (spec 8.9) ------------------------------------------
@@ -74,10 +151,17 @@ def safe_fields(fields) -> dict[str, str | int]:
 
 class OllamaClient:
     def __init__(self, ai_log: list[dict] | None = None,
-                 cache_dir: str | Path | None = None):
+                 cache_dir: str | Path | None = None, model: str | None = None):
         self.ai_log = ai_log if ai_log is not None else []
         self.cache: dict[str, str] = {}
         self.cache_dir = Path(cache_dir) if cache_dir else None
+        if model is not None:
+            self.model = model
+        else:
+            try:
+                self.model = _select_model(_installed_models(0.5))
+            except (OSError, KeyError, ValueError, urllib.error.URLError):
+                self.model = os.environ.get("STTKML_MODEL") or MODEL
         # The Voicer generates letter bodies on a background thread (spec 8.7),
         # so cache and log are touched from two threads. Neither feeds replay --
         # a save replays from the action log alone -- but they must not tear.
@@ -85,7 +169,7 @@ class OllamaClient:
 
     def call(self, role: str, messages: list[dict], schema: dict | None,
              seed: int, max_tokens: int, timeout_s: float, turn: int = 0) -> str:
-        model = os.environ.get("STTKML_MODEL", MODEL)
+        model = self.model
         prompt = json.dumps(messages, sort_keys=True, separators=(",", ":"))
         key = hashlib.sha256(f"{role}|{model}|{prompt}|{seed}".encode()).hexdigest()
         path = self.cache_dir / f"{key}.txt" if self.cache_dir else None

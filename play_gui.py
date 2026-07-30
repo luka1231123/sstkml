@@ -36,7 +36,8 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import load_session, new_seed, save as save_session
-from ai import counsel as ai_counsel, help_agent, librarian, parser as ai_parser
+from ai import (composer as ai_composer, counsel as ai_counsel, help_agent,
+                librarian, parser as ai_parser, voicer as ai_voicer)
 from tui import advice, collection, palace
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -66,18 +67,16 @@ DUMP = Path(__file__).parent / "saves" / "screens.txt"
 # here: they belong to `tui.desktop`, which states one default and one minimum
 # per window and is the only place either number appears (UI/UX spec 6).
 TABLETS: dict[str, tuple[str, str, object]] = {
-    "s": ("stack", "The Inbox", inbox_page.compose),
+    "s": ("stack", "The Scribes' Room", inbox_page.compose),
 }
 
 # The five ledgers. They were tablets -- read and closed, with every order they
 # described given through Counsel -- and are now workbenches with their own key
 # handler, like the City (UI/UX spec 15, phase 4).
 LEDGERS: dict[str, tuple[str, str, str]] = {
-    "t": ("stores", "The Stores", "on_stores_key"),
-    "r": ("roll", "The Roll", "on_roll_key"),
-    "m": ("muster", "The Muster", "on_muster_key"),
+    "t": ("stores", "The Storehouse", "on_storehouse_key"),
+    "m": ("muster", "The Corvée — Levy and Spear", "on_muster_key"),
     "o": ("oaths", "The Oaths", "on_oaths_key"),
-    "l": ("land", "The Land", "on_land_key"),
 }
 
 # The windows that hold a conversation: they own their own keys, because most
@@ -87,7 +86,6 @@ ROOMS: dict[str, tuple[str, str, str]] = {
     "w": ("world", "The Known World", "on_world_key"),
     "c": ("counsel", "Counsel", "on_counsel_key"),
     "v": ("altar", "The Altar", "on_altar_key"),
-    "a": ("archive", "The Tablet House", "on_archive_key"),
     "y": ("city", "The City", "on_city_key"),
     "j": ("palace", "The Palace", "on_palace_key"),
     "p": ("plague", "Sickness and Closures", "on_plague_key"),
@@ -97,12 +95,13 @@ ROOMS: dict[str, tuple[str, str, str]] = {
 
 # The hall advertises every door and marks the ones that are not built (D33:
 # never strand the player). The two lists must not drift, so the controller
-# reads the hall's rather than keeping a second one. The desk is reached from a
-# letter rather than from a key of its own, so it is listed by hand.
+# reads the hall's rather than keeping a second one. Writing and archive search
+# are stations inside the Scribes' Room; labour and land are stations inside
+# the Storehouse, so none of those are top-level windows.
 assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
     {window_key for window_key, _t, _how in TABLETS.values()}
     | {window_key for window_key, _t, _h in LEDGERS.values()}
-    | {window_key for window_key, _t, _h in ROOMS.values()} | {"desk"})
+    | {window_key for window_key, _t, _h in ROOMS.values()})
 
 
 # Windows that manage the game rather than the kingdom. An order given while
@@ -170,17 +169,13 @@ class Game:
         self.settings_path = Path(__file__).parent / "saves" / "settings.json"
         self.prefs = desktop.Preferences.load(self.settings_path)
         self.app = App(self.prefs)
-        # Yabninu speaks through a model when one is running (D38). Built once
-        # and shared; if there is no Ollama the calls fall back to authored
-        # lines and nothing on screen says which the player got.
-        self.client = None
-        if os.environ.get("STK_NO_AI") != "1":
-            try:
-                from ai.client import OllamaClient
-                self.client = OllamaClient(
-                    None, f"saves/{scenario}/ai_cache")
-            except Exception:
-                self.client = None
+        # Language is part of the shipped court, not an optional embellishment.
+        # `main()` verifies the small local model before constructing the game;
+        # constructing Game directly remains useful to the Tk probe and
+        # headless controller tests, and still creates the same shared client.
+        from ai.client import OllamaClient
+        self.client = OllamaClient(None, f"saves/{scenario}/ai_cache")
+        self.voicer = ai_voicer.Voicer(self.client, seed)
         self._model_results: queue.SimpleQueue = queue.SimpleQueue()
         self._model_jobs = 0
         self.open_letters: dict[str, dict] = {}
@@ -189,10 +184,13 @@ class Game:
         # is session state: none of it is a fact about the kingdom, so none of
         # it is logged and a replay is unaffected.
         self.desk: dict | None = None
+        self.desk_drafts: dict[str, dict] = {}
         self.works_pick = ""          # a work in hand, awaiting [x]
         self.inbox_pick = ""
-        self.inbox_filter = "unread"
+        self.inbox_filter = "all"
         self.inbox_scroll = 0
+        self.inbox_body_scroll = 0
+        self.inbox_pane = "rack"
         self.inbox_notice = ""
         delegate_people = [
             person for person in project(self.world).get(
@@ -213,6 +211,7 @@ class Game:
         self.city_notice = ""
         self.world_place_pick = self.world.court.seat
         self.world_route_scroll = 0
+        self.world_all_routes = False
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
         self.counsel_typing = False
@@ -235,12 +234,17 @@ class Game:
         self.archive_query = ""
         self.archive_hits: list[dict] = []
         self.archive_summary = ""
+        self.archive_summary_source = ""
+        self.archive_generation = 0
         self.archive_typing = False
+        self.archive_open_ref = ""
         self.archive_documents: dict[str, dict] = {}
         self.archive_document_scroll: dict[str, int] = {}
         # The pile's display order, held steady across the fortnight so the
         # numbers do not move under the player's finger (see document.order_of).
         self.stack_order: list[str] = document.order_of(project(self.world))
+        self.voicer.schedule(project(self.world)["stack"],
+                             self.world.date.absolute)
 
         self.switcher_pick = ""
         self.switcher_notice = ""
@@ -265,7 +269,7 @@ class Game:
     # --- state ---------------------------------------------------------------
 
     def _run_model(self, work, done) -> None:
-        """Run optional model work away from Tk and return on its event loop."""
+        """Run the court's language work away from Tk and return on its loop."""
         self._model_jobs += 1
         if self._model_jobs == 1:
             self.app.root().after(20, self._poll_model_results)
@@ -295,6 +299,76 @@ class Game:
     @property
     def belief(self) -> dict:
         return project(self.world)
+
+    def _language_belief(self, belief: dict) -> dict:
+        """Attach cached model voices without changing projected facts."""
+        voicer = self.__dict__.get("voicer")
+        if voicer is None:
+            return belief
+        stack = []
+        for item in belief.get("stack", []):
+            body, source = voicer.body(item)
+            # A foreign court's answer is kept the first time it is read out.
+            # Everything else the scribes voice can be voiced again; an answer
+            # cannot, because replay may not ask a model for it (spec 2.6, 5.3),
+            # and the words are recorded through the log like any other change.
+            if source == "model" and str(item.get("topic", "")).startswith(
+                    "reply_"):
+                self._record_reply_text(item["id"], body)
+            voiced = dict(item)
+            voiced["body"] = body
+            voiced["body_source"] = source
+            stack.append(voiced)
+        enriched = dict(belief)
+        enriched["stack"] = stack
+        return enriched
+
+    def _record_reply_text(self, letter_id: str, text: str) -> None:
+        """Keep an accepted reading of an answer, through the action log.
+
+        Costs no attention and raises nothing: it is a record of what was read,
+        not an order, and a projection pass is the wrong place to refuse the
+        player anything. A second reading of the same tablet is discarded by the
+        reducer, so this is safe to call on every redraw.
+        """
+        action = A.RecordReplyText(letter_id, text)
+        try:
+            world, _ = apply(self.world, action)
+        except (ValueError, TypeError, KeyError):
+            return
+        if world is self.world:
+            return
+        self.world = world
+        self.log.append({"turn": self.world.date.absolute,
+                         "action": A.to_dict(action)})
+
+    @staticmethod
+    def _outbox_belief(belief: dict) -> dict:
+        """Put physical dispatch marks into the Outbox's compact glance lines."""
+        outbox = []
+        for item in belief.get("outbox", []):
+            shown = dict(item)
+            facts = dict(item.get("facts") or {})
+            terms = list(item.get("terms") or ())
+            path = list(item.get("path") or ())
+            if terms:
+                facts["terms"] = composer.terms_summary(terms)
+            if path:
+                facts["route"] = " > ".join(
+                    str(place).replace("_", " ") for place in path)
+            handling = " · ".join(
+                str(item.get(field) or "").replace("_", " ")
+                for field in ("scribe_id", "seal", "courier_id")
+                if item.get(field))
+            if handling:
+                facts["scribe seal courier"] = handling
+            shown["facts"] = facts
+            outbox.append(shown)
+        if not outbox:
+            return belief
+        enriched = dict(belief)
+        enriched["outbox"] = outbox
+        return enriched
 
     # --- outcomes -------------------------------------------------------------
 
@@ -486,13 +560,22 @@ class Game:
             self.hours = saved_hours
         self.events = []
         self.desk = None
+        self.desk_drafts.clear()
         self.counsel_pending = None
         self.open_letters.clear()
         self.archive_documents.clear()
         self.archive_document_scroll.clear()
         self.stack_order = document.order_of(self.belief)
+        if "voicer" in self.__dict__:
+            self.voicer = ai_voicer.Voicer(self.client, self.seed)
+            self.voicer.schedule(self.belief["stack"],
+                                 self.world.date.absolute)
         self.inbox_pick = ""
         self.inbox_scroll = 0
+        self.inbox_body_scroll = 0
+        self.inbox_pane = "rack"
+        self.inbox_filter = "all"
+        self.archive_open_ref = ""
         self.inbox_notice = ""
         self.city_notice = ""
         self.plague_notice = ""
@@ -527,6 +610,9 @@ class Game:
         self.city_notice = ""
         self.plague_notice = ""
         self.stack_order = document.order_of(self.belief, self.stack_order)
+        if "voicer" in self.__dict__:
+            self.voicer.schedule(self.belief["stack"],
+                                 self.world.date.absolute)
         self.open_letters.clear()
         for key in [k for k in self.app.windows if k.startswith("letter:")]:
             self.app.close(key)
@@ -559,7 +645,7 @@ class Game:
         return desktop.default_size(key)
 
     def compose(self, key: str) -> Screen | None:
-        b = self.belief
+        b = self._outbox_belief(self._language_belief(self.belief))
         width, height = self._size(key)
         # Every screen is handed the outcome of the last order given in it.
         # One lookup rather than a differently-named attribute per window.
@@ -568,10 +654,55 @@ class Game:
             return hall.compose(
                 b, width, height, hours_left=self.hours, notice=notice)
         if key == "stack":
+            if getattr(self, "desk", None) is not None:
+                item = self._desk_item()
+                if item is not None:
+                    path = tuple(self.desk.get("path") or ())
+                    return composer.compose(
+                        item, self.desk["draft"], self.desk["intent"],
+                        self.desk["dictating"], house=b.get("house"),
+                        width=width, height=height,
+                        composing=self.desk.get("composing", False),
+                        notice=notice,
+                        cursor_index=self.desk.get("cursor"),
+                        source_scroll=self.desk.get("source_scroll", 0),
+                        terms=tuple(self.desk.get("terms", ())),
+                        blocks=self.desk.get("blocks"),
+                        block_focus=self.desk.get("block_focus", "matter"),
+                        matter=self.desk.get("matter", ""),
+                        advisor_undo="advisor_origin" in self.desk,
+                        term_builder=self.desk.get("term_builder"),
+                        term_focus=self.desk.get("term_focus", "kind"),
+                        seal_data={
+                            "scribe": self.desk.get("scribe_id", "yabninu"),
+                            "courier": self.desk.get("courier_id", "iliya"),
+                            "route": " > ".join(path),
+                            "travel_time": worldmap.path_legs(b, path),
+                        })
+            if getattr(self, "inbox_filter", "all") == "records":
+                opened = next(
+                    (hit for hit in self.archive_hits
+                     if str(hit.get("ref", "")) == getattr(
+                         self, "archive_open_ref", "")),
+                    None)
+                if opened is not None:
+                    return archive.tablet(
+                        opened, b, width, height,
+                        scroll=self.archive_document_scroll.get(
+                            "embedded", 0),
+                        embedded=True)
+                return archive.compose(
+                    b, self.archive_query, self.archive_hits,
+                    self.archive_summary, self.archive_typing,
+                    width, height, notice=notice,
+                    scroll=self.scroll_of("archive_scroll"),
+                    embedded=True)
             return inbox_page.compose(
                 b, width, height, self.stack_order, self.inbox_pick,
                 self.inbox_filter, self.inbox_scroll, self.hours,
-                self.inbox_delegate_pick, notice=notice)
+                self.inbox_delegate_pick, notice=notice,
+                body_scroll=getattr(self, "inbox_body_scroll", 0),
+                focus=getattr(self, "inbox_pane", "rack"))
         if key == "switcher":
             return switcher.compose(
                 self.switcher_entries(), self.switcher_pick, width, height,
@@ -581,7 +712,8 @@ class Game:
         if key == "world":
             return worldmap.compose(
                 b, width, height, self.world_route_scroll,
-                self.world_place_pick, notice=notice)
+                self.world_place_pick, notice=notice,
+                all_routes=getattr(self, "world_all_routes", False))
         if key == "city":
             return city.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("city_scroll"))
@@ -642,16 +774,6 @@ class Game:
             item = self.archive_documents.get(key)
             return None if item is None else archive.tablet(
                 item, b, scroll=self.archive_document_scroll.get(key, 0))
-        if key == "desk" and self.desk is not None:
-            correspondence = (
-                list(b["stack"]) + list(b.get("correspondence_archive", [])))
-            item = next((i for i in correspondence
-                         if i["id"] == self.desk["letter_id"]), None)
-            if item is not None:
-                return composer.compose(
-                    item, self.desk["draft"], self.desk["intent"],
-                    self.desk["dictating"], house=b.get("house"),
-                    width=width, height=height)
         if key == "orders":
             state = self.orders_state
             return orders_page.compose(
@@ -659,7 +781,8 @@ class Game:
                 view=state["view"], selected=state["pick"],
                 scroll=state["scroll"], notice=notice,
                 width=width, height=height)
-        if key in {w for w, _t, _h in LEDGERS.values()}:
+        if key in ({w for w, _t, _h in LEDGERS.values()}
+                   | {"roll", "land"}):
             return self.compose_ledger(key, b, width, height, notice)
         for _, (window_key, _title, how) in TABLETS.items():
             if key == window_key:
@@ -667,7 +790,7 @@ class Game:
         if key.startswith("letter:"):
             item = self.open_letters.get(key)
             return None if item is None else document.tablet(
-                item, house=b.get("house"))
+                item, body=item.get("body"), house=b.get("house"))
         return None
 
     # --- the desktop ---------------------------------------------------------
@@ -756,21 +879,23 @@ class Game:
                 title=window.title.split(" — ")[0],
                 note=self._window_note(key),
                 closable=key != "hall",
-                dirty=(key == "desk" and self.desk is not None
+                dirty=(key == "stack" and self.desk is not None
                        and bool(self.desk.get("draft"))),
             ))
         return entries
 
     def _window_note(self, key: str) -> str:
         """One line saying what state a window is carrying."""
-        b = self.belief
+        b = self._language_belief(self.belief)
         if key == "hall":
             return f"{self.hours}h left"
         if key == "stack":
+            if self.desk is not None:
+                return "wet reply"
+            if self.inbox_filter == "records":
+                return "archive search"
             unread = sum(1 for item in b["stack"] if not item["read"])
             return f"{unread} unread" if unread else self.inbox_filter
-        if key == "desk" and self.desk is not None:
-            return "unsent reply"
         if key.startswith("letter:") or key.startswith("archive:"):
             return "tablet"
         if key == "city":
@@ -925,11 +1050,99 @@ class Game:
 
     # --- the desk ------------------------------------------------------------
 
-    def open_desk(self, letter_id: str) -> None:
-        """Answer a letter. The tablet is not committed until it is sealed."""
+    def _desk_correspondence(self) -> list[dict]:
         b = self.belief
-        correspondence = (
-            list(b["stack"]) + list(b.get("correspondence_archive", [])))
+        return list(b["stack"]) + list(b.get("correspondence_archive", []))
+
+    def _desk_item(self, desk: dict | None = None) -> dict:
+        """The pinned reply, or a court-and-route tablet for a new letter."""
+        state = self.desk if desk is None else desk
+        if state is None:
+            raise ValueError("there is no wet tablet on the Desk")
+        reply_to = str(state.get("reply_to") or state.get("letter_id") or "")
+        if reply_to and not reply_to.startswith("new:"):
+            found = next(
+                (item for item in self._desk_correspondence()
+                 if item["id"] == reply_to),
+                None)
+            if found is not None:
+                return found
+        recipient = str(state.get("recipient") or "")
+        relation = next(
+            (entry for entry in self.belief.get("relations", [])
+             if entry.get("other") == recipient),
+            {})
+        place = str(state.get("target_place") or relation.get("place") or "")
+        route = " > ".join(state.get("path") or ())
+        standing = str(relation.get("status_claim") or "standing unknown")
+        return {
+            "id": state.get("draft_key", f"new:{recipient}"),
+            "sender": recipient,
+            "topic": "new letter",
+            "facts": {
+                "standing": standing.replace("_", " "),
+                "route": route or "no known route",
+            },
+            "body": "",
+            "new_letter": True,
+            "place": place,
+        }
+
+    def _recipient_place(self, recipient: str) -> str:
+        relation = next(
+            (entry for entry in self.belief.get("relations", [])
+             if entry.get("other") == recipient),
+            {})
+        return str(relation.get("place") or "")
+
+    def _new_term_builder(self, target_place: str,
+                          kind: str = "gift") -> dict:
+        belief = self.belief
+        goods = [
+            str(item.get("id"))
+            for item in belief.get("gift_goods", [])
+            if item.get("id")
+        ]
+        if not goods:
+            goods = [
+                str(good) for good, amount in belief.get("stores", {}).items()
+                if type(amount) is int and amount > 0
+            ]
+        people = [
+            str(person["id"])
+            for person in belief.get("house", {}).get("members", [])
+            if person.get("alive")
+        ]
+        return {
+            "kind": (
+                kind if kind in composer.TERM_KINDS
+                else composer.TERM_KINDS[0]),
+            "good": goods[0] if goods else "grain",
+            "quantity": 60,
+            "person_id": people[0] if people else "",
+            "destination": target_place,
+            "due_turn": self.world.date.absolute + 2,
+        }
+
+    def _store_active_desk(self) -> None:
+        if self.desk is None:
+            return
+        saved = dict(self.desk)
+        saved["dictating"] = False
+        saved["composing"] = False
+        saved["history"] = []
+        saved["future"] = []
+        key = str(
+            saved.get("draft_key")
+            or saved.get("letter_id")
+            or f"new:{saved.get('recipient', '')}")
+        saved["draft_key"] = key
+        self.__dict__.setdefault("desk_drafts", {})[
+            key] = saved
+
+    def open_desk(self, letter_id: str) -> None:
+        """Answer an incoming tablet at the same Desk used for new letters."""
+        correspondence = self._desk_correspondence()
         item = next(
             (candidate for candidate in correspondence
              if candidate["id"] == letter_id),
@@ -939,121 +1152,611 @@ class Game:
                         registry.REFUSAL, window="stack")
             self.repaint()
             return
-        if self.hours < REPLY_COST:
-            self.notify(
-                f"Answering requires {REPLY_COST} hours; "
-                f"{self.hours} remain.",
-                registry.REFUSAL, window="stack")
+        self._open_letter_desk(
+            str(item["sender"]), reply_to=letter_id,
+            target_place=self._recipient_place(str(item["sender"])))
+
+    def open_new_letter(self, recipient: str, target_place: str = "",
+                        preset_kind: str = "") -> None:
+        """Begin or resume a wet tablet to a foreign court from World."""
+        if not recipient:
+            self.notify("No foreign court is known at that place.",
+                        registry.REFUSAL, window="world")
             self.repaint()
             return
+        self._open_letter_desk(
+            recipient, target_place=(
+                target_place or self._recipient_place(recipient)),
+            preset_kind=preset_kind)
+
+    def _open_letter_desk(self, recipient: str, reply_to: str = "",
+                          target_place: str = "",
+                          preset_kind: str = "") -> None:
+        """Open one persistent wet tablet without spending dispatch time yet."""
+        if self.hours < REPLY_COST:
+            self.notify(
+                f"Sealing a letter requires {REPLY_COST} hours; "
+                f"{self.hours} remain.",
+                registry.REFUSAL, window=(
+                    "stack" if reply_to else "world"))
+            self.repaint()
+            return
+        draft_key = reply_to or f"new:{recipient}"
+        active_desk = getattr(self, "desk", None)
+        if active_desk is not None and \
+                active_desk.get("draft_key") != draft_key:
+            self._store_active_desk()
         self.inbox_notice = ""
-        self.desk = {
-            "letter_id": letter_id,
-            "intent": composer.INTENTS[0],
-            "dictating": False,
-            "dictated": False,
-            "buffer": "",
-            "draft": composer.formulary(
-                item["sender"], composer.INTENTS[0], self.seed,
-                self.world.date.absolute),
-        }
+        saved = getattr(self, "desk_drafts", {}).get(draft_key)
+        route = worldmap.route_path(
+            self.belief, str(self.belief.get("seat", "")), target_place)
+        if saved is not None:
+            self.desk = dict(saved)
+            self.desk["history"] = list(saved.get("history", ()))
+            self.desk["future"] = list(saved.get("future", ()))
+            self.desk["dictating"] = False
+            self.desk["composing"] = False
+            self.desk["intent"] = "reply" if reply_to else "letter"
+            self.desk["draft_key"] = draft_key
+            self.desk["letter_id"] = reply_to
+            self.desk["reply_to"] = reply_to
+            self.desk["recipient"] = recipient
+            self.desk["target_place"] = target_place
+            self.desk["path"] = tuple(saved.get("path") or route)
+            self.desk["blocks"] = composer.normalize_blocks(
+                saved.get("blocks"), recipient)
+            self.desk["block_focus"] = saved.get("block_focus", "matter")
+            self.desk["matter"] = saved.get("matter", saved.get("buffer", ""))
+            self.desk["terms"] = tuple(saved.get("terms", ()))
+            self.desk["term_builder"] = dict(
+                saved.get("term_builder")
+                or self._new_term_builder(target_place, preset_kind))
+            self.desk["term_focus"] = saved.get("term_focus", "kind")
+            self.desk["scribe_id"] = saved.get("scribe_id", "yabninu")
+            self.desk["courier_id"] = saved.get("courier_id", "iliya")
+            self.desk["buffer"] = self.desk["matter"]
+            self.desk["cursor"] = min(
+                int(saved.get("cursor", len(self.desk["matter"]))),
+                len(self.desk["matter"]))
+            self._regrade()
+        else:
+            builder = self._new_term_builder(target_place, preset_kind)
+            self.desk = {
+                "draft_key": draft_key,
+                "letter_id": reply_to,
+                "reply_to": reply_to,
+                "recipient": recipient,
+                "target_place": target_place,
+                "intent": "reply" if reply_to else "letter",
+                "dictating": False,
+                "dictated": False,
+                "buffer": "",
+                "matter": "",
+                "cursor": 0,
+                "history": [],
+                "future": [],
+                "source_scroll": 0,
+                "terms": (),
+                "term_builder": builder,
+                "term_focus": "kind",
+                "blocks": composer.default_blocks(),
+                "block_focus": "matter",
+                "scribe_id": "yabninu",
+                "courier_id": "iliya",
+                "path": route,
+                "generation": 0,
+                "composing": False,
+                "draft": composer.assemble(
+                    recipient, composer.default_blocks(), ""),
+            }
+        app = getattr(self, "app", None)
+        if app is None:
+            self.repaint()
+            return
+        width, height = desktop.default_size("stack")
         window = self.app.window(
-            "desk", f"The Desk — to {render.actor_name(item['sender'])}",
-            84, 30,
-            on_key=self.on_desk_key,
-            on_close=lambda: self.app.close("desk"))
+            "stack", "The Scribes' Room", width, height,
+            on_key=self.on_inbox_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("stack"))
+        # A pre-overhaul saved geometry may still have left a Desk window
+        # registered. It no longer owns state or a workflow.
+        self.app.close("desk")
         self.repaint()
         window.focus()
 
+    def _request_desk_draft(self, item: dict) -> None:
+        """Ask Yabninu to correct only the king's one- or two-sentence matter."""
+        desk = self.desk
+        if desk is None:
+            return
+        matter = desk.get("matter", "").strip()
+        if not matter:
+            self.notify(
+                "Write the matter before asking Yabninu to correct it.",
+                registry.REFUSAL, window="stack")
+            self.repaint()
+            return
+        desk["generation"] = desk.get("generation", 0) + 1
+        generation = desk["generation"]
+        draft_key = str(
+            desk.get("draft_key") or desk.get("letter_id")
+            or f"new:{desk.get('recipient', '')}")
+        turn = self.world.date.absolute
+        desk["composing"] = True
+
+        def work():
+            return ai_composer.correct_matter(
+                item["sender"], matter, self.seed, turn, self.client)
+
+        def done(result, error) -> None:
+            current = self.desk
+            if (
+                current is None
+                or str(
+                    current.get("draft_key") or current.get("letter_id")
+                    or f"new:{current.get('recipient', '')}") != draft_key
+                or current.get("generation") != generation
+                or current["dictating"]
+            ):
+                return
+            current["composing"] = False
+            if error is not None or result is None:
+                self.notify(
+                    "Yabninu could not correct the matter; your words remain.",
+                    registry.REFUSAL, window="stack")
+            else:
+                corrected = getattr(result, "text", result)
+                source = getattr(result, "source", "model")
+                if corrected and source == "model":
+                    current["advisor_origin"] = current["matter"]
+                    current["matter"] = str(corrected).strip()
+                    current["buffer"] = current["matter"]
+                    current["cursor"] = len(current["matter"])
+                    current["dictated"] = True
+                    current["draft"] = composer.assemble(
+                        item["sender"], current.get("blocks"),
+                        current["matter"], source=source)
+                if source != "model":
+                    self.notify(
+                        "Yabninu was unavailable; your words were not changed.",
+                        registry.REFUSAL, window="stack")
+                else:
+                    self.notify(
+                        "Yabninu corrected the matter; meaning and numbers kept.",
+                        registry.SUCCESS, window="stack")
+            self.repaint()
+
+        self._run_model(work, done)
+
     def _regrade(self) -> None:
-        """Recompose the draft from whatever the desk is currently holding."""
-        b = self.belief
-        correspondence = (
-            list(b["stack"]) + list(b.get("correspondence_archive", [])))
-        item = next(i for i in correspondence
-                    if i["id"] == self.desk["letter_id"])
-        # Once the king has taken the stylus the tablet is his. Finishing
-        # dictation used to fall back to the formulary, which silently threw
-        # away everything he had just said.
-        if self.desk["dictating"] or self.desk["dictated"]:
-            self.desk["draft"] = composer.dictated(
-                self.desk["buffer"], item["sender"])
-        else:
-            self.desk["draft"] = composer.formulary(
-                item["sender"], self.desk["intent"], self.seed,
-                self.world.date.absolute)
+        """Press the selected blocks and exact matter into a graded tablet."""
+        if self.desk is None:
+            return
+        item = self._desk_item()
+        self.desk["generation"] = self.desk.get("generation", 0) + 1
+        self.desk["composing"] = False
+        if self.desk.get("dictating"):
+            self.desk["matter"] = self.desk.get("buffer", "")
+        self.desk["draft"] = composer.assemble(
+            item["sender"], self.desk.get("blocks"),
+            self.desk.get("matter", ""), source="player")
+
+    @staticmethod
+    def _move_desk_cursor(text: str, cursor: int, vertical: int) -> int:
+        """Move the stylus one written line while retaining its column."""
+        line_start = text.rfind("\n", 0, cursor) + 1
+        column = cursor - line_start
+        if vertical < 0:
+            if line_start == 0:
+                return cursor
+            previous_end = line_start - 1
+            previous_start = text.rfind("\n", 0, previous_end) + 1
+            return min(previous_start + column, previous_end)
+        line_end = text.find("\n", cursor)
+        if line_end < 0:
+            return cursor
+        next_start = line_end + 1
+        next_end = text.find("\n", next_start)
+        if next_end < 0:
+            next_end = len(text)
+        return min(next_start + column, next_end)
 
     def on_desk_key(self, event) -> None:
-        """The one window that takes typing, so it owns every key it sees.
-
-        Nothing here falls through to `on_key`: a king who types `q` into a
-        letter means the letter q, and a controller that quits instead has lost
-        the tablet he was writing.
-        """
+        """Operate the embedded clay workbench, including a real movable stylus."""
         desk = self.desk
         if desk is None:
             return
         command = getattr(event, "command", "")
-        if command.startswith("intent:") and not desk["dictating"]:
-            chosen = command.split(":", 1)[1]
-            if chosen in composer.INTENTS:
-                desk["intent"] = chosen
-                desk["dictated"] = False
+        char = (event.char or "").lower()
+        control = bool(getattr(event, "state", 0) & 4)
+
+        def item_for_desk() -> dict:
+            return self._desk_item(desk)
+
+        def move_block(by: int) -> None:
+            current = desk.get("block_focus", "matter")
+            if current not in composer.FOCI:
+                current = "matter"
+            desk["block_focus"] = composer.FOCI[
+                (composer.FOCI.index(current) + by) % len(composer.FOCI)]
+
+        def move_choice(by: int) -> None:
+            block = desk.get("block_focus", "matter")
+            if block == "terms":
+                move_term_value(by)
+                return
+            if block == "matter":
+                return
+            choices = composer.block_choices(item_for_desk()["sender"])[block]
+            selected = desk.setdefault("blocks", composer.default_blocks())
+            selected[block] = (
+                int(selected.get(block, 0)) + by) % len(choices)
+            self._regrade()
+
+        def term_option_ids(field: str) -> list[str]:
+            belief = self.belief
+            if field == "kind":
+                return list(composer.TERM_KINDS)
+            if field == "good":
+                goods = [
+                    str(item.get("id"))
+                    for item in belief.get("gift_goods", [])
+                    if item.get("id")
+                ]
+                return goods or [
+                    str(good)
+                    for good, amount in belief.get("stores", {}).items()
+                    if type(amount) is int and amount > 0
+                ]
+            if field == "person_id":
+                return [
+                    str(person["id"])
+                    for person in belief.get("house", {}).get("members", [])
+                    if person.get("alive")
+                ]
+            if field == "destination":
+                return [
+                    str(place.get("id"))
+                    for place in worldmap.places_in_order(belief)
+                    if place.get("id")
+                ]
+            return []
+
+        def move_term_field(by: int) -> None:
+            builder = desk.setdefault(
+                "term_builder",
+                self._new_term_builder(desk.get("target_place", "")))
+            fields = composer.term_fields(builder)
+            current = desk.get("term_focus", fields[0])
+            if current not in fields:
+                current = fields[0]
+            desk["term_focus"] = fields[
+                (fields.index(current) + by) % len(fields)]
+
+        def move_term_value(by: int) -> None:
+            builder = desk.setdefault(
+                "term_builder",
+                self._new_term_builder(desk.get("target_place", "")))
+            fields = composer.term_fields(builder)
+            field = desk.get("term_focus", fields[0])
+            if field not in fields:
+                field = fields[0]
+                desk["term_focus"] = field
+            if field == "quantity":
+                builder[field] = max(
+                    1, int(builder.get(field, 1)) + by * 10)
+                return
+            if field == "due_turn":
+                builder[field] = max(
+                    0, int(builder.get(field, 0)) + by)
+                return
+            options = term_option_ids(field)
+            if not options:
+                return
+            current = str(builder.get(field, ""))
+            index = options.index(current) if current in options else 0
+            builder[field] = options[(index + by) % len(options)]
+            if field == "kind":
+                valid = composer.term_fields(builder)
+                if desk.get("term_focus") not in valid:
+                    desk["term_focus"] = valid[0]
+
+        def add_term() -> None:
+            builder = desk.setdefault(
+                "term_builder",
+                self._new_term_builder(desk.get("target_place", "")))
+            kind = str(builder.get("kind") or composer.TERM_KINDS[0])
+            values = {
+                "kind": kind,
+                "due_turn": int(builder.get("due_turn", 0)),
+            }
+            if kind in {"gift", "request_good", "promise_good"}:
+                values.update(
+                    good=str(builder.get("good") or ""),
+                    quantity=int(builder.get("quantity", 0)))
+            elif kind == "service":
+                values.update(
+                    quantity=int(builder.get("quantity", 0)),
+                    destination=str(builder.get("destination") or ""))
+            else:
+                values = {
+                    "kind": kind,
+                    "person_id": str(builder.get("person_id") or ""),
+                }
+            try:
+                term = A.LetterTerm(**values)
+            except (TypeError, ValueError) as error:
+                self.notify(
+                    f"That term is incomplete: {error}.",
+                    registry.REFUSAL, window="stack")
+                return
+            desk["terms"] = tuple(desk.get("terms", ())) + (term,)
+            self.notify(
+                "The material term is impressed beneath the wording.",
+                registry.SUCCESS, window="stack")
+
+        def remove_term() -> None:
+            terms = tuple(desk.get("terms", ()))
+            if not terms:
+                self.notify("No material term is impressed.",
+                            registry.REFUSAL, window="stack")
+                return
+            desk["terms"] = terms[:-1]
+            self.notify("The last material term is smoothed away.",
+                        registry.SUCCESS, window="stack")
+
+        if desk["dictating"]:
+            if event.keysym == "Escape":
+                desk["buffer"] = desk.pop("edit_origin_text")
+                desk["matter"] = desk["buffer"]
+                desk["dictated"] = desk.pop("edit_origin_dictated", False)
+                desk["cursor"] = min(
+                    len(desk["buffer"]), desk.get("cursor", 0))
+                desk["history"] = []
+                desk["future"] = []
+                desk["dictating"] = False
+                self._regrade()
+                self.repaint()
+                return
+            if control and event.keysym.lower() == "d":
+                desk["dictating"] = False
+                desk["dictated"] = True
+                desk.pop("edit_origin_text", None)
+                desk.pop("edit_origin_dictated", None)
+                desk["matter"] = desk["buffer"].strip()
+                desk["buffer"] = desk["matter"]
+                desk["cursor"] = min(desk["cursor"], len(desk["buffer"]))
+                self._regrade()
+                self.repaint()
+                return
+            if control and event.keysym.lower() in {"z", "y"}:
+                source = desk["history"] if event.keysym.lower() == "z" \
+                    else desk["future"]
+                target = desk["future"] if event.keysym.lower() == "z" \
+                    else desk["history"]
+                if source:
+                    target.append(desk["buffer"])
+                    desk["buffer"] = source.pop()
+                    desk["cursor"] = min(
+                        desk.get("cursor", 0), len(desk["buffer"]))
+                    self._regrade()
+                    self.repaint()
+                return
+            if event.keysym in {"Left", "Right", "Up", "Down",
+                                "Home", "End"}:
+                cursor = desk.get("cursor", len(desk["buffer"]))
+                if event.keysym == "Left":
+                    cursor = max(0, cursor - 1)
+                elif event.keysym == "Right":
+                    cursor = min(len(desk["buffer"]), cursor + 1)
+                elif event.keysym == "Up":
+                    cursor = self._move_desk_cursor(
+                        desk["buffer"], cursor, -1)
+                elif event.keysym == "Down":
+                    cursor = self._move_desk_cursor(
+                        desk["buffer"], cursor, 1)
+                elif event.keysym == "Home":
+                    cursor = desk["buffer"].rfind("\n", 0, cursor) + 1
+                else:
+                    end = desk["buffer"].find("\n", cursor)
+                    cursor = len(desk["buffer"]) if end < 0 else end
+                desk["cursor"] = cursor
+                self.repaint()
+                return
+
+            before = desk["buffer"]
+            cursor = desk.get("cursor", len(before))
+            changed = True
+            if event.keysym == "BackSpace":
+                if cursor:
+                    desk["buffer"] = before[:cursor - 1] + before[cursor:]
+                    desk["cursor"] = cursor - 1
+                else:
+                    changed = False
+            elif event.keysym == "Delete":
+                if cursor < len(before):
+                    desk["buffer"] = before[:cursor] + before[cursor + 1:]
+                else:
+                    changed = False
+            elif event.keysym == "Return":
+                desk["buffer"] = before[:cursor] + "\n" + before[cursor:]
+                desk["cursor"] = cursor + 1
+            elif event.char and event.char.isprintable():
+                desk["buffer"] = before[:cursor] + event.char + before[cursor:]
+                desk["cursor"] = cursor + len(event.char)
+            else:
+                return
+            if changed:
+                desk["history"].append(before)
+                desk["history"] = desk["history"][-100:]
+                desk["future"] = []
+                desk["dictated"] = True
+                desk.pop("advisor_origin", None)
                 self._regrade()
                 self.repaint()
             return
-        if event.keysym == "Escape":
-            self.desk = None
-            self.app.close("desk")
+
+        if command.startswith("block:"):
+            chosen = command.split(":", 1)[1]
+            if chosen in composer.FOCI:
+                desk["block_focus"] = chosen
+                self.repaint()
             return
-        if desk["dictating"]:
-            if event.keysym in ("BackSpace", "Delete"):
-                desk["buffer"] = desk["buffer"][:-1]
-            elif event.keysym == "Return":
-                desk["buffer"] += "\n"
-            elif event.state & 4 and event.keysym in ("d", "D"):
-                desk["dictating"] = False       # ctrl-d: done dictating
-                desk["dictated"] = True
-            elif event.char and event.char.isprintable():
-                desk["buffer"] += event.char
-            else:
-                return
+        if command.startswith("desk:term:focus:"):
+            field = command.rsplit(":", 1)[1]
+            if field in composer.term_fields(desk.get("term_builder")):
+                desk["term_focus"] = field
+                desk["block_focus"] = "terms"
+            self.repaint()
+            return
+        if command == "desk:term:field:next" or (
+                char == "t" and desk.get("block_focus") == "terms"):
+            move_term_field(1)
+            self.repaint()
+            return
+        if command == "desk:term:value:previous":
+            move_term_value(-1)
+            self.repaint()
+            return
+        if command == "desk:term:value:next":
+            move_term_value(1)
+            self.repaint()
+            return
+        if command == "desk:term:add" or (
+                char == "+" and desk.get("block_focus") == "terms"):
+            add_term()
+            self.repaint()
+            return
+        if command == "desk:term:remove" or (
+                char == "-" and desk.get("block_focus") == "terms"):
+            remove_term()
+            self.repaint()
+            return
+        if command == "desk:block:previous" or event.keysym == "Up":
+            move_block(-1)
+            self.repaint()
+            return
+        if command == "desk:block:next" or event.keysym in {"Down", "Tab"}:
+            move_block(1)
+            self.repaint()
+            return
+        if command == "desk:choice:previous" or event.keysym == "Left":
+            move_choice(-1)
+            self.repaint()
+            return
+        if command == "desk:choice:next" or event.keysym == "Right":
+            move_choice(1)
+            self.repaint()
+            return
+        if event.keysym == "Escape":
+            self._store_active_desk()
+            self.desk = None
+            self.repaint()
+            return
+        if command == "desk:discard" or char == "x":
+            draft_key = str(
+                desk.get("draft_key") or desk.get("letter_id")
+                or f"new:{desk.get('recipient', '')}")
+            self.__dict__.setdefault("desk_drafts", {}).pop(
+                draft_key, None)
+            self.desk = None
+            self.repaint()
+            return
+        if command == "desk:undo-correction" or (
+                char == "u" and "advisor_origin" in desk):
+            desk["matter"] = desk.pop("advisor_origin")
+            desk["buffer"] = desk["matter"]
+            desk["cursor"] = len(desk["matter"])
             self._regrade()
             self.repaint()
             return
-
-        char = (event.char or "").lower()
-        if event.keysym == "Tab":
-            order = composer.INTENTS
-            desk["intent"] = order[
-                (order.index(desk["intent"]) + 1) % len(order)]
-            # Changing what you mean asks the scribe for a fresh draft, and
-            # that discards a dictation. It is the one destructive key here,
-            # which is why it is the one that is easy to reach and hard to hit
-            # by accident.
-            desk["dictated"] = False
-            self._regrade()
-        elif char == "d":
+        if command == "desk:correct" or char in {"y", "g"}:
+            self._request_desk_draft(item_for_desk())
+            self.repaint()
+            return
+        if command == "desk:edit" or char in {"e", "d"}:
+            desk["block_focus"] = "matter"
+            desk["edit_origin_text"] = desk.get("matter", "")
+            desk["edit_origin_dictated"] = desk["dictated"]
             desk["dictating"] = True
             desk["dictated"] = True
-            desk["buffer"] = desk["draft"].text
+            desk["buffer"] = desk.get("matter", "")
+            desk["cursor"] = len(desk["buffer"])
+            desk["history"] = []
+            desk["future"] = []
             self._regrade()
-        elif event.keysym == "Return":
-            draft = desk["draft"]
-            letter_id = desk["letter_id"]
-            sealed = self.do(A.DictateReply(
-                letter_id, desk["intent"], draft.text, draft.profile,
-                draft.score.total, draft.score.violations), REPLY_COST,
-                window="desk")
-            if sealed:
-                self.desk = None
-                self.app.close("desk")
+            self.repaint()
+            return
+        if command == "desk:dispatch" or char == "s" or \
+                event.keysym == "Return":
+            if not desk.get("matter", "").strip():
+                self.notify(
+                    "The matter is blank. Write one or two sentences first.",
+                    registry.REFUSAL, window="stack")
                 self.repaint()
-                self.hall_window.focus()
+                return
+            count = composer.sentence_count(desk["matter"])
+            if count > 2:
+                self.notify(
+                    f"The matter has {count} sentences. Keep two, or ask "
+                    "Yabninu to tighten it.",
+                    registry.REFUSAL, window="stack")
+                self.repaint()
+                return
+            if desk.get("composing", False):
+                self.notify(
+                    "Yabninu is still correcting the matter.",
+                    registry.REFUSAL, window="stack")
+                self.repaint()
+                return
+            draft = desk["draft"]
+            recipient = str(
+                desk.get("recipient") or item_for_desk().get("sender") or "")
+            seal = composer.seal_id(
+                recipient, desk.get("blocks"))
+            if not seal:
+                self.notify(
+                    "An unsealed tablet cannot be dispatched. Choose a seal.",
+                    registry.REFUSAL, window="stack")
+                self.repaint()
+                return
+            path = tuple(desk.get("path") or ())
+            if not path:
+                self.notify(
+                    "No courier route to that court is known.",
+                    registry.REFUSAL, window="stack")
+                self.repaint()
+                return
+            draft_key = str(
+                desk.get("draft_key") or desk.get("letter_id")
+                or f"new:{recipient}")
+            action = A.DispatchLetter(
+                recipient=recipient,
+                reply_to=str(desk.get("reply_to") or ""),
+                text=draft.text,
+                profile=draft.profile,
+                terms=tuple(desk.get("terms", ())),
+                scribe_id=str(desk.get("scribe_id") or "yabninu"),
+                seal=seal,
+                courier_id=str(desk.get("courier_id") or "iliya"),
+                path=path,
+            )
+            sealed = self.do(action, window="stack")
+            if sealed:
+                self.__dict__.setdefault("desk_drafts", {}).pop(
+                    draft_key, None)
+                self.desk = None
+                self.inbox_filter = "outbox"
+                self.inbox_pick = ""
+                self.inbox_body_scroll = 0
+                self.inbox_pane = "rack"
+                self.repaint()
+                app = getattr(self, "app", None)
+                window = (
+                    app.windows.get("stack") if app is not None else None)
+                if window is not None:
+                    window.focus()
             return
-        else:
-            return
-        self.repaint()
 
     # --- Help, counsel, the altar, and the tablet house ----------------------
 
@@ -1084,6 +1787,15 @@ class Game:
             state["muster"]["task"] = ledger_page.TASKS[0]
             state["muster"]["place"] = ""
         return state
+
+    @property
+    def storehouse_view(self) -> str:
+        return self.__dict__.get("_storehouse_view", "stores")
+
+    @storehouse_view.setter
+    def storehouse_view(self, view: str) -> None:
+        if view in {"stores", "roll", "land"}:
+            self.__dict__["_storehouse_view"] = view
 
     # --- the Orders workbench (UI/UX spec 13) ---------------------------------
 
@@ -1179,6 +1891,15 @@ class Game:
                         registry.REFUSAL, window="orders")
             self.repaint()
             return
+        if set(descriptor.contexts) & {"roll", "land"}:
+            self.storehouse_view = (
+                "land" if "land" in descriptor.contexts else "roll")
+            self.open_ledger("t")
+            return
+        if "archive" in descriptor.contexts:
+            self.inbox_filter = "records"
+            self.open_tablet("s")
+            return
         doors = ({window: char for char, (window, _t, _h) in LEDGERS.items()}
                  | {window: char for char, (window, _t, _h) in ROOMS.items()}
                  | {window: char for char, (window, _t, _h) in TABLETS.items()})
@@ -1216,20 +1937,38 @@ class Game:
 
     def compose_ledger(self, key: str, b: dict, width: int, height: int,
                        notice) -> Screen:
+        if key == "stores":
+            view = self.storehouse_view
+            state = self.ledger_state[view]
+            common = dict(
+                selected=state["pick"], width=width, height=height,
+                scroll=state["scroll"], notice=notice, hours=self.hours,
+                room=True)
+            if view == "roll":
+                return ledger_page.roll(
+                    b, amount=state["amount"],
+                    priority=tuple(state["priority"]), **common)
+            if view == "land":
+                return ledger_page.land(
+                    b, days=state["amount"],
+                    group=state.get("group", ""), **common)
+            return ledger_page.stores(
+                b, amount=state["amount"], **common)
         state = self.ledger_state[key]
         common = dict(selected=state["pick"], width=width, height=height,
                       scroll=state["scroll"], notice=notice, hours=self.hours)
-        if key == "stores":
-            return ledger_page.stores(b, amount=state["amount"], **common)
         if key == "roll":
-            return ledger_page.roll(b, amount=state["amount"],
-                                    priority=tuple(state["priority"]), **common)
+            return ledger_page.roll(
+                b, amount=state["amount"],
+                priority=tuple(state["priority"]), **common)
         if key == "land":
-            return ledger_page.land(b, days=state["amount"],
-                                    group=state.get("group", ""), **common)
+            return ledger_page.land(
+                b, days=state["amount"],
+                group=state.get("group", ""), **common)
         if key == "muster":
             return ledger_page.muster(b, task=state["task"],
-                                      place=state["place"], **common)
+                                      place=state["place"],
+                                      amount=state["amount"], **common)
         return ledger_page.oaths(b, amount=state["amount"], **common)
 
     def ledger_rows(self, key: str) -> list[str]:
@@ -1251,7 +1990,8 @@ class Game:
         self.repaint()
         window.focus()
 
-    def ledger_key(self, key: str, event, step: int) -> bool:
+    def ledger_key(self, key: str, event, step: int,
+                   window: str | None = None) -> bool:
         """The parts every ledger shares: close, choose, scroll, set an amount.
 
         Returns True when it handled the key, so each screen's own handler is
@@ -1259,14 +1999,14 @@ class Game:
         """
         state = self.ledger_state[key]
         if event.keysym == "Escape":
-            self.app.close(key)
+            self.app.close(window or key)
             return True
         command = getattr(event, "command", "")
         if command.startswith("pick:"):
             state["pick"] = command.split(":", 1)[1]
             self.repaint()
             return True
-        rows = self.ledger_rows(key)
+        rows = self.window_rows(window or key)
         if event.keysym in ("Up", "Down"):
             if rows:
                 here = rows.index(state["pick"]) if state["pick"] in rows else 0
@@ -1292,9 +2032,31 @@ class Game:
         state = self.ledger_state[key]
         state["scroll"] = max(0, min(state["scroll"] + by, max(0, total - 1)))
 
-    def on_stores_key(self, event) -> None:
+    def on_storehouse_key(self, event) -> None:
+        """Move among the connected goods, labour, and estate stations."""
+        command = getattr(event, "command", "")
+        char = (event.char or "").lower()
+        chosen = ""
+        if command.startswith("tab:"):
+            chosen = command.split(":", 1)[1]
+        elif char in {"1", "2", "3"}:
+            chosen = {"1": "stores", "2": "roll", "3": "land"}[char]
+        if chosen in {"stores", "roll", "land"}:
+            self.storehouse_view = chosen
+            self.clear_notice("stores")
+            self.repaint()
+            return
+        if self.storehouse_view == "roll":
+            self.on_roll_key(event, window="stores")
+        elif self.storehouse_view == "land":
+            self.on_land_key(event, window="stores")
+        else:
+            self.on_stores_key(event, window="stores")
+
+    def on_stores_key(self, event, window: str = "stores") -> None:
         state = self.ledger_state["stores"]
-        if self.ledger_key("stores", event, ledger_page.STEPS["stores"]):
+        if self.ledger_key(
+                "stores", event, ledger_page.STEPS["stores"], window):
             return
         char = (event.char or "").lower()
         command = getattr(event, "command", "")
@@ -1302,20 +2064,20 @@ class Game:
         ledger = ledger_page.LEDGER_OF.get(state["pick"], "")
         if (char == _key("inspect_ledger") or wanted == "inspect_ledger") \
                 and ledger:
-            self.do(A.InspectLedger(ledger), window="stores")
+            self.do(A.InspectLedger(ledger), window=window)
         elif char == _key("eat_seed") or wanted == "eat_seed":
             if state["pick"] != "seed_grain" or state["amount"] <= 0:
                 self.notify(
                     "choose the seed grain and an amount to open.",
-                    registry.REFUSAL, window="stores")
+                    registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            if self.do(A.EatSeed(state["amount"]), window="stores"):
+            if self.do(A.EatSeed(state["amount"]), window=window):
                 state["amount"] = 0
 
-    def on_roll_key(self, event) -> None:
+    def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
-        if self.ledger_key("roll", event, ledger_page.STEPS["roll"]):
+        if self.ledger_key("roll", event, ledger_page.STEPS["roll"], window):
             return
         char = (event.char or "").lower()
         command = getattr(event, "command", "")
@@ -1324,10 +2086,10 @@ class Game:
         if char == _key("allocate") or wanted == "allocate":
             if not pick or state["amount"] <= 0:
                 self.notify("choose a group and an amount.",
-                            registry.REFUSAL, window="roll")
+                            registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            self.do(A.Allocate(pick, state["amount"]), window="roll")
+            self.do(A.Allocate(pick, state["amount"]), window=window)
         elif char == _key("set_priority") or wanted == "set_priority":
             # Marking is free and reversible; the order is given by Enter, so
             # a priority list is composed before it costs anything.
@@ -1339,19 +2101,19 @@ class Game:
         elif event.keysym == "Return":
             if not state["priority"]:
                 self.notify("mark the groups to be paid first, then enter.",
-                            registry.REFUSAL, window="roll")
+                            registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            if self.do(A.SetPriority(tuple(state["priority"])), window="roll"):
+            if self.do(A.SetPriority(tuple(state["priority"])), window=window):
                 state["priority"] = []
         elif char == _key("send_to_harvest") or wanted == "send_to_harvest":
             if not pick:
                 return
-            self.do(A.SendToHarvest(pick, True), window="roll")
+            self.do(A.SendToHarvest(pick, True), window=window)
 
-    def on_land_key(self, event) -> None:
+    def on_land_key(self, event, window: str = "land") -> None:
         state = self.ledger_state["land"]
-        if self.ledger_key("land", event, ledger_page.STEPS["corvee"]):
+        if self.ledger_key("land", event, ledger_page.STEPS["corvee"], window):
             return
         char = event.char or ""
         command = getattr(event, "command", "")
@@ -1360,16 +2122,16 @@ class Game:
         rate = data.get("land_due_rate", 0)
         step = ledger_page.STEPS["land_due"]
         if char == "<":
-            self.do(A.SetLandDue(max(0, rate - step)), window="land")
+            self.do(A.SetLandDue(max(0, rate - step)), window=window)
         elif char == ">":
-            self.do(A.SetLandDue(min(1000, rate + step)), window="land")
+            self.do(A.SetLandDue(min(1000, rate + step)), window=window)
         elif char.lower() == _key("raise_corvee") or wanted == "raise_corvee":
             if state["amount"] <= 0:
                 self.notify("choose how many days to call up.",
-                            registry.REFUSAL, window="land")
+                            registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            if self.do(A.RaiseCorvee(state["amount"]), window="land"):
+            if self.do(A.RaiseCorvee(state["amount"]), window=window):
                 state["amount"] = 0
         elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
             estate = next(
@@ -1379,11 +2141,11 @@ class Game:
                     or state["amount"] <= 0:
                 self.notify(
                     "choose an estate with a canal, and days to spend on it.",
-                    registry.REFUSAL, window="land")
+                    registry.REFUSAL, window=window)
                 self.repaint()
                 return
             if self.do(A.DredgeCanal(estate["id"], state["amount"]),
-                       window="land"):
+                       window=window):
                 state["amount"] = 0
         elif char.lower() == "g":
             groups = [item["id"] for item in self.belief.get("groups", [])]
@@ -1395,20 +2157,21 @@ class Game:
         elif char.lower() == _key("send_to_harvest") or wanted == "send_to_harvest":
             if not state.get("group"):
                 self.notify("[g] chooses which hands go to the fields.",
-                            registry.REFUSAL, window="land")
+                            registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            self.do(A.SendToHarvest(state["group"], True), window="land")
+            self.do(A.SendToHarvest(state["group"], True), window=window)
         elif char.lower() == _key("inspect_ledger") or wanted == "inspect_ledger":
-            self.do(A.InspectLedger("seed"), window="land")
+            self.do(A.InspectLedger("seed"), window=window)
         elif char.lower() == _key("set_land_due") or wanted == "set_land_due":
             self.notify(f"[<] and [>] move the land due, now {rate}/1000.",
-                        registry.PREVIEW, window="land")
+                        registry.PREVIEW, window=window)
             self.repaint()
 
     def on_muster_key(self, event) -> None:
         state = self.ledger_state["muster"]
-        if self.ledger_key("muster", event, 0):
+        if self.ledger_key(
+                "muster", event, ledger_page.STEPS["corvee"]):
             return
         char = (event.char or "").lower()
         command = getattr(event, "command", "")
@@ -1418,7 +2181,16 @@ class Game:
         formation = next(
             (f for f in formations if f["id"] == state["pick"]), None)
         places = [place["id"] for place in affordances.places(b)]
-        if char == "t":
+        if char == _key("raise_corvee") or wanted == "raise_corvee":
+            if state["amount"] <= 0:
+                self.notify(
+                    "choose how many person-days to call with [ and ].",
+                    registry.REFUSAL, window="muster")
+                self.repaint()
+                return
+            if self.do(A.RaiseCorvee(state["amount"]), window="muster"):
+                state["amount"] = 0
+        elif char == "t":
             tasks = ledger_page.TASKS
             state["task"] = tasks[
                 (tasks.index(state["task"]) + 1) % len(tasks)]
@@ -1944,10 +2716,14 @@ class Game:
             return
         belief = self.belief
         turn = self.world.date.absolute
-        immediate = ai_parser.preparse(text, belief)
-        if immediate is not None:
-            self._accept_counsel_result(immediate)
-            return
+        # A clientless controller exists only in headless tests and recovery.
+        # Normal free-form court language goes to the required local model
+        # first; exact direct controls use their own structured paths.
+        if self.client is None:
+            immediate = ai_parser.preparse(text, belief)
+            if immediate is not None:
+                self._accept_counsel_result(immediate)
+                return
 
         def work():
             return ai_parser.parse(
@@ -2134,12 +2910,13 @@ class Game:
         b = self.belief
         projects = b.get("projects") or []
         plans = b.get("plans") or []
-        _width, height = self._size("works")
+        width, height = self._size("works")
         out = collection.page(
             len(projects), works_page.project_room(height),
             self.scroll_of("works_scroll"))
-        plan_page = collection.page(
-            len(plans), len(works_page.ORDER),
+        plan_page = works_page.plan_page(
+            b, width, height,
+            self.scroll_of("works_scroll"),
             self.scroll_of("works_plan_scroll"))
 
         if event.keysym in self.STEPS:
@@ -2147,11 +2924,13 @@ class Game:
             # take the plans below them.
             step = self.STEPS[event.keysym]
             shifted = bool(getattr(event, "state", 0) & 1)
-            moved = (
-                self.scrolled("works_plan_scroll", len(plans),
-                              len(works_page.ORDER), step) if shifted
-                else self.scrolled("works_scroll", len(projects),
-                                   works_page.project_room(height), step))
+            if shifted:
+                moved = bool(plan_page.room) and self.scrolled(
+                    "works_plan_scroll", len(plans), plan_page.room, step)
+            else:
+                moved = self.scrolled(
+                    "works_scroll", len(projects),
+                    works_page.project_room(height), step)
             if moved:
                 self.repaint()
             return
@@ -2237,13 +3016,30 @@ class Game:
             self.repaint()
             window.focus()
 
-    def on_archive_key(self, event) -> None:
+    def on_archive_key(self, event, embedded: bool = False) -> None:
+        if embedded and self.archive_open_ref:
+            if event.keysym == "Escape":
+                self.archive_open_ref = ""
+                self.archive_document_scroll["embedded"] = 0
+                self.repaint()
+                return
+            if event.keysym in {"Up", "Down"}:
+                step = -1 if event.keysym == "Up" else 1
+                self.archive_document_scroll["embedded"] = max(
+                    0, self.archive_document_scroll.get("embedded", 0) + step)
+                self.repaint()
+            return
         if event.keysym == "Escape":
             if self.archive_typing:
                 self.archive_typing = False
                 self.repaint()
                 return
-            self.app.close("archive")
+            if embedded:
+                self.inbox_filter = "all"
+                self.archive_open_ref = ""
+                self.repaint()
+            else:
+                self.app.close("archive")
             return
         command = getattr(event, "command", "")
         if command.startswith("open:"):
@@ -2253,14 +3049,19 @@ class Game:
                  if str(hit.get("ref", "")) == ref),
                 None)
             if item is not None:
-                self.open_archive_document(item)
+                if embedded:
+                    self.archive_open_ref = ref
+                    self.archive_document_scroll["embedded"] = 0
+                    self.repaint()
+                else:
+                    self.open_archive_document(item)
             return
         if self.archive_typing:
             if event.keysym in ("BackSpace", "Delete"):
                 self.archive_query = self.archive_query[:-1]
             elif event.keysym == "Return":
                 self.archive_typing = False
-                self.search_archive()
+                self.search_archive(window="stack" if embedded else "archive")
                 return
             elif event.char and event.char.isprintable():
                 self.archive_query += event.char
@@ -2270,6 +3071,8 @@ class Game:
             return
         char = event.char or ""
         if event.keysym in self.STEPS:
+            if embedded and event.keysym not in {"Up", "Down"}:
+                return
             if self.scrolled("archive_scroll", len(self.archive_hits),
                              archive.RESULT_ROOM, self.STEPS[event.keysym]):
                 self.repaint()
@@ -2280,14 +3083,20 @@ class Game:
                 self.scroll_of("archive_scroll"))
             index = page.absolute(int(char))
             if index >= 0:
-                self.open_archive_document(self.archive_hits[index])
+                item = self.archive_hits[index]
+                if embedded:
+                    self.archive_open_ref = str(item.get("ref", ""))
+                    self.archive_document_scroll["embedded"] = 0
+                    self.repaint()
+                else:
+                    self.open_archive_document(item)
             return
         if char == "/":
             self.archive_typing = True
             self.archive_query = ""
             self.repaint()
         elif event.keysym == "Return":
-            self.search_archive()
+            self.search_archive(window="stack" if embedded else "archive")
 
     # --- the palace: court, house and relations in one room (spec 16) --------
 
@@ -2447,8 +3256,7 @@ class Game:
         elif char == registry.BY_ID["name_heir"].mnemonic \
                 or wanted == "name_heir":
             self.do(A.NameHeir(person["id"]), window="palace")
-        elif char == registry.BY_ID["marry_abroad"].mnemonic \
-                or wanted == "marry_abroad":
+        elif command == "letter-marriage" or char == "m":
             court = self.palace_pick("relations") or next(
                 (r["other"] for r in self.belief.get("relations", [])), "")
             if not court:
@@ -2456,7 +3264,14 @@ class Game:
                             registry.REFUSAL, window="palace")
                 self.repaint()
                 return
-            self.do(A.MarryAbroad(person["id"], court), window="palace")
+            relation = next(
+                (item for item in self.belief.get("relations", [])
+                 if item["other"] == court), None)
+            if relation is None:
+                return
+            self.open_new_letter(
+                court, relation["place"], "marriage_proposal")
+            self.desk["term_builder"]["person_id"] = person["id"]
 
     def palace_place(self, command: str, keysym: str, char: str) -> None:
         """The second half of appointing: a post for the man already chosen."""
@@ -2478,37 +3293,24 @@ class Game:
     def palace_relations(self, command: str, char: str) -> None:
         state = self.palace_state
         other = self.palace_pick("relations")
-        goods = [good["id"] for good in self.belief.get("gift_goods", [])]
-        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         revenue = self.belief.get("revenue", {})
-        if char in ("[", "]"):
-            state["amount"] = max(0, state["amount"] + (
-                palace.GIFT_STEP if char == "]" else -palace.GIFT_STEP))
-            self.repaint()
-            return
-        if char.lower() == "g" and goods:
-            here = goods.index(state["good"]) if state["good"] in goods else -1
-            state["good"] = goods[(here + 1) % len(goods)]
-            self.repaint()
-            return
         if char in ("<", ">") or command == "due":
             rate = revenue.get("harbour_rate", 100)
             step = palace.DUE_STEP if char != "<" else -palace.DUE_STEP
             self.do(A.SetHarbourDue(max(0, min(1000, rate + step))),
                     window="palace")
             return
-        if char.lower() == registry.BY_ID["send_gift"].mnemonic \
-                or wanted == "send_gift":
-            if not other or state["amount"] <= 0:
-                self.notify("choose a court and an amount.", registry.REFUSAL,
+        if command == "letter-gift" or char.lower() == "g":
+            relation = next(
+                (item for item in self.belief.get("relations", [])
+                 if item["other"] == other), None)
+            if relation is None:
+                self.notify("choose a court.", registry.REFUSAL,
                             window="palace")
                 self.repaint()
                 return
-            if self.do(A.SendGift(other, state["good"], state["amount"]),
-                       window="palace"):
-                state["amount"] = 0
-        elif char.lower() == registry.BY_ID["marry_abroad"].mnemonic \
-                or wanted == "marry_abroad":
+            self.open_new_letter(other, relation["place"], "gift")
+        elif command == "letter-marriage" or char.lower() == "m":
             person = self.palace_pick("house") or next(
                 (p["id"] for p in palace._people(self.belief)), "")
             if not person or not other:
@@ -2516,14 +3318,21 @@ class Game:
                             registry.REFUSAL, window="palace")
                 self.repaint()
                 return
-            self.do(A.MarryAbroad(person, other), window="palace")
+            relation = next(
+                (item for item in self.belief.get("relations", [])
+                 if item["other"] == other), None)
+            if relation is None:
+                return
+            self.open_new_letter(
+                other, relation["place"], "marriage_proposal")
+            self.desk["term_builder"]["person_id"] = person
 
     def on_world_key(self, event) -> None:
-        """Move about the chart, read the tablet, and shut a road.
+        """Move about the stable chart and read its place and route tablets.
 
-        The map and the tablet beside it are one selection, not two: clicking a
-        mark, clicking a line, and walking with the arrows all set the same
-        place, and the routes re-sort under it.
+        The map and the tablet beside it share one chosen place. Roads on the
+        chart are deliberately not hit targets; their written rows are, so
+        choosing a place never depends on which sparse line occupied a cell.
         """
         if event.keysym == "Escape":
             self.app.close("world")
@@ -2531,20 +3340,60 @@ class Game:
         command = getattr(event, "command", "")
         places = [str(place.get("id", ""))
                   for place in worldmap.places_in_order(self.belief)]
-        routes = worldmap.routes_of(self.belief, self.world_place_pick)
-        route_page = 6
+        all_routes = getattr(self, "world_all_routes", False)
+        routes = worldmap.tablet_routes(
+            self.belief, self.world_place_pick, all_routes)
+        route_page = worldmap.route_page_size(
+            self.belief, self.world_place_pick, self._size("world")[1])
         if self.world_place_pick not in places:
             self.world_place_pick = places[0] if places else ""
         here = places.index(self.world_place_pick) if places else 0
+        char = (event.char or "").lower()
 
+        if command.startswith("world:letter:"):
+            _world, _letter, recipient, preset = command.split(":", 3)
+            self.open_new_letter(
+                recipient, self.world_place_pick,
+                "" if preset == "letter" else preset)
+            return
+        if char in {"w", "g", "m"}:
+            recipient = worldmap.court_at(
+                self.belief, self.world_place_pick)
+            preset = {
+                "w": "", "g": "gift", "m": "marriage_proposal",
+            }[char]
+            self.open_new_letter(
+                recipient, self.world_place_pick, preset)
+            return
         if command.startswith("world:open:"):
             self.open_door_for(command.split(":", 2)[2])
             return
-        if command.startswith("world:route:"):
+        if command == "world:routes:scope" or (
+                char == "a"):
+            self.world_all_routes = not all_routes
+            self.world_route_scroll = 0
+        elif command.startswith("world:route:"):
             # Clicking a road selects the far end of it, which is what a
-            # player pointing at a line is asking about.
+            # player pointing at a line is asking about. A faint onward leg
+            # does not touch the current place, so choose the end beyond its
+            # directly connected neighbour rather than whichever endpoint
+            # happened to be authored first.
             _prefix, _kind, a, z = command.split(":", 3)
-            self.world_place_pick = z if a == self.world_place_pick else a
+            if a == self.world_place_pick:
+                self.world_place_pick = z
+            elif z == self.world_place_pick:
+                self.world_place_pick = a
+            else:
+                neighbours = {
+                    endpoint
+                    for route in worldmap.routes_from(
+                        self.belief, self.world_place_pick)
+                    for endpoint in (
+                        str(route.get("a", "")), str(route.get("b", "")))
+                }
+                self.world_place_pick = (
+                    z if a in neighbours and z not in neighbours
+                    else a)
         elif command.startswith("world:place:"):
             picked = command.split(":", 2)[2]
             if picked == "next" or picked == "previous":
@@ -2567,27 +3416,24 @@ class Game:
             self.world_route_scroll = min(
                 max(0, len(routes) - route_page),
                 self.world_route_scroll + route_page)
-        elif (event.char or "").lower() == "q" or command.startswith(
-                "do:quarantine:"):
-            place = self.world_place_pick
-            if not place or place == self.belief.get("seat"):
-                self.notify("The seat is not a road you can close.",
-                            registry.REFUSAL, window="world")
-                self.repaint()
-                return
-            closed = set(self.belief.get("plague", {}).get("quarantined", []))
-            self.do(A.Quarantine(place, lift=place in closed), window="world")
-            self.repaint()
-            return
         else:
             return
         if command.startswith(("world:place:", "world:route:")) or \
                 event.keysym in ("Up", "Down"):
             self.world_route_scroll = 0
+            self.world_all_routes = False
         self.repaint()
 
     def open_door_for(self, room: str) -> None:
         """Open the window that takes an order this one only lists."""
+        if room in {"roll", "land"}:
+            self.storehouse_view = room
+            self.open_ledger("t")
+            return
+        if room == "archive":
+            self.inbox_filter = "records"
+            self.open_tablet("s")
+            return
         for char, (key, _title, _handler) in {
                 **LEDGERS, **ROOMS, **TABLETS}.items():
             if key == room:
@@ -2644,41 +3490,135 @@ class Game:
                 window="plague")
             self.repaint()
 
-    def search_archive(self) -> None:
+    def search_archive(self, window: str = "archive") -> None:
         """One hour per query (spec 6.17), and the hour is the mechanic."""
         query = self.archive_query.strip().lower()
-        if not query or not self.do(A.SearchArchive(query), window="archive"):
+        if not query or not self.do(A.SearchArchive(query), window=window):
             self.repaint()
             return
         hits = self.belief.get("archive_index", {}).get("hits", {}).get(query, [])
         self.archive_hits = hits
-        self.archive_summary = librarian.fallback_summary(query, hits)
+        self.archive_generation = self.__dict__.get(
+            "archive_generation", 0) + 1
+        generation = self.archive_generation
+        turn = self.world.date.absolute
+        if len(hits) < librarian.MIN_HITS:
+            self.archive_summary = librarian.fallback_summary(query, hits)
+            self.archive_summary_source = "index"
+            self.repaint()
+            return
+        self.archive_summary = "The keeper is collating the returned tablets…"
+        self.archive_summary_source = "pending"
         self.repaint()
+
+        def work():
+            return librarian.summarize(
+                query, hits, self.seed, turn, self.client)
+
+        def done(result, error) -> None:
+            if (
+                self.archive_query.strip().lower() != query
+                or self.__dict__.get("archive_generation") != generation
+            ):
+                return
+            if error is not None or result is None:
+                self.archive_summary = librarian.fallback_summary(query, hits)
+                self.archive_summary_source = "recovery"
+                self.notify(
+                    "The keeper could not finish his collation; the exact "
+                    "finding list remains.",
+                    registry.REFUSAL, window=window)
+            else:
+                self.archive_summary, self.archive_summary_source = result
+                if self.archive_summary_source != "model":
+                    self.notify(
+                        "The keeper could not finish his collation; the exact "
+                        "finding list remains.",
+                        registry.REFUSAL, window=window)
+            self.repaint()
+
+        if self.client is None:
+            done(work(), None)
+        else:
+            self._run_model(work, done)
 
     # --- keys ----------------------------------------------------------------
 
     def on_inbox_key(self, event) -> None:
+        # Drafting is a station in this room, not another window. Once the wet
+        # tablet is on the table, every key belongs to it until it is sealed or
+        # laid aside.
+        if getattr(self, "desk", None) is not None:
+            self.on_desk_key(event)
+            return
+        command = getattr(event, "command", "")
+        if command.startswith("focus:"):
+            wanted = command.split(":", 1)[1]
+            if wanted == "toggle":
+                self.inbox_pane = (
+                    "clay"
+                    if getattr(self, "inbox_pane", "rack") == "rack"
+                    else "rack")
+            elif wanted in {"rack", "clay"}:
+                self.inbox_pane = wanted
+            self.repaint()
+            return
+
+        def choose_view(chosen: str) -> None:
+            self.inbox_filter = chosen
+            self.inbox_scroll = 0
+            self.inbox_body_scroll = 0
+            self.inbox_pane = "rack"
+            self.archive_open_ref = ""
+            if chosen != "records":
+                items = inbox_page.ordered_items(
+                    self.belief, self.stack_order, chosen)
+                self.inbox_pick = items[0]["id"] if items else ""
+            self.repaint()
+
+        if command.startswith("view:"):
+            chosen = command.split(":", 1)[1]
+            if chosen in {"all", "archived", "outbox", "records"}:
+                choose_view(chosen)
+            return
+
+        char = (event.char or "").lower()
+        views = {
+            "1": "all", "2": "archived", "3": "outbox",
+            "4": "records",
+            # Old muscle memory remains harmless while the visible contract is
+            # the four numbered stations.
+            "u": "all", "a": "all", "v": "archived", "o": "outbox"}
+        archive_typing = (
+            self.inbox_filter == "records"
+            and getattr(self, "archive_typing", False))
+        if not archive_typing and char in views:
+            choose_view(views[char])
+            return
+        if not archive_typing and event.keysym in {"Left", "Right"}:
+            stations = [key for key, _label in inbox_page.VIEWS]
+            try:
+                here = stations.index(self.inbox_filter)
+            except ValueError:
+                here = 0
+            step = -1 if event.keysym == "Left" else 1
+            choose_view(stations[(here + step) % len(stations)])
+            return
+        if self.inbox_filter == "records":
+            self.on_archive_key(event, embedded=True)
+            return
         if event.keysym == "Escape":
             self.app.close("stack")
             return
         self.inbox_notice = ""
-        command = getattr(event, "command", "")
         if command.startswith("select:"):
             self.inbox_pick = command.split(":", 1)[1]
+            self.inbox_body_scroll = 0
+            self.inbox_pane = "rack"
             self.repaint()
             return
-        if command.startswith("view:"):
-            chosen = command.split(":", 1)[1]
-            if chosen in {"unread", "all", "archived", "outbox"}:
-                self.inbox_filter = chosen
-                self.inbox_scroll = 0
-                items = inbox_page.ordered_items(
-                    self.belief, self.stack_order, chosen)
-                self.inbox_pick = items[0]["id"] if items else ""
-                self.repaint()
-            return
 
-        b = self.belief
+        b = self._language_belief(self.belief)
         inbound = (
             inbox_page.ordered_items(b, self.stack_order, "all")
             + inbox_page.ordered_items(b, self.stack_order, "archived"))
@@ -2734,31 +3674,12 @@ class Game:
                     A.DelegateLetter(letter_id, person_id), window="stack")
             return
 
-        char = (event.char or "").lower()
-        views = {
-            "u": "unread", "a": "all", "v": "archived", "o": "outbox"}
-        if char in views:
-            self.inbox_filter = views[char]
-            self.inbox_scroll = 0
-            items = inbox_page.ordered_items(
-                self.belief, self.stack_order, self.inbox_filter)
-            self.inbox_pick = items[0]["id"] if items else ""
-            self.repaint()
-            return
         if event.keysym == "Tab":
-            people = [
-                person for person in b.get("house", {}).get("members", [])
-                if person["alive"] and person["id"] != self.world.court.ruler
-                and person["location"] == self.world.court.seat
-            ]
-            ids = [person["id"] for person in people]
-            if ids:
-                try:
-                    index = (ids.index(self.inbox_delegate_pick) + 1) % len(ids)
-                except ValueError:
-                    index = 0
-                self.inbox_delegate_pick = ids[index]
-                self.repaint()
+            self.inbox_pane = (
+                "clay"
+                if getattr(self, "inbox_pane", "rack") == "rack"
+                else "rack")
+            self.repaint()
             return
 
         items = inbox_page.ordered_items(
@@ -2769,12 +3690,12 @@ class Game:
             if selected_item.get("answered_turn") is None:
                 self.open_desk(selected_item["id"])
             return
-        if (char == "c" and selected_item is not None
+        if (char in {"p", "c"} and selected_item is not None
                 and self.inbox_filter != "outbox"
                 and selected_item["read"]):
             self.open_letter(selected_item)
             return
-        if (char == "d" and selected_item is not None
+        if (char in {"g", "d"} and selected_item is not None
                 and self.inbox_filter != "outbox"
                 and selected_item["read"] and self.inbox_delegate_pick):
             self.do(A.DelegateLetter(
@@ -2799,7 +3720,18 @@ class Game:
             (i for i, item in enumerate(items)
              if item["id"] == self.inbox_pick),
             None)
-        if event.keysym in {"Up", "Down"}:
+        navigation = {
+            "nav:up": "Up",
+            "nav:down": "Down",
+        }.get(command, event.keysym)
+        if navigation in {"Up", "Down"} and getattr(
+                self, "inbox_pane", "rack") == "clay":
+            self.inbox_body_scroll = max(
+                0, self.inbox_body_scroll
+                + (-1 if navigation == "Up" else 1))
+            self.repaint()
+            return
+        if navigation in {"Up", "Down"}:
             if current_index is None:
                 # The just-read tablet has left the Unread filter.  The first
                 # navigation key moves to the first remaining row rather than
@@ -2810,9 +3742,10 @@ class Game:
                     0, min(
                         len(items) - 1,
                         current_index
-                        + (-1 if event.keysym == "Up" else 1)))
+                        + (-1 if navigation == "Up" else 1)))
             self.inbox_pick = items[index]["id"]
-            room = 30
+            self.inbox_body_scroll = 0
+            room = max(1, (self._size("stack")[1] - 10) // 2)
             if index < self.inbox_scroll:
                 self.inbox_scroll = index
             elif index >= self.inbox_scroll + room:
@@ -2829,6 +3762,7 @@ class Game:
             self.inbox_pick = item["id"]
             if not item["read"]:
                 self.do(A.ReadLetter(item["id"]), window="stack")
+                self.inbox_pane = "clay"
             else:
                 self.repaint()
 
@@ -2843,10 +3777,20 @@ class Game:
             self.counsel_typing = bool(concern.order_prompt)
             self.open_room("c")
             return
+        if concern.destination in {"roll", "land"}:
+            self.storehouse_view = concern.destination
+            self.open_ledger("t")
+            return
+        if concern.destination == "archive":
+            self.inbox_filter = "records"
+            self.open_tablet("s")
+            return
         door = next((key for key, _label, target in hall.DOORS
                      if target == concern.destination), "")
         if door in TABLETS:
             self.open_tablet(door)
+        elif door in LEDGERS:
+            self.open_ledger(door)
         elif door in ROOMS:
             self.open_room(door)
 
@@ -2872,6 +3816,13 @@ class Game:
             self.open_help()
         elif char in TABLETS or char in LEDGERS or char in ROOMS:
             self.open_door(char)
+        elif char in {"r", "l"}:
+            # Old keys now move to a station in the one Storehouse.
+            self.storehouse_view = "roll" if char == "r" else "land"
+            self.open_ledger("t")
+        elif char == "a":
+            self.inbox_filter = "records"
+            self.open_tablet("s")
         elif char == "d":
             # The desk without a letter chosen answers the oldest thing on the
             # pile, which is what a king with a stack in front of him does.
@@ -2946,10 +3897,13 @@ def report(check: dict) -> None:
 
 def main(argv: list[str]) -> int:
     from tui.backend_tk import available, diagnose
+    from ai.client import model_status, required_model_message
 
     if "--check" in argv:
         report(diagnose())
-        return 0
+        ready, detail = model_status()
+        print("  court model :", detail)
+        return 0 if ready else 1
     if not available():
         check = diagnose()
         print("the window game cannot start on this interpreter.\n")
@@ -2961,6 +3915,10 @@ def main(argv: list[str]) -> int:
               "  brew install python-tk@3.14\n"
               "  apt install python3-tk        (debian/ubuntu)\n"
               "\nthe terminal game is unaffected:  ./run.sh --cli")
+        return 1
+    ready, detail = model_status()
+    if not ready:
+        print(required_model_message(detail))
         return 1
     args = [a for a in argv[1:] if not a.startswith("-")]
     scenario = args[0] if args else "ugarit"

@@ -187,9 +187,20 @@ def test_the_window_backend_imports_no_toolkit_at_module_level():
     """Tk is imported lazily and only inside `tui/backend_tk.py`, so the
     headless suite, `session.replay` and the terminal path never touch a
     display. If this fails, the interface has stopped being testable by cell."""
-    import sys
-    from tui import backend_tk           # noqa: F401
-    assert "tkinter" not in sys.modules
+    # The preceding test deliberately calls ``available()``, which imports Tk
+    # lazily. Inspect the part of the module before the lazy loader instead of
+    # making this assertion depend on test order.
+    import ast
+    import inspect
+    from tui import backend_tk
+    tree = ast.parse(inspect.getsource(backend_tk))
+    imports = [
+        alias.name
+        for node in tree.body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in node.names
+    ]
+    assert "tkinter" not in imports
 
 
 def test_the_window_backend_speaks_the_same_palette():

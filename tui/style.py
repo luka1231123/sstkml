@@ -49,6 +49,12 @@ def key_command(key: str) -> str:
         "ctrl-o": "Control-o",
         "ctrl-s": "Control-s",
         "ctrl-u": "Control-u",
+        "ctrl-y": "Control-y",
+        "ctrl-z": "Control-z",
+        "←": "Left",
+        "→": "Right",
+        "↑": "Up",
+        "↓": "Down",
     }.get(key.lower(), key)
 
 
@@ -228,6 +234,16 @@ def notice(surface: Surface, x: int, y: int, width: int,
 def rule(surface: Surface, x: int, y: int, width: int,
          fg: int | None = None) -> None:
     surface.text(x, y, "─" * width, C["faint"] if fg is None else fg, C["ink"])
+
+
+def wedge_band(width: int, phase: int = 0) -> str:
+    """A one-cell cuneiform-inspired border safe in every supported renderer."""
+    motif = "╲·╱  ╱╲ ·  "
+    if width <= 0:
+        return ""
+    repeated = motif * (width // len(motif) + 2)
+    start = phase % len(motif)
+    return (repeated + repeated)[start:start + width]
 
 
 def meter(surface: Surface, x: int, y: int, width: int, filled: int,

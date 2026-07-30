@@ -90,7 +90,8 @@ def test_player_text_is_exact_and_can_outperform_scribe():
     raw = raw_draft(correct + "\n", "hatti_king")
     assert raw.text == correct + "\n"
     assert raw.score.total == 1000
-    assert 10 <= len(omitted.splitlines()) <= 18
+    assert 3 <= len(omitted.splitlines()) <= 6
+    assert 25 <= len(omitted.split()) <= 90
 
 
 def test_multi_topic_draft_can_split_into_two_tablets():

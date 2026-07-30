@@ -34,9 +34,47 @@ def _freshness(age: int) -> str:
     return "●" if age < 3 else "○" if age <= 8 else "·"
 
 
+def _term_dict(term) -> dict:
+    """Project only the explicit marks present on a delivered/sent tablet."""
+    return {
+        "kind": term.kind,
+        "good": term.good,
+        "quantity": term.quantity,
+        "person_id": term.person_id,
+        "destination": term.destination,
+        "due_turn": term.due_turn,
+    }
+
+
+# The topics `engine/mail.py` puts on a foreign court's returning tablet, and
+# the word the interface uses for each. Held here rather than imported from
+# `ai/`, because Belief feeds the language layer and never depends on it.
+_REPLY_TOPICS = {
+    "reply_accept": "accepted",
+    "reply_refuse": "refused",
+    "reply_counter": "terms offered back",
+}
+
+
+def _stored_reply_text(world) -> dict[str, str]:
+    """Accepted reply prose, by the tablet it is written on.
+
+    The court's own case record holds the words once they have been accepted
+    (`engine/state.py`), so a reloaded or replayed game reads text rather than
+    asking a model for it again (spec 2.6, 2.7). Only the tablet the king
+    actually holds is keyed here; the case itself never crosses this boundary.
+    """
+    return {
+        case.reply_letter_id: case.reply_text
+        for case in world.correspondence
+        if case.reply_letter_id and case.reply_text
+    }
+
+
 def _inbox_items(world, perr: int) -> list[dict]:
     now = world.date.absolute
     items = []
+    stored = _stored_reply_text(world)
     for L in world.inbox:
         arr = L.arrive_turn if L.arrive_turn is not None else now
         age = now - arr
@@ -55,9 +93,17 @@ def _inbox_items(world, perr: int) -> list[dict]:
         relation = world.relations.get(L.sender)
         # Every number in the tablet is the scribe's copy, fixed at transcription
         # (keyed on the turn it arrived) so it reads the same each time.
-        facts = {k: (transcribe(v, world.seed, arr, f"{L.id}:{k}", perr)
-                     if isinstance(v, int) and not isinstance(v, bool) else v)
-                 for k, v in L.facts}
+        # A foreign court's answer is exempt from the scribe's slip. Its figures
+        # are the structured terms impressed on the same clay (spec 3.2), and a
+        # miscopied figure beside an exact term would be a display fault rather
+        # than a fallible man: the king reads the terms, he does not count them.
+        facts = (
+            {k: (transcribe(v, world.seed, arr, f"{L.id}:{k}", perr)
+                 if isinstance(v, int) and not isinstance(v, bool)
+                 and L.topic not in _REPLY_TOPICS else v)
+             for k, v in L.facts}
+            if L.read else {}
+        )
         items.append({
             "id": L.id, "sender": L.sender, "topic": L.topic,
             "received_turn": arr, "age": age,
@@ -71,8 +117,83 @@ def _inbox_items(world, perr: int) -> list[dict]:
             "sender_status": relation.status_claim if relation else "servant",
             "persona": persona,
             "unanswered": relation.unanswered_letters_from_them if relation else 0,
+            "body": (L.text or stored.get(L.id, "")) if L.read else "",
+            "terms": (
+                [_term_dict(term) for term in L.terms]
+                if L.read else []),
+            "reply_to": L.reply_to,
         })
     return items
+
+
+def _known_legs(world, path) -> int:
+    """Courier legs along a route, from the court's own route tablet.
+
+    Legs are inherited knowledge and already cross this boundary in
+    `_world_graph`. What a closed sea will add to them is not knowable in
+    advance, which is why this is an expectation and never a promise.
+    """
+    legs = 0
+    for a, b in zip(path, path[1:]):
+        route = next(
+            (item for item in world.routes
+             if {item.a, item.b} == {a, b}), None)
+        legs += route.legs if route is not None else 1
+    return max(1, legs) if len(tuple(path)) > 1 else 1
+
+
+def _answer_state(world, record: dict, replies: dict) -> dict:
+    """What the court may know about the answer to one tablet it sent.
+
+    Everything here is derived from tablets the court is holding. The foreign
+    case, its decision, and its stores are not read: a court that learned it had
+    been refused before the refusal arrived would be reading World (spec 2.4).
+
+    Silence is the reason this function exists. A tablet that has outlived its
+    expected round trip is not missing from the Outbox and is not quietly
+    labelled sent; it reads as unanswered, with the date it went and the road it
+    went by, because an ignored letter and a drowned courier look the same from
+    here and the king must be able to see that he is waiting.
+    """
+    now = world.date.absolute
+    travel = _known_legs(world, record["path"])
+    # Out, a fortnight in a foreign hall, and back. The court knows its own
+    # route tablet and knows that an answer is not written the day it arrives.
+    expected = record["sent_turn"] + 2 * travel + 1
+    reply = replies.get(record["id"])
+    state = {
+        "travel_turns": travel,
+        "expected_reply_turn": expected,
+        "reply_id": "",
+        "reply_turn": None,
+        "decision": "",
+        "counter_terms": [],
+        "answered": reply is not None,
+        "silent": False,
+    }
+    if reply is not None:
+        state["reply_id"] = reply.id
+        state["reply_turn"] = (
+            reply.arrive_turn if reply.arrive_turn is not None else now)
+        if reply.read:
+            decision = str(dict(reply.facts).get("decision", ""))
+            state["decision"] = decision
+            state["counter_terms"] = [_term_dict(term) for term in reply.terms]
+            state["status"] = (
+                "answered — "
+                + _REPLY_TOPICS.get(reply.topic, decision or "answered"))
+        else:
+            # The tablet is here and the answer is not yet known. Reading it
+            # costs court hours like any other tablet.
+            state["status"] = "answer come — seal unbroken"
+    elif record["in_transit"]:
+        state["status"] = "courier away — no receipt"
+    elif now >= expected:
+        state["silent"] = True
+        state["status"] = "sent — no answer"
+    else:
+        state["status"] = "sent — no receipt"
+    return state
 
 
 def _outbox(world) -> list[dict]:
@@ -82,6 +203,10 @@ def _outbox(world) -> list[dict]:
     an item that has left ``letters_in_transit`` is only labelled "sent — no
     receipt", whether it arrived or vanished. The UI never turns engine truth
     into a delivery confirmation the court did not receive.
+
+    An answer is the one receipt the court does get, so a returning tablet is
+    matched to the letter it answers here (`_answer_state`), and a tablet whose
+    answer never came keeps its place on the rack as an unanswered one.
     """
     travelling = {
         letter.id: letter
@@ -116,6 +241,19 @@ def _outbox(world) -> list[dict]:
             "facts": (
                 {key: value for key, value in letter.facts}
                 if letter is not None else {}),
+            "terms": [
+                _term_dict(term)
+                for term in (
+                    letter.terms if letter is not None else doc.terms)
+            ],
+            "path": list(letter.path if letter is not None else doc.path),
+            "reply_to": (
+                letter.reply_to if letter is not None else doc.reply_to),
+            "scribe_id": (
+                letter.scribe_id if letter is not None else doc.scribe_id),
+            "seal": letter.seal if letter is not None else doc.seal,
+            "courier_id": (
+                letter.courier_id if letter is not None else doc.courier_id),
             "in_transit": letter is not None,
             "status": (
                 "courier away — no receipt"
@@ -147,6 +285,12 @@ def _outbox(world) -> list[dict]:
             "received_turn": letter.sent_turn,
             "body": body,
             "facts": facts,
+            "terms": [_term_dict(term) for term in letter.terms],
+            "path": list(letter.path),
+            "reply_to": letter.reply_to,
+            "scribe_id": letter.scribe_id,
+            "seal": letter.seal,
+            "courier_id": letter.courier_id,
             "in_transit": True,
             "status": "courier away — no receipt",
             "read": True,
@@ -155,6 +299,16 @@ def _outbox(world) -> list[dict]:
             "delegated_to": None,
             "delegated_turn": None,
         }
+
+    # Only tablets the court is holding: `world.inbox` is what arrived, so a
+    # reply still on the road cannot answer anything here.
+    replies = {
+        letter.reply_to: letter
+        for letter in world.inbox
+        if not letter.outgoing and letter.reply_to
+    }
+    for record in records.values():
+        record.update(_answer_state(world, record, replies))
     return sorted(
         records.values(), key=lambda item: (-item["sent_turn"], item["id"]))
 

@@ -1094,6 +1094,52 @@ offset = 4
 topic = "warning"
 facts = { enemy = "no caravan from the east", ships = 0 }
 
+# What the courts on the far side of those letters actually hold. Small on
+# purpose: a foreign court needs enough material standing to refuse a request
+# for a reason, and nothing more, because SPEC.md 6.2 replaces this with the
+# same stores, cohorts, and obligations Ugarit uses.
+#
+# `need` is the fortnightly draw against `stores`; `floor` is what the court
+# keeps back whatever it is asked. Egypt can spare grain and knows it. Alashiya
+# is a copper island that eats imported bread and will say no. Ura sells rather
+# than gives, and its granary is a cargo, not a reserve.
+[[foreign_courts]]
+actor = "pharaoh"
+people = 40000
+stores = { grain = 1400000 }
+need = { grain = 60000 }
+floor = { grain = 400000 }
+[[foreign_courts]]
+actor = "hatti_king"
+people = 30000
+stores = { grain = 300000 }
+need = { grain = 52000 }
+floor = { grain = 150000 }
+[[foreign_courts]]
+actor = "carchemish_viceroy"
+people = 12000
+stores = { grain = 190000 }
+need = { grain = 20000 }
+floor = { grain = 60000 }
+[[foreign_courts]]
+actor = "alashiya_gov"
+people = 9000
+stores = { grain = 40000 }
+need = { grain = 15000 }
+floor = { grain = 20000 }
+[[foreign_courts]]
+actor = "ura_merchant"
+people = 300
+stores = { grain = 8000 }
+need = { grain = 500 }
+floor = { grain = 0 }
+[[foreign_courts]]
+actor = "byblos_king"
+people = 7000
+stores = { grain = 60000 }
+need = { grain = 12000 }
+floor = { grain = 24000 }
+
 # Relationship claims are deliberately not all symmetrical. The mismatch with
 # Gubla is a live diplomatic trap, not a tooltip.
 [[relations]]

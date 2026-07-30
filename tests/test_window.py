@@ -221,6 +221,39 @@ def test_reading_from_the_inbox_costs_hours_and_keeps_the_tablet_selected():
     game.app.stop()
 
 
+def test_answering_stays_in_the_scribes_room_with_source_and_wet_clay():
+    if not available():
+        return
+    game = _game()
+    game.on_key(_Key("s"))
+    game.on_inbox_key(_Key(keysym="Return"))
+    game.on_inbox_key(_Key("r"))
+    assert game.desk is not None
+    assert "stack" in game.app.windows
+    assert "desk" not in game.app.windows
+    text = plain_text(game.compose("stack"))
+    assert "SOURCE TABLET" in text
+    assert "WET TABLET" in text
+    game.on_inbox_key(_Key(keysym="Escape"))
+    assert game.desk is None
+    assert "stack" in game.app.windows
+    game.app.stop()
+
+
+def test_old_roll_and_land_keys_open_stations_in_one_storehouse():
+    if not available():
+        return
+    game = _game()
+    game.on_key(_Key("r"))
+    first = game.app.windows["stores"]
+    assert game.storehouse_view == "roll"
+    game.on_key(_Key("l"))
+    assert game.storehouse_view == "land"
+    assert game.app.windows["stores"] is first
+    assert "roll" not in game.app.windows and "land" not in game.app.windows
+    game.app.stop()
+
+
 def test_an_hourless_king_gets_a_visible_refusal_for_an_unread_tablet():
     if not available():
         return
@@ -240,9 +273,10 @@ def test_escape_closes_a_tablet_and_the_hall_survives_it():
         return
     game = _game()
     game.on_key(_Key("r"))
-    assert "roll" in game.app.windows
-    game.on_tablet_key(_Key(keysym="Escape"), "roll")
-    assert "roll" not in game.app.windows
+    assert "stores" in game.app.windows
+    assert game.storehouse_view == "roll"
+    game.on_storehouse_key(_Key(keysym="Escape"))
+    assert "stores" not in game.app.windows
     assert game.app.windows["hall"].root.winfo_exists()
     game.repaint()                      # the hall still paints afterwards
     game.app.stop()

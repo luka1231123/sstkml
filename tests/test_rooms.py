@@ -103,20 +103,22 @@ def test_the_desk_shows_the_forms_failing_without_saying_so() -> None:
     draft = composer.dictated("give me grain", item["sender"])
     text = plain_text(composer.compose(item, draft, "request",
                                        house=b.get("house")))
-    assert "✗ address" in text
-    assert "THE FORMS" in text
+    assert "FORM BREAK ·" in text
+    assert "address" in text
     # It marks the form. It never says what to write, or that this is a mistake.
     assert "you should" not in text.lower()
 
 
-def test_the_desk_names_every_intent_the_king_may_have() -> None:
+def test_the_desk_names_the_letter_blocks_instead_of_abstract_postures() -> None:
     b = _belief()
     item = b["stack"][0]
-    draft = composer.formulary(item["sender"], "warn", SEED, 8)
-    text = plain_text(composer.compose(item, draft, "warn",
-                                       house=b.get("house")))
-    for intent in composer.INTENTS:
-        assert intent in text
+    matter = "Enemy ships approach the coast."
+    draft = composer.assemble(item["sender"], None, matter)
+    text = plain_text(composer.compose(
+        item, draft, house=b.get("house"), matter=matter))
+    for block in ("ADDRESS", "RECOGNITION", "MATTER", "SEAL"):
+        assert block in text
+    assert "POSTURE" not in text
 
 
 # --- counsel ------------------------------------------------------------------

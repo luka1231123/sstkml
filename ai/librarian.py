@@ -15,8 +15,9 @@ built only from Belief hits, and the numeric guard runs against the snippets:
 the summary may use a figure only if a tablet in front of it used that figure
 first.
 
-Cheap, low stakes, high value, and entirely optional. With the model off the
-templated version simply lists the hits, which is what a finding aid is anyway.
+Cheap, low stakes, and high value. The required lightweight model supplies the
+normal collation; the templated list is exact runtime recovery and remains
+useful when too few hits need summarizing.
 """
 from __future__ import annotations
 
@@ -82,7 +83,7 @@ def build_prompt(query: str, hits: list[dict]) -> list[dict]:
 
 
 def fallback_summary(query: str, hits: list[dict]) -> str:
-    """The finding aid with no model at all: what was found, in archive order.
+    """The recovery finding aid: what was found, in archive order.
 
     Genuinely good enough, because the facts are the content -- which is the
     same reason spec 8.8 says the templated epilogue is good enough.

@@ -57,8 +57,14 @@ def load_kernel(name: str = "world", seed: int = 1) -> Kernel:
     sites = {s["id"]: Site(
         id=s["id"], name=s["name"], settlement=s["settlement"],
         function=s["function"], region=s.get("region", ""),
-        capacity=s.get("capacity", 0))
+        capacity=s.get("capacity", 0), extent=s.get("extent", 0),
+        holder=s.get("holder", ""))
         for s in _rows(cfg, "sites")}
+    for site in sites.values():
+        if site.function == "estate" and (site.capacity <= 0 or site.extent <= 0):
+            raise ContentError(
+                f"{site.id}: an estate needs both a seed-return capacity and an "
+                f"extent, or nothing can be sown on it")
 
     cohorts = {c["id"]: Cohort(
         id=c["id"], settlement=c["settlement"], kind=c["kind"],
@@ -73,6 +79,10 @@ def load_kernel(name: str = "world", seed: int = 1) -> Kernel:
         kind=o["kind"], policy=o.get("policy", "subsistence"),
         authority=o.get("authority", 0))
         for o in _rows(cfg, "orgs")}
+    for site in sites.values():
+        if site.holder and site.holder not in orgs:
+            raise ContentError(
+                f"{site.id}: held by {site.holder!r}, which is not an organization")
 
     routes = {}
     for r in _rows(cfg, "routes"):
@@ -93,28 +103,64 @@ def load_kernel(name: str = "world", seed: int = 1) -> Kernel:
         raise ContentError(
             f"{path.name}: " + "; ".join(faults))
 
+    # A season is a span of fortnights: a [first, last] range, or an explicit
+    # list of them. Checked rather than trusted, because the one thing that can
+    # be written into this table by accident is a long array of something else
+    # -- the climate series belongs above the header and reads as a season named
+    # "climate" if it is written below it. That mistake is silent otherwise: the
+    # world loads, and every year has identical weather.
     seasons = {k: tuple(v) for k, v in cfg.get("seasons", {}).items()}
+    for name, span in sorted(seasons.items()):
+        if not span or len(span) > 24:
+            raise ContentError(
+                f"season {name!r} is not a fortnight span: {len(span)} entries")
+        if any(not isinstance(f, int) or not 1 <= f <= 24 for f in span):
+            raise ContentError(
+                f"season {name!r} names something that is not a fortnight")
     for leg in (leg for route in routes.values() for leg in route.legs):
         if leg.season and leg.season not in seasons:
             raise ContentError(f"leg names season {leg.season!r}, which is not authored")
 
-    # Opening stores, as lots. Ordinals come from the sorted goods at each
-    # settlement, so adding a good to one settlement cannot renumber another's.
+    # Opening stores, as lots. Ordinals come from the sorted (owner, good) pairs
+    # at each location, so adding a good in one place cannot renumber another's.
+    #
+    # A row may name a `site` and an `owner`. Both exist for the same reason:
+    # the world does not begin at the beginning of a story. There is already a
+    # crop in the ground when play starts, it is standing on a named estate
+    # rather than in the town, and some of it belongs to the temple. A scenario
+    # that could only author grain in a granary would have to start every game
+    # in the one fortnight of the year when that is the whole truth.
     book = W.Book(turn=0, phase="authored")
-    holdings: dict[str, dict[str, int]] = {}
+    holdings: dict[str, dict[tuple[str, str], int]] = {}
     for row in _rows(cfg, "stores"):
-        holdings.setdefault(row["settlement"], {})[row["good"]] = row["quantity"]
-    for settlement in sorted(holdings):
+        settlement = row["settlement"]
         if settlement not in settlements:
             raise ContentError(f"stores at {settlement!r}, which does not exist")
-        owner = _controller(orgs, settlement) or settlement
-        for i, good in enumerate(sorted(holdings[settlement])):
-            quantity = holdings[settlement][good]
-            if quantity <= 0:
-                raise ContentError(f"{settlement}: {good} store must be positive")
+        owner = row.get("owner") or _controller(orgs, settlement) or settlement
+        if owner not in orgs and owner not in settlements:
+            raise ContentError(
+                f"{settlement}: stores owned by {owner!r}, which does not exist")
+        location = row.get("site", settlement)
+        if location not in sites and location not in settlements:
+            raise ContentError(
+                f"{settlement}: stores at {location!r}, which does not exist")
+        if location in sites and sites[location].settlement != settlement:
+            raise ContentError(
+                f"{location} is not a site of {settlement}")
+        if row["quantity"] <= 0:
+            raise ContentError(
+                f"{settlement}: the {row['good']} store must be positive")
+        key = (owner, row["good"])
+        if key in holdings.get(location, {}):
+            raise ContentError(
+                f"{location}: {owner} has two opening stores of {row['good']}")
+        holdings.setdefault(location, {})[key] = row["quantity"]
+
+    for location in sorted(holdings):
+        for i, (owner, good) in enumerate(sorted(holdings[location])):
             book = book.create(
-                mint(settlement, 0, "lot", i), good, quantity, owner=owner,
-                holder=owner, location=settlement, reason="authored")
+                mint(location, 0, "lot", i), good, holdings[location][(owner, good)],
+                owner=owner, holder=owner, location=location, reason="authored")
 
     obligations = []
     for row in _rows(cfg, "obligations"):
@@ -142,7 +188,28 @@ def load_kernel(name: str = "world", seed: int = 1) -> Kernel:
     return Kernel(
         seed=seed, date=Date(year=1, fortnight=1, absolute=0),
         registry=registry, book=book, obligations=tuple(obligations),
-        beliefs={}, seasons=seasons, climate=climate)
+        beliefs={}, seasons=seasons, climate=climate, spoilage=_spoilage())
+
+
+def _spoilage() -> dict[str, int]:
+    """Per-good spoilage per fortnight, scaled 1000, from the authored table.
+
+    One source of truth for a rate the kernel and the single-city systems both
+    apply. A good with no rate authored does not spoil, which is the table's own
+    convention and is why this reads rather than defaults.
+    """
+    path = CONTENT / "goods.toml"
+    if not path.exists():
+        raise ContentError(f"no goods table: {path}")
+    goods = tomllib.loads(path.read_text())
+    rates = {}
+    for good, row in goods.items():
+        rate = row.get("spoilage_per_1000", 0) if isinstance(row, dict) else 0
+        if rate < 0:
+            raise ContentError(f"{good}: a spoilage rate is not negative")
+        if rate:
+            rates[good] = rate
+    return rates
 
 
 def _controller(orgs: dict, settlement: str) -> str:

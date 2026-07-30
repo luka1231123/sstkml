@@ -87,9 +87,10 @@ def test_a_screen_at_its_minimum_still_answers_the_mouse():
 
 
 def test_the_widest_and_narrowest_screens_land_in_the_expected_tiers():
-    assert desktop.tier(desktop.default_size("city")[0]) == desktop.WIDE
+    assert desktop.tier(desktop.default_size("city")[0]) == desktop.STANDARD
     assert desktop.tier(desktop.minimum_size("city")[0]) == desktop.STANDARD
-    assert desktop.tier(desktop.default_size("help")[0]) == desktop.COMPACT
+    assert desktop.tier(desktop.default_size("world")[0]) == desktop.WIDE
+    assert desktop.tier(desktop.default_size("help")[0]) == desktop.MINIMUM
     assert desktop.tier(desktop.minimum_size("help")[0]) == desktop.MINIMUM
 
 
@@ -106,3 +107,17 @@ def test_two_windows_fit_side_by_side_on_an_ordinary_laptop():
     tablet_columns = desktop.default_size("letter:")[0]
     stores_columns = desktop.default_size("stores")[0]
     assert tablet_columns + stores_columns <= 150
+
+
+def test_four_ordinary_windows_fit_as_a_two_by_two_working_desktop():
+    """World keeps its map size; ordinary work windows share the desktop."""
+    pairs = (("hall", "stack"), ("palace", "stores"))
+    assert max(
+        sum(desktop.default_size(key)[0] for key in pair)
+        for pair in pairs
+    ) <= 166
+    assert sum(
+        max(desktop.default_size(key)[1] for key in pair)
+        for pair in pairs
+    ) <= 58
+    assert desktop.default_size("world") == (104, 32)

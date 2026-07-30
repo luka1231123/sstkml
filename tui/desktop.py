@@ -22,6 +22,7 @@ from pathlib import Path
 FONT_MIN = 9
 FONT_MAX = 20
 FONT_DEFAULT = 11
+LAYOUT_VERSION = 2
 
 # Width tiers (spec 6). A composer asks which tier it is in and decides how
 # many panes to show; it never hardcodes a column count.
@@ -39,12 +40,12 @@ class WindowClass:
 
 
 CLASSES = {
-    "anchor": WindowClass("anchor", (92, 34), (72, 26)),
-    "workbench": WindowClass("workbench", (88, 30), (66, 22)),
-    "ledger": WindowClass("ledger", (78, 27), (58, 20)),
-    "document": WindowClass("document", (62, 25), (46, 18)),
-    "utility": WindowClass("utility", (52, 20), (40, 15)),
-    "palette": WindowClass("palette", (68, 15), (48, 11)),
+    "anchor": WindowClass("anchor", (84, 28), (84, 26)),
+    "workbench": WindowClass("workbench", (72, 24), (66, 22)),
+    "ledger": WindowClass("ledger", (64, 22), (58, 20)),
+    "document": WindowClass("document", (52, 19), (46, 18)),
+    "utility": WindowClass("utility", (46, 17), (40, 15)),
+    "palette": WindowClass("palette", (62, 14), (48, 11)),
 }
 
 
@@ -73,30 +74,37 @@ def _spec(key, title, window_class, default=None, minimum=None) -> WindowSpec:
 # Entity windows are keyed by prefix: `institution:tablet_house` is a document.
 WINDOWS: dict[str, WindowSpec] = {
     spec.key: spec for spec in (
-        _spec("hall", "The Hall", "anchor"),
-        _spec("stack", "The Inbox", "workbench", (90, 30), (66, 22)),
-        _spec("city", "The City", "workbench", (96, 34), (70, 24)),
-        _spec("orders", "Orders", "workbench", (88, 30), (66, 22)),
+        # The Hall stops at the narrowest width that preserves its carved
+        # palace column. Below 84 columns the room lost its identity and read
+        # as another flat dashboard.
+        _spec("hall", "The Hall", "anchor", (84, 28), (84, 26)),
+        _spec("stack", "The Scribes' Room", "workbench", (80, 27), (78, 26)),
+        # Four full-size houses, their labels and their matching ledger rows
+        # all fit at this floor. A shorter City used to cover those labels
+        # with the Works band while still advertising the hidden number keys.
+        _spec("city", "The City", "workbench", (74, 25), (70, 25)),
+        _spec("orders", "Orders", "workbench", (72, 24), (66, 22)),
+        # The World is intentionally exempt from the compact desktop pass.
         _spec("world", "The Known World", "workbench", (104, 32), (68, 22)),
-        _spec("palace", "The Palace", "workbench", (98, 36), (68, 24)),
-        _spec("archive", "The Tablet House", "ledger", (78, 28), (58, 20)),
-        _spec("works", "Works", "ledger", (82, 28), (62, 21)),
-        _spec("plague", "Sickness and Closures", "ledger", (78, 27), (58, 20)),
-        _spec("roll", "The Roll", "ledger", (82, 28), (62, 21)),
-        _spec("land", "The Land", "ledger", (80, 28), (60, 21)),
-        _spec("muster", "The Muster", "ledger", (80, 27), (60, 20)),
-        _spec("oaths", "The Oaths", "ledger", (78, 28), (58, 20)),
-        _spec("stores", "The Stores", "ledger", (76, 26), (58, 20)),
-        _spec("desk", "The Desk", "document", (66, 28), (52, 20)),
-        _spec("altar", "The Altar", "document", (68, 24), (52, 18)),
-        _spec("counsel", "Counsel", "document", (64, 22), (50, 17)),
-        _spec("fortnight", "The Fortnight", "document", (66, 22), (50, 17)),
+        _spec("palace", "The Palace", "workbench", (74, 25), (68, 24)),
+        _spec("works", "Works", "ledger", (66, 23), (62, 21)),
+        _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
+        _spec("roll", "The Roll", "ledger", (66, 23), (62, 21)),
+        _spec("land", "The Land", "ledger", (64, 23), (60, 21)),
+        _spec("muster", "The Corvée", "ledger", (64, 22), (60, 20)),
+        _spec("oaths", "The Oaths", "ledger", (62, 22), (58, 20)),
+        _spec("stores", "The Storehouse", "workbench", (78, 25), (76, 24)),
+        # The Shrine keeps enough vertical room for its medium altar vignette
+        # above the fixed ritual controls, even at the minimum geometry.
+        _spec("altar", "The Altar", "document", (54, 24), (52, 22)),
+        _spec("counsel", "Counsel", "document", (52, 18), (50, 17)),
+        _spec("fortnight", "The Fortnight", "document", (54, 18), (50, 17)),
         _spec("help", "Help", "utility"),
         _spec("palette", "Command", "palette"),
         _spec("switcher", "Windows", "utility", (42, 17), (40, 15)),
-        _spec("institution:", "Institution", "document", (62, 24), (46, 18)),
-        _spec("letter:", "Tablet", "document", (60, 25), (46, 18)),
-        _spec("archive:", "Tablet", "document", (60, 25), (46, 18)),
+        _spec("institution:", "Institution", "document", (50, 19), (46, 18)),
+        _spec("letter:", "Tablet", "document", (50, 20), (46, 18)),
+        _spec("archive:", "Tablet", "document", (50, 20), (46, 18)),
     )
 }
 
@@ -261,6 +269,7 @@ class Preferences:
     ascii_only: bool = False
     restore_placement: bool = True
     geometry: dict[str, dict] = dataclasses.field(default_factory=dict)
+    layout_version: int = LAYOUT_VERSION
 
     @classmethod
     def load(cls, path: str | Path) -> "Preferences":
@@ -271,12 +280,16 @@ class Preferences:
         if not isinstance(raw, dict):
             return cls()
         geometry = raw.get("geometry")
+        if isinstance(geometry, dict) and _int(
+                raw.get("layout_version"), 0) < LAYOUT_VERSION:
+            geometry = _migrate_geometry(geometry)
         prefs = cls(
             font_size=clamp_font(_int(raw.get("font_size"), FONT_DEFAULT)),
             font_family=str(raw.get("font_family") or ""),
             ascii_only=bool(raw.get("ascii_only", False)),
             restore_placement=bool(raw.get("restore_placement", True)),
             geometry=geometry if isinstance(geometry, dict) else {},
+            layout_version=LAYOUT_VERSION,
         )
         return prefs
 
@@ -304,8 +317,9 @@ class Preferences:
         if not isinstance(remembered, dict):
             return None
         try:
-            columns, rows = clamp_size(
-                key, remembered["columns"], remembered["rows"])
+            columns = int(remembered["columns"])
+            rows = int(remembered["rows"])
+            columns, rows = clamp_size(key, columns, rows)
             return {"x": int(remembered["x"]), "y": int(remembered["y"]),
                     "columns": columns, "rows": rows}
         except (KeyError, TypeError, ValueError):
@@ -317,3 +331,22 @@ def _int(value, fallback: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _migrate_geometry(geometry: dict) -> dict:
+    """Compact inherited standalone-room sizes once; never resize World."""
+    migrated = {}
+    for key, raw in geometry.items():
+        if not isinstance(raw, dict):
+            migrated[key] = raw
+            continue
+        row = dict(raw)
+        if family(key) != "world":
+            default_columns, default_rows = default_size(key)
+            try:
+                row["columns"] = min(int(row["columns"]), default_columns)
+                row["rows"] = min(int(row["rows"]), default_rows)
+            except (KeyError, TypeError, ValueError):
+                pass
+        migrated[key] = row
+    return migrated

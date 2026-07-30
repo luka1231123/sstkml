@@ -131,7 +131,7 @@ def _petitions(b: dict) -> Concern | None:
         "justice", min(9, 3 + waiting), f"{len(petitions)} judgements wait",
         f"The oldest case has stood for {waiting} fortnights.",
         "hear the oldest claim, or give judgement on what is known.",
-        "justice", speaker=SCRIBE,
+        "palace", speaker=SCRIBE,
         basis="he keeps the docket and reads the waiting off it")
 
 

@@ -12,7 +12,8 @@ from pathlib import Path
 from engine.core import Date, in_range, stream
 from engine.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
-                          Document, Estate, Formation, HarbourCargoLot,
+                          Document, Estate, ForeignCourt, Formation,
+                          HarbourCargoLot,
                           HouseMember, Institution, MetalState, Oath, Petition,
                           Place, PlagueState,
                           Relation, Rite, Route, Workshop, World)
@@ -129,6 +130,22 @@ def load_scenario(name: str, seed: int) -> World:
             known_rival_gift_source=r.get("known_rival_gift_source"),
             is_vassal=bool(r.get("is_vassal", False)),
             report_bias=int(r.get("report_bias", 0)),
+        )
+    # The material standing of the courts on the far side of the letters. Their
+    # place is the one they already write from: a court cannot be somewhere else
+    # for the purpose of deciding than it is for the purpose of posting.
+    foreign_courts = {}
+    for row in cfg.get("foreign_courts", []):
+        actor = row["actor"]
+        if actor not in actor_places:
+            raise ValueError(
+                f"foreign court {actor!r} is not a known correspondent")
+        foreign_courts[actor] = ForeignCourt(
+            actor=actor, place=actor_places[actor],
+            stores={k: int(v) for k, v in row.get("stores", {}).items()},
+            need={k: int(v) for k, v in row.get("need", {}).items()},
+            floor={k: int(v) for k, v in row.get("floor", {}).items()},
+            people=int(row.get("people", 0)),
         )
     oaths = tuple(
         Oath(
@@ -307,7 +324,7 @@ def load_scenario(name: str, seed: int) -> World:
         date=Date(year=1, fortnight=0, absolute=0),   # turn 1 begins with an advance
         court=court,
         places=places, routes=routes, correspondents=correspondents, season=season,
-        relations=relations, oaths=oaths,
+        relations=relations, oaths=oaths, foreign_courts=foreign_courts,
         plague=plague_state,
         documents=load_predecessor_archive(cfg["scenario"]),
         gift_values={k: int(v) for k, v in relation_cfg["gifts"]["value_per_unit"].items()},

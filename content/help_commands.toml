@@ -207,12 +207,12 @@ verbs = ["EAT_SEED"]
 id = "gift"
 category = "orders"
 title = "Send a foreign gift"
-syntax = "gift <actor> <good> <quantity>"
-answer = "Tell Counsel the correspondent, gift good, and quantity. Sending a gift costs one hour and can only use known correspondents and gift goods."
-examples = ["gift hatti_king oil 100", "Send 100 oil to the king of Hatti."]
+syntax = "World → choose a court → Gift by letter"
+answer = "Open the known World, choose a foreign court, and open a gift letter at the Desk. Impress the good and quantity as a term, write the Matter, then seal it for a courier."
+examples = ["Open Hatti in the World and choose Gift by letter."]
 keywords = ["gift", "send", "foreign", "actor", "correspondent", "good", "oil", "diplomacy"]
 keys = []
-verbs = ["SEND_GIFT"]
+verbs = []
 
 [[command]]
 id = "harvest_labour"
@@ -317,12 +317,12 @@ verbs = ["SUPPRESS_OMEN", "DEFY_OMEN"]
 id = "marry"
 category = "orders"
 title = "Arrange a foreign marriage"
-syntax = "marry <person> to <actor>"
-answer = "Tell Counsel which eligible member of the house should go to which known foreign court. A foreign marriage costs two hours and moves that person abroad."
-examples = ["marry pidray to hatti_king"]
+syntax = "World → choose a court → Marriage by letter"
+answer = "Open the known World, choose a foreign court, and write a marriage proposal at the Desk. Select the living person as a term. Delivery creates a proposal, not an immediate marriage."
+examples = ["Open Hatti in the World and choose Marriage by letter."]
 keywords = ["marry", "marriage", "daughter", "person", "foreign", "court", "alliance", "house"]
 keys = []
-verbs = ["MARRY_ABROAD"]
+verbs = []
 
 [[command]]
 id = "swear"

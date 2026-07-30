@@ -19,7 +19,8 @@ from tools import inventory
 REQUIRED_ATTENTION = {
     "end_fortnight": 0, "allocate": 0, "set_priority": 0, "eat_seed": 0,
     "read_letter": 2, "file_letter": 0, "delegate_letter": 1,
-    "dictate_reply": 2, "inspect_ledger": 1, "send_gift": 1,
+    "dictate_reply": 2, "dispatch_letter": 2,
+    "inspect_ledger": 1, "send_gift": 1,
     "send_to_harvest": 1, "assign_troops": 1, "raise_corvee": 1,
     "dredge_canal": 1, "marry_abroad": 2, "consult_diviner": 2,
     "suppress_omen": 2, "defy_omen": 0, "swear_oath": 2, "quarantine": 1,

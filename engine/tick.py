@@ -122,6 +122,14 @@ def advance(world: World) -> tuple[World, list]:
     # A10: audit explicit oath clauses for the human/archive record.
     world, e = relations.audit_oaths(world); events += e
 
+    # A14: the far side of the correspondence. Each foreign court counts its own
+    # place, then answers the tablets that have reached it. Observation before
+    # decision, and both after arrivals: a court answering today decides from
+    # what it can see today, and from a tablet delivered no later than this turn.
+    from engine import correspondence_policy, foreign_belief
+    world, e = foreign_belief.step(world); events += e
+    world, e = correspondence_policy.step(world); events += e
+
     # A15: generate new intents after arrivals, so each new travelling letter
     # still carries at least one full turn of latency.
     world, e = mail.generate_incoming(world); events += e

@@ -10,7 +10,7 @@ import json
 import secrets
 from pathlib import Path
 
-from engine.actions import EndTurn, from_dict, to_dict
+from engine.actions import DispatchLetter, EndTurn, from_dict, to_dict
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
@@ -36,6 +36,17 @@ def _verify_protocol(world, action):
     if not (getattr(action, "text", "") and getattr(action, "profile", "")):
         return
     from ai.grader import grade_for, profile_for
+    if isinstance(action, DispatchLetter):
+        expected = profile_for(action.recipient)
+        if action.profile != expected:
+            raise ValueError(
+                f"protocol profile mismatch: got {action.profile}, "
+                f"expected {expected}")
+        # DispatchLetter stores exact text and its formula profile. Its
+        # structured terms are the authority for mechanics; replay never asks
+        # a model to reconstruct or reinterpret them.
+        grade_for(action.text, action.profile, recipient=action.recipient)
+        return
     letter = next((item for item in world.inbox
                    if item.id == action.letter_id), None)
     if letter is None:

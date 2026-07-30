@@ -1,5 +1,5 @@
-"""M2 tests: the closed sea produces a backlog and a flood, and replay survives
-mail actions (read/reply)."""
+"""M2 tests: the closed sea produces a backlog without duplicate demands, and
+replay survives mail actions (read/reply)."""
 from __future__ import annotations
 
 from engine import actions as A
@@ -14,7 +14,7 @@ from session import replay, save
 SEED = 8814402919
 
 
-def test_closed_sea_backlogs_then_floods():
+def test_closed_sea_backlogs_then_releases_distinct_tablets():
     world = load_scenario("ugarit", SEED)
     winter_sea_backlog = 0
     max_sea_arrivals = 0
@@ -34,8 +34,8 @@ def test_closed_sea_backlogs_then_floods():
         sea_arrivals = sum(1 for e in events if isinstance(e, A.LetterArrived)
                            and e.sender in ("alashiya_gov", "pharaoh"))
         max_sea_arrivals = max(max_sea_arrivals, sea_arrivals)
-    assert winter_sea_backlog > 0        # letters really did pile up at the harbour
-    assert max_sea_arrivals >= 3         # and landed together in a flood
+    assert winter_sea_backlog > 0        # tablets really wait at the harbour
+    assert max_sea_arrivals >= 1         # and eventually cross when it opens
 
 
 def test_replay_with_mail_actions():

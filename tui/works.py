@@ -15,6 +15,8 @@ half later (6.21), and the game does not grade bets (D19).
 """
 from __future__ import annotations
 
+import textwrap
+
 from tui import art, collection, style
 from tui.grid import INDEX, Screen, Surface
 
@@ -33,6 +35,74 @@ def _bar(surface: Surface, x: int, y: int, width: int,
 def project_room(height: int) -> int:
     """Works in hand visible at once; three rows apiece."""
     return max(1, min(len(PICK), (height - 16) // 3))
+
+
+def _project_page(b: dict, height: int, scroll: int) -> collection.Page:
+    return collection.page(
+        len(b.get("projects") or []), project_room(height), scroll)
+
+
+def _plan_top(b: dict, height: int, scroll: int) -> int:
+    """First row available to plans, matching the project/pool layout below."""
+    projects = b.get("projects") or []
+    out = _project_page(b, height, scroll)
+    y = 5
+    y += len(out.slice(projects)) * 3 if projects else 2
+    if out.partial:
+        y += 1
+    # Rule and four corvée rows, then the plan heading and its spacer.
+    return y + 7
+
+
+def _material_cost(plan: dict, per: dict) -> str:
+    return ", ".join(
+        f"{qty * plan['days'] // 1000:,} {good}"
+        for good, qty in sorted(per.items()) if qty)
+
+
+def _cost_lines(cost: str, width: int) -> list[str]:
+    """A complete stacked cost; no quantity or unit is discarded."""
+    return textwrap.wrap(
+        f"cost: {cost or 'labour only'}",
+        width=max(1, width - 10),
+        break_long_words=True,
+        break_on_hyphens=False,
+    ) or ["cost: labour only"]
+
+
+def _plan_shape(b: dict, width: int) -> tuple[bool, int]:
+    """Whether costs need their own rows, and rows consumed by each plan."""
+    plans = b.get("plans") or []
+    per = b.get("works_materials") or {}
+    costs = [_material_cost(plan, per) for plan in plans]
+    inline_room = max(0, width - 47)
+    stacked = any(len(cost) > inline_room for cost in costs)
+    if not stacked:
+        return False, 1
+    cost_rows = max(
+        (len(_cost_lines(cost, width)) for cost in costs),
+        default=1,
+    )
+    return True, 1 + cost_rows
+
+
+def plan_page(b: dict, width: int, height: int, scroll: int = 0,
+              plan_scroll: int = 0) -> collection.Page:
+    """The plans whose numbered actions are genuinely visible.
+
+    The controller uses this same page. A digit therefore cannot name a plan
+    that the current window did not draw.
+    """
+    plans = b.get("plans") or []
+    _stacked, row_height = _plan_shape(b, width)
+    available = max(0, height - 2 - _plan_top(b, height, scroll))
+    room = min(len(ORDER), available // row_height)
+    visible = collection.page(len(plans), room, plan_scroll)
+    if visible.partial:
+        # A partial list spends one row saying how Shift+arrows reaches it.
+        room = min(len(ORDER), max(0, available - 1) // row_height)
+        visible = collection.page(len(plans), room, plan_scroll)
+    return visible
 
 
 def compose(b: dict, selected: str = "", width: int = 82,
@@ -57,7 +127,7 @@ def compose(b: dict, selected: str = "", width: int = 82,
         surface.text(4, y, "nobody is building anything.", C["ash"], C["ink"])
         y += 2
     # Three rows a project, so the page is what the window can actually hold.
-    out = collection.page(len(projects), project_room(height), scroll)
+    out = _project_page(b, height, scroll)
     for number, _absolute, project in out.rows(projects):
         key = PICK[number - 1]
         chosen = key == selected
@@ -102,26 +172,35 @@ def compose(b: dict, selected: str = "", width: int = 82,
               fg=C["bone"], bg=C["faint"])
     y += 2
     per = b.get("works_materials") or {}
-    plan_room = max(1, min(len(ORDER), height - 4 - y))
-    buildable = collection.page(len(plans), plan_room, plan_scroll)
+    stacked, plan_height = _plan_shape(b, width)
+    buildable = plan_page(b, width, height, scroll, plan_scroll)
     for number, _absolute, plan in buildable.rows(plans):
-        if y >= height - 4:
-            break
         style.keycap(surface, 3, y, ORDER[number - 1], "")
         surface.text(8, y, plan["name"][:24], C["clay"], C["ink"])
         surface.text(33, y, f"{plan['days']:,} days", C["dim"], C["ink"])
-        cost = ", ".join(
-            f"{qty * plan['days'] // 1000:,} {good}"
-            for good, qty in sorted(per.items()) if qty)
-        surface.text(44, y, cost[: width - 47], C["ash"], C["ink"])
-        y += 1
+        cost = _material_cost(plan, per)
+        if stacked:
+            for offset, line in enumerate(_cost_lines(cost, width), 1):
+                surface.text(8, y + offset, line, C["ash"], C["ink"])
+        else:
+            surface.text(44, y, cost, C["ash"], C["ink"])
+        y += plan_height
 
-    if buildable.partial:
-        surface.text(8, min(height - 4, y), f"↑↓ plans {buildable.label()}",
-                     C["dim"], C["ink"])
+    if buildable.partial and y < height - 2:
+        paging = (
+            f"shift+↑↓ plans {buildable.label()}" if buildable.room
+            else "plans do not fit · enlarge this window")
+        surface.text(8, y, paging, C["dim"], C["ink"])
+    visible_plans = len(buildable.slice(plans))
+    plan_keys = (
+        f"[1-{visible_plans}]" if visible_plans > 1
+        else "[1]" if visible_plans else "")
+    plan_action = (
+        f"{plan_keys} set it in hand" if plan_keys
+        else "enlarge to see plans")
     note = (" [x] call them off — what they have eaten is eaten"
             if selected else
-            " [1-9] set it in hand   [a-h] a work already out   [esc] close")
+            f" {plan_action}   [a-h] a work already out   [esc] close")
     style.bar(surface, 2, height - 2, width - 4, note,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

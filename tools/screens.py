@@ -50,37 +50,46 @@ def _ledger(key: str) -> dict:
 # `play_gui.TABLETS` opens the real windows at, so the wrapping read here is
 # the wrapping the player gets.
 SCREENS = {
-    "hall": ("THE HALL", lambda b: hall.compose(b, 104, 36)),
-    "stack": ("THE INBOX", lambda b: inbox.compose(b, 108, 36)),
+    "hall": ("THE HALL", lambda b: hall.compose(
+        b, *desktop.default_size("hall"))),
+    "stack": ("THE TABLET HOUSE", lambda b: inbox.compose(
+        b, *desktop.default_size("stack"))),
     # The five workbenches, at the sizes `tui.desktop` opens them.
-    "stores": ("THE STORES",
-               lambda b: ledgers.stores(b, **_ledger("stores"))),
+    "stores": ("THE STOREHOUSE",
+               lambda b: ledgers.stores(
+                   b, room=True, **_ledger("stores"))),
     "roll": ("THE ROLL", lambda b: ledgers.roll(b, **_ledger("roll"))),
-    "muster": ("THE MUSTER", lambda b: ledgers.muster(b, **_ledger("muster"))),
+    "muster": ("THE CORVÉE", lambda b: ledgers.muster(b, **_ledger("muster"))),
     "oaths": ("THE OATHS", lambda b: ledgers.oaths(b, **_ledger("oaths"))),
     "land": ("THE LAND", lambda b: ledgers.land(b, **_ledger("land"))),
     "palace": ("THE PALACE", lambda b: palace.compose(
-        b, view="court", hours=8, width=98, height=36)),
+        b, view="court", hours=8,
+        width=desktop.default_size("palace")[0],
+        height=desktop.default_size("palace")[1])),
     "house": ("THE PALACE — THE HOUSE", lambda b: palace.compose(
-        b, view="house", hours=8, width=98, height=36)),
+        b, view="house", hours=8,
+        width=desktop.default_size("palace")[0],
+        height=desktop.default_size("palace")[1])),
     "relations": ("THE PALACE — RELATIONS", lambda b: palace.compose(
-        b, view="relations", hours=8, width=98, height=36)),
+        b, view="relations", hours=8,
+        width=desktop.default_size("palace")[0],
+        height=desktop.default_size("palace")[1])),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
     "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 104, 32)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(
-        b, _talk(b), 6, "", False, 92, 36)),
+        b, _talk(b), 6, "", False, *desktop.default_size("counsel"))),
     "altar": ("THE ALTAR", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
         "harvest", ("oil", 20), 78, 32)),
-    "archive": ("THE TABLET HOUSE", lambda b: archive.compose(
+    "archive": ("THE SCRIBES' ROOM — RECORDS", lambda b: archive.compose(
         b, "oath", b.get("archive_index", {}).get("hits", {}).get("oath", []),
-        "", False, 84, 32)),
+        "", False, *desktop.default_size("stack"), embedded=True)),
     "orders": ("ORDERS", lambda b: orders.compose(
         b, _LOG, max((r["turn"] for r in _LOG), default=0),
         hours=8, view="all", width=88, height=30)),
-    "desk": ("THE DESK", lambda b: _desk(b)),
+    "desk": ("THE SCRIBES' ROOM — WRITING TABLE", lambda b: _desk(b)),
 }
 
 
@@ -94,9 +103,17 @@ def _talk(b: dict) -> list[tuple[str, str]]:
 def _desk(b: dict):
     """The desk answering whatever is at the top of the pile."""
     item = b["stack"][0]
-    draft = composer.formulary(item["sender"], "refuse", SEED, 8)
-    return composer.compose(item, draft, "refuse", house=b.get("house"),
-                            width=84, height=30)
+    matter = (
+        "I cannot grant what this tablet asks. "
+        "The needs of my house must stand.")
+    blocks = composer.default_blocks()
+    draft = composer.assemble(item["sender"], blocks, matter)
+    # Writing is a station inside correspondence and uses that room's actual
+    # capacity, not the retired standalone Desk geometry.
+    width, height = desktop.default_size("stack")
+    return composer.compose(
+        item, draft, "reply", house=b.get("house"),
+        width=width, height=height, blocks=blocks, matter=matter)
 
 
 def state(scenario: str = "ugarit", seed: int = SEED, turns: int = 6):

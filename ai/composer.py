@@ -1,20 +1,57 @@
-"""Optional model composer with deterministic, graded fallback drafts."""
+"""Local-model composer with deterministic guards and compact recovery drafts."""
 from __future__ import annotations
 
 import dataclasses
 import re
 import tomllib
+from collections import Counter
 from pathlib import Path
 
 from ai.client import ModelUnavailable
 from ai.grader import ProtocolScore, formula, grade_for, load_formulae, profile_for
-from ai.numeric_guard import extract_numerals_and_number_words, guard
+from ai.numeric_guard import (
+    extract_numerals_and_number_words,
+    guard,
+    normalise,
+)
 
 _CONTENT = Path(__file__).parent.parent / "content"
 _ACTORS = tomllib.loads((_CONTENT / "actors.toml").read_text())["names"]
 _EXEMPLARS = tomllib.loads(
     (_CONTENT / "corpus" / "outgoing.toml").read_text()
 )["letters"]
+_INTENT_MARKERS = {
+    # These are semantic hints, not required magic words. Small local models
+    # naturally render the same posture several ways ("stand firm in loyalty"
+    # is still reassurance), so the gate must recognize a compact family of
+    # expressions rather than turn good prose into an apparent service error.
+    "reassure": (
+        "reassur", "do not fear", "goodwill", "loyal", "at peace",
+        "heart is open", "heart remains", "stand firm",
+    ),
+    "refuse": (
+        "cannot", "refus", "shall not", "will not", "not perform",
+        "unable",
+    ),
+    "promise": (
+        "i shall", "i promise", "i will", "my seal binds", "shall obey",
+    ),
+    "warn": ("danger", "enemy", "warn", "watch", "threat"),
+    "excuse": ("could not", "delay", "because", "pardon", "obstacle"),
+    "request": ("i ask", "request", "send", "i seek", "grant"),
+}
+_COMMITMENT = re.compile(
+    r"\b(?:i|we|my house|ugarit)\s+"
+    r"(?:shall|will|promise|swear|pledge|guarantee|undertake)\b",
+    re.I,
+)
+_NAME = re.compile(r"\b[A-Z][A-Za-z'’-]{2,}\b")
+_NEGATION = re.compile(
+    r"\b(?:not|no|never|cannot|can't|cant|won't|wont|don't|dont|isn't|isnt|"
+    r"wasn't|wasnt|couldn't|couldnt|shouldn't|shouldnt|wouldn't|wouldnt|"
+    r"without|refus\w*|deny|denies|denied)\b",
+    re.I,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,18 +62,78 @@ class Draft:
     source: str
 
 
-def _body(intent: str) -> str:
-    forms = {
-        "reassure": "Let your heart be reassured. Your words have reached my house.",
-        "refuse": "I cannot grant what you seek. Let this answer stand.",
-        "promise": "I shall perform what has been asked of my house.",
-        "warn": "Danger stands upon the road. Let this warning reach you in time.",
-        "excuse": "An obstacle delayed my house; let this explanation be heard.",
-        "request": "I ask that the matter named by my lord receive an answer.",
-    }
+@dataclasses.dataclass(frozen=True)
+class MatterCorrection:
+    """A compact matter clause and whether Yabninu or recovery supplied it."""
+
+    text: str
+    source: str
+
+
+def _intent_key(intent: str) -> str:
     lowered = intent.casefold()
-    return next((body for key, body in forms.items() if key in lowered),
-                "The matter dictated by my lord is set before the recipient.")
+    return next((key for key in _INTENT_MARKERS if key in lowered), "")
+
+
+def _body(intent: str) -> tuple[str, str]:
+    """Return recognition and matter clauses without inventing material facts."""
+    forms = {
+        "reassure": (
+            "Your tablet was heard in my hall.",
+            "Let your heart be reassured: goodwill remains between our houses.",
+        ),
+        "refuse": (
+            "Your words were heard in my hall.",
+            "What you seek I cannot perform and cannot grant; "
+            "let this refusal stand.",
+        ),
+        "promise": (
+            "Your command was heard in my hall.",
+            "What was asked I shall perform; my seal binds this answer.",
+        ),
+        "warn": (
+            "Hear the word brought swiftly to my gate.",
+            "Danger gathers upon the road; set your watch before it "
+            "reaches your walls.",
+        ),
+        "excuse": (
+            "Your words were heard in my hall.",
+            "I could not answer at the appointed time; this delay was "
+            "not contempt.",
+        ),
+        "request": (
+            "Let this tablet be heard in your hall.",
+            "I ask for an answer to the matter already named; send it "
+            "beneath your seal.",
+        ),
+    }
+    return next(
+        (body for key, body in forms.items() if key == _intent_key(intent)),
+        (
+            "The words dictated in my hall are set before you.",
+            "Hear this matter as Ammurapi has spoken it beneath his seal.",
+        ),
+    )
+
+
+def _compact(text: str) -> bool:
+    """Model drafts share the same small physical envelope as fallback clay."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    return 25 <= len(text.split()) <= 90 and 3 <= len(lines) <= 6
+
+
+def _model_draft_ok(text: str, profile_id: str, recipient: str,
+                    intent: str) -> bool:
+    """Keep small-model phrasing inside known rank and intent boundaries."""
+    if not _compact(text):
+        return False
+    score = grade_for(text, profile_id, recipient=recipient)
+    if not (score.address_ok and score.prostration_ok
+            and score.self_designation_ok and score.topic_count <= 1):
+        return False
+    key = _intent_key(intent)
+    return not key or any(
+        marker in text.casefold() for marker in _INTENT_MARKERS[key])
 
 
 def fallback_text(recipient: str, intent: str, profile_id: str,
@@ -50,18 +147,8 @@ def fallback_text(recipient: str, intent: str, profile_id: str,
     # A deterministic scribal lapse makes learned raw dictation meaningfully better.
     if prostration and (seed + turn) % 5:
         lines.append(prostration)
-    lines.extend((
-        _body(intent),
-        "The words that came to me have been heard.",
-        "My scribe has placed them faithfully upon this tablet.",
-        "Nothing in the message has been hidden from my sight.",
-        "My house remembers the hand from which the message came.",
-        "Let this writing make my purpose plain.",
-        "The seal of my house stands upon these words.",
-        "A courier bears them without addition or omission.",
-        "When this tablet is heard, let its answer be known.",
-        "Thus I have spoken; thus it is written.",
-    ))
+    lines.extend(_body(intent))
+    lines.append("Yabninu wrote it; the palace courier bears the sealed tablet.")
     return "\n".join(lines)
 
 
@@ -106,14 +193,131 @@ def split_draft(draft: Draft, recipient: str) -> tuple[Draft, ...]:
     return ()
 
 
-def _mark_guard_fail(client, role: str = "composer") -> None:
+def _mark_last(client, role: str, **flags) -> None:
     flag = getattr(client, "flag_last", None)
     if flag is not None:
-        flag(role, guard_fail=True)
+        flag(role, **flags)
     else:                                   # a test double with only an ai_log
         log = getattr(client, "ai_log", None)
         if log:
-            log[-1]["guard_fail"] = True
+            log[-1].update(flags)
+
+
+def _mark_guard_fail(client, role: str = "composer") -> None:
+    _mark_last(client, role, guard_fail=True)
+
+
+def _recovery_matter(matter: str) -> str:
+    """Keep the player's exact substance while fitting it onto at most two lines.
+
+    Recovery is deliberately mechanical: it may join sentences with semicolons
+    but never paraphrases, invents a reason, or changes a number.
+    """
+    clean = " ".join(str(matter).split())
+    parts = [
+        part.strip()
+        for part in re.findall(r"[^.!?]+(?:[.!?]+|$)", clean)
+        if part.strip()
+    ]
+    if len(parts) <= 2:
+        return clean
+    first = parts[0].rstrip(".!?") + "."
+    rest = "; ".join(part.rstrip(".!?") for part in parts[1:]) + "."
+    return f"{first} {rest}"
+
+
+def _number_multiset(text: str) -> Counter[str]:
+    return Counter(
+        normalise(value)
+        for value in extract_numerals_and_number_words(text)
+    )
+
+
+def _named_terms(text: str) -> set[str]:
+    """Return likely names, ignoring ordinary capitalization after a stop."""
+    names: set[str] = set()
+    for match in _NAME.finditer(text):
+        before = text[:match.start()].rstrip()
+        if before and before[-1] not in ".!?":
+            names.add(match.group(0).casefold())
+    return names
+
+
+def _matter_ok(original: str, corrected: str) -> bool:
+    """Apply narrow, deterministic safety checks to a stylistic correction."""
+    text = " ".join(corrected.split())
+    if not text or len(text.split()) > 60:
+        return False
+    sentences = [
+        part for part in re.findall(r"[^.!?]+(?:[.!?]+|$)", text)
+        if part.strip()
+    ]
+    if not 1 <= len(sentences) <= 2:
+        return False
+    if _number_multiset(text) != _number_multiset(original):
+        return False
+
+    if not _named_terms(text) <= _named_terms(original):
+        return False
+    if not _COMMITMENT.search(original) and _COMMITMENT.search(text):
+        return False
+    if bool(_NEGATION.search(original)) != bool(_NEGATION.search(text)):
+        return False
+    return True
+
+
+def correct_matter(recipient: str, matter: str, seed: int, turn: int,
+                   client=None) -> MatterCorrection:
+    """Have Yabninu compact a matter without changing its material meaning.
+
+    The result contains only the corrected matter, never an address or closing.
+    Numbers must survive exactly, new named actors/places and new commitments
+    are rejected, and the physical envelope is one or two concise sentences.
+    """
+    recovery = _recovery_matter(matter)
+    if client is None:
+        return MatterCorrection(recovery, "fallback")
+
+    recipient_name = _ACTORS.get(recipient, recipient.replace("_", " "))
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Yabninu, a concise Bronze Age palace scribe. Correct "
+                "only the wording of the supplied matter. Return only one or "
+                "two short sentences: no address, greeting, commentary, or "
+                "closing. Preserve its meaning, every number, named person, "
+                "place, deadline, condition, negation, and uncertainty. Add "
+                "no fact, reason, offer, threat, or promise. /no_think"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Recipient context: {recipient_name}\n"
+                f"Matter to correct exactly:\n{matter}"
+            ),
+        },
+    ]
+    try:
+        for attempt in range(2):
+            text = client.call(
+                "matter_corrector", messages, None, seed, 140, 20, turn)
+            if _matter_ok(matter, text):
+                return MatterCorrection(" ".join(text.split()), "model")
+            _mark_last(client, "matter_corrector", validation_fail=True)
+            if attempt == 0:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Try once more. Copy every number and named term "
+                        "exactly. Do not add a commitment. Return only one or "
+                        "two concise sentences."
+                    ),
+                })
+    except ModelUnavailable:
+        pass
+    return MatterCorrection(recovery, "fallback")
 
 
 def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
@@ -136,7 +340,9 @@ def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
     )
     messages = [
         {"role": "system", "content":
-         "You are Yabninu, scribe of Ammurapi. Write only the tablet, 10 to 18 lines. /no_think"},
+         "You are Yabninu, scribe of Ammurapi. Write only a compact Bronze Age "
+         "tablet of 25 to 90 words in 3 to 6 formulaic lines. Preserve the "
+         "stated intent, recipient, and facts exactly; invent no terms. /no_think"},
         {"role": "user", "content": prompt},
     ]
     if client is not None:
@@ -144,15 +350,25 @@ def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
             for attempt in range(2):
                 text = client.call("composer", messages, None, seed, 350, 25, turn)
                 ok, stray = guard(text, allowed)
-                if ok:
+                if ok and _model_draft_ok(
+                        text, profile_id, recipient, intent):
                     return Draft(
                         text, profile_id,
                         grade_for(text, profile_id, recipient=recipient), "model")
-                _mark_guard_fail(client)
+                if not ok:
+                    _mark_guard_fail(client)
+                else:
+                    _mark_last(client, "composer", validation_fail=True)
                 if attempt == 0:
-                    messages.append({"role": "user", "content":
-                                     "Rewrite. Remove these unlicensed numbers: "
-                                     + ", ".join(stray)})
+                    correction = (
+                        "Rewrite in 25 to 90 words and 3 to 6 lines. Keep the "
+                        "required opening and prostration exactly, and express "
+                        f"only this intent: {intent}."
+                        if ok else
+                        "Rewrite. Remove these unlicensed numbers: "
+                        + ", ".join(stray)
+                    )
+                    messages.append({"role": "user", "content": correction})
         except ModelUnavailable:
             pass
     text = fallback_text(recipient, intent, profile_id, seed, turn)

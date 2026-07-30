@@ -7,8 +7,18 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from engine.core import Date
+
+if TYPE_CHECKING:
+    from engine.actions import LetterTerm
+    from engine.obligation import (
+        GoodsReservation,
+        LetterObligation,
+        MarriageProposal,
+        RequestClaim,
+    )
 
 # Type aliases for readers. These are authored strings, not generated counters.
 GoodId = str
@@ -459,6 +469,14 @@ class Document:
     title: str = ""
     tags: tuple[str, ...] = ()
     recipient: ActorId | None = None
+    # Outgoing letter provenance survives after the courier leaves transit.
+    # Defaults keep predecessor archive fixtures and old constructors valid.
+    terms: tuple["LetterTerm", ...] = ()
+    path: tuple[PlaceId, ...] = ()
+    reply_to: str = ""
+    scribe_id: str = ""
+    seal: str = ""
+    courier_id: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -492,8 +510,12 @@ class Correspondent:
 
 @dataclasses.dataclass(frozen=True)
 class Letter:
-    """The unit that travels and is read. Its prose is rendered on demand from
-    these structured fields -- the engine never holds letter text (spec 8.7)."""
+    """The physical tablet that travels and is read.
+
+    Incoming tablets may render authored facts on demand. Outgoing tablets
+    retain the player's exact text and explicit terms so replay never asks a
+    model to reconstruct authoritative intent.
+    """
     id: str
     sender: ActorId
     recipient: ActorId
@@ -511,6 +533,12 @@ class Letter:
     delegated_to: ActorId | None = None
     delegated_turn: int | None = None
     outgoing: bool = False       # True = the player's own reply
+    text: str = ""               # exact outgoing prose; never model-regenerated
+    terms: tuple["LetterTerm", ...] = ()
+    reply_to: str = ""
+    scribe_id: str = ""
+    seal: str = ""
+    courier_id: str = ""
     # What was actually the case when he wrote (spec 6.8). Never projected into
     # Belief and never shown to the model: the ruler learns it, if at all, from a
     # second correspondent who saw the same thing. Empty means "he had no motive
@@ -582,6 +610,89 @@ class Oath:
     binds_house: bool = False
 
 
+# What a foreign court may do with a tablet that has reached it (spec 6.6, and
+# the correspondence workstream in SPEC.md 6.1). Closed, because a decision the
+# inspector cannot name is a decision nobody can explain afterwards. "ignore" is
+# a real answer and is why silence has to be visible state rather than an
+# absence: the court that never replies has decided, and the king cannot tell
+# that apart from a drowned courier.
+CORRESPONDENCE_DECISIONS = frozenset({
+    "accept",     # the terms stand as written
+    "refuse",     # the terms are declined, and the reply says so
+    "counter",    # different terms are offered back
+    "delay",      # the answer waits, and the case is looked at again
+    "ignore",     # no reply is ever written
+})
+
+
+@dataclasses.dataclass(frozen=True)
+class ForeignCourt:
+    """What an autonomous correspondent has and needs, in its own units.
+
+    Deliberately small, and a deletion target: SPEC.md 6.2 unifies Ugarit and
+    the foreign settlements onto one material grammar, and when that lands this
+    record is replaced by the kernel's stores, cohorts, and obligations. Until
+    then a foreign court still has to be able to decide from something material
+    rather than from an authored mood, or "the court knows its own shortage" is
+    prose.
+
+    `need` is the fortnightly draw against `stores`; `floor` is the quantity the
+    court will not part with whatever it is asked, because a granary emptied for
+    a friend is a granary emptied.
+    """
+    actor: ActorId
+    place: PlaceId
+    stores: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
+    need: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
+    floor: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
+    people: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class CorrespondenceCase:
+    """One delivered tablet awaiting, or having received, a foreign answer.
+
+    The case is the record the inspector reads to answer "why did Ma'hadu say
+    no": it names the tablet, the actor, the turn it arrived, the terms as
+    delivered, the decision, and the claim ids the decision rested on. It never
+    holds World: the deciding policy is handed `(actor, belief)` and this case,
+    and nothing else.
+
+    `reply_text` stores accepted prose exactly once. Replay reads it; replay
+    never asks a model for it again (spec 2.6, 2.7).
+    """
+    id: str
+    letter_id: str
+    actor: ActorId
+    place: PlaceId
+    received_turn: int
+    terms: tuple["LetterTerm", ...] = ()
+    decision: str = ""
+    decided_turn: int | None = None
+    # A delayed case is reconsidered on this turn; 0 while nothing is deferred.
+    delay_until: int = 0
+    # Terms offered back. Non-empty only on a counter.
+    counter_terms: tuple["LetterTerm", ...] = ()
+    # Claim ids behind the decision. Empty is legal only before deciding.
+    basis: tuple[str, ...] = ()
+    reply_letter_id: str = ""
+    reply_text: str = ""
+
+    def __post_init__(self) -> None:
+        if self.decision and self.decision not in CORRESPONDENCE_DECISIONS:
+            raise ValueError(
+                f"unregistered correspondence decision: {self.decision!r}")
+        if self.counter_terms and self.decision != "counter":
+            raise ValueError(
+                f"{self.id}: counter terms on a {self.decision or 'pending'} case")
+        if self.decision and self.decided_turn is None:
+            raise ValueError(f"{self.id}: a decision happens on a turn")
+
+    def open(self) -> bool:
+        """Still awaiting an answer. A delayed case is open; an ignored one is not."""
+        return not self.decision or self.decision == "delay"
+
+
 @dataclasses.dataclass(frozen=True)
 class ProtocolRecord:
     """Derived result retained for M6 consequences; prose stays in the action log."""
@@ -609,6 +720,22 @@ class World:
     letters_in_transit: tuple[Letter, ...] = ()
     inbox: tuple[Letter, ...] = ()            # arrived letters: the Stack's source
     letter_seq: int = 0                       # monotonic id counter
+    # Structured marks on dispatched tablets persist as legal/material records.
+    letter_reservations: tuple["GoodsReservation", ...] = ()
+    letter_obligations: tuple["LetterObligation", ...] = ()
+    letter_claims: tuple["RequestClaim", ...] = ()
+    marriage_proposals: tuple["MarriageProposal", ...] = ()
+    # --- the far side of the correspondence (SPEC.md 6.1 phase B) ---
+    # What each autonomous correspondent holds and needs, what it believes, and
+    # every tablet of ours that has reached it. `foreign_beliefs` values are
+    # engine.believe.Belief; the annotation stays loose so state.py keeps
+    # importing nothing but the date.
+    foreign_courts: Mapping[ActorId, ForeignCourt] = dataclasses.field(
+        default_factory=dict)
+    foreign_beliefs: Mapping[ActorId, object] = dataclasses.field(
+        default_factory=dict)
+    correspondence: tuple[CorrespondenceCase, ...] = ()
+    case_seq: int = 0
     protocol_log: tuple[ProtocolRecord, ...] = ()
     relations: Mapping[ActorId, Relation] = dataclasses.field(default_factory=dict)
     oaths: tuple[Oath, ...] = ()

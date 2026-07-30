@@ -36,14 +36,20 @@ EVENT_SUFFIXES = (
     "Worn", "Melted", "Met", "Decayed", "Consumed", "Begun", "Finished",
     "Abandoned", "Fled", "Sought", "Applied", "Violated", "Threshed",
     "Sown", "Harvested", "Dredged", "Raised", "Spoiled", "Grumbling",
-    "Conceived", "Revolt",
+    "Conceived", "Revolt", "Landed",
 )
 
 # Events whose names do not end in a past participle the sweep recognises.
 # Named rather than matched: `SentToHarvest` is the event and `SendToHarvest`
 # is the order, and a suffix rule wide enough to catch the first would hide the
 # second from the orphan check entirely.
-EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched"})
+EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched",
+                         # Not intent: it records that an accepted reading of a
+                         # foreign court's answer was kept, so replay reads text
+                         # instead of asking a model again (spec 2.6). It has no
+                         # cost, no room, and no grammar, so a descriptor would
+                         # put a phantom order in the palace.
+                         "RecordReplyText"})
 
 
 def _player_action_types() -> list[type]:
@@ -57,6 +63,8 @@ def _player_action_types() -> list[type]:
         if not isinstance(cls, type) or not hasattr(cls, "__dataclass_fields__"):
             continue
         if name.startswith("_"):
+            continue
+        if getattr(cls, "_registry_value", False):
             continue
         if name in EVENT_NAMES:
             continue
@@ -124,16 +132,16 @@ def faults() -> list[str]:
     import play_gui
     openable = ({k for k, _t, _h in play_gui.TABLETS.values()}
                 | {k for k, _t, _h in play_gui.LEDGERS.values()}
-                | {k for k, _t, _h in play_gui.ROOMS.values()} | {"desk"})
+                | {k for k, _t, _h in play_gui.ROOMS.values()})
     for target in sorted(built - openable):
         found.append(f"unreachable room: hall advertises '{target}'")
     for target in sorted(openable - built):
         found.append(f"undocumented room: '{target}' has no hall door")
 
-    # 7. The phase 4 exit gate: Counsel is unnecessary for every implemented
-    #    action. Counsel is the optional model layer, so an action reachable
-    #    only through it does not exist at all when the model is off -- which
-    #    the specification names as the reference configuration.
+    # 7. Counsel is human-language interpretation, never the sole mechanical
+    #    route. Every implemented action also belongs beside its evidence on a
+    #    direct structured screen; the required model does not become an
+    #    authority merely because it is part of the product.
     for descriptor in registry.DESCRIPTORS:
         routes = [context for context in descriptor.contexts
                   if context != "counsel"]
@@ -191,13 +199,55 @@ def _workbench_gaps() -> list[str]:
                     f"the palace's {view} does not offer {descriptor.id}, "
                     f"which the registry says belongs to {context}")
 
-    screens = {
-        "stores": ledgers.stores(belief, hours=8, width=80, height=28),
-        "roll": ledgers.roll(belief, hours=8, width=88, height=28),
-        "land": ledgers.land(belief, hours=8, width=84, height=28),
-        "muster": ledgers.muster(belief, hours=8, width=84, height=28),
-        "oaths": ledgers.oaths(belief, hours=8, width=82, height=28),
+    land_data = belief.get("land") or {}
+    estates = list(land_data.get("estates", []))
+    audit_land = {
+        **belief,
+        "land": {
+            **land_data,
+            "estates": (
+                [{**estates[0], "irrigated": True,
+                  "canal_condition": 500}] + estates[1:]
+                if estates else []),
+        },
     }
+    oaths = list(belief.get("oaths", []))
+    audit_oaths = {
+        **belief,
+        "oaths": (
+            [{**oaths[0], "lapsed": True}] + oaths[1:]
+            if oaths else []),
+    }
+    groups = list(belief.get("groups", []))
+    screens = {
+        "roll": ledgers.roll(
+            belief, amount=50, hours=8, width=88, height=28),
+        "land": ledgers.land(
+            audit_land, days=5,
+            group=groups[0]["id"] if groups else "",
+            hours=8, width=84, height=28),
+        "muster": ledgers.muster(
+            belief, hours=8, width=84, height=28),
+        "oaths": ledgers.oaths(
+            audit_oaths, amount=50, hours=8, width=82, height=28),
+    }
+    store_screens = (
+        ledgers.stores(
+            belief, selected="grain", hours=8, width=80, height=28),
+        ledgers.stores(
+            belief, selected="seed_grain", amount=50,
+            hours=8, width=80, height=28),
+    )
+    offered_stores = {
+        hit.command.split(":", 1)[1]
+        for screen in store_screens for hit in screen.hits
+        if hit.command.startswith("do:")
+    }
+    for descriptor in registry.in_context("stores"):
+        if descriptor.id not in offered_stores:
+            gaps.append(
+                f"stores does not offer {descriptor.id}, which the "
+                "registry says belongs to it")
     for context, screen in screens.items():
         offered = {hit.command.split(":", 1)[1] for hit in screen.hits
                    if hit.command.startswith("do:")}

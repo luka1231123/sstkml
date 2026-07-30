@@ -21,6 +21,56 @@ C = INDEX
 
 Row = tuple[tuple[str, str], ...]        # ((text, colour name), ...)
 
+# A foreign court's answer, and the plain word the interface uses for it. The
+# topic alone would give the decision away, so the word is only ever taken from
+# the facts, and Belief withholds the facts of an unread tablet
+# (`belief/project.py`). Every screen that reads a tablet shares these two
+# helpers so that an answer is never described two ways.
+ANSWER_TOPICS = ("reply_accept", "reply_refuse", "reply_counter")
+ANSWER_WORDS = {
+    "accept": "accepted",
+    "refuse": "refused",
+    "counter": "terms offered back",
+}
+
+
+def is_answer(item: dict) -> bool:
+    """Whether this tablet is a foreign court's answer to one of ours."""
+    return str(item.get("topic", "")) in ANSWER_TOPICS
+
+
+def answer_subject(item: dict) -> str:
+    """The rack line for an answer: what it is, and the decision if it is read."""
+    word = ANSWER_WORDS.get(str((item.get("facts") or {}).get("decision", "")))
+    return "an answer to your tablet" + (f" — {word}" if word else "")
+
+
+def answer_lines(item: dict, width: int) -> list[tuple[str, str]]:
+    """The answer as `(text, colour)` rows: decision, tablet answered, terms.
+
+    Terms wrap; they are never truncated and never summarised. A counter the
+    king cannot read in full is a counter he cannot answer, and the figures in
+    it are the whole matter (spec 3.2).
+    """
+    from tui.composer import term_summary
+
+    decision = str((item.get("facts") or {}).get("decision", ""))
+    word = ANSWER_WORDS.get(decision)
+    if not word:
+        return [("the seal is unbroken; the answer is not yet known", "ash")]
+    tone = {"accept": "barley", "refuse": "blood",
+            "counter": "gold"}[decision]
+    rows: list[tuple[str, str]] = [(word, tone)]
+    answered = str(item.get("reply_to", ""))
+    if answered:
+        rows.append((f"answering your tablet {answered}", "dim"))
+    room = max(12, width)
+    for term in item.get("terms") or ():
+        for index, line in enumerate(
+                textwrap.wrap(term_summary(term), room) or [""]):
+            rows.append((line if index == 0 else "  " + line, "bone"))
+    return rows
+
 
 def _frame(surface: Surface, title: str, note: str = "") -> None:
     """The shared furniture. Every tablet gets exactly this and no more.
@@ -96,8 +146,9 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
 
     # Truncated against the frame, not the surface: `text` clips at the edge of
     # the world, which for a boxed window means writing over the right border.
-    surface.text(3, 2, _trunc(render.letter_summary(item["topic"]), width - 6),
-                 C["dim"], C["ink"])
+    subject = (answer_subject(item) if is_answer(item)
+               else render.letter_summary(item["topic"]))
+    surface.text(3, 2, _trunc(subject, width - 6), C["dim"], C["ink"])
     stamp = f"reached your hand, turn {item['received_turn']}"
     surface.text(3, 3, stamp, C["ash"], C["ink"])
     surface.text(3, 4, "─" * (width - 6), C["faint"], C["ink"])
@@ -108,15 +159,30 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
     # paragraph break and a single newline is not, so the second is unwrapped
     # before rewrapping to this window's width.
     y = 6
+    # An answer is not read for its figures but for its decision, so its rows
+    # are measured before a word of clay is drawn and the courtesies give way to
+    # them. The terms are the matter; the wording around them is not.
+    answer_rows = answer_lines(item, width - 8) if is_answer(item) else []
+    floor = height - 4 - len(answer_rows)
     paragraphs = [" ".join(block.split())
                   for block in body.split("\n\n") if block.strip()]
     for paragraph in paragraphs:
         for line in textwrap.wrap(paragraph, width - 8) or [""]:
-            if y >= height - 4:
+            if y >= floor:
                 break
             surface.text(4, y, line, C["clay"], C["ink"])
             y += 1
         y += 1
+
+    if answer_rows:
+        # Pinned to the foot of the tablet, so the block cannot be pushed
+        # through the frame by a long-winded court.
+        y = max(6, height - 2 - len(answer_rows))
+        surface.text(3, y - 1, "─" * (width - 6), C["faint"], C["ink"])
+        for text, tone in answer_rows:
+            surface.text(4, y, text, C[tone], C["ink"])
+            y += 1
+        return surface.interactive()
 
     # The figures it asserts, pulled out where they can be compared with a
     # second tablet. This is the whole point of the window kind.
@@ -356,11 +422,24 @@ def land(b: dict, width: int = 70, height: int = 24) -> Screen:
 
 def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
     troops = b.get("troops", {})
+    land = b.get("land") or {}
     rows: list[Row] = [
+        (("crown corvée", "gold"),
+         (f"{land.get('corvee_days', 0):,}d", "flame"),
+         ("called", "clay"), ("this fortnight", "dim")),
+        *[
+            (("hands · " + group["name"], "clay"),
+             (str(group["size"]), "dim"),
+             (_spoken_id(group["function"]), "sand"),
+             (_spoken_id(group["place"]), "dim"))
+            for group in b.get("groups", [])
+        ],
+        *[
         ((f["name"], "clay"), (str(f["strength"]), "dim"),
          (f["task"], "flame" if f["task"] == "campaign" else "clay"),
          (_spoken_id(f["place"]), "dim"))
         for f in troops.get("formations", [])
+        ],
     ]
     for holding, men in sorted(troops.get("garrisons", {}).items()):
         rows.append((("holding " + _spoken_id(holding), "ash"),
@@ -378,5 +457,7 @@ def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
             (due, "blood" if summons["overdue"] else "dim"),
             (_spoken_id(summons["oath_id"]), "dim"),
         ))
-    return ledger("THE MUSTER", ("formation / summons", "men", "order", "place"),
-                  rows, (26, -5, 10, 12), width, height)
+    return ledger(
+        "THE CORVÉE — LEVY AND SPEAR",
+        ("levy / formation / summons", "heads", "duty", "place"),
+        rows, (26, -5, 10, 12), width, height)

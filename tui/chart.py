@@ -31,13 +31,29 @@ import math
 # latitude is drawn tall, to undo the shape of a character cell.
 CELL_ASPECT = 2
 
-# The spiral a mark walks when the cell it wants is taken. Nearest first, and
-# sideways before up: two ports an hour apart should end up beside each other
-# on the same coast rather than one of them inland.
-_NUDGE = ((1, 0), (-1, 0), (2, 0), (-2, 0), (0, 1), (0, -1),
-          (1, 1), (-1, -1), (1, -1), (-1, 1), (3, 0), (-3, 0),
-          (2, 1), (-2, -1), (2, -1), (-2, 1), (0, 2), (0, -2),
-          (3, 1), (-3, -1), (3, -1), (-3, 1), (4, 0), (-4, 0))
+def _nudge_order(limit: int = 6) -> tuple[tuple[int, int], ...]:
+    """A stable nearest-first search, preferring sideways movement.
+
+    Character maps have much more horizontal than vertical resolution. Moving
+    a crowded port sideways first therefore preserves its apparent latitude
+    better than stacking a column of fused marks.
+    """
+    cells = [
+        (dx, dy)
+        for dx in range(-limit, limit + 1)
+        for dy in range(-limit, limit + 1)
+        if dx or dy
+    ]
+    return tuple(sorted(cells, key=lambda cell: (
+        max(abs(cell[0]), abs(cell[1])),
+        abs(cell[1]),
+        abs(cell[0]),
+        cell[0] < 0,
+        cell[1] < 0,
+    )))
+
+
+_NUDGE = _nudge_order()
 
 
 def _coordinate(place: dict, key: str) -> int | None:
@@ -56,7 +72,8 @@ def placed(places: list[dict]) -> list[dict]:
             and _coordinate(place, "lon") is not None]
 
 
-def project(places: list[dict], width: int, height: int) -> dict[str, tuple[int, int]]:
+def project(places: list[dict], width: int, height: int,
+            spacing: int = 0) -> dict[str, tuple[int, int]]:
     """Where each place falls on a `width` x `height` grid of cells.
 
     North is up and east is right. The whole set is scaled to fit and centred;
@@ -100,26 +117,35 @@ def project(places: list[dict], width: int, height: int) -> dict[str, tuple[int,
         y = margin_y + int(round((top - place["lat"]) * scale))
         x = max(0, min(width - 1, x))
         y = max(0, min(height - 1, y))
-        cell = _free(x, y, width, height, taken)
+        cell = _free(x, y, width, height, taken, max(0, spacing))
         taken[cell] = str(place.get("id", ""))
         at[str(place.get("id", ""))] = cell
     return at
 
 
+def _clear(cell: tuple[int, int], taken: dict[tuple[int, int], str],
+           spacing: int) -> bool:
+    return all(
+        max(abs(cell[0] - other[0]), abs(cell[1] - other[1])) > spacing
+        for other in taken
+    )
+
+
 def _free(x: int, y: int, width: int, height: int,
-          taken: dict[tuple[int, int], str]) -> tuple[int, int]:
+          taken: dict[tuple[int, int], str],
+          spacing: int = 0) -> tuple[int, int]:
     """The wanted cell, or the nearest free one, or the wanted cell anyway.
 
     Two marks in one cell is one place hidden with no sign that it is missing,
     so a mark walks a short way to be seen. It gives up rather than walking far
     enough to lie about where it is.
     """
-    if (x, y) not in taken:
+    if _clear((x, y), taken, spacing):
         return (x, y)
     for dx, dy in _NUDGE:
         cell = (x + dx, y + dy)
         if (0 <= cell[0] < width and 0 <= cell[1] < height
-                and cell not in taken):
+                and _clear(cell, taken, spacing)):
             return cell
     return (x, y)
 

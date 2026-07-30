@@ -18,7 +18,7 @@ settled here, by arithmetic, before any prompt exists — `recall()` hands him a
 stale figure or the wrong man's name one time in five — and the model is asked
 only to put that into his mouth. So the lie is deterministic and replayable, and
 the model cannot invent a different one: the numeric guard rejects any figure he
-was not handed. The authored sentences below are what a machine with no Ollama
+was not handed. The authored sentences below are runtime recovery when Ollama
 hears instead, and nothing marks which of the two the player got.
 """
 from __future__ import annotations
@@ -109,10 +109,10 @@ def recall(b: dict, topic: str, seed: int, turn: int) -> dict:
 
 
 def answer(b: dict, topic: str, seed: int, turn: int) -> str:
-    """What Yabninu says with no model to say it for him (D38).
+    """Grounded recovery content if Yabninu's required local voice fails.
 
-    Authored, and deliberately in the same voice, so that a player without
-    Ollama is playing the same game and not a lesser one.
+    It keeps the structured facts visible, but the lightweight model is the
+    normal human voice of the court.
     """
     right = _reliable(seed, turn, topic)
 

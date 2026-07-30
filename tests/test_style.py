@@ -85,8 +85,7 @@ def test_every_built_door_has_a_window_behind_it() -> None:
 
     behind = ({key for key, _t, _how in play_gui.TABLETS.values()}
               | {key for key, _t, _h in play_gui.LEDGERS.values()}
-              | {key for key, _t, _h in play_gui.ROOMS.values()}
-              | {"desk"})          # reached from a letter, not from a key
+              | {key for key, _t, _h in play_gui.ROOMS.values()})
     advertised = {target for _k, _l, target in hall.DOORS
                   if target in hall.BUILT}
     assert behind == advertised

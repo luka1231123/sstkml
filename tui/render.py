@@ -122,8 +122,7 @@ def archive_screen(b: dict, matches: list | None = None) -> str:
 
 
 def letter_full(it: dict, body: str | None = None) -> str:
-    """`body` is the Voicer's text when it is ready (M7); without it the
-    authored template stands, which is the game with the model off."""
+    """`body` is the Voicer's text; the authored reading is recovery only."""
     who = actor_name(it["sender"])
     if body is None:
         body = letter_body(it["sender"], it["topic"], it["facts"])

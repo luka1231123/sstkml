@@ -133,6 +133,10 @@ def _store_explanation(before_world, before: Snapshot, after: Snapshot,
                 add(event.good, event.taken, f"{name}:{event.lot_id}")
         elif isinstance(event, A.GiftSent):
             add(event.good, -event.quantity, name)
+        elif isinstance(event, A.CargoLanded):
+            # It left a foreign granary on a recorded turn; the reservation it
+            # settles is the other half of the entry.
+            add(event.good, event.quantity, f"{name}:{event.record_id}")
         elif isinstance(event, A.SeedEaten):
             add("seed_grain", -event.amount, name)
             add("grain", event.amount, name)

@@ -72,6 +72,10 @@ class ActionDescriptor:
     examples: tuple[str, ...] = ()
     confirm: bool = False
     batch: bool = False
+    # Old save logs may contain actions which no longer belong to the live
+    # interface. Keep their descriptor for decoding/cost compatibility while
+    # excluding them from contexts, controls, and typed player affordances.
+    player_accessible: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -142,6 +146,9 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
        ("stack", "letter", "desk"), ("answer <tablet>",), 2,
        (Field("tablet", "tablet"),), mnemonic="w",
        help_topic="reply", confirm=True),
+    _d("dispatch_letter", A.DispatchLetter, "Seal and send", "Dispatch",
+       ("desk",), ("write to <court>",), 2,
+       mnemonic="s", help_topic="reply", confirm=True),
     _d("inspect_ledger", A.InspectLedger, "Inspect count", "Inspect",
        ("stores", "land"), ("inspect granary", "inspect seed"), 1,
        (Field("ledger", "ledger"),), mnemonic="i", help_topic="inspect"),
@@ -151,7 +158,8 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         Field("actor", "actor")),
        # Not 'g': Delegate already owns that letter on a tablet, where both
        # actions are offered at once.
-       mnemonic="i", help_topic="gift", confirm=True),
+       mnemonic="i", help_topic="gift", confirm=True,
+       player_accessible=False),
     _d("send_to_harvest", A.SendToHarvest, "Send to fields", "Send",
        ("roll", "land"), ("send <group> to harvest", "recall <group>"), 1,
        (Field("group", "group"),), mnemonic="h", help_topic="harvest_labour"),
@@ -161,7 +169,7 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         Field("place", "place", optional=True)),
        mnemonic="a", help_topic="assign_troops"),
     _d("raise_corvee", A.RaiseCorvee, "Raise corvée", "Corvée",
-       ("land", "works"), ("raise corvee <days>",), 1,
+       ("land", "works", "muster"), ("raise corvee <days>",), 1,
        (Field("days", "quantity"),), mnemonic="c", help_topic="corvee"),
     _d("dredge_canal", A.DredgeCanal, "Dredge", "Dredge", ("land",),
        ("dredge <estate> for <days>",), 1,
@@ -170,7 +178,8 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     _d("marry_abroad", A.MarryAbroad, "Marry abroad", "Marry",
        ("house", "relations"), ("marry <person> to <court>",), 2,
        (Field("person", "person"), Field("court", "actor")),
-       mnemonic="m", help_topic="marry", confirm=True),
+       mnemonic="m", help_topic="marry", confirm=True,
+       player_accessible=False),
     _d("consult_diviner", A.ConsultDiviner, "Consult", "Consult", ("altar",),
        ("consult <question> [for <subject>] [with <offering>]",), 2,
        (Field("question", "question"), Field("subject", "person", True),
@@ -275,14 +284,30 @@ def argument_names(descriptor: ActionDescriptor) -> dict[str, str]:
             if field.argument or index < len(engine)}
 
 
+def player_descriptors() -> tuple[ActionDescriptor, ...]:
+    """Descriptors which may be offered to the player in a new session.
+
+    ``DESCRIPTORS`` remains the complete compatibility registry. In
+    particular, old SendGift and MarryAbroad records still need their stable
+    type and attention metadata when an existing reign is replayed.
+    """
+    return tuple(
+        descriptor for descriptor in DESCRIPTORS
+        if descriptor.player_accessible
+    )
+
+
 def in_context(context: str) -> tuple[ActionDescriptor, ...]:
     """Every action a given window can offer, in declaration order."""
-    return tuple(d for d in DESCRIPTORS if context in d.contexts)
+    return tuple(
+        descriptor for descriptor in player_descriptors()
+        if context in descriptor.contexts
+    )
 
 
 def contexts() -> tuple[str, ...]:
     seen: list[str] = []
-    for descriptor in DESCRIPTORS:
+    for descriptor in player_descriptors():
         for context in descriptor.contexts:
             if context not in seen:
                 seen.append(context)

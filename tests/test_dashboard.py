@@ -100,11 +100,13 @@ def test_preparser_covers_new_dashboard_orders() -> None:
         ("hear boundary_ashiranu", A.HearPetition),
         ("set the land due to 250", A.SetLandDue),
         ("name niqmaddu heir", A.NameHeir),
-        ("marry pidray to hatti_king", A.MarryAbroad),
     )
     for words, expected in examples:
         result = parser.preparse(words, b)
         assert result is not None and isinstance(result.actions[0], expected), words
+    marriage = parser.preparse("marry pidray to hatti_king", b)
+    assert marriage is not None and not marriage.actions
+    assert "World" in marriage.question and "Desk" in marriage.question
 
 
 def test_counsel_can_recommend_a_specific_next_step_offline() -> None:

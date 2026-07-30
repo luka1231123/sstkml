@@ -235,7 +235,7 @@ def test_oath_deadline_records_breach_without_causing_random_physics():
     assert events == []
 
 
-def test_removed_divine_liability_and_parser_knows_gifts():
+def test_removed_divine_liability_and_gifts_are_written_at_the_desk():
     world = load_scenario("ugarit", SEED)
     assert "liability" not in {
         field.name for field in dataclasses.fields(type(world.court))}
@@ -246,4 +246,5 @@ def test_removed_divine_liability_and_parser_knows_gifts():
                   if r["other"] == "byblos_king")
     assert byblos["their_status_claim"] == "uncertain"
     parsed = preparse("gift hatti_king copper 10", belief)
-    assert parsed.actions == (A.SendGift("hatti_king", "copper", 10),)
+    assert parsed.actions == ()
+    assert "World" in parsed.question and "Desk" in parsed.question

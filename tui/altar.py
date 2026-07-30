@@ -29,6 +29,72 @@ QUESTIONS = (
 
 OFFERINGS = (("1", "oil", 20), ("2", "wine", 20), ("3", "grain", 200))
 
+_MEDIUM_ALTAR = art.ALTAR[:8] + (art.ALTAR[-1],)
+_MEDIUM_PRIEST = art.PRIEST[:6] + (art.PRIEST[-1],)
+_SMALL_ALTAR = (
+    "      ▟▙      ",
+    "   ▄▄▄██▄▄▄   ",
+    " ▟██████████▙ ",
+    "▀▀▀▀▀▀▀▀▀▀▀▀▀",
+)
+_SMALL_PRIEST = (
+    "  ▲  ",
+    " ▗█▖ ",
+    " ▐█▌ ",
+    " ███ ",
+)
+
+
+def _room(surface: Surface, width: int, controls_top: int,
+          readings: list[str]) -> None:
+    """Draw only in the space above the fixed ritual controls.
+
+    The original room assumed a 32-row window while the desktop actually opens
+    it at 24 rows. Its altar and priest therefore continued through the
+    questions and offerings. Each height band now owns a bounded vignette; the
+    controls never have to paint legibility back over a statue.
+    """
+    surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
+
+    if controls_top >= 17:
+        altar_rows, priest_rows = art.ALTAR, art.PRIEST
+        altar_y, priest_y, words_y = 3, 7, 17
+        priest_x, words_x = 3, 20
+    elif controls_top >= 12:
+        altar_rows, priest_rows = _MEDIUM_ALTAR, _MEDIUM_PRIEST
+        altar_y, priest_y, words_y = 2, 3, 11
+        priest_x, words_x = 3, 18
+    else:
+        altar_rows, priest_rows = _SMALL_ALTAR, _SMALL_PRIEST
+        altar_y, priest_y, words_y = 2, 2, 6
+        priest_x, words_x = 3, 16
+
+    altar_x = max(priest_x + len(priest_rows[0]) + 1,
+                  width - len(altar_rows[0]) - 3)
+    art.draw(surface, altar_x, altar_y, altar_rows,
+             lit=C["flame"], mid=C["blood"], dark=C["wine"],
+             edge=C["faint"])
+    art.draw(surface, priest_x, priest_y, priest_rows,
+             lit=C["bone"], mid=C["dim"], dark=C["faint"])
+    if words_y < controls_top:
+        surface.text(priest_x, words_y, "the diviner",
+                     C["wine"], C["ink"])
+
+    room = max(0, controls_top - words_y)
+    line_width = max(10, width - words_x - 3)
+    lines: list[str] = []
+    if readings:
+        for reading in readings[-4:]:
+            wrapped = textwrap.wrap(reading, line_width) or [""]
+            if lines:
+                lines.append("")
+            lines.extend(wrapped)
+    elif room and controls_top >= 12:
+        lines = ["He waits at the stone."]
+    for offset, line in enumerate(lines[-room:] if room else ()):
+        surface.text(words_x, words_y + offset, line[:line_width],
+                     C["bone"] if readings else C["ash"], C["ink"])
+
 
 def compose(b: dict, readings: list[str], chosen: str = "harvest",
             offering: tuple[str, int] | None = None,
@@ -37,36 +103,9 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALTAR", drop=False)
 
-    # The room. The frieze runs above the stone, the diviner stands beside it.
-    surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
-    art.draw(surface, (width - 34) // 2, 3, art.ALTAR,
-             lit=C["flame"], mid=C["blood"], dark=C["wine"], edge=C["faint"])
-    art.draw(surface, 3, 8, art.PRIEST, lit=C["bone"], mid=C["dim"],
-             dark=C["faint"])
-    surface.text(3, 18, "the diviner", C["wine"], C["ink"])
-
-    y = 17
-    surface.text(20, y, "─" * (width - 23), C["faint"], C["ink"])
-    y += 1
-
-    # What he has said, most recent last, in his own voice.
-    if not readings:
-        for line in textwrap.wrap(
-                "He waits with his hands on the stone. He will not begin until "
-                "he is asked, and he will not ask what you want to hear.",
-                width - 24):
-            surface.text(20, y, line, C["ash"], C["ink"])
-            y += 1
-    for reading in readings[-4:]:
-        for line in textwrap.wrap(reading, width - 24):
-            if y >= height - 11:
-                break
-            surface.text(20, y, line, C["bone"], C["ink"])
-            y += 1
-        y += 1
-
     # --- what may be asked ---------------------------------------------------
     foot = height - 10
+    _room(surface, width, foot, readings)
     style.bar(surface, 2, foot, width - 4, " WHAT YOU WOULD KNOW",
               fg=C["bone"], bg=C["faint"])
     people = [
@@ -77,19 +116,20 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
         (person for person in people if person["id"] == subject), None)
     subject_name = (
         chosen_person["name"] if chosen_person is not None
-        else "choose a living member of the house")
+        else "choose a house member")
     for offset, (key, label, topic) in enumerate(QUESTIONS):
         shown = (
             f"of the death of {subject_name}" if topic == "death" else label)
-        style.keycap(surface, 3, foot + 1 + offset, key, shown[:55])
+        label_room = max(8, width - 18)
+        style.keycap(surface, 3, foot + 1 + offset, key, shown[:label_room])
         if topic == chosen:
-            surface.text(width - 10, foot + 1 + offset, "◄ this",
+            surface.text(width - 9, foot + 1 + offset, "◄ this",
                          C["flame"], C["ink"])
 
     if chosen == "death":
-        style.keycap(surface, 37, foot + 4, "[", "previous",
+        style.keycap(surface, 3, foot + 4, "[", "previous",
                      enabled=len(people) > 1)
-        style.keycap(surface, 53, foot + 4, "]", "next",
+        style.keycap(surface, 19, foot + 4, "]", "next",
                      enabled=len(people) > 1)
 
     style.bar(surface, 2, foot + 5, width - 4, " WHAT YOU WOULD GIVE",
@@ -112,6 +152,6 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             "it buys a readier one."[:width - 6],
             C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
-              " [enter] put the question   ·   two hours, and what you laid down",
+              " [enter] ask   ·   2 hours + offering",
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

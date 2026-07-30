@@ -1,4 +1,4 @@
-# The M13.1 kernel world.
+# The kernel world.
 #
 # Three settlements under one accounting grammar. Ugarit is the player's seat
 # and does not decide for itself here -- its detailed state is still the legacy
@@ -9,6 +9,48 @@
 #
 # Quantities are qa of grain. Person-days are per fortnight. Rates scaled by
 # 1000 are integer ratios, never floats (spec 10.3).
+#
+# The numbers below are calibrated against each other, not measured from a
+# tablet, and should be read as a working economy rather than as a claim about
+# the thirteenth century. What they are calibrated to produce, and what the
+# tests pin, is a specific shape: an ordinary year leaves a modest surplus, the
+# harvest window is the moment when hands are scarce, and a dry year opens a
+# gap that no amount of local effort closes. That last one is deliberate. It is
+# the reason the settlements will need each other once M13.2 gives them ships.
+
+# Climate comes before [seasons] and must stay there. Written after the header
+# it is not a top-level key at all, it is a season named "climate" -- which is
+# how it was authored until M13.2, and why every year of the world had
+# identical weather without anything reporting a fault. The loader now refuses
+# a season that is not a fortnight span, so the mistake cannot come back
+# quietly.
+#
+# By absolute turn, wrapping -- four years of twenty-four fortnights, so the
+# weather is not the same every year. Only the growing fortnights are ever
+# read, which is why a year is written as one figure repeated: a drought that
+# arrives after the harvest is in is not a drought that matters to the harvest.
+# A growing season straddles two of these blocks (it runs from the twenty-third
+# fortnight of one year into the seventh of the next), so a year's character
+# reaches the crop that was sown at the end of the year before it.
+#
+# 100 is an ordinary year. Nothing here is a scripted crisis: it is weather, it
+# is the same weather for every settlement in the region, and what it does to
+# each of them depends on what that settlement decided and how much ground it
+# had to decide over.
+climate = [
+  # year one: ordinary
+  100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+  100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+  # year two: a wet winter and a good spring
+  112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112,
+  112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112,
+  # year three: the rains fail
+  62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62,
+  62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62,
+  # year four: late and thin, but a harvest
+  88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88,
+  88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88,
+]
 
 [seasons]
 sowing    = [19, 22]
@@ -17,12 +59,7 @@ harvest   = [8, 11]
 threshing = [12, 13]
 low_water = [14, 18]
 sailing   = [5, 20]     # the sea is shut outside this span
-
-# By absolute turn, wrapping. 100 is an ordinary year. The dip is not a scripted
-# crisis: it is weather, it is the same weather for everyone in the region, and
-# what it does to each settlement depends on what that settlement decided.
-climate = [100, 100, 96, 92, 88, 80, 72, 64, 60, 64, 72, 84,
-           96, 104, 108, 112, 108, 104, 100, 96, 100, 104, 100, 100]
+overland  = [1, 21]     # and the road up-country is out in the deep wet
 
 [[regions]]
 id = "region:north_levant"
@@ -45,7 +82,12 @@ name = "Alashiya"
 seat = "settlement:alashiya_port"
 controls = ["settlement:alashiya_port"]
 
-# --- Ugarit: the seat, and not autonomous in M13.1 ----------------------------
+# --- Ugarit: the seat, and not autonomous ------------------------------------
+#
+# Nothing here decides, so nothing here is farmed by the kernel: no council
+# organization means no decider, and the fields sit. That is not an oversight,
+# it is what "the legacy court still owns Ugarit" means, and it is what M13.2
+# ends when the court becomes an adapter over these entities.
 
 [[settlements]]
 id = "settlement:ugarit"
@@ -61,7 +103,8 @@ name = "the fields of Ugarit"
 settlement = "settlement:ugarit"
 region = "region:north_levant"
 function = "estate"
-capacity = 1050          # qa per person-day, scaled 1000
+capacity = 7500          # qa returned per 1000 qa sown: the best ground here
+extent = 46000           # qa of seed the plain takes in a year
 
 [[cohorts]]
 id = "cohort:ugarit_fields"
@@ -76,13 +119,19 @@ good = "grain"
 quantity = 26000
 
 # --- Ma'hadu: the port, and it runs itself ------------------------------------
+#
+# Sized to feed itself in an ordinary year with something over, and to fail in
+# a dry one. Five hundred and sixty people eating ten qa a fortnight need
+# 134,400 qa in a year; twenty-six thousand qa of seed at seven to one returns
+# about 182,000 standing, which is a little under 171,000 threshed -- enough,
+# once next year's seed is taken out of it, and not enough twice running.
 
 [[settlements]]
 id = "settlement:mahadu"
 name = "Ma'hadu"
 region = "region:north_levant"
 polity = "polity:ugarit"
-sites = ["site:mahadu_fields", "site:mahadu_harbour"]
+sites = ["site:mahadu_fields", "site:mahadu_god_land", "site:mahadu_harbour"]
 
 [[sites]]
 id = "site:mahadu_fields"
@@ -90,7 +139,22 @@ name = "the fields behind Ma'hadu"
 settlement = "settlement:mahadu"
 region = "region:north_levant"
 function = "estate"
-capacity = 880           # thinner ground than the plain of Ugarit
+holder = "org:mahadu_council"
+capacity = 7000          # thinner ground than the plain of Ugarit
+extent = 26000
+
+# The god's land. Better ground and less of it, worked by the temple's own
+# decision and not the council's -- which is how the records have it, and which
+# leaves the two of them competing for hands rather than for furrows.
+[[sites]]
+id = "site:mahadu_god_land"
+name = "the god's land at Ma'hadu"
+settlement = "settlement:mahadu"
+region = "region:north_levant"
+function = "estate"
+holder = "org:mahadu_temple"
+capacity = 7600
+extent = 5000
 
 [[sites]]
 id = "site:mahadu_harbour"
@@ -108,9 +172,10 @@ kind = "council"
 policy = "subsistence"
 authority = 300
 
-# A second claimant on the same body of people. The elders and the temple both
-# want the fortnight's hands, and in a thin year the allocator decides who goes
-# short -- there is no authored split between them.
+# The second claimant on one body of people. The elders and the temple both
+# want the harvest fortnight's hands, and the allocator decides who goes short
+# -- there is no authored split between them. The temple wins on authority,
+# which is the claim being modelled and is not the same as it being just.
 [[orgs]]
 id = "org:mahadu_temple"
 name = "the house of Baal at the harbour"
@@ -134,10 +199,55 @@ households = 30
 people = 120
 labour_per_head = 10
 
+# The house that owns the crossing (spec 6.6, M13.2's merchant organization).
+#
+# It is not a market and it is not a price mechanism: it is one interested party
+# that buys where grain is cheap, carries it at its own risk, and sells where it
+# is dear. Nothing obliges it to sail and nothing obliges anyone to buy from it,
+# which is why an island can starve with a full ship two fortnights away.
+#
+# Lowest authority in the town. When the harvest fortnight comes and the elders
+# and the temple both want hands, the merchant is who goes without -- which is
+# roughly the standing of a trading house against a palace and a god, and it
+# makes the sailing season's overlap with the harvest bite the right way round.
+[[orgs]]
+id = "org:mahadu_merchant"
+name = "the house of Sinaranu"
+settlement = "settlement:mahadu"
+kind = "merchant"
+policy = "trade"
+authority = 100
+
+# Its working capital. Copper rather than silver because that is what the trade
+# was: Alashiya bought grain with the metal it dug, and Ugarit's merchant houses
+# grew rich carrying it. Sixty shekels of copper stow like one qa of grain, so a
+# ship can bring home the price of the cargo it took out.
+[[stores]]
+settlement = "settlement:mahadu"
+owner = "org:mahadu_merchant"
+good = "copper"
+quantity = 4000
+
+# What is in hand and what is already in the ground. Play does not begin at the
+# beginning of a story: it is the first fortnight of the year, the crop was
+# sown last autumn, and the granary holds what is left of last year's.
 [[stores]]
 settlement = "settlement:mahadu"
 good = "grain"
-quantity = 9000
+quantity = 80000
+
+[[stores]]
+settlement = "settlement:mahadu"
+site = "site:mahadu_fields"
+good = "standing_grain"
+quantity = 182000
+
+[[stores]]
+settlement = "settlement:mahadu"
+site = "site:mahadu_god_land"
+owner = "org:mahadu_temple"
+good = "standing_grain"
+quantity = 38000
 
 # The port owes the crown a fixed render each harvest. It is not deducted
 # automatically: the elders decide whether they can spare it, and when they
@@ -155,6 +265,13 @@ authority = "polity:ugarit"
 consequence = "the king would send for the elders"
 
 # --- the Alashiyan port: foreign, and it runs itself --------------------------
+#
+# Deliberately short of ground. Five hundred people, a hundred and seventy of
+# them at the copper rather than in the fields, and an estate that returns
+# something over half of what they eat. Nothing local closes that gap: worked
+# perfectly, in the best year on the calendar, the island still runs down. It
+# is the clearest statement the world makes that trade is not decoration, and
+# it is what M13.2's ships are for.
 
 [[settlements]]
 id = "settlement:alashiya_port"
@@ -169,7 +286,9 @@ name = "the Alashiyan fields"
 settlement = "settlement:alashiya_port"
 region = "region:alashiya"
 function = "estate"
-capacity = 760
+holder = "org:alashiya_council"
+capacity = 5500          # thin island ground
+extent = 12000
 
 [[sites]]
 id = "site:alashiya_mine"
@@ -205,12 +324,120 @@ ration_per_head = 11
 [[stores]]
 settlement = "settlement:alashiya_port"
 good = "grain"
-quantity = 6200
+quantity = 60000
+
+[[stores]]
+settlement = "settlement:alashiya_port"
+site = "site:alashiya_fields"
+good = "standing_grain"
+quantity = 66000
+
+# What the island pays with, and the second clock running on it.
+#
+# The mine above produces nothing: extraction is M13.3's, and until it is built
+# this store is a stock rather than an income. That is deliberately visible. The
+# island no longer starves for want of grain -- there is grain, two fortnights
+# away, and ships that will bring it -- it starves for want of anything left to
+# buy it with, and it does so on a clock of years instead of months. Trading a
+# fast death for a slow one is what trade actually does, and the slow one is the
+# problem the next milestone is for.
+[[stores]]
+settlement = "settlement:alashiya_port"
+owner = "org:alashiya_council"
+good = "copper"
+quantity = 60000
+
+# --- Ari: up-country, and the reason the crossing has anything to carry -------
+#
+# M13.2's inland supplier. Much ground and few mouths, which is the whole of
+# what it is for: Ma'hadu can feed itself and no more, so a crossing that had
+# only the port to draw on would move a rounding error and the island would die
+# anyway. The grain that keeps Alashiya alive is grown here, walks a fortnight
+# down to the harbour, and crosses from there. Nothing in Ari knows that, and
+# nothing in Ari would care: it sells its surplus because copper keeps.
+#
+# It opens with more than a year of eating already in the granary, and that is
+# the difference between a place that grows a surplus and a place that has one.
+# A council will not sell into its own winter, so a town authored at the edge of
+# subsistence has nothing to offer for the two years it takes to build a
+# reserve -- which is a fair description of most of the ancient countryside and
+# a poor description of the one settlement in this world whose job is to supply
+# a port. Ari has been selling grain down that road for generations.
+#
+# The road is the second constraint and it does not agree with the first. It is
+# out in the deep wet, when the sea is open at neither end; the sea is shut for
+# four fortnights when the road is fine. A cargo has to pass both, and the
+# fortnight that suits one may not suit the other.
+
+[[settlements]]
+id = "settlement:ari"
+name = "Ari"
+region = "region:north_levant"
+polity = "polity:ugarit"
+sites = ["site:ari_fields"]
+
+[[sites]]
+id = "site:ari_fields"
+name = "the fields of Ari"
+settlement = "settlement:ari"
+region = "region:north_levant"
+function = "estate"
+holder = "org:ari_council"
+capacity = 7500          # the good plain ground, the same as Ugarit's
+extent = 60000
+
+[[orgs]]
+id = "org:ari_council"
+name = "the headman of Ari and his brothers"
+settlement = "settlement:ari"
+kind = "council"
+policy = "subsistence"
+authority = 200
+
+[[cohorts]]
+id = "cohort:ari_fields"
+settlement = "settlement:ari"
+kind = "field_labour"
+households = 112
+people = 560
+
+[[stores]]
+settlement = "settlement:ari"
+good = "grain"
+quantity = 200000
+
+[[stores]]
+settlement = "settlement:ari"
+site = "site:ari_fields"
+good = "standing_grain"
+quantity = 420000
+
+[[routes]]
+id = "route:ari_mahadu"
+name = "the road down to the harbour"
+capacity = 5000
+risk = 30                # a road is not a sea, but it is not nothing either
+
+[[routes.legs]]
+origin = "settlement:ari"
+destination = "site:mahadu_harbour"
+mode = "road"
+fortnights = 1
+season = "overland"
 
 [[routes]]
 id = "route:mahadu_alashiya"
 name = "the crossing to Alashiya"
-capacity = 3000
+# Qa of grain per fortnight, in each direction: the port's whole carrying trade,
+# not one hull. Individual vessels with condition, crew, and provisioning are
+# M13.3's, and until then this is the honest abstraction rather than a ship
+# pretending to be a fleet.
+#
+# Sized against the island's shortfall on purpose. A crossing that could carry
+# everything would make the season and the capacity decorative; this one can
+# just about close the gap across a full sailing season, so a lost cargo or a
+# fortnight of bad decisions is not made up later in the year.
+capacity = 5000
 risk = 120
 
 [[routes.legs]]

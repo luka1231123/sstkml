@@ -66,6 +66,101 @@ class DictateReply:
 
 
 @dataclasses.dataclass(frozen=True)
+class RecordReplyText:
+    """The words a foreign court's answer is read in, accepted and kept.
+
+    Not player intent and not a fact: the decision, the terms, and the figures
+    were the engine's before any language existed (spec 2.7). This records that
+    a particular reading of them was accepted, so a reloaded or replayed game
+    reads the same tablet instead of asking a model for it again (spec 2.6,
+    5.3). It costs the king nothing, because reading a tablet aloud is not an
+    act of rule.
+
+    Recorded once. A tablet already carrying accepted words keeps them; the
+    second reading is discarded rather than allowed to rewrite what was read.
+    """
+    letter_id: str
+    text: str
+
+
+LETTER_TERM_KINDS = frozenset({
+    "gift",
+    "request_good",
+    "promise_good",
+    "service",
+    "marriage_proposal",
+})
+
+
+@dataclasses.dataclass(frozen=True)
+class LetterTerm:
+    """One engine-readable term carried by a tablet.
+
+    Terms contain commitments and requests, never tone or generated prose.
+    World-dependent checks (known goods, living people, valid destinations)
+    happen when the dispatch is applied.
+    """
+    _registry_value = True
+
+    kind: str
+    good: str = ""
+    quantity: int = 0
+    person_id: str = ""
+    destination: str = ""
+    due_turn: int = 0
+
+    def __post_init__(self) -> None:
+        if self.kind not in LETTER_TERM_KINDS:
+            raise ValueError(f"unknown letter term kind: {self.kind!r}")
+        if self.quantity < 0:
+            raise ValueError("letter term quantity cannot be negative")
+        if self.due_turn < 0:
+            raise ValueError("letter term due_turn cannot be negative")
+        if self.kind in {"gift", "request_good", "promise_good"}:
+            if not self.good or self.quantity <= 0:
+                raise ValueError(
+                    f"{self.kind} requires a good and positive quantity")
+        elif self.kind == "service":
+            if self.quantity <= 0 or not self.destination:
+                raise ValueError(
+                    "service requires positive person-days and a destination")
+        elif self.kind == "marriage_proposal" and not self.person_id:
+            raise ValueError("marriage_proposal requires a selected person")
+
+
+@dataclasses.dataclass(frozen=True)
+class DispatchLetter:
+    """Seal and dispatch the player's exact words with explicit terms."""
+    recipient: str
+    reply_to: str
+    text: str
+    profile: str
+    terms: tuple[LetterTerm, ...]
+    scribe_id: str
+    seal: str
+    courier_id: str
+    path: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        required = {
+            "recipient": self.recipient,
+            "text": self.text.strip(),
+            "profile": self.profile,
+            "scribe_id": self.scribe_id,
+            "seal": self.seal,
+            "courier_id": self.courier_id,
+        }
+        missing = tuple(name for name, value in required.items() if not value)
+        if missing:
+            raise ValueError(
+                "dispatch requires " + ", ".join(missing))
+        if not self.path:
+            raise ValueError("dispatch requires a route path")
+        if not all(isinstance(term, LetterTerm) for term in self.terms):
+            raise TypeError("dispatch terms must be LetterTerm values")
+
+
+@dataclasses.dataclass(frozen=True)
 class InspectLedger:
     ledger: str      # "granary" | "seed" — spend an hour, see the true count
 
@@ -341,6 +436,21 @@ class LetterDelegated:
 class LedgerInspected:
     ledger: str
     true_value: int
+
+
+@dataclasses.dataclass(frozen=True)
+class CargoLanded:
+    """Goods that left a named foreign granary have entered the court's stores.
+
+    The one event that explains an increase the court did not produce, and the
+    reason the conservation audit can still balance a fortnight in which a
+    foreign court's caravan arrived (SPEC.md 2.2). It names the reservation, so
+    the record it settles is one lookup away.
+    """
+    record_id: str
+    sender: str
+    good: str
+    quantity: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -804,7 +914,8 @@ class OfferingConsumed:
 _TYPES = {
     c.__name__: c for c in (
         EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, ArchiveLetter,
-        DelegateLetter, DictateReply,
+        DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
+        RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
         HearPetition, RulePetition,
         SetLandDue, SetHarbourDue, PlacePerson, DismissPerson, NameHeir,
@@ -839,25 +950,53 @@ _TYPES = {
 }
 
 
+def _encode(value):
+    if dataclasses.is_dataclass(value):
+        return {
+            "_t": type(value).__name__,
+            **{
+                field.name: _encode(getattr(value, field.name))
+                for field in dataclasses.fields(value)
+            },
+        }
+    if isinstance(value, (tuple, list)):
+        return [_encode(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _encode(item) for key, item in value.items()}
+    return value
+
+
+def _decode(value):
+    if isinstance(value, list):
+        # Action/event collections are immutable throughout the engine.
+        return tuple(_decode(item) for item in value)
+    if isinstance(value, dict):
+        if "_t" not in value:
+            return {key: _decode(item) for key, item in value.items()}
+        cls = _TYPES[value["_t"]]
+        kwargs = {}
+        for field in dataclasses.fields(cls):
+            if field.name not in value:
+                if field.default is not dataclasses.MISSING:
+                    kwargs[field.name] = field.default
+                    continue
+                if field.default_factory is not dataclasses.MISSING:
+                    kwargs[field.name] = field.default_factory()
+                    continue
+                raise KeyError(field.name)
+            kwargs[field.name] = _decode(value[field.name])
+        return cls(**kwargs)
+    return value
+
+
 def to_dict(obj) -> dict:
-    d = {"_t": type(obj).__name__}
-    for f in dataclasses.fields(obj):
-        v = getattr(obj, f.name)
-        d[f.name] = list(v) if isinstance(v, tuple) else v
-    return d
+    encoded = _encode(obj)
+    if not isinstance(encoded, dict) or "_t" not in encoded:
+        raise TypeError("only registered action/event dataclasses can be encoded")
+    if encoded["_t"] not in _TYPES:
+        raise KeyError(encoded["_t"])
+    return encoded
 
 
 def from_dict(d: dict):
-    cls = _TYPES[d["_t"]]
-    kwargs = {}
-    for f in dataclasses.fields(cls):
-        if f.name not in d:
-            if f.default is not dataclasses.MISSING:
-                kwargs[f.name] = f.default
-                continue
-            raise KeyError(f.name)
-        v = d[f.name]
-        if isinstance(v, list):
-            v = tuple(v)
-        kwargs[f.name] = v
-    return cls(**kwargs)
+    return _decode(d)

@@ -12,9 +12,9 @@ from engine import actions as A
 
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
-    "INSPECT_LEDGER", "EAT_SEED", "SEND_GIFT", "END_TURN",
+    "INSPECT_LEDGER", "EAT_SEED", "END_TURN",
     "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE", "ASSIGN_TROOPS",
-    "CONSULT_DIVINER", "MARRY_ABROAD", "SWEAR_OATH",
+    "CONSULT_DIVINER", "SWEAR_OATH",
     "DREDGE_CANAL", "BUILD", "REPAIR", "ABANDON_WORK",
     "SUPPRESS_OMEN", "DEFY_OMEN", "QUARANTINE", "LIFT_QUARANTINE",
     "EXPIATE", "SEARCH_ARCHIVE", "HEAR_PETITION", "RULE_PETITION",
@@ -44,6 +44,12 @@ class ParseResult:
     question: str | None = None
     source: str = "model"
     unavailable: bool = False
+
+
+LETTER_ONLY_DIPLOMACY = (
+    "Open the World, choose the foreign court, then write at the Desk; "
+    "gifts and marriages are terms of a letter."
+)
 
 
 # The deterministic Belief readers live in `affordances`, which the palette
@@ -81,9 +87,49 @@ def _resolve_place(value, belief):
     return affordances.resolve("place", value, belief)
 
 
+def _letter_only_diplomacy(text: str, belief: dict) -> ParseResult | None:
+    """Catch former one-line diplomacy without turning it into an action.
+
+    Resolution keeps ``send troops ...`` and other legitimate uses of "send"
+    out of this redirect. Both the offline parser and the model-backed path call
+    this before action parsing, so enabling a model cannot restore the removed
+    immediate mutation.
+    """
+    match = re.fullmatch(
+        r"(?:gift|send)\s+(\w+)\s+(\w+)\s+(\d+)", text)
+    if match:
+        actors = {r["other"] for r in belief.get("relations", [])}
+        goods = {g["id"] for g in belief.get("gift_goods", [])}
+        if match[1] in actors and match[2] in goods:
+            return ParseResult(
+                question=LETTER_ONLY_DIPLOMACY, source="preparser")
+
+    match = re.fullmatch(
+        r"send\s+(\d+)\s+(\w+)\s+to\s+(\w+)", text)
+    if match:
+        actors = {r["other"] for r in belief.get("relations", [])}
+        goods = {g["id"] for g in belief.get("gift_goods", [])}
+        if match[3] in actors and match[2] in goods:
+            return ParseResult(
+                question=LETTER_ONLY_DIPLOMACY, source="preparser")
+
+    match = re.fullmatch(
+        r"(?:marry|send)\s+(.+?)\s+(?:to|into)"
+        r"(?:\s+the)?(?:\s+court\s+of)?\s+([\w:.-]+)", text)
+    person = _resolve_person(match[1], belief) if match else None
+    actors = {r["other"] for r in belief.get("relations", [])}
+    if match and person and match[2] in actors:
+        return ParseResult(
+            question=LETTER_ONLY_DIPLOMACY, source="preparser")
+    return None
+
+
 def preparse(line: str, belief: dict) -> ParseResult | None:
     """Only high-confidence forms belong here; ambiguity goes to the model."""
     text = line.lower().strip().rstrip(".")
+    redirected = _letter_only_diplomacy(text, belief)
+    if redirected is not None:
+        return redirected
     groups = {g["id"] for g in belief["groups"]}
     match = re.fullmatch(
         r"(?:allocate|give|pay)\s+(.+?)\s+(\d+)(?:\s+qa)?", text)
@@ -104,24 +150,6 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     match = re.fullmatch(r"(?:eat|use)\s+(\d+)(?:\s+qa)?(?:\s+of)?\s+seed(?:\s+grain)?", text)
     if match:
         return ParseResult((A.EatSeed(int(match[1])),), source="preparser")
-    match = re.fullmatch(
-        r"(?:gift|send)\s+(\w+)\s+(\w+)\s+(\d+)", text)
-    if match:
-        actors = {r["other"] for r in belief.get("relations", [])}
-        goods = {g["id"] for g in belief.get("gift_goods", [])}
-        if match[1] in actors and match[2] in goods:
-            return ParseResult((
-                A.SendGift(match[1], match[2], int(match[3])),),
-                source="preparser")
-    match = re.fullmatch(
-        r"send\s+(\d+)\s+(\w+)\s+to\s+(\w+)", text)
-    if match:
-        actors = {r["other"] for r in belief.get("relations", [])}
-        goods = {g["id"] for g in belief.get("gift_goods", [])}
-        if match[3] in actors and match[2] in goods:
-            return ParseResult((
-                A.SendGift(match[3], match[2], int(match[1])),),
-                source="preparser")
     match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(.{1,200})", text)
     if match and (letter := _resolve_letter(match[1], belief)):
         return ParseResult((A.DictateReply(letter, match[2]),), source="preparser")
@@ -251,15 +279,6 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     if match and match[1] in {o["id"] for o in belief.get("oaths", [])}:
         return ParseResult((A.SwearOath(match[1]),), source="preparser")
     match = re.fullmatch(
-        r"(?:marry|send)\s+(.+?)\s+(?:to|into)"
-        r"(?:\s+the)?(?:\s+court\s+of)?\s+([\w:.-]+)", text)
-    person = _resolve_person(match[1], belief) if match else None
-    if (match and person
-            and match[2] in {relation["other"]
-                             for relation in belief.get("relations", [])}):
-        return ParseResult(
-            (A.MarryAbroad(person, match[2]),), source="preparser")
-    match = re.fullmatch(
         r"(?:suppress|hush)(?:\s+the)?(?:\s+omen)?\s+([\w:.-]+)", text)
     if match and match[1] in _omen_ids(belief):
         return ParseResult((A.SuppressOmen(match[1]),), source="preparser")
@@ -388,15 +407,6 @@ def _action(item: dict, belief: dict):
         return A.InspectLedger(args["ledger"])
     if verb == "EAT_SEED" and type(args.get("qa")) is int:
         return A.EatSeed(args["qa"])
-    if verb == "SEND_GIFT":
-        recipient = args.get("recipient")
-        good, quantity = args.get("good"), args.get("quantity")
-        actors = {r["other"] for r in belief.get("relations", [])}
-        goods = {g["id"] for g in belief.get("gift_goods", [])}
-        if (recipient not in actors or good not in goods
-                or type(quantity) is not int):
-            raise ValueError("invalid gift")
-        return A.SendGift(recipient, good, quantity)
     if verb in ("SEND_TO_HARVEST", "RECALL_FROM_HARVEST"):
         group = args.get("group")
         if group not in groups:
@@ -442,12 +452,6 @@ def _action(item: dict, belief: dict):
         if question == "death" and subject not in _house_ids(belief):
             raise ValueError("no such person in the house")
         return A.ConsultDiviner(question, subject if question == "death" else "")
-    if verb == "MARRY_ABROAD":
-        person, actor = args.get("person"), args.get("actor")
-        actors = {r["other"] for r in belief.get("relations", [])}
-        if person not in _house_ids(belief) or actor not in actors:
-            raise ValueError("invalid marriage")
-        return A.MarryAbroad(person, actor)
     if verb == "SWEAR_OATH":
         oath = args.get("oath")
         if oath not in _oath_ids(belief):
@@ -511,10 +515,17 @@ def _action(item: dict, belief: dict):
 
 def parse(line: str, belief: dict, hours_left: int, seed: int, turn: int,
           client=None) -> ParseResult:
-    quick = preparse(line, belief)
-    if quick:
-        return quick
+    redirected = _letter_only_diplomacy(
+        line.lower().strip().rstrip("."), belief)
+    if redirected is not None:
+        return redirected
     if client is None:
+        # Headless tests and runtime recovery may still exercise the exact
+        # grammar directly. The shipped controllers require a client and send
+        # free-form court language through it first.
+        quick = preparse(line, belief)
+        if quick:
+            return quick
         return ParseResult(unavailable=True)
     messages = [
         {"role": "system", "content":

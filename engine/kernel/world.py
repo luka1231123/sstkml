@@ -12,16 +12,29 @@ result. Delete any settlement and the rest carry on, because none of them was
 reading anything the others owned.
 
 The economy modelled is deliberately one chain -- fields, labour, grain,
-eating, and a tribute obligation -- because M13.1's job is the kernel, not the
-economy. M13.2 puts the grain slice on top of it.
+eating, and a tribute obligation -- because the kernel's job is the kernel, not
+the whole economy.
 
-One honest limitation, stated rather than hidden: production here runs every
-fortnight and is not gated on the agricultural seasons. The kernel needs a
-production phase that competes for labour and conserves goods, and it has one;
-it does not yet need the sowing-growing-harvest-threshing chain, which is
-exactly what M13.2 delivers on top of this. The seasons are authored and used
--- the tribute falls due in the harvest window -- but the fields do not keep
-them yet. Do not read the grain figures here as a balanced economy.
+M13.1 ran that chain flat: every fortnight of the year turned person-days into
+grain at one rate, which the module admitted at the time was placeholder. M13.2
+replaces it with the real agricultural year in `engine.kernel.farm` -- sowing,
+growing, harvest, threshing -- and the difference is not decoration. A flat rate
+has no moments, so moving labour costs the same whenever you move it. A year
+with a four-fortnight harvest window has a moment where hands are everything,
+and a settlement that spent them elsewhere does not get a second chance until
+next year.
+
+The other half of M13.2 is `engine.kernel.carry`, and the two halves are the
+same argument. The grain year ends with a settlement that is short of ground
+rather than short of effort, so no decision it can make at home closes the gap;
+the crossing is how grain reaches it from somewhere with a surplus, and it is
+the first thing in this world that exists in neither place while it happens.
+
+What that buys is not a supply line, it is a second way to be wrong. A council
+now decides what to sell against a winter it has not had yet, and a merchant
+commits to a crossing on a price it heard about four fortnights ago, from the
+last ship in -- because news travels on the same hulls as the cargo, and a ship
+that sinks carries neither.
 """
 from __future__ import annotations
 
@@ -34,11 +47,13 @@ from engine import observe as OB
 from engine import ownership as W
 from engine.core import Date, stream
 from engine.entity import Cohort, EntityId, Registry, check, mint
+from engine.kernel import carry as C
+from engine.kernel import farm as F
 from engine.kernel import resolve as R
 from engine.kernel import turn as T
 from engine.kernel.intent import Intent, Snapshot, open_turn
 
-GRAIN = "grain"
+GRAIN = F.GRAIN
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +69,14 @@ class Kernel:
     seasons: Mapping[str, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
     climate: tuple[int, ...] = ()     # by absolute turn; 100 is an ordinary year
+    # Per good, per fortnight, scaled 1000. Authored in content/goods.toml and
+    # carried here rather than looked up, because engine/ does not read files.
+    # A good absent from this mapping does not spoil.
+    spoilage: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # Cargo at sea. The only thing in the world that is in neither of the places
+    # it concerns, which is why it is state and the contracts that put it there
+    # are not: a bargain is struck and settled in a fortnight, a crossing is not.
+    voyages: tuple[C.Voyage, ...] = ()
 
     # --- reading ------------------------------------------------------------
 
@@ -79,12 +102,25 @@ class Kernel:
     def labour(self, settlement: EntityId) -> int:
         return sum(c.labour() for c in self.cohorts_of(settlement))
 
-    def field_site(self, settlement: EntityId) -> EntityId:
-        for site_id in sorted(self.registry.sites):
-            site = self.registry.sites[site_id]
-            if site.settlement == settlement and site.function == "estate":
+    def field_site(self, settlement: EntityId, actor: EntityId = "") -> EntityId:
+        """The estate an actor works at a place, or the place's first estate.
+
+        An actor that holds ground of its own gets that ground. An actor that
+        holds none falls back to whatever the settlement's common fields are --
+        which is also what a caller asking about the place rather than about
+        anyone in particular is asking for.
+        """
+        estates = [i for i in sorted(self.registry.sites)
+                   if self.registry.sites[i].settlement == settlement
+                   and self.registry.sites[i].function == "estate"]
+        if actor:
+            for site_id in estates:
+                if self.registry.sites[site_id].holder == actor:
+                    return site_id
+        for site_id in estates:
+            if not self.registry.sites[site_id].holder:
                 return site_id
-        return ""
+        return estates[0] if estates else ""
 
     def deciders(self) -> tuple[EntityId, ...]:
         """Every organization that decides, in a stable order.
@@ -117,79 +153,175 @@ class Kernel:
 # could read another settlement's granary, and nothing in the output would show
 # it had. tests/test_kernel_world.py inspects these signatures.
 
-def subsistence(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
-    """Feed your people, work your fields, pay what you believe you owe.
+def _work(actor: EntityId, belief: B.Belief, subject: EntityId,
+          task: str, days: int) -> Intent | None:
+    """One ask for person-days, or nothing if the actor wants none."""
+    if days <= 0:
+        return None
+    return Intent(
+        id=f"{actor}|{task}|{subject}", actor=actor, kind="produce", task=task,
+        turn=belief.value(subject, "turn", 0), subject=subject,
+        resource=f"{subject}#labour", quantity=days, authority=actor,
+        priority=1, basis=tuple(c.id for c in belief.about(subject, "season")))
 
-    Everything below comes from `belief.value(...)`. If the council has not
-    seen its granary this turn it acts on the last count it has, which is the
-    entire reason claims carry a date.
+
+def _farm(actor: EntityId, belief: B.Belief, home: EntityId,
+          feeds_town: bool) -> tuple[Intent, ...]:
+    """Do this fortnight's field work, and set next year's seed aside.
+
+    Every quantity comes from `belief.value(...)`, including which season it is.
+    That last one matters more than it looks: a policy that asked the calendar
+    would be reading the world, and the whole arrangement in spec 10.11 is that
+    an actor decides from what it holds. An actor knows the season the same way
+    it knows its granary -- by living there -- so the season arrives as a claim.
+
+    `feeds_town` is the difference between a council and a temple, and it is
+    about who goes hungry if the seed is set aside. A council is answerable for
+    the town's rations and keeps them back first; a temple keeps back nothing,
+    because the mouths it answers for are counted in the town's own.
+
+    Only at home. Since the crossing, an actor holds claims about ports across
+    the water, and nobody farms a field they have merely had word of.
     """
     intents: list[Intent] = []
+    for subject in (home,) if home else ():
+        task = F.TASK_FOR.get(belief.value(subject, "season", F.NO_SEASON), "")
+        if not task:
+            continue
 
-    # The council knows its own place: the claims it holds about labour, stores,
-    # and what it owes are keyed by the settlement it sits in. Sorted, so that
-    # a council with claims about more than one place decides in a fixed order.
-    subjects = sorted({c.subject for c in belief.claims
-                       if c.attribute in ("labour", "stores_grain", "owes")})
-    for subject in subjects:
-        labour = belief.value(subject, "labour", 0)
-        if labour > 0:
+        if task == "sow":
+            # Bounded by the seed kept and by ground still unsown. Both are
+            # things the actor can see; neither is the engine telling it what
+            # it can afford.
+            land = max(0, belief.value(subject, "extent", 0)
+                       - belief.value(subject, "under_crop", 0))
+            days = F.days_for(min(belief.value(subject, "own_seed", 0), land),
+                              F.SOW_PER_DAY)
+        elif task == "tend":
+            days = F.days_for(belief.value(subject, "own_standing", 0),
+                              F.TEND_PER_DAY)
+        elif task == "reap":
+            days = F.days_for(belief.value(subject, "own_standing", 0),
+                              F.REAP_PER_DAY)
+        else:
+            days = F.days_for(belief.value(subject, "own_sheaves", 0),
+                              F.THRESH_PER_DAY)
+
+        ask = _work(actor, belief, subject, task, days)
+        if ask is not None:
+            intents.append(ask)
+
+        if task != "thresh":
+            continue
+
+        # Seed for next year, out of grain that could be eaten this one. Capped
+        # at the ground it could sow and at the seed already in hand, so that a
+        # run of good years does not turn into a granary full of seed nobody
+        # will ever put in the earth.
+        reserve = (belief.value(subject, "need", 0) * F.SEED_RESERVE_FORTNIGHTS
+                   if feeds_town else 0)
+        spare = max(0, belief.value(subject, "own_grain", 0) - reserve)
+        target = max(0, belief.value(subject, "extent", 0)
+                     - belief.value(subject, "own_seed", 0))
+        quantity = min(spare, target)
+        if quantity > 0:
             intents.append(Intent(
-                id=f"{actor}|work|{subject}", actor=actor, kind="work",
-                turn=belief.value(subject, "turn", 0), subject=subject,
-                resource=f"{subject}#labour", quantity=labour,
-                authority=actor, priority=1,
-                basis=tuple(c.id for c in belief.about(subject, "labour"))))
-
-        owed = belief.value(subject, "owes", 0)
-        stores = belief.value(subject, "stores_grain", 0)
-        if owed > 0:
-            # Render only what the council believes it can spare. A tribute
-            # that would empty the granary is not paid; that is a decision, and
-            # it is why obligations default.
-            spare = max(0, stores - belief.value(subject, "need", 0))
-            offer = min(owed, spare)
-            if offer > 0:
-                intents.append(Intent(
-                    id=f"{actor}|render|{subject}", actor=actor, kind="render",
-                    turn=belief.value(subject, "turn", 0), subject=subject,
-                    quantity=offer, authority=actor, priority=2,
-                    basis=tuple(c.id for c in belief.about(subject, "owes"))))
+                id=f"{actor}|seed|{subject}", actor=actor, kind="produce",
+                task="seed", turn=belief.value(subject, "turn", 0),
+                subject=subject, quantity=quantity, authority=actor,
+                priority=1,
+                basis=tuple(c.id for c in belief.about(subject, "own_grain"))))
     return tuple(intents)
+
+
+def _render(actor: EntityId, belief: B.Belief,
+            home: EntityId) -> tuple[Intent, ...]:
+    """Pay what you believe you owe, out of what you believe you can spare."""
+    intents: list[Intent] = []
+    for subject in (home,) if home else ():
+        owed = belief.value(subject, "owes", 0)
+        if owed <= 0:
+            continue
+        # A tribute that would empty the granary is not paid; that is a
+        # decision, and it is why obligations default.
+        spare = max(0, belief.value(subject, "stores_grain", 0)
+                    - belief.value(subject, "need", 0))
+        offer = min(owed, spare)
+        if offer > 0:
+            intents.append(Intent(
+                id=f"{actor}|render|{subject}", actor=actor, kind="render",
+                turn=belief.value(subject, "turn", 0), subject=subject,
+                quantity=offer, authority=actor, priority=2,
+                basis=tuple(c.id for c in belief.about(subject, "owes"))))
+    return tuple(intents)
+
+
+def subsistence(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
+    """Feed your people, work your fields, pay what you owe, and trade the rest.
+
+    A council does not trade for gain and the two market clauses are not a
+    change of character: it sells the surplus of a good year because copper
+    keeps and grain does not, and it buys in a bad one because the alternative
+    is watching a cargo it could have paid for be carried somewhere else.
+
+    Both bounded entirely by belief, which is where a settlement is undone. What
+    it will sell is what it thinks it can spare, decided against a winter it has
+    not had yet. What it can buy is what it has left to pay with -- and when the
+    purse empties, the grain is still on the quay and it is still not theirs.
+    """
+    home = C.home(belief)
+    return (_farm(actor, belief, home, feeds_town=True)
+            + _render(actor, belief, home)
+            + C.sell_surplus(actor, belief, home)
+            + C.buy_shortfall(actor, belief, home))
 
 
 def cult(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
     """Work the god's land. Render nothing: the temple owes the crown nothing.
 
     A second claimant on the same person-days is the point of this policy. The
-    fields and the temple estate draw on one body of people, and the allocator
-    -- not a hand-tuned split -- decides who goes short.
+    god's estate and the town's fields draw on one body of people and one
+    extent of ground, and the allocator -- not a hand-tuned split -- decides who
+    goes short. The temple wins those contests on authority, which is the
+    historical claim being modelled and is not the same as it being right.
     """
-    intents: list[Intent] = []
-    subjects = sorted({c.subject for c in belief.claims
-                       if c.attribute == "labour"})
-    for subject in subjects:
-        labour = belief.value(subject, "labour", 0)
-        if labour <= 0:
-            continue
-        # The temple asks for the share of the season's hands custom gives it,
-        # and asks for all of it whether or not the fields can spare them.
-        intents.append(Intent(
-            id=f"{actor}|work|{subject}", actor=actor, kind="work",
-            turn=belief.value(subject, "turn", 0), subject=subject,
-            resource=f"{subject}#labour", quantity=labour * 3 // 10,
-            authority=actor, priority=1,
-            basis=tuple(c.id for c in belief.about(subject, "labour"))))
-    return tuple(intents)
+    return _farm(actor, belief, C.home(belief), feeds_town=False)
 
 
-POLICIES = {"subsistence": subsistence, "cult": cult}
+POLICIES = {"subsistence": subsistence, "cult": cult, "trade": C.trade}
 
 
 # --- the phases ---------------------------------------------------------------
 
+def _estate_of(world: Kernel, settlement: EntityId, actor: EntityId) -> EntityId:
+    """The ground this actor farms here, or "" if it farms none.
+
+    `field_site` falls back to the settlement's common fields for an actor that
+    holds no estate, which is right for a caller asking about the place. It is
+    wrong for an actor: a merchant house holds no ground, and letting it observe
+    the council's extent would put a number in its belief that it has no
+    business having and that nothing entitles it to act on.
+    """
+    site_id = world.field_site(settlement, actor)
+    site = world.registry.sites.get(site_id)
+    if site is None or (site.holder and site.holder != actor):
+        return ""
+    return site_id
+
+
 def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
-    """Phase 3. Each council counts what is in front of it, and nothing else."""
+    """Phase 3. Each actor counts what is in front of it, and nothing else.
+
+    "In front of it" now has two parts, because an actor is not always in one
+    place. At home it counts everything a fortnight in a small port tells you.
+    Away -- wherever it has goods of its own standing on a quay -- it counts its
+    own property and the price of the day, because it has a factor there doing
+    exactly that.
+
+    What it never gets from here is the state of a place it is not: the far
+    port's stores, its shortfall, what it would pay. Those arrive on a ship, in
+    `carry._tell`, dated to the day the ship left.
+    """
     world: Kernel = snapshot.world
     beliefs = dict(kernel.beliefs)
     turn = snapshot.turn
@@ -198,10 +330,28 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
         need = sum(c.ration() for c in world.cohorts_of(settlement))
         owed = sum(o.outstanding() for o in world.obligations
                    if o.party == settlement and o.status in ("due", "part_paid"))
+        site_id = _estate_of(world, settlement, actor)
+        site = world.registry.sites.get(site_id)
         readings = {
             "stores_grain": world.stores(settlement),
             "people": world.people(settlement),
             "labour": world.labour(settlement),
+            # The ground and how much of it is sown: visible from the field
+            # edge, and the same figure for everyone who farms this estate.
+            "extent": site.extent if site else 0,
+            "under_crop": F.under_crop(world, site_id) if site_id else 0,
+            # Its own property, counted. Not the temple's, not the crown's.
+            "own_grain": F.held(world.book, actor, F.GRAIN, settlement),
+            "own_seed": F.held(world.book, actor, F.SEED, settlement),
+            "own_standing": F.held(world.book, actor, F.STANDING, site_id),
+            "own_sheaves": F.held(world.book, actor, F.SHEAVES, settlement),
+            "own_copper": F.held(world.book, actor, C.COPPER, settlement),
+            "season": F.code_for(world.seasons, world.date.fortnight),
+            # Which place this is: the actor's own claim about where it stands,
+            # so that a policy holding claims about three ports can still tell
+            # which one it lives in without being handed the registry.
+            "home": 1,
+            **C.readings(world, settlement),
         }
         belief = beliefs.get(actor, B.Belief(holder=actor))
         belief = OB.project(
@@ -212,15 +362,54 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
             B.Claim(id=f"{actor}|{turn}|need", holder=actor, subject=settlement,
                     attribute="need", value=need, source="inferred",
                     observed_turn=turn, received_turn=turn,
-                    basis=(f"c|{actor}|{turn}|people",)),
+                    basis=(f"c|{actor}|{turn}|{settlement}|people",)),
             B.Claim(id=f"{actor}|{turn}|owes", holder=actor, subject=settlement,
                     attribute="owes", value=owed, source="observed",
                     observed_turn=turn, received_turn=turn),
             B.Claim(id=f"{actor}|{turn}|turn", holder=actor, subject=settlement,
                     attribute="turn", value=turn, source="observed",
                     observed_turn=turn, received_turn=turn))
+        belief = _abroad(world, belief, actor, settlement, turn)
         beliefs[actor] = belief
     return dataclasses.replace(kernel, beliefs=beliefs), []
+
+
+def _abroad(world: Kernel, belief: B.Belief, actor: EntityId,
+            home: EntityId, turn: int) -> B.Belief:
+    """What an actor knows about the places it is not, and how it came to.
+
+    Two ways, and neither of them is a lookup.
+
+    Where it has goods, it has someone with them, and that person counts the
+    goods and hears the price. Cargo still at sea is not here: its location is
+    the route, not a settlement, and nobody on a ship is taking the market.
+
+    Where it has none, it has custom. A merchant house that has never had word
+    from a port it nonetheless knows the way to assumes grain fetches the
+    ordinary price there -- and sails on that assumption the first time, which
+    is how the trade starts and is a fair description of how it did. The claim
+    is dated to before the world began, so the first real report supersedes it
+    and it never competes with news again.
+    """
+    places = {lot.location for lot in world.book.owned_by(actor)
+              if lot.location in world.registry.settlements
+              and lot.location != home}
+    for place in sorted(places):
+        belief = belief.add(*OB.as_claims(OB.observe_local(actor, place, turn, {
+            "own_grain": F.held(world.book, actor, F.GRAIN, place),
+            "own_copper": F.held(world.book, actor, C.COPPER, place),
+            "price_grain": C.readings(world, place)["price_grain"],
+        }), turn))
+
+    for place in C.reachable(world, home):
+        if belief.about(place, "price_grain"):
+            continue
+        belief = belief.add(B.Claim(
+            id=f"{actor}|custom|{place}|price_grain", holder=actor,
+            subject=place, attribute="price_grain", value=C.BASE_PRICE,
+            source="assumed", observed_turn=0, received_turn=turn,
+            confidence=100))
+    return belief
 
 
 def _intents(kernel: Kernel, snapshot: Snapshot) -> tuple[Intent, ...]:
@@ -234,50 +423,69 @@ def _intents(kernel: Kernel, snapshot: Snapshot) -> tuple[Intent, ...]:
 
 
 def _capacity(kernel: Kernel) -> dict[EntityId, int]:
-    """The exclusive pools. One labour pool per settlement, this turn only."""
-    return {f"{s}#labour": kernel.labour(s)
-            for s in sorted(kernel.registry.settlements)}
+    """The exclusive pools, this turn only: hands in each place, hulls on each sea.
+
+    Both settled by the one allocator, in the one pass, by the one rule -- which
+    is the whole reason spec 6.1 puts allocation in a phase of its own. A cargo
+    outbid for hold and a council outbid for the harvest's hands went short the
+    same way and are visible in the same record.
+    """
+    pools = {f"{s}#labour": kernel.labour(s)
+             for s in sorted(kernel.registry.settlements)}
+    pools.update(C.capacity(kernel))
+    return pools
 
 
-def _produce(kernel: Kernel, allocation: R.Allocation) -> tuple[Kernel, list]:
-    """Phase 6. Granted person-days become grain, or do not."""
-    events: list = []
-    book = kernel.book.at_phase(kernel.date.absolute, "production")
-    climate = kernel.climate_at(kernel.date.absolute)
+def _farm_steps(intents: tuple[Intent, ...],
+                allocation: R.Allocation) -> tuple[T.Step, ...]:
+    """Phase 6, in calendar order. Only one of the four bites in any fortnight.
 
-    # Each organization's granted days make its own grain: the temple's estate
-    # is not the council's granary, and a lot has one owner.
-    made: dict[tuple[EntityId, EntityId], int] = {}
-    for grant in allocation.grants:
-        if not grant.resource.endswith("#labour") or grant.granted <= 0:
-            continue
-        settlement = grant.resource.rsplit("#", 1)[0]
-        site_id = kernel.field_site(settlement)
-        if not site_id:
-            continue
-        site = kernel.registry.sites[site_id]
-        # qa per person-day, scaled 1000, against the year's climate.
-        key = (settlement, grant.actor)
-        made[key] = (made.get(key, 0)
-                     + grant.granted * site.capacity // 1000 * climate // 100)
+    They are all `production` and could have been one function. They are four
+    because the year is four things, and because a step that does nothing for
+    twenty fortnights out of twenty-four should be visibly doing nothing rather
+    than hiding inside a branch.
+    """
+    return (
+        T.Step("production", "sowing", lambda k: F.sow(k, intents, allocation)),
+        T.Step("production", "growing", lambda k: F.tend(k, intents, allocation)),
+        T.Step("production", "harvest", lambda k: F.reap(k, intents, allocation)),
+        T.Step("production", "threshing",
+               lambda k: F.thresh(k, intents, allocation)),
+        T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
+        T.Step("production", "the stack", F.keep),
+    )
 
-    deciders = kernel.deciders()
-    for settlement, owner in sorted(made):
-        quantity = made[(settlement, owner)]
-        if quantity <= 0:
-            continue
-        # The settlement is the stable parent, and the ordinal is the owner's
-        # place among that settlement's own deciders -- not among the world's,
-        # or an organization founded in Alashiya would renumber Ma'hadu's lots.
-        local = [o for o in deciders
-                 if kernel.registry.orgs[o].settlement == settlement]
-        lot_id = mint(settlement, kernel.date.absolute, "lot",
-                      local.index(owner) if owner in local else 0)
-        book = book.create(lot_id, GRAIN, quantity, owner=owner,
-                           holder=owner, location=settlement,
-                           reason="harvested")
-        events.append(("harvested", settlement, quantity))
-    return dataclasses.replace(kernel, book=book), events
+
+def _local_food(kernel: Kernel, book: W.Book,
+                settlement: EntityId) -> tuple[W.GoodsLot, ...]:
+    """What the households of a place may eat, in the order they will eat it.
+
+    Grain first, then the seed corn. Reaching the second is a real decision with
+    a real price -- it is next year's harvest going into this fortnight's
+    bread -- and households have always made it rather than starve.
+
+    Ownership bounds it, and bounds it tightly: the common stores of the place
+    and the stores of the body that governs it, and nothing else standing in the
+    same town.
+
+    Two exclusions, for the same reason. Grain in Ma'hadu that belongs to the
+    crown because it was rendered as tribute is not Ma'hadu's to eat; taking it
+    would be a seizure, which is a political act with consequences. And the
+    temple's granary is not the town's either. A temple that feeds the hungry in
+    a bad year is doing something -- relief, patronage, a claim on those it
+    fed -- and spec 6.3 has it as a choice a household makes and an institution
+    grants. Letting it happen silently every fortnight would delete the choice
+    and, worse, would hide the case this world most wants to be able to show:
+    a full temple store beside a hungry town.
+
+    So the temple's grain accumulates here and nothing spends it. That is not
+    an oversight, it is an unbuilt mechanism sitting in plain view, and M13.5's
+    petitions are what build it.
+    """
+    mine = {settlement, kernel.controller(settlement)}
+    return tuple(lot for good in (GRAIN, F.SEED)
+                 for lot in book.at(settlement)
+                 if lot.good == good and lot.owner in mine)
 
 
 def _consume(kernel: Kernel) -> tuple[Kernel, list]:
@@ -293,14 +501,22 @@ def _consume(kernel: Kernel) -> tuple[Kernel, list]:
         for cohort in kernel.cohorts_of(settlement):
             want = cohort.ration()
             got = 0
-            for lot in book.at(settlement):
-                if lot.good != GRAIN or want - got <= 0:
+            ate_seed = 0
+            for lot in _local_food(kernel, book, settlement):
+                if want - got <= 0:
+                    break
+                current = book.lots.get(lot.id)
+                if current is None:
                     continue
-                take = min(want - got, lot.free)
+                take = min(want - got, current.free)
                 if take <= 0:
                     continue
-                book = book.consume(lot.id, take, "consumed")
+                book = book.consume(current.id, take, "consumed")
                 got += take
+                if current.good == F.SEED:
+                    ate_seed += take
+            if ate_seed:
+                events.append(("ate_the_seed", cohort.id, ate_seed))
             if got >= want:
                 cohorts[cohort.id] = dataclasses.replace(
                     cohort, hunger=max(0, cohort.hunger - 1))
@@ -338,6 +554,12 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
             events.append(("due", obligation.id, obligation.owed()))
 
     offered = {i.subject: i.quantity for i in intents if i.kind == "render"}
+    # Ordinal counters for the parts split off by a levy, one per place. Kept
+    # per party because the id's parent is the party: two settlements rendering
+    # on the same turn cannot collide, and two lots split for the same
+    # obligation must not. A single ordinal per obligation was the earlier form
+    # and it minted the same id twice whenever a render crossed two lots.
+    parts: dict[EntityId, int] = {}
     for i, obligation in enumerate(obligations):
         if obligation.status not in ("due", "part_paid"):
             continue
@@ -348,12 +570,22 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
         for lot in book.at(obligation.party):
             if lot.good != obligation.good or moved >= offer:
                 continue
+            # A party cannot render what the beneficiary already owns. The
+            # crown's own grain sits in Ma'hadu after every tribute -- it has
+            # been paid but nothing has carried it away -- and levying it again
+            # would be both a double payment and, since ownership would not
+            # change, an outright error.
+            if lot.owner == obligation.beneficiary:
+                continue
             take = min(offer - moved, lot.free)
             if take <= 0:
                 continue
-            # Offset well clear of the production ordinals above, so a levy and
-            # a harvest in the same fortnight cannot mint the same id.
-            part = mint(obligation.party, kernel.date.absolute, "lot", 100 + i)
+            ordinal = parts.get(obligation.party, 0)
+            parts[obligation.party] = ordinal + 1
+            # Block 2000 and up: clear of the farm steps' ordinals, which run
+            # from 200 to just past 1000 at the same parent on the same turn.
+            part = mint(obligation.party, kernel.date.absolute, "lot",
+                        2000 + ordinal)
             book = book.give(
                 lot.id, take, obligation.beneficiary, "levied",
                 authority=obligation.id,
@@ -403,6 +635,10 @@ class TurnLog:
     allocation: R.Allocation = dataclasses.field(default_factory=R.Allocation)
     transfers: tuple[W.Transfer, ...] = ()
     events: tuple = ()
+    # The turn's bargains. Here rather than in the world because every one of
+    # them is agreed, delivered, and paid inside the phase that matched it; when
+    # M13.3 lets a contract promise delivery next spring, it becomes state.
+    contracts: tuple[C.Contract, ...] = ()
 
 
 def advance(kernel: Kernel) -> tuple[Kernel, list]:
@@ -419,9 +655,17 @@ def advance_logged(kernel: Kernel) -> tuple[Kernel, list, TurnLog]:
         year=date.year + (1 if fortnight == 1 else 0), fortnight=fortnight,
         absolute=date.absolute + 1))
 
-    snapshot = open_turn(kernel, kernel.date.absolute)
     events: list = []
 
+    # Phases 2 to 5 run outside the phase runner, because between them they
+    # build the two things every step inside it consumes: the snapshot each
+    # actor decided from, and the allocation. The order is still 6.1's, and
+    # arrivals coming first is what it is for -- a ship that lands this morning
+    # is news this fortnight's decisions are made on, not next fortnight's.
+    kernel, produced = C.arrivals(kernel)
+    events.extend(produced)
+
+    snapshot = open_turn(kernel, kernel.date.absolute)
     kernel, produced = _observe(kernel, snapshot)
     events.extend(produced)
 
@@ -431,12 +675,22 @@ def advance_logged(kernel: Kernel) -> tuple[Kernel, list, TurnLog]:
         authority_rank=lambda i: kernel.registry.orgs[i.actor].authority
         if i.actor in kernel.registry.orgs else 0)
 
+    struck: list[C.Contract] = []
+
+    def _market(state):
+        state, produced, contracts = C.market(state, intents)
+        struck.extend(contracts)
+        return state, produced
+
     # Through the phase runner rather than around it, so that the order these
     # run in is checked against spec 6.1 on every turn rather than trusted.
-    kernel, produced, _trace = T.run(kernel, (
-        T.Step("production", "fields", lambda k: _produce(k, allocation)),
+    kernel, produced, _trace = T.run(kernel, _farm_steps(intents, allocation) + (
         T.Step("consumption", "rations", _consume),
-        T.Step("settlement", "obligations", lambda k: _settle(k, intents))))
+        T.Step("market", "bargains", _market),
+        T.Step("movement", "sailings",
+               lambda k: C.movement(k, intents, allocation)),
+        T.Step("settlement", "obligations", lambda k: _settle(k, intents)),
+        T.Step("settlement", "the stores", C.consolidate)))
     events.extend(produced)
 
     log = TurnLog(
@@ -444,7 +698,7 @@ def advance_logged(kernel: Kernel) -> tuple[Kernel, list, TurnLog]:
         # The book's ledger is drained on the turn's first `at_phase`, so what
         # stands on it now is this turn's movements and only this turn's.
         transfers=kernel.book.transfers,
-        events=tuple(events))
+        events=tuple(events), contracts=tuple(struck))
     return kernel, events, log
 
 
@@ -458,4 +712,19 @@ def faults(kernel: Kernel) -> tuple[str, ...]:
         for claim in kernel.beliefs[actor].claims:
             if claim.holder != actor:
                 found.append(f"{claim.id}: held by the wrong actor")
+    for voyage in kernel.voyages:
+        if voyage.route not in kernel.registry.routes:
+            found.append(f"{voyage.id}: sails a route that does not exist")
+        for endpoint in (voyage.origin, voyage.destination):
+            if not exists(endpoint):
+                found.append(f"{voyage.id}: puts in at {endpoint!r}, which does not")
+        if voyage.arrives <= voyage.departed:
+            found.append(f"{voyage.id}: arrives before it left")
+        # Cargo that is not on the route it is being carried along is cargo two
+        # systems disagree about the position of.
+        for lot_id in voyage.cargo:
+            lot = kernel.book.lots.get(lot_id)
+            if lot is not None and lot.location != voyage.route:
+                found.append(
+                    f"{voyage.id}: carries {lot_id}, which is at {lot.location!r}")
     return tuple(found)

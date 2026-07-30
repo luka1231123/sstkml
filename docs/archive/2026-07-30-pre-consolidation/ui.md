@@ -1,7 +1,9 @@
-# SAY TO THE KING, MY LORD
+# SAY TO THE KING, MY LORD — ARCHIVED UI/UX SPECIFICATION
 ## Windowed UI/UX rework specification — “The Palace Desktop”
 
-- Status: proposed implementation specification
+> Archived on 2026-07-30. Repository-root `SPEC.md` supersedes this document.
+
+- Status: archived on 2026-07-30
 - Revision: 2026-07-28
 - Scope: primary windowed game; terminal play remains supported
 - Relationship to `SPEC.md`: this refines sections 4.4, 8, 11.3, M13.0, and
@@ -35,14 +37,15 @@ Change:
 - large single-purpose reports into compact list/detail/action workbenches;
 - Help from a 100 × 38 AI conversation into a roughly 52 × 20 deterministic
   field manual;
-- Counsel from a 92 × 36 blocking-feeling chat into a compact order/advice
-  window with immediate deterministic output;
+- Counsel from a 92 × 36 blocking-feeling chat into a compact, grounded
+  model-backed order/advice window;
 - Counsel as the only practical route to many mechanics into direct controls
   on the screen where the relevant evidence is visible;
 - silent refusals into specific inline explanations;
 - unmanaged overlapping windows into remembered placement, useful tiling, and
   a window switcher;
-- routine model calls into explicit, rare, cancellable background prose work.
+- blocking or oversized model calls into short, required, cancellable
+  background court-language work.
 
 The target is not a modern dashboard wearing ASCII. It is a good information
 manager from 1993 that understands the mouse: fast, terse, inspectable,
@@ -65,7 +68,8 @@ cell has a purpose.
    caused an action to fail.
 6. Every implemented mechanic has a complete direct-control path. Typed
    commands are an additional power-user path.
-7. The complete game is instant and usable with AI disabled or unavailable.
+7. The lightweight local model is a required court-language service; direct
+   state inspection and structured actions stay responsive while it works.
 8. Better usability never becomes omniscience; claims retain source and age.
 9. Windowed and terminal play share action meanings, costs, validation, names,
    and help text.
@@ -79,8 +83,10 @@ cell has a purpose.
 - No animation for its own sake.
 - No hidden truth, privileged freshness, correct-answer advice, or exact
   disease compartments.
-- No model dependency for commands, Help, NPC policy, replay, or readable
-  prose.
+- No model authority over commands, Help facts, NPC policy, arithmetic,
+  simulation mutation, or replay. Court correspondence, interpretation,
+  translation, summaries, and voiced counsel normally depend on the required
+  local model.
 - No attention cost for selecting, sorting, filtering, moving windows,
   correcting syntax, or recovering from an interface error.
 
@@ -180,7 +186,7 @@ These are inputs, not literal templates.
 | [Microsoft dialog guidance](https://learn.microsoft.com/en-us/windows/win32/uxguide/win-dialog-box) | Dialogs interrupt flow; modeless tools suit frequent ongoing tasks. | Help, Counsel, ledgers, dossiers, and previews are modeless. |
 | [Emily Short on parser UX](https://emshort.blog/2010/06/10/parser-discussion-redux/) and [Inform disambiguation](https://www.inform-fiction.org/manual/html/s33.html) | “Guess the verb” obscures whether wording or capability failed; good parsers ask focused questions. | Errors identify the unknown verb, target, value, or missing choice and show legal alternatives. |
 | [WCAG 2.2](https://www.w3.org/TR/WCAG22/) | Text must scale without loss of content/function; contrast and keyboard operation cannot be decorative afterthoughts. | Smaller default type is paired with 9–20 point scaling, reflow, colour-independent states, and complete keyboard paths. |
-| [Apple progress guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) | Long work must not look frozen and should be cancellable when possible. | Optional model work is background work with textual status and Cancel. |
+| [Apple progress guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) | Long work must not look frozen and should be cancellable when possible. | Model work is background work with textual status and Cancel. |
 
 The synthesis: preserve mature keyboard speed and information density, add
 visible mouse directness, and use real windows only where keeping context
@@ -193,9 +199,11 @@ visible has strategic value.
 ### Window roles
 
 1. **Anchor — Hall.** One persistent home window. Closing it requests exit.
-2. **Workbenches.** One instance each of Inbox, Orders, City, Works, Roll,
-   Muster, Archive, World, Relations, and Health. Reopening raises the existing
-   window and preserves selection, filters, scroll, and geometry.
+2. **Rooms/workbenches.** One instance each of Scribes' Room, Storehouse,
+   Orders, City, Muster, Court, Shrine, World, and Counsel. Reading, archive,
+   and drafting are stations in the Scribes' Room; stores, labour, and land are
+   stations in the Storehouse. Reopening raises the existing window and
+   preserves selection, station, scroll, and geometry.
 3. **Documents/dossiers.** Multiple tablets, people, institutions, routes,
    obligations, projects, and places can remain open, keyed by entity ID.
 4. **Utilities.** Help, command palette, Settings, Files, and Window Switcher
@@ -256,15 +264,16 @@ existing workbench rather than create duplicates.
 | Class | Default | Minimum | Examples |
 |---|---:|---:|---|
 | Anchor | 92 × 34 | 72 × 26 | Hall |
-| Wide workbench | 88 × 30 | 66 × 22 | Inbox, Orders, City, World |
-| Ledger workbench | 78 × 27 | 58 × 20 | Roll, Land, Muster, Works |
+| Wide workbench | 88 × 30 | 66 × 22 | Orders, City, World |
+| Ledger workbench | 78 × 27 | 58 × 20 | Muster, Works |
 | Document/dossier | 62 × 25 | 46 × 18 | Tablet, person, institution |
 | Compact utility | 52 × 20 | 40 × 15 | Help, Files, Settings |
 | Command palette | 68 × 15 | 48 × 11 | typed commands |
 
-City may default to 96 columns and Inbox to 90 where space allows. No initial
-auxiliary window exceeds 80% of usable monitor width or height unless restoring
-the player's saved geometry.
+City may default to 96 columns, the Scribes' Room to 100 × 32, and the
+Storehouse to 90 × 30 where space allows. No initial auxiliary window exceeds
+80% of usable monitor width or height unless restoring the player's saved
+geometry.
 
 ### Responsive tiers
 
@@ -303,7 +312,8 @@ At default font:
 
 - Hall and Help are fully visible together at 1440 × 900.
 - Tablet and Stores are fully visible together at 1366 × 768.
-- Inbox and detached tablet are readable together at 1440 × 900.
+- Scribes' Room and a deliberately pinned tablet are readable together at
+  1440 × 900.
 - City and institution detail are readable together at 1440 × 900.
 - At 200% type, every action remains reachable through reflow, pane switching,
   or scrolling.
@@ -318,7 +328,7 @@ selection cursors, shaded meters, and visible keycaps inside. Avoid floating
 cards, glossy widgets, hamburger menus, toast stacks, and oversized headings.
 
 Use setting-appropriate words for content and plain software terms for
-operation. The **Tablet House** may still use **Search**, **Save**,
+operation. The **Scribes' Room** may still use **Search**, **Save**,
 **Settings**, and **Close**.
 
 ### Symbols
@@ -557,10 +567,10 @@ Rules:
 8. Direct controls, palette, terminal commands, and Help derive from the same
    `ActionDescriptor`.
 
-If deterministic parsing fails, offer **Edit**, **Show examples**, and explicit
-**Ask interpreter…**. A small model may asynchronously propose a draft, but
-the normal validator, disambiguation, preview, and confirmation still apply.
-Model output is never an action.
+Free-form prose is interpreted asynchronously by the required small model,
+then passed through the normal validator, focused disambiguation, preview, and
+confirmation. **Edit** and **Show examples** remain available. Model output is
+never itself an action.
 
 ---
 
@@ -611,7 +621,7 @@ troops?” Strategic “Should I?” advice belongs to a named adviser.
 Counsel is a compact place to ask a person, inspect a draft order, and receive
 attributed advice. It is not a universal control surface or giant chat client.
 
-- Default 64 × 22; minimum 50 × 17.
+- Default 64 × 20; minimum 50 × 17.
 - Five/six-row portrait only when space permits.
 - Conversation uses available body instead of reserved blank rows.
 - Bottom always has ready input, state/cost, and actions.
@@ -619,12 +629,12 @@ attributed advice. It is not a universal control surface or giant chat client.
 
 Three input kinds:
 
-1. **Known factual question:** immediate deterministic answer from adviser
-   Belief, with source/uncertainty.
+1. **Known factual question:** a short model-voiced answer grounded only in
+   adviser Belief, with its exact source and uncertainty beside it.
 2. **Order:** deterministic grammar produces semantic preview; voice cannot
    change structured meaning.
-3. **Open advice:** immediate short rule/authored answer; optional explicit
-   **Elaborate** may request model prose.
+3. **Open advice:** request a short, attributed model-backed answer grounded
+   only in the named adviser's Belief and cited records.
 
 Advice is a small attributed card:
 
@@ -640,14 +650,15 @@ Advice is generated at most once at the start of a fortnight, on explicit
 request, or when a materially new known exception crosses a deterministic
 threshold. Never on screen open, selection, or repaint.
 
-If **Elaborate** or **Ask interpreter** invokes a model:
+When advice, drafting, translation, summary, or interpretation invokes the
+model:
 
-- immediate fallback stays visible;
+- the relevant sources and exact structured terms stay visible;
 - show `Yabninu is composing… [Cancel]`;
 - every other window remains usable;
 - only the requesting card is busy;
 - completion never steals focus;
-- failure retains fallback and states no longer answer was produced;
+- failure preserves the player's work and offers retry or repair guidance;
 - repeated Enter cannot queue duplicates;
 - stale/out-of-order results are discarded by request ID.
 
@@ -732,28 +743,32 @@ require inline Save/Discard/Cancel.
 
 ## 14. Correspondence screens
 
-### Inbox
+### Scribes' Room
 
-**Purpose:** triage, read, compare, answer, delegate, and archive mail without
-losing selection. **Default:** 90 × 30. **Minimum:** 66 × 22.
+**Purpose:** triage, read, compare, answer, delegate, file, search, and dispatch
+without opening a new window for each step. **Default:** 100 × 32.
+**Minimum:** 78 × 26.
 
-Left: 32–36-column scrollable list. Right: selected metadata, body/unread cost,
-related items, actions. Tabs: Unread, Needs action, Delegated, All, Archive,
-Outbox. Filters: sender, subject, age, status.
+The four stations are Inbox, Filed, Sent, and Records. Left: a stable,
+two-line-per-tablet rack. Right: selected provenance and a structured reading.
+The reading separates **At a glance**, **Address**, **Message**, and **Seal**;
+asserted values are surfaced before the full wording.
 
-Rows show unread/urgent glyph, sender, subject, age, and response state.
-Reading never makes the selected row vanish. Under an Unread filter, retain it
-as a dim `just read` row until selection moves.
+Rows show unread/answered/filed glyph, sender, subject, and age. Reading never
+makes the selected row vanish. Long clay scrolls independently with a visible
+position.
 
 Actions:
 
-- Read (2h), Open detached;
+- Read (2h), Pin beside;
 - Answer, Delegate request, Acknowledge;
 - Compare, Conversation, Sender dossier;
 - Pin, Archive/Restore.
 
-Reading shows the body in place. Answer raises Desk while Inbox remains.
-Delegate creates a structured draft linked to the tablet.
+Answer changes the right-hand station into the writing table. The source
+tablet remains pinned on the left, with its claims separated from its words.
+Escape lays the wet tablet aside and returns to the rack; sealing returns to
+the same selected correspondence. No standalone Desk window exists.
 
 ### Tablet
 
@@ -766,23 +781,25 @@ facts block lists asserted values and related known claims, never hidden truth.
 Actions mirror Inbox. Replace the current orphaned standalone-letter route with
 this canonical document.
 
-### Desk
+### Writing-table station
 
-**Purpose:** compose an exact reply while its source remains visible.
-**Default:** 66 × 28. **Minimum:** 52 × 20.
+**Purpose:** compose an exact reply while its source remains visible inside
+the Scribes' Room.
 
 Fields: recipient/thread, intent, subject, editable body, protocol checklist,
 source link, Outbox status. Support cursor movement, selection, undo/redo,
 scroll, immediate authored formulae, Save draft, Compare, Validate, Seal/send
 (2h preview), and Discard.
 
-No model is required for edit/grade/preview/send. Optional **Embellish**
-produces an asynchronous side-by-side alternative and never replaces text
-without acceptance.
+The normal Desk path asks the model for a compact scribe's draft from the
+chosen intent and explicit terms. The player edits or rejects it, and may
+dictate exact text instead. Grade, preview, and send operate on the accepted
+text without another model call; generated language never replaces player
+text without acceptance.
 
 ### Outbox/conversation
 
-Outbox is an Inbox tab, not another giant window. Show Draft, Sealed, Courier
+Sent is a Scribes' Room station, not another giant window. Show Draft, Sealed, Courier
 assigned, In transit, Delivered if known, Intercepted if known, Answered. A
 thread interleaves sent/received tablets by known dates and preserves uncertain
 delivery.
@@ -791,10 +808,11 @@ delivery.
 
 ## 15. Kingdom management screens
 
-### Stores
+### Storehouse
 
 **Purpose:** stock, movement, reservation, spoilage, bronze/melt chain, and
-stock decisions. **Default:** 76 × 26. **Minimum:** 58 × 20.
+stock decisions, with connected Labour and Land stations.
+**Default:** 90 × 30. **Minimum:** 76 × 24.
 
 Use at most five rows of stateful vessels/granary art. Table:
 
@@ -941,7 +959,7 @@ History.
 ### Archive
 
 **Purpose:** find and compare primary records without turning scholarship into
-a chatbot. **Default:** 78 × 28. **Minimum:** 58 × 20.
+a chatbot. **Default:** 78 × 22. **Minimum:** 58 × 20.
 
 Use a search/filter row, result list, selected preview, and actions. Search
 supports exact phrase, all/any terms, document kind, actor, place, reign, and
@@ -955,10 +973,9 @@ slots followed by clipped content. The one-hour game cost applies when the
 query is submitted, never to changing filters, sorting returned records, or
 opening a returned record.
 
-Search and snippets are deterministic. An optional **Summarize selected**
-operation may use a model, but the source stays beside the summary, the summary
-is visibly labelled as generated commentary, and it is never indexed as a
-primary record.
+Search and snippets are exact record operations. **Summarize selected** uses
+the required model; the sources stay beside the summary, the summary is visibly
+labelled as a scribe's rendering, and it is never indexed as a primary record.
 
 ### World
 
@@ -1048,7 +1065,7 @@ Hall status line shows saved/unsaved and time.
 
 ### Settings
 
-**Purpose:** configure presentation, input, files, and optional AI without
+**Purpose:** configure presentation, input, files, and the local language model without
 leaving the game. **Default:** 56 × 23. **Minimum:** 44 × 17.
 
 Tabs:
@@ -1146,22 +1163,24 @@ Targets:
 
 ---
 
-## 20. AI and adviser policy
+## 20. Court-language model and adviser policy
 
 ### Product rule
 
-**AI is prose seasoning, never interface infrastructure.** The complete game,
-including Help and all orders, must remain fast and comprehensible with no
-model process, no network, and an empty model cache.
+**The lightweight local model is court-language infrastructure, never
+simulation authority.** People in this game communicate through language, so
+the normal game requires a local model for their voices and for the player's
+work with letters. The engine remains the sole authority for facts, costs,
+decisions, and consequences.
 
-Allowed model uses:
+Required model uses:
 
-- explicit **Elaborate** on an already visible deterministic adviser answer;
-- explicit **Ask interpreter** after the deterministic command parser has
-  shown what it could not resolve;
-- optional **Embellish** for a player-written letter, accepted manually;
-- rare, important NPC voice passages prepared in the background and cached;
-- optional summary of selected archive records, labelled and source-adjacent.
+- compact incoming and outgoing letters in each writer's situated voice;
+- the scribe's interpretation and drafting of player correspondence;
+- attributed counsel grounded in the named adviser's current Belief;
+- translation and explanation of tablets;
+- summaries of selected records and correspondence threads, kept beside their
+  sources.
 
 Forbidden model uses:
 
@@ -1171,33 +1190,38 @@ Forbidden model uses:
   “best action” rankings;
 - ordinary screen open, selection, repaint, turn projection, or save/load;
 - changing letter protocol grades or simulation effects;
-- delaying input acknowledgement, direct controls, or deterministic fallback.
+- delaying input acknowledgement or direct structured controls;
+- turning generated prose into a new fact or primary historical record.
 
 ### Defaults and limits
 
-- Default interface/adviser mode: **Off**. First-run setup may offer an
-  explicit **Small local** opt-in.
-- Small local target: a quantized model at or below roughly 4B parameters;
-  larger custom models are an expert setting, never the shipped usability
-  assumption.
+- Default and supported baseline: **Small local**, currently
+  `qwen3:4b-instruct`.
+  First-run and `./run.sh --check` verify the service and weights and give an
+  exact repair command when either is missing.
+- Target: a quantized model around 1.5B–4B parameters. Larger custom models are
+  an expert setting, never the shipped usability assumption.
 - One in-flight request per role and one shared configurable concurrency cap.
 - Context at most 2,048 tokens and output at most 160 tokens by default.
-- Product deadline: 5 seconds for optional prose; interpreter draft 3 seconds.
-- Show deterministic content within 100 ms and a textual busy state within
-  another frame. Timeout/cancel keeps that content.
+- Product deadline: 5 seconds for routine language; interpreter draft 3
+  seconds.
+- Show sources and structured content within 100 ms and a textual busy state
+  within another frame. Timeout/cancel preserves those materials and the
+  player's draft.
 - Cache by model/version, role, normalized prompt, Belief snapshot identity,
   language, and seed. Replay consumes no model output.
 - Request IDs, cancellation tokens, and source-version checks discard stale
   or out-of-order completion.
 - Enter is disabled for the active request or idempotently raises it; it never
   queues duplicates.
-- Model failure is a quiet local status, not an error dialog.
+- Model failure is a clear local status with retry and setup repair. A compact
+  emergency rendering may preserve access to an already-known matter, but it
+  is recovery rather than the routine product experience.
 
-The present 14B default is outside this contract. In a measured warm run, Help
-took about 5.8 seconds and Counsel about 14.3 seconds. Moving the call off the
-Tk thread prevents a freeze, but does not make a frequently required workflow
-usable. Remove Help's call, make adviser prose explicit, and optimize the
-deterministic experience first.
+The former 14B default is outside this contract. Required language must be
+small enough for an ordinary local setup, short enough to remain court
+correspondence rather than generated exposition, and asynchronous so the
+palace remains usable while a scribe or adviser works.
 
 ### Adviser frequency and posture
 
@@ -1309,11 +1333,11 @@ No workbench directly constructs an unmanaged `Toplevel`.
 
 ### Background work
 
-All optional model work enters a bounded worker service. The Tk thread enqueues
-a request and immediately renders fallback/busy state; only the Tk event queue
-applies a matching completion. The service supports cancel, timeout, request
-identity, source version, duplicate suppression, and shutdown. Nothing calls a
-model during a composer or reducer.
+All model work enters a bounded worker service. The Tk thread enqueues a
+request and immediately renders sources, structured terms, and busy state;
+only the Tk event queue applies a matching completion. The service supports
+cancel, timeout, request identity, source version, duplicate suppression, and
+shutdown. Nothing calls a model during a composer or reducer.
 
 ### Session integrity
 
@@ -1394,16 +1418,17 @@ Exit: Counsel is unnecessary for all current simulation actions.
 Exit: the player can answer “what changed, who said it, how old is it, what
 conflicts, what did I order, and what is blocked?” through visible links.
 
-### Phase 6 — optional prose and polish
+### Phase 6 — required court language and polish
 
-- Enforce Off/Small/Custom model policy, bounded queue, cancel, cache, and
-  performance telemetry.
+- Enforce Small/Custom model policy, startup verification, bounded queue,
+  cancel, cache, and performance telemetry.
 - Add small/stateful responsive art variants and pure-ASCII snapshots.
 - Tune density, palette, focus/hover/pressed states, key labels, and copy mode.
 - Conduct usability sessions and address discovered paths, not just styling.
 
-Exit: AI-off is the reference test configuration; AI-on can time out without
-changing task completion or simulation results.
+Exit: the baseline small model is part of the reference test configuration;
+timeouts preserve drafts and structured controls without changing simulation
+results.
 
 ---
 
@@ -1444,10 +1469,11 @@ changing task completion or simulation results.
 
 ### AI failure tests
 
-Run each optional model surface with AI Off, model missing, cold start, timeout,
-malformed output, cancellation, duplicate Enter, completion after close,
-out-of-order completion, and app shutdown. Direct controls and deterministic
-content remain available; no late result steals focus, executes an action, or
+Run each model surface with service missing at startup, weights missing, cold
+start, timeout, malformed output, cancellation, duplicate Enter, completion
+after close, out-of-order completion, and app shutdown. Startup failures give
+exact repair guidance; runtime failures preserve sources, drafts, and
+structured controls. No late result steals focus, executes an action, or
 changes replay.
 
 ### Performance budgets on reference hardware
@@ -1459,10 +1485,10 @@ changes replay.
 | Deterministic parse/validation | 100 ms |
 | Screen compose after resize | 25 ms |
 | Window raise/switch | 100 ms |
-| AI request fallback + busy state | 100 ms |
+| Model request sources + busy state | 100 ms |
 
-Optional model completion has a deadline rather than an animation target. It
-never counts as required task completion.
+Model completion has a deadline rather than an animation target. Simulation
+mutation never waits for or derives authority from generated prose.
 
 ### Task-based usability review
 
@@ -1479,10 +1505,10 @@ With Help available but no prior key knowledge, a new player must be able to:
 9. enlarge type to 200%, tile two useful windows, and continue;
 10. save with three hours remaining, load, and still have three hours.
 
-Observe route, clicks/keys, backtracking, errors, and time. Targets: no task
-requires Counsel; every error explains the missing choice; every task can be
-completed with AI Off; common tasks reach preview within three contextual
-activations.
+Observe route, clicks/keys, backtracking, errors, and time. Targets: Counsel is
+not the sole path to a structured action; every error explains the missing
+choice; required language tasks work with the baseline small model; common
+tasks reach preview within three contextual activations.
 
 ---
 
@@ -1498,14 +1524,15 @@ The redesign is done when:
   share its art/data/action discipline;
 - Help is instant, deterministic, compact, correct, and generated from the
   live control contract;
-- Counsel is optional, attributed, infrequent, and never a control bottleneck;
+- Counsel is model-backed, attributed, infrequent, and never the sole control
+  path;
 - every collection scrolls, every click has keyboard parity, every refusal is
   visible, and every destructive act previews its semantics;
 - source, age, conflict, cost, and order status are present wherever they
   affect a decision;
 - window placement, resize, font scaling, and switching make windowing useful;
-- AI Off is fully featured, and optional small-model work is cancellable and
-  unable to affect deterministic state;
+- the baseline lightweight model is required, responsive, grounded,
+  cancellable, and unable to affect deterministic state;
 - save/load cannot replenish attention;
 - all acceptance suites and the ten usability tasks pass.
 

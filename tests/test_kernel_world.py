@@ -18,6 +18,7 @@ from engine import believe as B
 from engine import obligation as O
 from engine import ownership as W
 from engine.entity import Registry
+from engine.kernel import farm as F
 from engine.kernel import resolve as R
 from engine.kernel import world as K
 from load_kernel import load_kernel
@@ -25,6 +26,7 @@ from load_kernel import load_kernel
 UGARIT = "settlement:ugarit"
 MAHADU = "settlement:mahadu"
 ALASHIYA = "settlement:alashiya_port"
+ARI = "settlement:ari"
 
 
 def _run(kernel: K.Kernel, turns: int = 24):
@@ -60,32 +62,66 @@ def _without_ugarit(kernel: K.Kernel) -> K.Kernel:
     return dataclasses.replace(kernel, registry=registry, book=book)
 
 
+def landlocked(kernel: K.Kernel) -> K.Kernel:
+    """The same world with every route deleted: no crossing, and no news of one.
+
+    M13.2 gave Alashiya a way out of the trap M13.1 built for it, so several of
+    the claims below no longer show up in the authored world -- not because they
+    stopped being true, but because a merchant is now answering them every
+    fortnight. Cutting the routes is how they are still asked. Nothing else is
+    touched: the same fields, the same people, the same seed in the ground.
+    """
+    registry = dataclasses.replace(kernel.registry, routes={})
+    return dataclasses.replace(kernel, registry=registry, voyages=())
+
+
 # --- the gate -----------------------------------------------------------------
 
 def test_the_authored_kernel_world_loads_and_is_sound() -> None:
     kernel = load_kernel()
     assert K.faults(kernel) == ()
-    assert kernel.autonomous() == (ALASHIYA, MAHADU)
+    assert kernel.autonomous() == (ALASHIYA, ARI, MAHADU)
     assert not kernel.registry.settlements[UGARIT].autonomous
-    assert kernel.stores(MAHADU) == 9000
+    assert kernel.stores(MAHADU) == 80_000
+
+    # The world does not begin at the beginning of a story. It is the first
+    # fortnight of the year, and last autumn's crop is already in the ground --
+    # on two estates, because the god's land is not the town's.
+    fields = kernel.field_site(MAHADU, "org:mahadu_council")
+    gods = kernel.field_site(MAHADU, "org:mahadu_temple")
+    assert fields != gods
+    assert F.held(kernel.book, "org:mahadu_council", F.STANDING, fields) == 182_000
+    assert F.held(kernel.book, "org:mahadu_temple", F.STANDING, gods) == 38_000
 
 
 def test_the_others_produce_consume_decide_and_change_with_ugarit_idle() -> None:
     kernel = load_kernel()
     opening = {s: kernel.stores(s) for s in kernel.autonomous()}
-    opening_people = {c: kernel.registry.cohorts[c].people
+    # The whole cohort rather than its head-count. A year in which a place goes
+    # hungry and is then supplied is a year that reached the people, and the
+    # cohorts carry that as hunger and grievance whether or not anyone died of
+    # it -- which, since M13.2, they may well not have.
+    opening_people = {c: kernel.registry.cohorts[c]
                       for c in sorted(kernel.registry.cohorts)}
 
-    kernel, events = _run(kernel)
+    # Two years rather than one. The first is now a year in which the crossing
+    # holds -- Alashiya is short and is supplied, and nobody dies of it, which
+    # is a result and not an absence of one. The second is when the island's
+    # metal starts to run down and the shortfall reaches the households.
+    kernel, events = _run(kernel, turns=48)
     kinds = {e[0] for e in events}
 
-    assert "harvested" in kinds, "they produce"
+    # Production is now a year rather than a rate, so "they produce" means the
+    # whole chain came round: what was standing was cut, what was cut was
+    # threshed, part of what was threshed was kept back, and it went into the
+    # ground again. Any one of these alone would not show the year turning.
+    assert {"reaped", "threshed", "set_aside", "sown"} <= kinds, "they produce"
     assert "hungry" in kinds or any(         # they consume, and it can fall short
         kernel.stores(s) != opening[s] for s in opening), "they consume"
     assert {"due", "rendered"} & kinds, "they decide what to render"
     assert any(kernel.stores(s) != opening[s] for s in opening), "they change"
 
-    after = {c: kernel.registry.cohorts[c].people
+    after = {c: kernel.registry.cohorts[c]
              for c in sorted(kernel.registry.cohorts)}
     assert after != opening_people, "and the change reaches the people"
 
@@ -105,8 +141,14 @@ def test_removing_ugarit_entirely_changes_nothing_for_the_others() -> None:
 
 
 def test_a_settlement_that_cannot_feed_itself_declines_without_anyone_deciding_it() -> None:
-    """Spec 11.2 scenario 1: they sometimes fail, and no cadence made it happen."""
-    kernel, _ = _run(load_kernel(), turns=40)
+    """Spec 11.2 scenario 1: they sometimes fail, and no cadence made it happen.
+
+    Asked with the routes cut, because in the authored world the answer is now
+    that somebody sails. That is M13.2's whole point and not a repeal of this
+    one: the island is still a place that cannot feed itself, and what stands
+    between it and the decline below is a merchant who might not come.
+    """
+    kernel, _ = _run(landlocked(load_kernel()), turns=40)
     thin = kernel.registry.cohorts["cohort:alashiya_fields"]
     assert thin.hunger > 0 and thin.grievance > 0
     assert kernel.people(ALASHIYA) < 500, "the shortfall reached the people"
@@ -162,13 +204,28 @@ def test_a_policy_may_not_take_the_world() -> None:
 
 
 def test_a_council_decides_only_from_what_it_holds() -> None:
+    """Nothing an actor knows about anywhere else arrived by looking at it.
+
+    Councils hold claims about the far port now, because ships come in and the
+    crews say what they saw. The boundary that matters is not how many places a
+    belief mentions -- it is that only one of them was counted. Everything else
+    is `reported` or `assumed`, dated to when it was true rather than to now,
+    and carries the chain it came down.
+    """
     kernel, _ = _run(load_kernel(), turns=3)
     for settlement in kernel.autonomous():
         actor = kernel.controller(settlement)
         belief = kernel.beliefs[actor]
         assert belief.holder == actor
-        assert {c.subject for c in belief.claims} == {settlement}, \
-            "a council holds claims about its own place and no other"
+        counted = {c.subject for c in belief.claims if c.source == "observed"}
+        assert counted == {settlement}, \
+            "a council counts its own place and no other"
+        for claim in belief.claims:
+            if claim.subject == settlement:
+                continue
+            assert claim.source in ("reported", "assumed"), claim
+            assert claim.observed_turn < claim.received_turn, \
+                "word from elsewhere is older than the day it arrives"
 
 
 def test_belief_is_dated_sourced_and_never_overwritten() -> None:
@@ -203,16 +260,23 @@ def test_rendering_a_tribute_actually_moves_the_grain() -> None:
     updated book on the floor: the obligation went to discharged while the
     grain never changed hands. Every ledger agreed, and nothing was paid.
     """
-    kernel, _ = _run(load_kernel(), turns=10)
+    kernel, _ = _run(load_kernel(), turns=8)      # the fortnight it is rendered
     crown = "polity:ugarit"
     theirs = [lot for lot in kernel.book.owned_by(crown) if lot.good == "grain"]
     assert theirs, "the crown owns grain it did not own before"
     assert sum(lot.quantity for lot in theirs) == 1800
 
     # Ownership moved; custody and place did not. Nothing has carried it yet,
-    # and M13.1 has no transport -- so it is the crown's grain, in Ma'hadu.
+    # and there is no transport -- so it is the crown's grain, in Ma'hadu.
     assert all(lot.location == MAHADU for lot in theirs)
     assert all(lot.holder != crown for lot in theirs)
+
+    # And because it is real grain in a real store rather than a number on a
+    # tablet, it goes off while it waits for someone to come and get it.
+    later, _ = _run(kernel, turns=6)
+    kept = sum(lot.quantity for lot in later.book.owned_by(crown)
+               if lot.good == "grain")
+    assert 0 < kept < 1800, "tribute nobody collects is tribute that spoils"
 
 
 def test_a_recurring_render_stands_again_next_year() -> None:
@@ -226,27 +290,39 @@ def test_a_recurring_render_stands_again_next_year() -> None:
 def test_two_claimants_on_one_body_of_people_and_authority_decides() -> None:
     """The allocator has to bind, or it is decoration.
 
-    Ma'hadu's elders and its temple both want the fortnight's hands. Nothing
-    splits them by hand: the temple outranks the elders, takes what it asked
-    for, and the elders go short by exactly that much.
+    Ma'hadu's elders and its temple both want the harvest fortnight's hands.
+    Nothing splits them by hand: the temple outranks the elders, takes what it
+    asked for, and the elders get what is left and go short.
+
+    The harvest is where this is worth testing and it is the only place it is.
+    Tending a standing crop is cheap enough that both of them can be satisfied
+    all winter; cutting it is the one moment in the year when the town does not
+    have enough hands to go round, which is exactly why it is the moment worth
+    modelling.
     """
     kernel = load_kernel()
-    assert kernel.deciders() == ("org:alashiya_council", "org:mahadu_council",
+    assert kernel.deciders() == ("org:alashiya_council", "org:ari_council",
+                                 "org:mahadu_council", "org:mahadu_merchant",
                                  "org:mahadu_temple")
 
+    # Forward to the first fortnight of the harvest window.
+    while kernel.date.fortnight != 7:
+        kernel, _ = K.advance(kernel)
     kernel, _, log = K.advance_logged(kernel)
+    assert F.season(kernel.seasons, kernel.date.fortnight, "harvest")
+
     at_mahadu = {g.actor: g for g in log.allocation.grants
                  if g.resource == f"{MAHADU}#labour"}
     assert set(at_mahadu) == {"org:mahadu_council", "org:mahadu_temple"}
 
     temple, elders = at_mahadu["org:mahadu_temple"], at_mahadu["org:mahadu_council"]
     assert temple.met, "the higher authority is served first, and in full"
-    assert not elders.met
-    assert elders.short == temple.granted
+    assert not elders.met, "and the elders reap what hands are left over"
     assert temple.granted + elders.granted == kernel.labour(MAHADU)
 
-    # And each keeps what its own hands made: a lot has one owner.
-    owners = {lot.owner for lot in kernel.book.at(MAHADU) if lot.good == "grain"}
+    # And each keeps what its own hands cut: a lot has one owner.
+    owners = {lot.owner for lot in kernel.book.at(MAHADU)
+              if lot.good == F.SHEAVES}
     assert {"org:mahadu_council", "org:mahadu_temple"} <= owners
 
 
