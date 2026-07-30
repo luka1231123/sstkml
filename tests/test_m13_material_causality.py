@@ -22,11 +22,17 @@ def _without_authored_import(seed: int = SEED):
             world.plague, import_place="", import_turn=-1, import_cases=0))
 
 
+# The sick place is a neighbouring Alu one land leg away, because only an Alu
+# has people (docs/ALU_CLASSIFICATION.md §4). Ma'hadu, which used to stand here,
+# is Ugarit's own harbour and keeps no compartments of its own.
+SOURCE = "mukish"
+
+
 def _infected_source(exposure: int = 1000):
     world = _without_authored_import()
     world = dataclasses.replace(
         world, plague=dataclasses.replace(world.plague, exposure=exposure))
-    world, _ = plague.begin(world, "ma_hadu", 8)
+    world, _ = plague.begin(world, SOURCE, 8)
     return world
 
 
@@ -40,7 +46,12 @@ def test_authored_import_is_explicit_deterministic_and_not_spontaneous():
 
     a = load_scenario("ugarit", SEED)
     b = load_scenario("ugarit", SEED)
-    assert a.plague.import_place == "ma_hadu"
+    # The tablet still lands the travellers at the harbour it always named; the
+    # sickness begins among the people they land among, who are Ugarit's.
+    authored = tomllib.loads(
+        Path("content/scenarios/ugarit.toml").read_text())["plague"]
+    assert authored["import_place"] == "ma_hadu"
+    assert a.plague.import_place == "seat"
     assert a.plague.import_turn == 12
     for _ in range(11):
         a, _ = advance(a)
@@ -49,10 +60,10 @@ def test_authored_import_is_explicit_deterministic_and_not_spontaneous():
     a, ae = advance(a)
     b, be = advance(b)
     assert any(isinstance(event, A.PlagueBegan)
-               and event.place_id == "ma_hadu" for event in ae)
+               and event.place_id == "seat" for event in ae)
     assert ae == be and state_hash(a) == state_hash(b)
-    assert a.places["ma_hadu"].infected > 0
-    assert a.places["seat"].infected == 0
+    assert a.places["seat"].infected > 0
+    assert a.places[SOURCE].infected == 0
 
 
 def test_only_an_exposed_modeled_journey_can_seed_another_place():
@@ -62,7 +73,7 @@ def test_only_an_exposed_modeled_journey_can_seed_another_place():
 
     journey = _infected_source()
     journey = mail.inject_incoming(
-        journey, "sinaranu", "ma_hadu", "warning", ())
+        journey, "sinaranu", SOURCE, "warning", ())
     journey, events = advance(journey)
     assert journey.places["seat"].infected > 0
     assert any(isinstance(event, A.PlagueSpread)
@@ -72,19 +83,19 @@ def test_only_an_exposed_modeled_journey_can_seed_another_place():
 def test_quarantine_holds_the_courier_and_contact_then_lifting_resumes_both():
     world = _infected_source()
     world = mail.inject_incoming(
-        world, "sinaranu", "ma_hadu", "warning", ())
+        world, "sinaranu", SOURCE, "warning", ())
     courier_id = world.letters_in_transit[-1].id
-    world, _ = apply(world, A.Quarantine("ma_hadu"))
+    world, _ = apply(world, A.Quarantine(SOURCE))
 
     world, events = advance(world)
     held = next(letter for letter in world.letters_in_transit
                 if letter.id == courier_id)
-    assert held.at_node == "ma_hadu" and held.edge_index == 0
+    assert held.at_node == SOURCE and held.edge_index == 0
     assert held.disease_exposed is True
     assert world.places["seat"].infected == 0
     assert not any(isinstance(event, A.PlagueSpread) for event in events)
 
-    world, _ = apply(world, A.Quarantine("ma_hadu", lift=True))
+    world, _ = apply(world, A.Quarantine(SOURCE, lift=True))
     world, events = advance(world)
     assert not any(letter.id == courier_id
                    for letter in world.letters_in_transit)
@@ -95,13 +106,13 @@ def test_quarantine_holds_the_courier_and_contact_then_lifting_resumes_both():
 
 def test_plague_progress_event_reconciles_every_nonfatal_sir_change():
     world = _infected_source()
-    before = world.places["ma_hadu"]
+    before = world.places[SOURCE]
     world, events = plague.step(world)
-    after = world.places["ma_hadu"]
+    after = world.places[SOURCE]
     progressed = next(
         event for event in events
         if isinstance(event, A.PlagueProgressed)
-        and event.place_id == "ma_hadu")
+        and event.place_id == SOURCE)
     assert progressed.new_infections == before.susceptible - after.susceptible
     assert progressed.recovered == after.recovered - before.recovered
     assert A.from_dict(A.to_dict(progressed)) == progressed

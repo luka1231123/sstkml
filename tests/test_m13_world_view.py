@@ -61,8 +61,11 @@ def _route(a: str, b: str, mode: str = "land", age: int = 0,
     }
 
 
-def _site(kind: str, hub: str, col: int, row: int) -> dict:
-    return {"kind": kind, "hub": hub, "col": col, "row": row}
+def _site(kind: str, alu: str, col: int, row: int) -> dict:
+    role = "palace_centre" if kind == "palace" else "capacity"
+    capacity = "" if kind == "palace" else ("food" if kind == "grain" else kind)
+    return {"kind": kind, "alu": alu, "role": role, "capacity": capacity,
+            "col": col, "row": row}
 
 
 def _belief(places: list[dict], routes: list[dict],
@@ -451,7 +454,7 @@ def test_the_hinterland_is_counted_beside_the_map_and_never_named() -> None:
              _site("grain", "home", 5, 4), _site("copper", "home", 9, 1)]
     text = plain_text(
         worldmap.compose(_belief(places, [], sites=sites), 104, 30))
-    assert "2 small palaces" in text
+    assert "2 palace centres" in text
     assert "copper" in text
 
 

@@ -50,12 +50,15 @@ POWER_WORD = {
     "hatti": "under Hatti",
     "ahhiyawa": "of the Ahhiyawa",
     "free": "under no overlord",
+    "assyria": "under Assyria",
+    "karduniash": "under Babylon",
 }
 RANK_WORD = {
     "seat": "your own seat",
     "imperial": "an imperial capital",
     "royal": "a royal seat",
     "town": "a town",
+    "centre": "a palace centre",
 }
 
 # How often a route lays down a glyph. A road is solid, a sea lane is a dashed
@@ -315,6 +318,11 @@ def _mark_of(place: dict, b: dict, courts: dict[str, dict],
     open_mark, close_mark = atlas.BRACKET.get(rank, ("", ""))
 
     tone = atlas.POWER_TONE.get(str(place.get("power", "")), "ash")
+    if str(place.get("kind", "")) == "palace_centre":
+        # Drawn under its own name and under nobody's bracket. Dim because the
+        # eye should find the seats first: this is a holding, not a court that
+        # answers letters.
+        tone = "dim"
     if place_id == str(b.get("seat", "")):
         tone = "flame"
     elif place_id == selected:
@@ -720,22 +728,41 @@ def _wrap(text: str, room: int, lines: int = 2) -> list[str]:
 
 
 def _hinterland(b: dict, place: str, room: int) -> list[tuple[str, str]]:
-    """What lies behind a hub, counted by kind. Never named."""
-    counted: dict[str, int] = {}
+    """What lies behind an Alu, counted by kind. Never named.
+
+    Holdings and capacities are counted apart, in that order, because they are
+    different answers to different questions: a palace centre is somewhere a
+    detachment can be sent and somewhere an enemy can take, and a capacity is
+    ground and production that belongs to the Alu and is nowhere in particular.
+    """
+    centres, capacities = 0, {}
     for site in atlas.sites_of(b):
-        if str(site.get("hub", "")) != place:
+        if str(site.get("alu", "")) != place:
+            continue
+        if str(site.get("role", "")) == "palace_centre":
+            centres += 1
             continue
         kind = str(site.get("kind", ""))
-        counted[kind] = counted.get(kind, 0) + 1
-    if not counted:
-        return []
+        capacities[kind] = capacities.get(kind, 0) + 1
     parts = []
-    for kind, count in sorted(counted.items()):
+    if centres:
+        parts.append(f"{centres} {atlas.SITE_WORD['palace']}"
+                     if centres > 1 else "one palace centre")
+    for kind, count in sorted(capacities.items()):
         word = atlas.SITE_WORD.get(kind, kind)
-        parts.append(f"{count} {word}" if count > 1 or kind in
-                     ("palace", "grain") else word)
-    return [(line, "dim") for line in
-            _wrap("hinterland: " + " · ".join(parts), room, 2)]
+        parts.append(f"{count} {word}" if count > 1 or kind == "grain" else word)
+    named = [_spoken(item.get("name") or item.get("id"))
+             for item in places_in_order(b)
+             if str(item.get("kind", "")) == "palace_centre"
+             and str(item.get("alu", "")) == place]
+    if not parts and not named:
+        return []
+    lines = [(line, "dim") for line in
+             _wrap("hinterland: " + " · ".join(parts), room, 2)] if parts else []
+    if named:
+        lines += [(line, "dim") for line in
+                  _wrap("its own: " + " · ".join(sorted(named)), room, 2)]
+    return lines
 
 
 def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
@@ -753,7 +780,14 @@ def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
     rank = "seat" if place == seat else str(entry.get("rank", "town"))
     power = str(entry.get("power", ""))
     standing = RANK_WORD.get(rank, "a town")
-    if power and rank != "seat":
+    if str(entry.get("kind", "")) == "palace_centre":
+        # Whose it is, not what empire answers for it: a palace centre has no
+        # king of its own, and the useful fact is the Alu that holds it.
+        owner = next((item for item in places_in_order(b)
+                      if str(item.get("id", "")) == str(entry.get("alu", ""))), {})
+        held_by = _spoken(owner.get("name") or entry.get("alu", ""))
+        standing = f"{standing} of {held_by}" if held_by else standing
+    elif power and rank != "seat":
         standing = f"{standing} {POWER_WORD.get(power, '')}".strip()
     lines.append((standing[:room],
                   "flame" if place == seat

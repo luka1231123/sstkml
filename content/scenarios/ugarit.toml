@@ -594,6 +594,7 @@ col = 135
 row = 76    # 30.80N 31.83E
 power = "egypt"
 rank = "imperial"
+kind = "alu"
 glyph = "P"
 role = "the imperial capital, and where the army is gathered"
 
@@ -605,6 +606,7 @@ col = 128
 row = 83    # 29.85N 31.25E
 power = "egypt"
 rank = "royal"
+kind = "alu"
 glyph = "M"
 role = "the scribes of the Two Lands, and the Nile's grain"
 
@@ -616,6 +618,7 @@ col = 146
 row = 113    # 25.70N 32.64E
 power = "egypt"
 rank = "royal"
+kind = "alu"
 glyph = "W"
 role = "Amun's city: secure, and a weight on the treasury"
 
@@ -627,6 +630,7 @@ col = 169
 row = 70    # 31.50N 34.45E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "G"
 role = "the fortress where all Levantine tribute is counted"
 
@@ -638,6 +642,7 @@ col = 170
 row = 69    # 31.67N 34.55E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "A"
 role = "a rich vassal, and keeper of the coast road"
 
@@ -649,6 +654,7 @@ col = 173
 row = 70    # 31.56N 34.85E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "L"
 role = "a stronghold over the southern highlands"
 
@@ -660,6 +666,7 @@ col = 177
 row = 62    # 32.58N 35.18E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "M"
 role = "the lynchpin of the inland road into Syria"
 
@@ -671,6 +678,7 @@ col = 178
 row = 57    # 33.27N 35.20E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "T"
 role = "an island fortress, and a harbour nobody can storm"
 
@@ -682,6 +690,7 @@ col = 180
 row = 55    # 33.56N 35.37E
 power = "egypt"
 rank = "town"
+kind = "alu"
 glyph = "S"
 role = "the purple city"
 
@@ -693,6 +702,7 @@ col = 184
 row = 51    # 34.12N 35.65E
 power = "egypt"
 rank = "royal"
+kind = "alu"
 glyph = "B"
 role = "the favoured vassal: cedar for Pharaoh's ships"
 
@@ -704,39 +714,46 @@ col = 187
 row = 47    # 34.71N 35.99E
 power = "hatti"
 rank = "town"
+kind = "alu"
 glyph = "S"
 role = "the vassal that has played both sides and is still standing"
 
 [[places]]
 id = "gibala"
 name = "Gib'ala"
-population = 1200
+population = 0
 col = 187
 row = 42    # 35.32N 35.92E
 power = "hatti"
-rank = "town"
+rank = "centre"
+kind = "palace_centre"
+alu = "seat"
 glyph = "g"
 role = "your southern harbour"
 
 [[places]]
 id = "ma_hadu"
 name = "Ma'hadu"
-population = 2500
+population = 0
 col = 185
 row = 40    # 35.58N 35.75E
 power = "hatti"
-rank = "town"
+rank = "centre"
+kind = "palace_centre"
+alu = "seat"
+harbour = true
 glyph = "h"
 role = "your white harbour, an hour's walk from the gate"
 
 [[places]]
 id = "seat"
 name = "Ugarit"
-population = 8000
+population = 11700
 col = 186
 row = 40    # 35.60N 35.78E
 power = "hatti"
 rank = "seat"
+kind = "alu"
 glyph = "U"
 role = "your own seat: the freest port on this sea"
 
@@ -748,6 +765,7 @@ col = 192
 row = 35    # 36.25N 36.38E
 power = "hatti"
 rank = "royal"
+kind = "alu"
 glyph = "A"
 role = "Mukish's palace on the inland road between Ugarit and Halab"
 
@@ -759,6 +777,7 @@ col = 202
 row = 36    # 36.20N 37.16E
 power = "hatti"
 rank = "royal"
+kind = "alu"
 glyph = "H"
 role = "the second viceroyalty: north Syrian grain, and the Storm-god"
 
@@ -770,6 +789,7 @@ col = 213
 row = 31    # 36.83N 38.02E
 power = "hatti"
 rank = "royal"
+kind = "alu"
 glyph = "C"
 role = "the viceroyalty that commands every Syrian war"
 
@@ -781,6 +801,7 @@ col = 213
 row = 37    # 35.98N 38.12E
 power = "hatti"
 rank = "town"
+kind = "alu"
 glyph = "E"
 role = "the river crossing, and the gate of the tin road"
 
@@ -792,28 +813,33 @@ col = 170
 row = 7    # 40.02N 34.62E
 power = "hatti"
 rank = "imperial"
+kind = "alu"
 glyph = "H"
 role = "the Sun's capital: walls on a rock, and grain from elsewhere"
 
 [[places]]
 id = "tarhuntassa"
 name = "Tarhuntassa"
-population = 6000
+population = 9000
 col = 162
 row = 34    # 36.90N 33.60E
 power = "hatti"
 rank = "royal"
+kind = "alu"
 glyph = "T"
 role = "the southern co-capital, and a rival to the north"
 
 [[places]]
 id = "ura"
 name = "Ura"
-population = 3000
+population = 0
 col = 163
 row = 34    # 36.38N 33.93E
 power = "hatti"
-rank = "town"
+rank = "centre"
+kind = "palace_centre"
+alu = "tarhuntassa"
+harbour = true
 glyph = "U"
 role = "the grain port; shut it and Hattusa starves"
 
@@ -825,6 +851,7 @@ col = 106
 row = 21    # 38.20N 29.50E
 power = "hatti"
 rank = "town"
+kind = "alu"
 glyph = "M"
 role = "the Arzawan country, held to its oath by force"
 
@@ -836,6 +863,7 @@ col = 65
 row = 8    # 39.96N 26.24E
 power = "hatti"
 rank = "royal"
+kind = "alu"
 glyph = "W"
 role = "the straits, and the raiding that comes with them"
 
@@ -847,6 +875,7 @@ col = 79
 row = 23    # 37.94N 27.34E
 power = "free"
 rank = "royal"
+kind = "alu"
 glyph = "A"
 role = "Arzawa's rebel seat, at war with Hattusa in the hills"
 
@@ -858,28 +887,32 @@ col = 79
 row = 26    # 37.53N 27.28E
 power = "ahhiyawa"
 rank = "town"
+kind = "alu"
 glyph = "M"
 role = "the Ahhiyawan foothold that pays for rebellion"
 
 [[places]]
 id = "mycenae"
 name = "Mycenae"
-population = 10000
+population = 15000
 col = 22
 row = 24    # 37.73N 22.75E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "M"
 role = "the richest palace, and hegemon when it suits it"
 
 [[places]]
 id = "tiryns"
 name = "Tiryns"
-population = 5000
+population = 0
 col = 23
 row = 25    # 37.60N 22.80E
 power = "ahhiyawa"
-rank = "royal"
+rank = "centre"
+kind = "palace_centre"
+alu = "mycenae"
 glyph = "T"
 role = "cyclopean walls, and the Argolid's own shore"
 
@@ -891,17 +924,19 @@ col = 8
 row = 29    # 37.03N 21.70E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "P"
 role = "the western archive: flax, linen, and the road to Italy"
 
 [[places]]
 id = "thebes_gr"
 name = "Thebes"
-population = 7000
+population = 9000
 col = 29
 row = 20    # 38.32N 23.32E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "T"
 role = "master of the Boeotian plain"
 
@@ -913,17 +948,20 @@ col = 34
 row = 22    # 37.98N 23.73E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "A"
 role = "an acropolis that will still be standing afterwards"
 
 [[places]]
 id = "gla"
 name = "Gla"
-population = 2000
+population = 0
 col = 27
 row = 19    # 38.45N 23.17E
 power = "ahhiyawa"
-rank = "town"
+rank = "centre"
+kind = "palace_centre"
+alu = "thebes_gr"
 glyph = "g"
 role = "one fortress around one drained lake"
 
@@ -935,6 +973,7 @@ col = 24
 row = 12    # 39.36N 22.95E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "I"
 role = "the northern gate, and a fleet that raids"
 
@@ -946,6 +985,7 @@ col = 52
 row = 42    # 35.30N 25.16E
 power = "ahhiyawa"
 rank = "royal"
+kind = "alu"
 glyph = "K"
 role = "a Minoan capital run for the Aegean trade"
 
@@ -957,6 +997,7 @@ col = 38
 row = 41    # 35.51N 24.02E
 power = "ahhiyawa"
 rank = "town"
+kind = "alu"
 glyph = "K"
 role = "aromatics and cloth, rising in the west of Crete"
 
@@ -968,6 +1009,7 @@ col = 161
 row = 43    # 35.17N 33.87E
 power = "free"
 rank = "royal"
+kind = "alu"
 glyph = "E"
 role = "the copper: every bronze on this sea begins here"
 
@@ -977,8 +1019,9 @@ name = "Assur"
 population = 9000
 col = 278
 row = 41    # 35.46N 43.26E
-power = "free"
+power = "assyria"
 rank = "imperial"
+kind = "alu"
 glyph = "A"
 role = "Assyria, armed, and waiting for a weak season"
 
@@ -988,10 +1031,151 @@ name = "Babylon"
 population = 20000
 col = 293
 row = 63    # 32.54N 44.42E
-power = "free"
+power = "karduniash"
 rank = "imperial"
+kind = "alu"
 glyph = "B"
 role = "the Kassite court: prestige, and a hollow guard"
+
+
+# ── Added for Alpha 0.7 (docs/ALU_CLASSIFICATION.md §5): the east of the
+# map, the Anatolian interior, and the river above Memphis, which the
+# authored thirty-odd left thin. Same grammar, same grid.
+
+[[places]]
+id = "nineveh"
+name = "Ninua"
+population = 7000
+col = 277
+row = 34    # 36.36N 43.15E
+power = "assyria"
+rank = "royal"
+kind = "alu"
+glyph = "N"
+role = "Ishtar's own city, and where the northern road turns west"
+
+[[places]]
+id = "dur_kurigalzu"
+name = "Dur-Kurigalzu"
+population = 8000
+col = 290
+row = 57    # 33.35N 44.20E
+power = "karduniash"
+rank = "royal"
+kind = "alu"
+glyph = "K"
+role = "the Kassite king's new foundation, and hungry as new cities are"
+
+[[places]]
+id = "dur_katlimmu"
+name = "Dur-Katlimmu"
+population = 3000
+col = 247
+row = 40    # 35.65N 40.75E
+power = "assyria"
+rank = "town"
+kind = "alu"
+glyph = "D"
+role = "the Assyrian hand on the Habur, counting the western road"
+
+[[places]]
+id = "nuzi"
+name = "Nuzi"
+population = 2500
+col = 291
+row = 42    # 35.38N 44.30E
+power = "assyria"
+rank = "town"
+kind = "alu"
+glyph = "n"
+role = "eastern ground, and tablets full of other men's debts"
+
+[[places]]
+id = "tarsa"
+name = "Tarsa"
+population = 4000
+col = 174
+row = 30    # 36.92N 34.90E
+power = "hatti"
+rank = "town"
+kind = "alu"
+glyph = "R"
+role = "the Cilician gate, where Hatti's grain comes ashore"
+
+[[places]]
+id = "kanesh"
+name = "Kanesh"
+population = 3500
+col = 183
+row = 16    # 38.85N 35.63E
+power = "hatti"
+rank = "town"
+kind = "alu"
+glyph = "k"
+role = "old Nesa, whose tongue the kings still write in"
+
+[[places]]
+id = "khemenu"
+name = "Khemenu"
+population = 6000
+col = 122
+row = 98    # 27.78N 30.80E
+power = "egypt"
+rank = "royal"
+kind = "alu"
+glyph = "X"
+role = "Thoth's city, and the granary of the middle river"
+
+[[places]]
+id = "abdju"
+name = "Abdju"
+population = 5000
+col = 137
+row = 110    # 26.18N 31.92E
+power = "egypt"
+rank = "royal"
+kind = "alu"
+glyph = "O"
+role = "Osiris' burial ground, and a cult the whole land pays for"
+
+[[places]]
+id = "sau"
+name = "Sau"
+population = 5000
+col = 122
+row = 74    # 30.97N 30.77E
+power = "egypt"
+rank = "royal"
+kind = "alu"
+glyph = "S"
+role = "Neith's city in the western Delta, with the Libyan wind at its back"
+
+[[places]]
+id = "tjaru"
+name = "Tjaru"
+population = 3000
+col = 142
+row = 75    # 30.89N 32.36E
+power = "egypt"
+rank = "town"
+kind = "alu"
+glyph = "J"
+role = "the fortress gate of the Ways of Horus, where Asia begins"
+
+# Sippar is a palace centre of Babylon and not an Alu of its own: a city
+# with a god, a canal, and no king (docs/ALU_CLASSIFICATION.md §5.1).
+[[places]]
+id = "sippar"
+name = "Sippar"
+population = 0
+col = 290
+row = 59    # 33.06N 44.24E
+power = "karduniash"
+rank = "centre"
+kind = "palace_centre"
+alu = "babylon"
+glyph = "s"
+role = "Shamash's city, and the tablets of Babylon's northern ground"
 
 # ── Routes. legs = fortnights of courier time, worked out from how far apart
 # the two places really are: a hundred kilometres of road, a hundred and fifty
@@ -1448,884 +1632,1624 @@ mode = "sea"
 seasonal = true
 risk = 69          # 180 km
 
+
+# ── The roads and river reaches to the Alu added for Alpha 0.7, on the
+# same arithmetic as the rest: risk is 40 plus a third of the road
+# kilometres, or a sixth of the sea and river ones.
+
+[[routes]]
+a = "assur"
+b = "nineveh"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 82          # 126 km
+
+[[routes]]
+a = "assur"
+b = "nuzi"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 79          # 118 km
+
+[[routes]]
+a = "nineveh"
+b = "nuzi"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 103          # 188 km
+
+[[routes]]
+a = "nineveh"
+b = "dur_katlimmu"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 136          # 287 km
+
+[[routes]]
+a = "dur_katlimmu"
+b = "assur"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 135          # 285 km
+
+[[routes]]
+a = "dur_katlimmu"
+b = "emar"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 143          # 308 km
+
+[[routes]]
+a = "babylon"
+b = "dur_kurigalzu"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 78          # 115 km
+
+[[routes]]
+a = "dur_kurigalzu"
+b = "nuzi"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 134          # 282 km
+
+[[routes]]
+a = "tarsa"
+b = "ura"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 85          # 134 km
+
+[[routes]]
+a = "tarsa"
+b = "tarhuntassa"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 88          # 145 km
+
+[[routes]]
+a = "tarsa"
+b = "kanesh"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 133          # 280 km
+
+[[routes]]
+a = "tarsa"
+b = "carchemish"
+legs = 4
+mode = "land"
+seasonal = false
+risk = 156          # 347 km
+
+[[routes]]
+a = "tarsa"
+b = "alashiya"
+legs = 1
+mode = "sea"
+seasonal = true
+risk = 82          # 253 km
+
+[[routes]]
+a = "kanesh"
+b = "hattusa"
+legs = 2
+mode = "land"
+seasonal = false
+risk = 105          # 195 km
+
+[[routes]]
+a = "egypt"
+b = "tjaru"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 61          # 64 km
+
+[[routes]]
+a = "tjaru"
+b = "gaza"
+legs = 3
+mode = "land"
+seasonal = false
+risk = 128          # 263 km
+
+[[routes]]
+a = "sau"
+b = "egypt"
+legs = 1
+mode = "land"
+seasonal = false
+risk = 83          # 129 km
+
+[[routes]]
+a = "sau"
+b = "memphis"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 62          # 133 km
+
+[[routes]]
+a = "memphis"
+b = "khemenu"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 79          # 234 km
+
+[[routes]]
+a = "khemenu"
+b = "abdju"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 75          # 210 km
+
+[[routes]]
+a = "abdju"
+b = "waset"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 55          # 90 km
+
+[[routes]]
+a = "babylon"
+b = "sippar"
+legs = 1
+mode = "river"
+seasonal = false
+risk = 47          # 42 km
+
 # ── The hinterland. No names: a small palace is a holding, counted, not a town
 # the king writes to. `kind` decides the mark and the layer it appears on.
 
 [[sites]]
 kind = "palace"
-hub = "egypt"
+role = "palace_centre"
+alu = "egypt"
 col = 135
 row = 79
 
 [[sites]]
 kind = "palace"
-hub = "egypt"
+role = "palace_centre"
+alu = "egypt"
 col = 140
 row = 76
 
 [[sites]]
 kind = "grain"
-hub = "egypt"
+role = "capacity"
+capacity = "food"
+alu = "egypt"
 col = 135
 row = 74
 
 [[sites]]
 kind = "grain"
-hub = "egypt"
+role = "capacity"
+capacity = "food"
+alu = "egypt"
 col = 135
 row = 78
 
 [[sites]]
 kind = "grain"
-hub = "egypt"
+role = "capacity"
+capacity = "food"
+alu = "egypt"
 col = 133
 row = 75
 
 [[sites]]
 kind = "palace"
-hub = "memphis"
+role = "palace_centre"
+alu = "memphis"
 col = 126
 row = 81
 
 [[sites]]
 kind = "palace"
-hub = "memphis"
+role = "palace_centre"
+alu = "memphis"
 col = 126
 row = 85
 
 [[sites]]
 kind = "grain"
-hub = "memphis"
+role = "capacity"
+capacity = "food"
+alu = "memphis"
 col = 128
 row = 81
 
 [[sites]]
 kind = "grain"
-hub = "memphis"
+role = "capacity"
+capacity = "food"
+alu = "memphis"
 col = 128
 row = 85
 
 [[sites]]
 kind = "grain"
-hub = "memphis"
+role = "capacity"
+capacity = "food"
+alu = "memphis"
 col = 126
 row = 82
 
 [[sites]]
 kind = "palace"
-hub = "waset"
+role = "palace_centre"
+alu = "waset"
 col = 146
 row = 116
 
 [[sites]]
 kind = "palace"
-hub = "waset"
+role = "palace_centre"
+alu = "waset"
 col = 144
 row = 111
 
 [[sites]]
 kind = "grain"
-hub = "waset"
+role = "capacity"
+capacity = "food"
+alu = "waset"
 col = 146
 row = 111
 
 [[sites]]
 kind = "grain"
-hub = "waset"
+role = "capacity"
+capacity = "food"
+alu = "waset"
 col = 146
 row = 115
 
 [[sites]]
 kind = "grain"
-hub = "waset"
+role = "capacity"
+capacity = "food"
+alu = "waset"
 col = 144
 row = 114
 
 [[sites]]
 kind = "palace"
-hub = "gaza"
+role = "palace_centre"
+alu = "gaza"
 col = 174
 row = 70
 
 [[sites]]
 kind = "grain"
-hub = "gaza"
+role = "capacity"
+capacity = "food"
+alu = "gaza"
 col = 167
 row = 71
 
 [[sites]]
 kind = "grain"
-hub = "gaza"
+role = "capacity"
+capacity = "food"
+alu = "gaza"
 col = 171
 row = 69
 
 [[sites]]
 kind = "palace"
-hub = "ashkelon"
+role = "palace_centre"
+alu = "ashkelon"
 col = 175
 row = 69
 
 [[sites]]
 kind = "grain"
-hub = "ashkelon"
+role = "capacity"
+capacity = "food"
+alu = "ashkelon"
 col = 170
 row = 71
 
 [[sites]]
 kind = "grain"
-hub = "ashkelon"
+role = "capacity"
+capacity = "food"
+alu = "ashkelon"
 col = 172
 row = 68
 
 [[sites]]
 kind = "palace"
-hub = "lachish"
+role = "palace_centre"
+alu = "lachish"
 col = 173
 row = 67
 
 [[sites]]
 kind = "grain"
-hub = "lachish"
+role = "capacity"
+capacity = "food"
+alu = "lachish"
 col = 173
 row = 68
 
 [[sites]]
 kind = "grain"
-hub = "lachish"
+role = "capacity"
+capacity = "food"
+alu = "lachish"
 col = 171
 row = 71
 
 [[sites]]
 kind = "palace"
-hub = "megiddo"
+role = "palace_centre"
+alu = "megiddo"
 col = 177
 row = 59
 
 [[sites]]
 kind = "grain"
-hub = "megiddo"
+role = "capacity"
+capacity = "food"
+alu = "megiddo"
 col = 177
 row = 60
 
 [[sites]]
 kind = "grain"
-hub = "megiddo"
+role = "capacity"
+capacity = "food"
+alu = "megiddo"
 col = 175
 row = 61
 
 [[sites]]
 kind = "palace"
-hub = "tyre"
+role = "palace_centre"
+alu = "tyre"
 col = 178
 row = 60
 
 [[sites]]
 kind = "grain"
-hub = "tyre"
+role = "capacity"
+capacity = "food"
+alu = "tyre"
 col = 180
 row = 58
 
 [[sites]]
 kind = "grain"
-hub = "tyre"
+role = "capacity"
+capacity = "food"
+alu = "tyre"
 col = 182
 row = 57
 
 [[sites]]
 kind = "palace"
-hub = "sidon"
+role = "palace_centre"
+alu = "sidon"
 col = 182
 row = 53
 
 [[sites]]
 kind = "grain"
-hub = "sidon"
+role = "capacity"
+capacity = "food"
+alu = "sidon"
 col = 182
 row = 56
 
 [[sites]]
 kind = "grain"
-hub = "sidon"
+role = "capacity"
+capacity = "food"
+alu = "sidon"
 col = 184
 row = 55
 
 [[sites]]
 kind = "palace"
-hub = "byblos"
+role = "palace_centre"
+alu = "byblos"
 col = 189
 row = 51
 
 [[sites]]
 kind = "grain"
-hub = "byblos"
+role = "capacity"
+capacity = "food"
+alu = "byblos"
 col = 185
 row = 49
 
 [[sites]]
 kind = "grain"
-hub = "byblos"
+role = "capacity"
+capacity = "food"
+alu = "byblos"
 col = 186
 row = 49
 
 [[sites]]
 kind = "palace"
-hub = "amurru"
+role = "palace_centre"
+alu = "amurru"
 col = 187
 row = 44
 
 [[sites]]
 kind = "grain"
-hub = "amurru"
+role = "capacity"
+capacity = "food"
+alu = "amurru"
 col = 187
 row = 45
 
 [[sites]]
 kind = "grain"
-hub = "amurru"
+role = "capacity"
+capacity = "food"
+alu = "amurru"
 col = 189
 row = 46
 
 [[sites]]
 kind = "palace"
-hub = "gibala"
+role = "palace_centre"
+alu = "seat"
 col = 187
 row = 39
 
 [[sites]]
 kind = "grain"
-hub = "gibala"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 187
 row = 40
 
 [[sites]]
 kind = "grain"
-hub = "gibala"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 188
 row = 40
 
 [[sites]]
 kind = "palace"
-hub = "ma_hadu"
+role = "palace_centre"
+alu = "seat"
 col = 190
 row = 40
 
 [[sites]]
 kind = "grain"
-hub = "ma_hadu"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 187
 row = 41
 
 [[sites]]
 kind = "grain"
-hub = "ma_hadu"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 186
 row = 38
 
 [[sites]]
 kind = "palace"
-hub = "seat"
+role = "palace_centre"
+alu = "seat"
 col = 191
 row = 40
 
 [[sites]]
 kind = "palace"
-hub = "seat"
+role = "palace_centre"
+alu = "seat"
 col = 188
 row = 38
 
 [[sites]]
 kind = "grain"
-hub = "seat"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 188
 row = 41
 
 [[sites]]
 kind = "grain"
-hub = "seat"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 188
 row = 42
 
 [[sites]]
 kind = "grain"
-hub = "seat"
+role = "capacity"
+capacity = "food"
+alu = "seat"
 col = 187
 row = 43
 
 [[sites]]
 kind = "palace"
-hub = "halab"
+role = "palace_centre"
+alu = "halab"
 col = 197
 row = 36
 
 [[sites]]
 kind = "palace"
-hub = "halab"
+role = "palace_centre"
+alu = "halab"
 col = 202
 row = 33
 
 [[sites]]
 kind = "grain"
-hub = "halab"
+role = "capacity"
+capacity = "food"
+alu = "halab"
 col = 202
 row = 38
 
 [[sites]]
 kind = "grain"
-hub = "halab"
+role = "capacity"
+capacity = "food"
+alu = "halab"
 col = 200
 row = 37
 
 [[sites]]
 kind = "grain"
-hub = "halab"
+role = "capacity"
+capacity = "food"
+alu = "halab"
 col = 201
 row = 38
 
 [[sites]]
 kind = "palace"
-hub = "carchemish"
+role = "palace_centre"
+alu = "carchemish"
 col = 208
 row = 31
 
 [[sites]]
 kind = "palace"
-hub = "carchemish"
+role = "palace_centre"
+alu = "carchemish"
 col = 213
 row = 28
 
 [[sites]]
 kind = "grain"
-hub = "carchemish"
+role = "capacity"
+capacity = "food"
+alu = "carchemish"
 col = 213
 row = 29
 
 [[sites]]
 kind = "grain"
-hub = "carchemish"
+role = "capacity"
+capacity = "food"
+alu = "carchemish"
 col = 213
 row = 33
 
 [[sites]]
 kind = "grain"
-hub = "carchemish"
+role = "capacity"
+capacity = "food"
+alu = "carchemish"
 col = 211
 row = 30
 
 [[sites]]
 kind = "palace"
-hub = "emar"
+role = "palace_centre"
+alu = "emar"
 col = 208
 row = 37
 
 [[sites]]
 kind = "grain"
-hub = "emar"
+role = "capacity"
+capacity = "food"
+alu = "emar"
 col = 213
 row = 35
 
 [[sites]]
 kind = "grain"
-hub = "emar"
+role = "capacity"
+capacity = "food"
+alu = "emar"
 col = 215
 row = 36
 
 [[sites]]
 kind = "palace"
-hub = "hattusa"
+role = "palace_centre"
+alu = "hattusa"
 col = 165
 row = 7
 
 [[sites]]
 kind = "palace"
-hub = "hattusa"
+role = "palace_centre"
+alu = "hattusa"
 col = 170
 row = 4
 
 [[sites]]
 kind = "grain"
-hub = "hattusa"
+role = "capacity"
+capacity = "food"
+alu = "hattusa"
 col = 169
 row = 4
 
 [[sites]]
 kind = "grain"
-hub = "hattusa"
+role = "capacity"
+capacity = "food"
+alu = "hattusa"
 col = 171
 row = 4
 
 [[sites]]
 kind = "grain"
-hub = "hattusa"
+role = "capacity"
+capacity = "food"
+alu = "hattusa"
 col = 170
 row = 3
 
 [[sites]]
 kind = "palace"
-hub = "tarhuntassa"
+role = "palace_centre"
+alu = "tarhuntassa"
 col = 157
 row = 34
 
 [[sites]]
 kind = "palace"
-hub = "tarhuntassa"
+role = "palace_centre"
+alu = "tarhuntassa"
 col = 164
 row = 32
 
 [[sites]]
 kind = "grain"
-hub = "tarhuntassa"
+role = "capacity"
+capacity = "food"
+alu = "tarhuntassa"
 col = 165
 row = 33
 
 [[sites]]
 kind = "grain"
-hub = "tarhuntassa"
+role = "capacity"
+capacity = "food"
+alu = "tarhuntassa"
 col = 158
 row = 36
 
 [[sites]]
 kind = "palace"
-hub = "ura"
+role = "palace_centre"
+alu = "tarhuntassa"
 col = 158
 row = 34
 
 [[sites]]
 kind = "grain"
-hub = "ura"
+role = "capacity"
+capacity = "food"
+alu = "tarhuntassa"
 col = 161
 row = 35
 
 [[sites]]
 kind = "grain"
-hub = "ura"
+role = "capacity"
+capacity = "food"
+alu = "tarhuntassa"
 col = 167
 row = 32
 
 [[sites]]
 kind = "palace"
-hub = "mira"
+role = "palace_centre"
+alu = "mira"
 col = 106
 row = 18
 
 [[sites]]
 kind = "grain"
-hub = "mira"
+role = "capacity"
+capacity = "food"
+alu = "mira"
 col = 106
 row = 23
 
 [[sites]]
 kind = "grain"
-hub = "mira"
+role = "capacity"
+capacity = "food"
+alu = "mira"
 col = 104
 row = 20
 
 [[sites]]
 kind = "palace"
-hub = "wilusa"
+role = "palace_centre"
+alu = "wilusa"
 col = 65
 row = 11
 
 [[sites]]
 kind = "grain"
-hub = "wilusa"
+role = "capacity"
+capacity = "food"
+alu = "wilusa"
 col = 65
 row = 10
 
 [[sites]]
 kind = "grain"
-hub = "wilusa"
+role = "capacity"
+capacity = "food"
+alu = "wilusa"
 col = 67
 row = 7
 
 [[sites]]
 kind = "palace"
-hub = "apasa"
+role = "palace_centre"
+alu = "apasa"
 col = 79
 row = 20
 
 [[sites]]
 kind = "grain"
-hub = "apasa"
+role = "capacity"
+capacity = "food"
+alu = "apasa"
 col = 79
 row = 21
 
 [[sites]]
 kind = "grain"
-hub = "apasa"
+role = "capacity"
+capacity = "food"
+alu = "apasa"
 col = 79
 row = 25
 
 [[sites]]
 kind = "palace"
-hub = "millawanda"
+role = "palace_centre"
+alu = "millawanda"
 col = 79
 row = 29
 
 [[sites]]
 kind = "grain"
-hub = "millawanda"
+role = "capacity"
+capacity = "food"
+alu = "millawanda"
 col = 79
 row = 24
 
 [[sites]]
 kind = "grain"
-hub = "millawanda"
+role = "capacity"
+capacity = "food"
+alu = "millawanda"
 col = 77
 row = 25
 
 [[sites]]
 kind = "palace"
-hub = "mycenae"
+role = "palace_centre"
+alu = "mycenae"
 col = 17
 row = 24
 
 [[sites]]
 kind = "palace"
-hub = "mycenae"
+role = "palace_centre"
+alu = "mycenae"
 col = 22
 row = 27
 
 [[sites]]
 kind = "grain"
-hub = "mycenae"
+role = "capacity"
+capacity = "food"
+alu = "mycenae"
 col = 24
 row = 23
 
 [[sites]]
 kind = "grain"
-hub = "mycenae"
+role = "capacity"
+capacity = "food"
+alu = "mycenae"
 col = 21
 row = 22
 
 [[sites]]
 kind = "grain"
-hub = "mycenae"
+role = "capacity"
+capacity = "food"
+alu = "mycenae"
 col = 25
 row = 23
 
 [[sites]]
 kind = "palace"
-hub = "tiryns"
+role = "palace_centre"
+alu = "mycenae"
 col = 18
 row = 25
 
 [[sites]]
 kind = "grain"
-hub = "tiryns"
+role = "capacity"
+capacity = "food"
+alu = "mycenae"
 col = 23
 row = 23
 
 [[sites]]
 kind = "grain"
-hub = "tiryns"
+role = "capacity"
+capacity = "food"
+alu = "mycenae"
 col = 25
 row = 26
 
 [[sites]]
 kind = "palace"
-hub = "pylos"
+role = "palace_centre"
+alu = "pylos"
 col = 8
 row = 26
 
 [[sites]]
 kind = "palace"
-hub = "pylos"
+role = "palace_centre"
+alu = "pylos"
 col = 13
 row = 29
 
 [[sites]]
 kind = "grain"
-hub = "pylos"
+role = "capacity"
+capacity = "food"
+alu = "pylos"
 col = 12
 row = 29
 
 [[sites]]
 kind = "grain"
-hub = "pylos"
+role = "capacity"
+capacity = "food"
+alu = "pylos"
 col = 9
 row = 27
 
 [[sites]]
 kind = "palace"
-hub = "thebes_gr"
+role = "palace_centre"
+alu = "thebes_gr"
 col = 24
 row = 20
 
 [[sites]]
 kind = "palace"
-hub = "thebes_gr"
+role = "palace_centre"
+alu = "thebes_gr"
 col = 34
 row = 20
 
 [[sites]]
 kind = "grain"
-hub = "thebes_gr"
+role = "capacity"
+capacity = "food"
+alu = "thebes_gr"
 col = 29
 row = 18
 
 [[sites]]
 kind = "grain"
-hub = "thebes_gr"
+role = "capacity"
+capacity = "food"
+alu = "thebes_gr"
 col = 29
 row = 22
 
 [[sites]]
 kind = "palace"
-hub = "athens"
+role = "palace_centre"
+alu = "athens"
 col = 34
 row = 19
 
 [[sites]]
 kind = "grain"
-hub = "athens"
+role = "capacity"
+capacity = "food"
+alu = "athens"
 col = 36
 row = 23
 
 [[sites]]
 kind = "grain"
-hub = "athens"
+role = "capacity"
+capacity = "food"
+alu = "athens"
 col = 30
 row = 22
 
 [[sites]]
 kind = "palace"
-hub = "gla"
+role = "palace_centre"
+alu = "thebes_gr"
 col = 22
 row = 19
 
 [[sites]]
 kind = "grain"
-hub = "gla"
+role = "capacity"
+capacity = "food"
+alu = "thebes_gr"
 col = 27
 row = 21
 
 [[sites]]
 kind = "grain"
-hub = "gla"
+role = "capacity"
+capacity = "food"
+alu = "thebes_gr"
 col = 31
 row = 19
 
 [[sites]]
 kind = "palace"
-hub = "iolcos"
+role = "palace_centre"
+alu = "iolcos"
 col = 19
 row = 12
 
 [[sites]]
 kind = "grain"
-hub = "iolcos"
+role = "capacity"
+capacity = "food"
+alu = "iolcos"
 col = 24
 row = 14
 
 [[sites]]
 kind = "grain"
-hub = "iolcos"
+role = "capacity"
+capacity = "food"
+alu = "iolcos"
 col = 22
 row = 11
 
 [[sites]]
 kind = "palace"
-hub = "knossos"
+role = "palace_centre"
+alu = "knossos"
 col = 47
 row = 42
 
 [[sites]]
 kind = "palace"
-hub = "knossos"
+role = "palace_centre"
+alu = "knossos"
 col = 57
 row = 42
 
 [[sites]]
 kind = "grain"
-hub = "knossos"
+role = "capacity"
+capacity = "food"
+alu = "knossos"
 col = 50
 row = 44
 
 [[sites]]
 kind = "grain"
-hub = "knossos"
+role = "capacity"
+capacity = "food"
+alu = "knossos"
 col = 58
 row = 42
 
 [[sites]]
 kind = "grain"
-hub = "knossos"
+role = "capacity"
+capacity = "food"
+alu = "knossos"
 col = 49
 row = 44
 
 [[sites]]
 kind = "palace"
-hub = "kydonia"
+role = "palace_centre"
+alu = "kydonia"
 col = 33
 row = 41
 
 [[sites]]
 kind = "grain"
-hub = "kydonia"
+role = "capacity"
+capacity = "food"
+alu = "kydonia"
 col = 34
 row = 41
 
 [[sites]]
 kind = "grain"
-hub = "kydonia"
+role = "capacity"
+capacity = "food"
+alu = "kydonia"
 col = 39
 row = 43
 
 [[sites]]
 kind = "palace"
-hub = "alashiya"
+role = "palace_centre"
+alu = "alashiya"
 col = 156
 row = 43
 
 [[sites]]
 kind = "palace"
-hub = "alashiya"
+role = "palace_centre"
+alu = "alashiya"
 col = 163
 row = 41
 
 [[sites]]
 kind = "grain"
-hub = "alashiya"
+role = "capacity"
+capacity = "food"
+alu = "alashiya"
 col = 159
 row = 42
 
 [[sites]]
 kind = "grain"
-hub = "alashiya"
+role = "capacity"
+capacity = "food"
+alu = "alashiya"
 col = 159
 row = 44
 
 [[sites]]
 kind = "palace"
-hub = "assur"
+role = "palace_centre"
+alu = "assur"
 col = 273
 row = 41
 
 [[sites]]
 kind = "palace"
-hub = "assur"
+role = "palace_centre"
+alu = "assur"
 col = 278
 row = 38
 
 [[sites]]
 kind = "grain"
-hub = "assur"
+role = "capacity"
+capacity = "food"
+alu = "assur"
 col = 278
 row = 39
 
 [[sites]]
 kind = "grain"
-hub = "assur"
+role = "capacity"
+capacity = "food"
+alu = "assur"
 col = 278
 row = 43
 
 [[sites]]
 kind = "grain"
-hub = "assur"
+role = "capacity"
+capacity = "food"
+alu = "assur"
 col = 276
 row = 40
 
 [[sites]]
 kind = "palace"
-hub = "babylon"
+role = "palace_centre"
+alu = "babylon"
 col = 288
 row = 63
 
 [[sites]]
 kind = "palace"
-hub = "babylon"
+role = "palace_centre"
+alu = "babylon"
 col = 293
 row = 60
 
 [[sites]]
 kind = "grain"
-hub = "babylon"
+role = "capacity"
+capacity = "food"
+alu = "babylon"
 col = 293
 row = 61
 
 [[sites]]
 kind = "grain"
-hub = "babylon"
+role = "capacity"
+capacity = "food"
+alu = "babylon"
 col = 293
 row = 65
 
 [[sites]]
 kind = "grain"
-hub = "babylon"
+role = "capacity"
+capacity = "food"
+alu = "babylon"
 col = 291
 row = 62
 
 [[sites]]
 kind = "copper"
-hub = "alashiya"
+role = "capacity"
+capacity = "copper"
+alu = "alashiya"
 col = 163
 row = 44
 
 [[sites]]
 kind = "copper"
-hub = "alashiya"
+role = "capacity"
+capacity = "copper"
+alu = "alashiya"
 col = 157
 row = 43
 
 [[sites]]
 kind = "tin"
-hub = "emar"
+role = "capacity"
+capacity = "tin"
+alu = "emar"
 col = 213
 row = 39
 
 [[sites]]
 kind = "tin"
-hub = "assur"
+role = "capacity"
+capacity = "tin"
+alu = "assur"
 col = 276
 row = 42
 
 [[sites]]
 kind = "gold"
-hub = "waset"
+role = "capacity"
+capacity = "gold"
+alu = "waset"
 col = 148
 row = 112
 
 [[sites]]
 kind = "silver"
-hub = "athens"
+role = "capacity"
+capacity = "silver"
+alu = "athens"
 col = 32
 row = 21
 
 [[sites]]
 kind = "silver"
-hub = "mira"
+role = "capacity"
+capacity = "silver"
+alu = "mira"
 col = 106
 row = 19
 
 [[sites]]
 kind = "cedar"
-hub = "byblos"
+role = "capacity"
+capacity = "cedar"
+alu = "byblos"
 col = 184
 row = 53
 
 [[sites]]
 kind = "cedar"
-hub = "tarhuntassa"
+role = "capacity"
+capacity = "cedar"
+alu = "tarhuntassa"
 col = 162
 row = 32
 
 [[sites]]
 kind = "horses"
-hub = "wilusa"
+role = "capacity"
+capacity = "horses"
+alu = "wilusa"
 col = 67
 row = 9
 
 [[sites]]
 kind = "horses"
-hub = "hattusa"
+role = "capacity"
+capacity = "horses"
+alu = "hattusa"
 col = 170
 row = 5
 
 [[sites]]
 kind = "lapis"
-hub = "babylon"
+role = "capacity"
+capacity = "lapis"
+alu = "babylon"
 col = 295
 row = 62
+
+
+# ── The hinterland of the Alu added for Alpha 0.7. Same formula the rest
+# of the map was authored on: a royal seat holds two palace centres and
+# three of ground, a town one and two.
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "nineveh"
+col = 277
+row = 32
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "nineveh"
+col = 279
+row = 34
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nineveh"
+col = 277
+row = 36
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nineveh"
+col = 275
+row = 34
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nineveh"
+col = 279
+row = 32
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "dur_kurigalzu"
+col = 290
+row = 55
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "dur_kurigalzu"
+col = 292
+row = 57
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "dur_kurigalzu"
+col = 292
+row = 59
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "dur_kurigalzu"
+col = 288
+row = 57
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "dur_kurigalzu"
+col = 292
+row = 55
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "dur_katlimmu"
+col = 247
+row = 38
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "dur_katlimmu"
+col = 249
+row = 40
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "dur_katlimmu"
+col = 247
+row = 42
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "nuzi"
+col = 291
+row = 40
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nuzi"
+col = 293
+row = 42
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nuzi"
+col = 291
+row = 44
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "tarsa"
+col = 174
+row = 28
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tarsa"
+col = 176
+row = 30
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tarsa"
+col = 172
+row = 30
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "kanesh"
+col = 183
+row = 14
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "kanesh"
+col = 185
+row = 16
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "kanesh"
+col = 183
+row = 18
+
+[[sites]]
+kind = "silver"
+role = "capacity"
+capacity = "silver"
+alu = "kanesh"
+col = 181
+row = 16
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "khemenu"
+col = 122
+row = 96
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "khemenu"
+col = 124
+row = 98
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "khemenu"
+col = 122
+row = 100
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "khemenu"
+col = 124
+row = 96
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "khemenu"
+col = 124
+row = 100
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "abdju"
+col = 137
+row = 108
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "abdju"
+col = 139
+row = 110
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "abdju"
+col = 139
+row = 108
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "abdju"
+col = 135
+row = 108
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "abdju"
+col = 141
+row = 110
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "sau"
+col = 122
+row = 72
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "sau"
+col = 124
+row = 74
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "sau"
+col = 122
+row = 76
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "sau"
+col = 120
+row = 74
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "sau"
+col = 124
+row = 72
+
+[[sites]]
+kind = "palace"
+role = "palace_centre"
+alu = "tjaru"
+col = 142
+row = 73
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tjaru"
+col = 144
+row = 75
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tjaru"
+col = 142
+row = 77
 
 # ── Who writes, and how often. `facts` are TRUE at the moment of writing; what
 # the tablet asserts is these figures run through the sender's `report_bias`

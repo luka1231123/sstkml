@@ -61,6 +61,10 @@ BRACKET = {
     "imperial": ("[", "]"),
     "royal": ("(", ")"),
     "town": ("", ""),
+    # A palace centre wears no bracket because it is nobody's seat: it is a
+    # holding of an Alu that happens to be big enough to have been written
+    # down with a name. The tablet beside the map says whose it is.
+    "centre": ("", ""),
 }
 
 # Whose empire answers for the place. Colour only ever repeats what the tablet
@@ -70,6 +74,8 @@ POWER_TONE = {
     "hatti": "flame",
     "ahhiyawa": "lapis",
     "free": "verdigris",
+    "assyria": "wine",
+    "karduniash": "sand",
 }
 
 # The hinterland, which has no names: a holding, an estate, a source of metal.
@@ -95,7 +101,7 @@ SITE_TONE = {
 METAL_TONE = "gold"
 
 SITE_WORD = {
-    "palace": "small palaces",
+    "palace": "palace centres",
     "grain": "grain estates",
     "copper": "copper",
     "tin": "tin",

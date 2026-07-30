@@ -744,6 +744,9 @@ def _world_graph(world) -> dict:
                 "rank": place.rank,
                 "glyph": place.glyph,
                 "role": place.role,
+                "kind": place.kind,
+                "alu": place.alu,
+                "harbour": place.harbour,
                 "source": source,
                 "as_of_turn": 0,
                 "age_turns": max(0, now),
@@ -786,8 +789,8 @@ def _world_graph(world) -> dict:
             "legend": world.terrain.legend,
         },
         "sites": [
-            {"kind": site.kind, "hub": site.hub,
-             "col": site.col, "row": site.row}
+            {"kind": site.kind, "alu": site.alu, "role": site.role,
+             "capacity": site.capacity, "col": site.col, "row": site.row}
             for site in world.sites
         ],
     }

@@ -89,6 +89,9 @@ def load_scenario(name: str, seed: int) -> World:
         # A column and a row into the authored terrain, plus what the place is
         # to the map: whose empire, what rank, which letter, and the one line
         # the tablet writes about it. None of it is read by a rule.
+        kind = str(p.get("kind", "alu"))
+        if kind not in ("alu", "palace_centre"):
+            raise ValueError(f"{p['id']}: unknown place kind {kind!r}")
         places[p["id"]] = Place(id=p["id"], name=p["name"],
                                 col=int(p.get("col", 0)),
                                 row=int(p.get("row", 0)),
@@ -96,7 +99,23 @@ def load_scenario(name: str, seed: int) -> World:
                                 rank=str(p.get("rank", "town")),
                                 glyph=str(p.get("glyph", "")),
                                 role=str(p.get("role", "")),
+                                kind=kind,
+                                alu=str(p.get("alu", "")),
+                                harbour=bool(p.get("harbour", False)),
                                 population=pop, susceptible=pop)
+    # Every mark answers to one Alu, and the answer is authored (spec 8.3).
+    # Resolved here rather than at the tablet because a mark with no owner, or
+    # an owner that is itself a holding, is a scenario fault and not a drawing
+    # one: it is how a decorative site becomes a settlement nobody meant.
+    alu_ids = {i for i, place in places.items() if place.kind == "alu"}
+    for place in places.values():
+        if place.kind != "palace_centre":
+            if place.alu:
+                raise ValueError(f"{place.id}: an Alu cannot belong to {place.alu}")
+            continue
+        if place.alu not in alu_ids:
+            raise ValueError(f"{place.id}: palace centre of unknown Alu "
+                             f"{place.alu!r}")
     routes = tuple(
         Route(a=r["a"], b=r["b"], legs=int(r["legs"]), mode=r["mode"],
               seasonal=bool(r["seasonal"]), risk=int(r["risk"]))
@@ -114,11 +133,24 @@ def load_scenario(name: str, seed: int) -> World:
         step_lon=round(float(ground.get("step_lon", 0)) * 100),
         step_lat=round(float(ground.get("step_lat", 0)) * 100),
         legend=str(ground.get("legend", "")))
-    sites = tuple(
-        Site(kind=str(s.get("kind", "")), hub=str(s.get("hub", "")),
-             col=int(s.get("col", 0)), row=int(s.get("row", 0)))
-        for s in cfg.get("sites", [])
-    )
+    sites = []
+    for s in cfg.get("sites", []):
+        role = str(s.get("role", ""))
+        alu = str(s.get("alu", ""))
+        if role not in ("palace_centre", "capacity"):
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             f"unknown role {role!r}")
+        if alu not in alu_ids:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             f"unknown Alu {alu!r}")
+        capacity = str(s.get("capacity", ""))
+        if role == "capacity" and not capacity:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             "a capacity must say what of")
+        sites.append(Site(kind=str(s.get("kind", "")), alu=alu, role=role,
+                          capacity=capacity, col=int(s.get("col", 0)),
+                          row=int(s.get("row", 0))))
+    sites = tuple(sites)
     correspondents = tuple(
         Correspondent(
             actor=c["actor"], place=c["place"], cadence=int(c["cadence"]),
@@ -325,12 +357,20 @@ def load_scenario(name: str, seed: int) -> World:
                        * int(revenue_cfg["land"]["initial_rate"]) // 1000),
     )
     plague_cfg = cfg.get("plague", {})
+    # The scenario may land infected travellers at a palace centre, because
+    # that is where ships come in and the tablet says Ma'hadu. The people they
+    # land among are the Alu's, so the seeding resolves to the Alu that holds
+    # the harbour -- a palace centre keeps no compartments of its own.
+    import_place = str(plague_cfg.get("import_place", ""))
+    landed = places.get(import_place)
+    if landed is not None and landed.kind == "palace_centre":
+        import_place = landed.alu
     plague_state = PlagueState(
         beta=int(plague_cfg.get("beta", 0)),
         gamma=int(plague_cfg.get("gamma", 0)),
         mortality=int(plague_cfg.get("mortality", 0)),
         exposure=int(plague_cfg.get("exposure", 0)),
-        import_place=str(plague_cfg.get("import_place", "")),
+        import_place=import_place,
         import_turn=int(plague_cfg.get("import_turn", -1)),
         import_cases=int(plague_cfg.get("import_cases", 0)),
     )

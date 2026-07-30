@@ -422,6 +422,14 @@ class Place:
     rank: str = "town"
     glyph: str = ""
     role: str = ""
+    # What the mark IS, and whose it is (spec 8.3, docs/ALU_CLASSIFICATION.md).
+    # An Alu is a city with a king, a hinterland, and its own decisions; a
+    # palace centre is a located holding of one, with neither king nor
+    # simulation of its own. `alu` is the owner and is empty on an Alu itself.
+    # Both are authored: nothing is inferred from a name, a rank, or a size.
+    kind: str = "alu"              # "alu" | "palace_centre"
+    alu: PlaceId = ""
+    harbour: bool = False          # the Alu reaches the sea through this mark
     population: int = 0            # authored opening size; S is seeded from it
     susceptible: int = 0
     infected: int = 0
@@ -521,14 +529,21 @@ class Terrain:
 
 @dataclasses.dataclass(frozen=True)
 class Site:
-    """One holding in a hub's hinterland: a small palace, an estate, a mine.
+    """One holding in an Alu's hinterland: a small palace, an estate, a mine.
 
     It has no name on purpose. This is what the hinterland of a great house
     looks like from the capital -- a count of holdings, each of a kind, each
-    answering to one hub -- and not a second list of towns to write letters to.
+    answering to one Alu -- and not a second list of towns to write letters to.
+
+    `role` is the classification and it is authored, never guessed: a palace
+    centre is a place that can be raided, garrisoned, or lost on its own, and a
+    capacity is not a place at all but ground and production belonging to the
+    Alu. Nothing here is ever a settlement (docs/ALU_CLASSIFICATION.md §4).
     """
     kind: str            # "palace" | "grain" | "copper" | "tin" | ...
-    hub: PlaceId         # whose hinterland it lies in
+    alu: PlaceId         # whose hinterland it lies in
+    role: str = "capacity"   # "palace_centre" | "capacity"
+    capacity: str = ""       # "food" | "copper" | ...; empty on a palace centre
     col: int = 0
     row: int = 0
 
