@@ -9,6 +9,7 @@ from engine.tick import advance
 from load import load_scenario
 from tui import advice, counsel, hall, inbox, style
 from tui.grid import InteractiveScreen, Surface, plain_text, pure_ascii
+from engine import seat
 
 SEED = 8814402919
 
@@ -58,7 +59,7 @@ def test_hall_is_a_clickable_dashboard_with_advice() -> None:
     assert all(f"{item.speaker}:" in text or item.speaker not in text
                for item in matters)
     commands = {hit.command for hit in view.hits if hit.enabled}
-    assert {"1", "s", "c", "space"} <= commands
+    assert {"1", "s", "y", "j", "space"} <= commands
 
 
 def test_inbox_keeps_selection_and_tablet_in_one_view() -> None:
@@ -133,16 +134,16 @@ def _headless_game():
 
 def test_counsel_previews_then_executes_a_plain_order_and_logs_it() -> None:
     game = _headless_game()
-    before = game.world.court.allocations.get("smiths_palace")
+    before = seat.allowances(game.world).get("smiths_palace")
     game.submit_counsel("allocate smiths_palace 7000")
     assert before != 7000
-    assert game.world.court.allocations.get("smiths_palace") == before
+    assert seat.allowances(game.world).get("smiths_palace") == before
     assert game.log == []
     assert game.counsel_pending is not None
     assert "I understand the order as" in game.counsel_said[-1][1]
 
     game.confirm_counsel_order()
-    assert game.world.court.allocations["smiths_palace"] == 7000
+    assert seat.allowances(game.world)["smiths_palace"] == 7000
     assert game.log and game.log[-1]["action"]["_t"] == "Allocate"
     assert "It is done" in game.counsel_said[-1][1]
 

@@ -26,6 +26,29 @@ C = INDEX
 INTENTS = ("reassure", "refuse", "promise", "warn", "excuse", "request")
 BLOCKS = ("address", "recognition", "matter", "seal")
 FOCI = ("address", "recognition", "matter", "terms", "seal")
+
+# Every piece a tablet can be built from, in the order they stand on the clay.
+# Which of them a given recipient may receive comes from that profile's `blocks`
+# list in `content/formulae.toml`, and each is a convention documented in
+# `content/corpus/historical.toml`. `matter` is the player's own words and is
+# never optional; the rest can be added, edited and taken off.
+BLOCK_ORDER = (
+    "address", "prostration", "wellbeing", "recognition", "quotation",
+    "matter", "instruction", "oath", "seal",
+)
+BLOCK_LABELS = {
+    "address": "ADDRESS",
+    "prostration": "PROSTRATION",
+    "wellbeing": "WISH FOR HIS HOUSE",
+    "recognition": "RECOGNITION",
+    "quotation": "THEIR OWN WORDS",
+    "matter": "MATTER · YOUR WORDS",
+    "instruction": "INSTRUCTION",
+    "oath": "OATH",
+    "seal": "SEAL",
+}
+# Blocks the desk puts on a new tablet before the player touches it.
+OPENING_BLOCKS = ("address", "recognition", "matter", "seal")
 TERM_KINDS = (
     "gift", "request_good", "promise_good", "service",
     "marriage_proposal",
@@ -75,7 +98,49 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
     proper = rule["opening"].format(recipient=name)
     if rule.get("prostration"):
         proper += "\n" + rule["prostration"]
+    gods = rule.get("deities", [])
+    oath_line = (
+        f"By {' and '.join(gods)}, what I have written I shall perform."
+        if gods else "By the gods, what I have written I shall perform.")
     return {
+        "prostration": (
+            BlockChoice("SEVEN AND SEVEN",
+                        rule.get("prostration")
+                        or "At the feet of my lord, seven times and seven"
+                           " times I fall."),
+            BlockChoice("NONE", ""),
+        ),
+        "wellbeing": (
+            BlockChoice("HIS HOUSE",
+                        rule.get("wellbeing")
+                        or "May it be well with you and with your house."),
+            BlockChoice(
+                "HOUSE AND HORSES",
+                "May it be well with you, with your house, your wives, your"
+                " sons and your horses. It is well with me."),
+            BlockChoice("NONE", ""),
+        ),
+        "quotation": (
+            BlockChoice(
+                "QUOTE AND ANSWER",
+                f"{rule.get('quotation_form', 'As to what you wrote me,'
+                                               ' saying:')} \"…\""),
+            BlockChoice("NONE", ""),
+        ),
+        "instruction": (
+            BlockChoice(
+                "WRITE BACK",
+                "Write to me when it is done, and write the count of the days"
+                " spent."),
+            BlockChoice(
+                "BY THE SAME COURIER",
+                "Send your answer with the same courier."),
+            BlockChoice("NONE", ""),
+        ),
+        "oath": (
+            BlockChoice("BY THE GODS", oath_line),
+            BlockChoice("NONE", ""),
+        ),
         "address": (
             BlockChoice("COURT FORM", proper),
             BlockChoice(
@@ -108,33 +173,85 @@ def default_blocks() -> dict[str, int]:
     return {"address": 0, "recognition": 0, "seal": 0}
 
 
+def permitted_blocks(recipient: str) -> tuple[str, ...]:
+    """Which pieces this recipient's register allows, in tablet order."""
+    rule = formula(load_formulae(), profile_for(recipient))
+    allowed = set(rule.get("blocks", OPENING_BLOCKS)) | {"matter", "seal"}
+    # Recognition is not a rank convention; it is the desk's own courtesy and
+    # is offered everywhere the register does not forbid a greeting.
+    if not rule.get("wellbeing_forbidden"):
+        allowed.add("recognition")
+    return tuple(name for name in BLOCK_ORDER if name in allowed)
+
+
+def opening_order(recipient: str) -> tuple[str, ...]:
+    """The pieces a fresh tablet starts with for this recipient."""
+    allowed = permitted_blocks(recipient)
+    start = [name for name in OPENING_BLOCKS if name in allowed]
+    rule = formula(load_formulae(), profile_for(recipient))
+    # A register that requires a piece starts with it laid out, so that the
+    # player removes it deliberately rather than forgetting it.
+    if rule.get("prostration") and "prostration" in allowed:
+        start.insert(1, "prostration")
+    if rule.get("wellbeing_required") and "wellbeing" in allowed:
+        start.insert(1, "wellbeing")
+    return tuple(name for name in BLOCK_ORDER if name in start)
+
+
+def normalise_order(order, recipient: str) -> tuple[str, ...]:
+    """Keep a saved block order legal: permitted pieces, tablet order, matter."""
+    allowed = permitted_blocks(recipient)
+    kept = [name for name in (order or ()) if name in allowed]
+    if "matter" not in kept:
+        kept.append("matter")
+    return tuple(name for name in BLOCK_ORDER if name in kept)
+
+
 def normalize_blocks(blocks: dict[str, int] | None,
                      recipient: str) -> dict[str, int]:
     choices = block_choices(recipient)
-    selected = default_blocks()
+    # Every piece the register allows carries its first form until the player
+    # picks another, so a block added to the tablet is never blank.
+    selected = {name: 0 for name in permitted_blocks(recipient)}
+    selected.update(default_blocks())
     selected.update(blocks or {})
-    for name in selected:
+    for name in list(selected):
+        if name not in choices:
+            selected.pop(name)
+            continue
         selected[name] = int(selected[name]) % len(choices[name])
     return selected
 
 
-def selected_blocks(recipient: str,
-                    blocks: dict[str, int] | None) -> dict[str, BlockChoice]:
+def selected_blocks(recipient: str, blocks: dict[str, int] | None,
+                    edits: dict[str, str] | None = None,
+                    ) -> dict[str, BlockChoice]:
+    """The chosen line for each block, with the player's own words winning.
+
+    An edited block keeps its label so the desk still says which piece it is,
+    and shows what the king actually dictated rather than the canned form.
+    """
     choices = block_choices(recipient)
     picked = normalize_blocks(blocks, recipient)
-    return {name: choices[name][picked[name]] for name in picked}
+    made = {name: choices[name][picked[name]] for name in picked}
+    for name, text in (edits or {}).items():
+        if name in choices and text.strip():
+            label = made.get(name, choices[name][0]).label
+            made[name] = BlockChoice(f"{label} · YOURS", text.strip())
+    return made
 
 
 def assemble(recipient: str, blocks: dict[str, int] | None, matter: str,
-             source: str = "player") -> Draft:
-    """Press the selected pieces and exact player matter into one tablet."""
-    picked = selected_blocks(recipient, blocks)
-    parts = (
-        picked["address"].text.strip(),
-        picked["recognition"].text.strip(),
-        matter.strip(),
-        picked["seal"].text.strip(),
-    )
+             source: str = "player", order=None,
+             edits: dict[str, str] | None = None) -> Draft:
+    """Press the pieces on this tablet, in their order, around the matter."""
+    picked = selected_blocks(recipient, blocks, edits)
+    laid = normalise_order(order or OPENING_BLOCKS, recipient)
+    parts = [
+        matter.strip() if name == "matter"
+        else picked.get(name, BlockChoice("", "")).text.strip()
+        for name in laid
+    ]
     text = "\n".join(part for part in parts if part)
     made = raw_draft(text, recipient)
     return dataclasses.replace(made, source=source)
@@ -265,6 +382,26 @@ def _draw_block(surface: Surface, x: int, y: int, width: int,
     return y + body_rows + 1
 
 
+def _draw_bound(surface: Surface, x: int, y: int, width: int, rows: int,
+                bound: tuple[str, ...]) -> int:
+    """What the finished matter binds the crown to, read from its own words.
+
+    Not a control. The player writes sentences; this reports what the tablet
+    will oblige him to, so that a promise is seen before the seal goes on.
+    """
+    surface.fill(x + 1, y, max(0, width - 2), max(1, rows + 1),
+                 " ", C["clay"], C["ink"])
+    heading = ("BOUND BY THIS TABLET" if bound
+               else "BOUND BY THIS TABLET · nothing yet")
+    surface.text(x + 2, y, _short(heading, width - 4), C["bone"], C["ink"])
+    for offset, line in enumerate(bound[:rows]):
+        surface.text(x + 4, y + 1 + offset, _short(f"· {line}", width - 6),
+                     C["gold"], C["ink"])
+    if len(bound) > rows and rows:
+        surface.text(x + width - 2, y + rows, "…", C["ash"], C["ink"])
+    return y + max(1, rows) + 1
+
+
 def _draw_terms(surface: Surface, x: int, y: int, width: int,
                 terms: tuple[object, ...], builder: dict,
                 focused: bool, term_focus: str) -> int:
@@ -345,10 +482,15 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             advisor_undo: bool = False,
             term_builder: dict | None = None,
             term_focus: str = "kind",
-            seal_data: dict | None = None) -> Screen:
-    """Lay source knowledge beside one four-piece wet outgoing tablet."""
+            seal_data: dict | None = None,
+            block_order=None,
+            block_edits: dict[str, str] | None = None,
+            bound: tuple[str, ...] = ()) -> Screen:
+    """Lay source knowledge beside the wet outgoing tablet and its pieces."""
     recipient = str(item["sender"])
-    picked = selected_blocks(recipient, blocks)
+    picked = selected_blocks(recipient, blocks, block_edits)
+    laid = normalise_order(block_order or OPENING_BLOCKS, recipient)
+    bound = tuple(bound)
     terms = tuple(terms)
     term_builder = dict(term_builder or {"kind": TERM_KINDS[0]})
     seal_data = dict(seal_data or {})
@@ -435,7 +577,8 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     right = divider + 3
     right_width = width - right - 3
     surface.box(right - 1, 2, right_width + 2, max(3, source_bottom - 1),
-                style="single", fg=C["sand"], title="WET TABLET · FOUR PIECES")
+                style="single", fg=C["sand"],
+                title=f"WET TABLET · {len(laid)} PIECES")
     surface.fill(right, 3, right_width, max(0, source_bottom - 3),
                  " ", C["clay"], C["ink"])
     surface.text(right, 3, style.wedge_band(right_width, phase=7),
@@ -443,22 +586,29 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     style.notice(surface, right, 3, right_width, notice)
     y = 4
     address_rows = 2 if height < 30 else 3
-    y = _draw_block(
-        surface, right, y, right_width, "address", picked["address"],
-        block_focus == "address", address_rows, "block:address")
-    y = _draw_block(
-        surface, right, y, right_width, "recognition", picked["recognition"],
-        block_focus == "recognition", 1, "block:recognition")
+    # Pieces standing above the matter, in the order they lie on the clay.
+    for name in laid:
+        if name == "matter":
+            break
+        y = _draw_block(
+            surface, right, y, right_width, BLOCK_LABELS.get(name, name),
+            picked.get(name, BlockChoice("", "")),
+            block_focus == name,
+            address_rows if name == "address" else 1, f"block:{name}")
 
-    matter_rows = max(3, min(5, height - y - 12))
+    below = [name for name in laid if name not in ("matter",)
+             and laid.index(name) > laid.index("matter")]
+    matter_rows = max(3, min(7, height - y - 11 - 2 * len(below)))
     surface.fill(right + 1, y, max(0, right_width - 2), matter_rows + 1,
                  " ", C["clay"], C["ink"])
     pointer = ">" if block_focus == "matter" else " "
     surface.text(right, y, pointer,
                  C["flame"] if block_focus == "matter" else C["faint"], C["ink"])
-    surface.text(right + 2, y, "MATTER · YOUR WORDS", C["bone"], C["ink"])
+    surface.text(right + 2, y, BLOCK_LABELS["matter"], C["bone"], C["ink"])
+    said = sentence_count(matter)
+    chip = f" {said} SENTENCE{'' if said == 1 else 'S'} "
     surface.text(
-        right + right_width - 15, y, " 1–2 SENTENCES ",
+        right + right_width - len(chip), y, chip,
         C["ink"] if block_focus == "matter" else C["clay"],
         C["sand"] if block_focus == "matter" else C["faint"])
     surface.link(right, y, right_width, matter_rows + 1, "block:matter")
@@ -470,7 +620,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             shown_matter[:position] + "█" + shown_matter[position:])
     matter_lines = _wrapped(shown_matter, max(8, right_width - 6))
     if not matter.strip() and not dictating:
-        matter_lines = ["Write one or two sentences in your own words."]
+        matter_lines = ["Write what you want said, in your own words."]
     for offset, line in enumerate(matter_lines[:matter_rows]):
         surface.text(
             right + 4, y + 1 + offset, _short(line, right_width - 6),
@@ -480,9 +630,16 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
                      C["ash"], C["ink"])
     y += matter_rows + 1
 
-    y = _draw_terms(
-        surface, right, y, right_width, terms, term_builder,
-        block_focus == "terms", term_focus)
+    # Pieces standing below the matter, then what the matter binds.
+    for name in below:
+        if name == "seal":
+            continue
+        y = _draw_block(
+            surface, right, y, right_width, BLOCK_LABELS.get(name, name),
+            picked.get(name, BlockChoice("", "")),
+            block_focus == name, 1, f"block:{name}")
+    y = _draw_bound(surface, right, y, right_width,
+                    min(3, max(1, len(bound))), bound)
 
     seal_choice = picked["seal"]
     if seal_data:
@@ -572,6 +729,10 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
                                command="desk:choice:previous"),
             style.FooterAction("→", choice_label,
                                command="desk:choice:next"),
+            style.FooterAction("+", "add piece", command="desk:block:add"),
+            style.FooterAction("-", "take off",
+                               enabled=block_focus not in ("matter", "address"),
+                               command="desk:block:remove"),
         ], y=height - 3, x=2, width=width - 4)
         advisor_action = (
             style.FooterAction(
@@ -584,7 +745,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
                 command="desk:correct"))
         style.footer(surface, [
             style.FooterAction(
-                "e", "matter" if compact else "write matter",
+                "e", "write" if compact else "write this piece",
                 command="desk:edit"),
             advisor_action,
             style.FooterAction(

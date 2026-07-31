@@ -269,11 +269,11 @@ def test_a_missed_festival_lands_harder_at_a_ruined_temple() -> None:
 # it is drawn from the *reported* figure. These tests hold both claims down.
 
 def test_every_kind_the_screen_names_has_a_building() -> None:
-    from tui import art, city
+    from tui import art, alu
 
-    for kind in city.DOES:
+    for kind in alu.DOES:
         assert kind in art.BUILDINGS, f"{kind} would be drawn as a hovel"
-        assert kind in city.WORD, f"{kind} has no word to stand under it"
+        assert kind in alu.WORD, f"{kind} has no word to stand under it"
     for kind, rows in art.BUILDINGS.items():
         assert art.size(rows)[0] == art.BUILDING_WIDTH, kind
         assert art.size(rows)[1] <= 9, f"{kind} is taller than the sky"
@@ -311,7 +311,7 @@ def test_the_skyline_draws_what_the_head_says_not_what_is_so() -> None:
     The lie already lives in `condition` by the time Belief hands it over, so
     this asserts the screen does not go behind Belief's back for the truth.
     """
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     world = _with_condition(_world(1), "harbour_mahadu", 200)
@@ -321,17 +321,17 @@ def test_the_skyline_draws_what_the_head_says_not_what_is_so() -> None:
     assert quay["condition"] > 400, "the harbourmaster should be flattering it"
     honest = [dict(i, condition=200 if i["id"] == "harbour_mahadu"
                    else i["condition"]) for i in b["institutions"]]
-    said = plain_text(city.compose(b))
-    truth = plain_text(city.compose({**b, "institutions": honest}))
+    said = plain_text(alu.compose(b))
+    truth = plain_text(alu.compose({**b, "institutions": honest}))
     assert said != truth, "the drawing must move when the reported figure does"
 
 
 def test_the_city_screen_stays_inside_its_frame() -> None:
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(12))
-    lines = plain_text(city.compose(b)).splitlines()
+    lines = plain_text(alu.compose(b)).splitlines()
     assert len(lines) == 36
     for line in lines:
         assert len(line) == 96
@@ -339,34 +339,34 @@ def test_the_city_screen_stays_inside_its_frame() -> None:
 
 
 def test_every_building_carries_the_key_that_opens_it() -> None:
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(4))
-    text = plain_text(city.compose(b))
-    for index in range(1, len(b["institutions"][:city.DRAWN]) + 1):
+    text = plain_text(alu.compose(b))
+    for index in range(1, len(b["institutions"][:alu.DRAWN]) + 1):
         assert f"[{index}]" in text
     assert "walls" in text and "temple" in text
 
 
 def test_a_vacant_post_is_marked_on_the_skyline_and_in_words() -> None:
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(4))
     assert any(not i["head"] for i in b["institutions"])
-    text = plain_text(city.compose(b))
+    text = plain_text(alu.compose(b))
     assert "×" in text and "no one minds it" in text
 
 
 def test_the_detail_window_stays_inside_its_frame() -> None:
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(20))
     for inst in b["institutions"]:
         lines = plain_text(
-            city.detail(b, inst, inst.get("history"), 68, 22)).splitlines()
+            alu.detail(b, inst, inst.get("history"), 68, 22)).splitlines()
         assert len(lines) == 22
         for line in lines:
             assert len(line) == 68 and line[0] in "╔║╚"
@@ -374,12 +374,12 @@ def test_the_detail_window_stays_inside_its_frame() -> None:
 
 def test_the_moon_over_the_city_is_the_half_of_the_month() -> None:
     """The one decoration that is also information (the calendar is lunar)."""
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(1))
-    former = plain_text(city.compose({**b, "date": "yr 1, Ayyaru, former half"}))
-    latter = plain_text(city.compose({**b, "date": "yr 1, Ayyaru, latter half"}))
+    former = plain_text(alu.compose({**b, "date": "yr 1, Ayyaru, former half"}))
+    latter = plain_text(alu.compose({**b, "date": "yr 1, Ayyaru, latter half"}))
     assert former != latter, "the moon must turn with the fortnight"
     assert "▄▄▖" in former and "▗▄▄" in latter
 
@@ -404,11 +404,11 @@ def test_the_lower_town_stands_behind_the_great_houses() -> None:
 
 def test_nothing_drawn_reaches_the_list_below_it() -> None:
     """Decoration that leaks into the table is a misread number, eventually."""
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     b = project(_world(6))
-    lines = plain_text(city.compose(b)).splitlines()
+    lines = plain_text(alu.compose(b)).splitlines()
     for line in lines[16:]:
         # Not the blocks: the sparkline is made of those. The drawn glyphs.
         assert not (set(line) & set("▟▙≈╲╱▲∩◘╫▤▩")), repr(line)
@@ -547,13 +547,13 @@ def test_the_works_screen_stays_inside_its_frame() -> None:
 
 
 def test_a_building_under_repair_wears_its_scaffolding() -> None:
-    from tui import city
+    from tui import alu
     from tui.grid import plain_text
 
     world = _working_world()
-    quiet = plain_text(city.compose(project(world)))
+    quiet = plain_text(alu.compose(project(world)))
     world, _ = apply(world, A.BeginRepair("walls_seat"))
     world, _ = advance(world)
-    busy = plain_text(city.compose(project(world)))
+    busy = plain_text(alu.compose(project(world)))
     assert "┄" not in quiet and "┄" in busy
     assert "the men are out on" in busy

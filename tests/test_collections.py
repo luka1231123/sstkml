@@ -7,7 +7,7 @@ is exactly where the old screens stopped drawing and said nothing.
 """
 from __future__ import annotations
 
-from tui import archive, city, collection, palace, works
+from tui import archive, alu, collection, palace, works
 from tui.grid import plain_text
 
 SIZES = (0, 1, 9, 10, 100)
@@ -135,8 +135,8 @@ def test_the_house_shows_its_tenth_adult() -> None:
 def test_the_city_table_pages_rather_than_stopping() -> None:
     for count in SIZES:
         belief = _institutions(count)
-        assert plain_text(city.compose(belief, height=36))
-    text = plain_text(city.compose(_institutions(100), height=36, scroll=95))
+        assert plain_text(alu.compose(belief, height=36))
+    text = plain_text(alu.compose(_institutions(100), height=36, scroll=95))
     assert "house99" in text
 
 

@@ -156,9 +156,9 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
             "eat_seed", key_for("eat_seed"),
             label=f"open {amount:,} qa for food"))
     note = (
-        "[ ] set an amount   [e] open it for food   ↑↓ choose"
+        "↑↓ choose   [ ] set an amount   [e] open it for food   [esc] close"
         if selected == "seed_grain" else
-        "↑↓ choose a jar or account")
+        "↑↓ choose   [i] inspect   [esc] close")
     return compose(
         "THE STOREHOUSE" if room else "THE STORES",
         ("good", "counted", "recent"), (18, -22, 12),
@@ -238,7 +238,7 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
         (26, -5, -13, -6, 12),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="nobody is on the roll.",
-        note="[ ] set an amount   ↑↓ choose   [enter] order the priority",
+        note="↑↓ choose   [ ] set an amount   [a] allot   [p] mark   [enter] order   [esc] close",
         views=STOREHOUSE_VIEWS if room else (), view="roll")
 
 
@@ -259,7 +259,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
             (estate["name"], "sand"),
             (_spoken(estate["place"]), "dim"),
             (water, "sky" if estate.get("irrigated") else "ash"),
-            (f"{estate['hands'] // 10}%", "clay"),
+            (f"{estate['hands']} hands", "clay"),
         )))
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
@@ -267,46 +267,47 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
 
     rate = data.get("land_due_rate", 0)
     detail: list[tuple[str, str]] = [
-        (f"the river gauge stands at {data.get('gauge', 0)}", "sky"),
-        ("", "ink"),
-        (f"last year's floor  "
-         f"{_compact_good('grain', data.get('last_harvest', 0))}", "barley"),
-        (f"the year before    "
-         f"{_compact_good('grain', data.get('previous_harvest', 0))}", "dim"),
+        (f"the river gauge stands at {data.get('gauge', 0)} · "
+         f"the fields are in {data.get('stage', 'low water')}", "sky"),
+        (f"last year the land gave the crown "
+         f"{_compact_good('grain', data.get('last_land_due', 0))}", "barley"),
         (f"land due ordered   {rate}/1000", "gold"),
-        (f"last taken         "
-         f"{_compact_good('grain', data.get('last_land_due', 0))}", "dim"),
-        ("", "ink"),
         (f"seed in store      "
          f"{_compact_good('grain', data.get('seed_in_store', 0))}", "sand"),
         (f"seed in the ground "
          f"{_compact_good('grain', data.get('seed_in_ground', 0))}", "sand"),
-        (f"the sowing asks    "
+        (f"the ground can take "
          f"{_compact_good('grain', data.get('seed_recommended', 0))}", "dim"),
-        ("", "ink"),
-        (f"hands available  {data.get('labour_days_this_turn', 0):,}d",
-         "clay"),
-        (f"work asks        {data.get('labour_days_needed', 0):,}d",
-         "dim"),
-        (f"corvée called    {data.get('corvee_days', 0):,}d", "dim"),
-        ("", "ink"),
-        ((f"{days} days in hand" if days else "[ ] choose work days"),
+        (f"hands {data.get('labour_days_this_turn', 0):,}d available · "
+         f"work asks {data.get('labour_days_needed', 0):,}d · "
+         f"corvée {data.get('corvee_days', 0):,}d", "clay"),
+    ]
+    if estate is not None:
+        detail += [
+            ("THE ESTATE", "gold"),
+            (f"ground {estate['extent']:,} qa · capacity "
+             f"{estate['capacity']:,} · {estate['hands']} hands", "sand"),
+            (f"sown {estate['under_crop']:,} qa · "
+             f"open {max(0, estate['extent'] - estate['under_crop']):,} qa",
+             "verdigris" if estate['under_crop'] else "ash"),
+            (f"the palace holds "
+             f"{_compact_good('grain', estate['seed'])} seed · "
+             f"{_compact_good('grain', estate['sheaves'])} sheaves · "
+             f"{_compact_good('grain', estate['grain'])} grain", "dim"),
+        ]
+    detail += [
+        (f"{days} days in hand" if days else "[ ] choose work days",
          "flame" if days else "dim"),
         ("[< >] land due ±25", "dim"),
     ]
 
     # Hands come from the Roll, but the decision to send them belongs here,
     # where the gauge and the sowing are on the same screen. The group is
-    # cycled rather than typed, so the whole order is one screen's work.
+    # cycled rather than typed, so the whole order is one screen's work. The
+    # chosen group names the send control in the footer, so the detail keeps
+    # itself for the estate dossier.
     hands = [g for g in b.get("groups", [])]
     chosen_group = next((g for g in hands if g["id"] == group), None)
-    if hands:
-        detail += [
-            ("", "ink"),
-            ("HANDS TO THE FIELDS", "gold"),
-            (f"[g] {chosen_group['name'][:26] if chosen_group else 'choose a group'}",
-             "flame" if chosen_group else "ash"),
-        ]
 
     controls = []
     if days > 0:
@@ -329,10 +330,10 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     return compose(
         "THE STOREHOUSE — ESTATES AND HARVEST" if room else "THE LAND",
         ("estate", "place", "water", "hands"),
-        (22, -10, 10, -5),
+        (22, -10, 10, -8),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="this house holds no estates.",
-        note="[ ] set days   [< >] land due   [g] group   ↑↓ choose",
+        note="↑↓ choose   [ ] set days   [< >] land due   [c] call up   [g] group   [h] to the fields   [esc] close",
         views=STOREHOUSE_VIEWS if room else (), view="land")
 
 
@@ -467,12 +468,12 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
                 enabled=formation is not None),
     ]
     return compose(
-        "THE CORVÉE — LEVY AND SPEAR",
+        "THE MUSTER — LEVY AND SPEAR",
         ("levy / formation / summons", "heads", "duty", "place"),
         (24, -5, 10, 14),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="no hands or formations are recorded.",
-        note="[ ] person-days   [c] call   [t] task   [l] place   ↑↓ choose")
+        note="↑↓ choose   [ ] set days   [c] call up   [t] task   [l] place   [esc] close")
 
 
 # --- the oaths ----------------------------------------------------------------
@@ -533,7 +534,7 @@ def oaths(b: dict, selected: str = "", width: int = 78, height: int = 28,
         "THE OATHS", ("tablet", "standing", "before"), (26, -12, 20),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="no oath tablet is held in this archive.",
-        note="[ ] set an amount   ↑↓ choose")
+        note="↑↓ choose   [ ] set an amount   [esc] close")
 
 
 def _clause(clause: dict) -> str:

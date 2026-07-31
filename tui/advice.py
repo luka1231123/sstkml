@@ -181,8 +181,8 @@ def _offices(b: dict) -> Concern | None:
     return Concern(
         "offices", 5, f"{len(vacant)} offices stand vacant",
         f"{named.capitalize()} has nobody in charge.",
-        "appoint someone in the House, or look at the post in the City.",
-        "city", speaker=SCRIBE,
+        "appoint someone in the House, or look at the post in the Alu.",
+        "alu", speaker=SCRIBE,
         basis="the posts are on his own roll of the household")
 
 
@@ -201,7 +201,7 @@ def _institutions(b: dict) -> Concern | None:
     return Concern(
         "institutions", 5, f"{worst['name'].capitalize()} is failing",
         f"Its condition is {worst['condition']}{qualifier}.",
-        "inspect it in the City, then decide whether to repair it.", "city",
+        "inspect it in the Alu, then decide whether to repair it.", "alu",
         speaker=speaker, basis=basis)
 
 

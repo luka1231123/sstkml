@@ -30,7 +30,7 @@ def test_good_and_bad_hatti_protocol():
     assert score.violations == (
         "wrong_address", "missing_prostration", "missing_self_designation",
         "kinship_overreach", "multi_topic", "excuse_and_request",
-        "wrong_oath_gods",
+        "wrong_oath_gods", "missing_closing",
     )
 
 

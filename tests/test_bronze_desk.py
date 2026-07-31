@@ -101,7 +101,7 @@ def test_desk_exposes_compact_letter_anatomy_and_arrow_controls() -> None:
         assert part in text
     assert "POSTURE" not in text
     assert "[↑] block" in text and "[←] choice" in text
-    assert "[e] write matter" in text
+    assert "[e] write this piece" in text
     assert "[y] Yabninu correct" in text
     assert "PgUp" not in text and "PgDn" not in text
 

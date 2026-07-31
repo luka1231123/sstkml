@@ -243,13 +243,11 @@ def land_screen(b: dict) -> str:
         return "  THE LAND — (this house holds no estates.)"
     lines = ["  THE LAND — the gauge, last year's floor, and your standing orders", ""]
     lines.append(f"    the river gauge stands at {land['gauge']}")
-    lines.append(f"    last year's threshing floor   "
-                 f"{fmt_good('grain', land['last_harvest']):>28}")
-    lines.append(f"    the year before               "
-                 f"{fmt_good('grain', land['previous_harvest']):>28}")
+    lines.append(f"    the fields are in {land['stage']}")
+    lines.append(f"    last year the land gave the crown   "
+                 f"{fmt_good('grain', land['last_land_due']):>28}")
     lines.append(f"    due ordered                  "
-                 f"{land['land_due_rate']:>5}/1000; last taken "
-                 f"{fmt_good('grain', land['last_land_due'])}")
+                 f"{land['land_due_rate']:>5}/1000")
     lines.append("")
     seed, ground = land["seed_in_store"], land["seed_in_ground"]
     want = land["seed_recommended"]
@@ -500,9 +498,9 @@ def plague_screen(b: dict) -> str:
         return "  There is no word of sickness."
     lines = ["  THE SICKNESS", ""]
     if p.get("sickness_at_seat"):
-        lines.append("  There is sickness in the city.")
+        lines.append("  There is sickness in the Alu.")
     else:
-        lines.append("  There is no sickness in the city that anyone has reported.")
+        lines.append("  There is no sickness in the Alu that anyone has reported.")
     if p.get("burials_at_seat"):
         lines.append(f"  The gravediggers' count stands at {p['burials_at_seat']}.")
     closed = p.get("quarantined") or []
@@ -549,7 +547,7 @@ def events_lines(events, court) -> list[str]:
             # Sickness at the seat is directly observable. A foreign authored
             # introduction is World truth and stays off this court report until
             # a traveller or correspondent actually brings word of it.
-            out.append("  There is sickness in the city. Men are lying in the "
+            out.append("  There is sickness in the Alu. Men are lying in the "
                        "streets by the customs house.")
         elif isinstance(e, A.PlagueDeaths) and e.place_id == court.seat:
             out.append(f"  The gravediggers have taken {e.dead} more.")

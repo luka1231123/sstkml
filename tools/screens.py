@@ -32,7 +32,7 @@ from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_scenario                  # noqa: E402
 from tui import desktop, inbox, ledgers, orders, palace, works
-from tui import (altar, archive, city, composer, counsel, document, hall,   # noqa: E402
+from tui import (altar, archive, alu, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
 from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
@@ -75,7 +75,7 @@ SCREENS = {
         width=desktop.default_size("palace")[0],
         height=desktop.default_size("palace")[1])),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
-    "city": ("THE CITY", lambda b: city.compose(b, None, 96, 36)),
+    "alu": ("THE ALU", lambda b: alu.compose(b, None, 96, 36)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 104, 32)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(

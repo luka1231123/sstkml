@@ -103,7 +103,7 @@ def _summary(surface: Surface, plague: dict, width: int) -> None:
         if sickness else "no general sickness is visible"
     )
     surface.text(
-        3, 3, _fit(f"ROYAL CITY · {condition}", room),
+        3, 3, _fit(f"ROYAL ALU · {condition}", room),
         C["blood"] if sickness else C["clay"], C["ink"])
     burials = plague.get("burials_at_seat", 0)
     offerings = len(plague.get("offerings_made", []))

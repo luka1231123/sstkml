@@ -20,6 +20,48 @@ _ACTORS = tomllib.loads((_CONTENT / "actors.toml").read_text())["names"]
 _EXEMPLARS = tomllib.loads(
     (_CONTENT / "corpus" / "outgoing.toml").read_text()
 )["letters"]
+# The scribe's standing instructions, his per-rank instruction, and the
+# rough-to-formatted pairs he is shown. Authored in one file so a prompt change
+# is a content change (`content/scribe_prompt.toml`).
+_SCRIBE = tomllib.loads((_CONTENT / "scribe_prompt.toml").read_text())
+# Letters demonstrating one convention each, by rank direction.
+_HISTORICAL = tomllib.loads(
+    (_CONTENT / "corpus" / "historical.toml").read_text()
+)["letters"]
+
+
+def historical(direction: str = "") -> tuple[dict, ...]:
+    """Exemplars, optionally only those written in one rank direction."""
+    return tuple(
+        letter for letter in _HISTORICAL
+        if not direction or letter.get("direction") == direction)
+
+
+def scribe_messages(recipient: str, matter: str) -> list[dict]:
+    """The scribe's prompt for one matter: standing rules, rank, examples.
+
+    Assembled here rather than written inline so that the rules, the register
+    and the worked pairs can each be read and tested on their own.
+    """
+    rule = formula(load_formulae(), profile_for(recipient))
+    direction = rule.get("direction", "level")
+    system = _SCRIBE["system"]["text"]
+    rank = _SCRIBE.get("rank", {}).get(direction, {}).get("text", "")
+    if rank:
+        system = f"{system}\n\n{rank}"
+    messages = [{"role": "system", "content": system}]
+    for pair in _SCRIBE.get("examples", []):
+        if pair.get("direction") != direction:
+            continue
+        messages.append({"role": "user", "content": pair["rough"]})
+        messages.append({"role": "assistant", "content": pair["formatted"]})
+    recipient_name = _ACTORS.get(recipient, recipient.replace("_", " "))
+    messages.append({
+        "role": "user",
+        "content": (f"Recipient: {recipient_name} ({rule['label']}).\n"
+                    f"Matter to put into form:\n{matter}"),
+    })
+    return messages
 _INTENT_MARKERS = {
     # These are semantic hints, not required magic words. Small local models
     # naturally render the same posture several ways ("stand firm in loyalty"
@@ -147,6 +189,10 @@ def fallback_text(recipient: str, intent: str, profile_id: str,
     # A deterministic scribal lapse makes learned raw dictation meaningfully better.
     if prostration and (seed + turn) % 5:
         lines.append(prostration)
+    # Between equals the wish for the other house is not decoration; a tablet
+    # without it is graded as one that skipped the greeting.
+    if rule.get("wellbeing_required") and rule.get("wellbeing"):
+        lines.append(rule["wellbeing"])
     lines.extend(_body(intent))
     lines.append("Yabninu wrote it; the palace courier bears the sealed tablet.")
     return "\n".join(lines)
@@ -278,31 +324,12 @@ def correct_matter(recipient: str, matter: str, seed: int, turn: int,
     if client is None:
         return MatterCorrection(recovery, "fallback")
 
-    recipient_name = _ACTORS.get(recipient, recipient.replace("_", " "))
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are Yabninu, a concise Bronze Age palace scribe. Correct "
-                "only the wording of the supplied matter. Return only one or "
-                "two short sentences: no address, greeting, commentary, or "
-                "closing. Preserve its meaning, every number, named person, "
-                "place, deadline, condition, negation, and uncertainty. Add "
-                "no fact, reason, offer, threat, or promise. /no_think"
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Recipient context: {recipient_name}\n"
-                f"Matter to correct exactly:\n{matter}"
-            ),
-        },
-    ]
+    messages = scribe_messages(recipient, matter)
+    limit = int(_SCRIBE["meta"].get("max_words", 140))
     try:
-        for attempt in range(2):
+        for attempt in range(int(_SCRIBE["meta"].get("attempts", 2))):
             text = client.call(
-                "matter_corrector", messages, None, seed, 140, 20, turn)
+                "matter_corrector", messages, None, seed, limit, 20, turn)
             if _matter_ok(matter, text):
                 return MatterCorrection(" ".join(text.split()), "model")
             _mark_last(client, "matter_corrector", validation_fail=True)

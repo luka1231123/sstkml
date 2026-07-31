@@ -152,6 +152,6 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             "it buys a readier one."[:width - 6],
             C["ash"], C["ink"])
     style.bar(surface, 2, height - 2, width - 4,
-              " [enter] ask   ·   2 hours + offering",
+              " [enter] ask   ·   2 hours + offering   ·   [o] the oaths",
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

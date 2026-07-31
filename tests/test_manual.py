@@ -51,8 +51,8 @@ def test_search_is_deterministic():
 
 
 def test_an_empty_search_puts_the_current_screen_first():
-    for topic in manual.search("", "city")[:1]:
-        assert "city" in topic.screens
+    for topic in manual.search("", "alu")[:1]:
+        assert "alu" in topic.screens
 
 
 def test_a_search_that_matches_nothing_returns_nothing():
@@ -61,8 +61,8 @@ def test_a_search_that_matches_nothing_returns_nothing():
 
 def test_the_screen_a_player_came_from_lifts_its_own_topics():
     """Same query, different screen, different first answer where it matters."""
-    from_city = manual.search("repair", "city")
-    assert "city" in from_city[0].screens
+    from_city = manual.search("repair", "alu")
+    assert "alu" in from_city[0].screens
 
 
 def test_no_topic_is_listed_twice():
@@ -75,7 +75,7 @@ def test_no_topic_is_listed_twice():
 def test_the_manual_composes_at_its_default_and_its_minimum():
     for width, height in (desktop.default_size("help"),
                           desktop.minimum_size("help")):
-        grid = cells(help_page.compose(width, height, "repair", "", "city"))
+        grid = cells(help_page.compose(width, height, "repair", "", "alu"))
         assert len(grid) == height
         assert all(len(row) == width for row in grid)
 
@@ -83,7 +83,7 @@ def test_the_manual_composes_at_its_default_and_its_minimum():
 def test_the_narrow_manual_drops_the_list_before_the_answer():
     """Spec 6: lose decoration, never the information."""
     narrow = plain_text(help_page.compose(
-        *desktop.minimum_size("help"), "repair", "", "city"))
+        *desktop.minimum_size("help"), "repair", "", "alu"))
     assert "Command: repair" in narrow
 
 

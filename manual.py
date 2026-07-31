@@ -42,7 +42,7 @@ SCREEN_OF_CATEGORY = {
     "archive": "archive",
     "relations": "relations",
     "health": "plague",
-    "city": "city",
+    "alu": "alu",
 }
 
 

@@ -226,8 +226,33 @@ def harvest(world: World, events: list) -> tuple[World, list]:
     if not grain and not held_back:
         return world, out
     out.append(A.Threshed(grain, held_back))
-    court = dataclasses.replace(world.court, last_land_due=grain - held_back)
+    if not grain:
+        # Seed moved aside on a turn with no floor work. It is still a
+        # movement the ledger must account for, but it is not a harvest:
+        # the year's figure keeps the last threshing's.
+        return world, out
+    court = dataclasses.replace(world.court, last_land_due=grain)
     return dataclasses.replace(world, court=court), out
+
+
+def close_year(world: World) -> World:
+    """Close the court's labour season at the threshing fortnight (spec 6.4).
+
+    The seasonal reset used to live in the court's own land module, which C4
+    retired when the harvest moved to the kernel. The crown's fields close on
+    the kernel's calendar now, so the reset runs here, where `harvest` already
+    stands. The corvée, the groups in the fields and `works_days` are all "this
+    season" figures; the first threshing fortnight is the new year. The first
+    two are the cohorts' now, so the reset reaches through to them.
+    """
+    span = world.season.get("threshing") or (12, 13)
+    if world.date.fortnight != span[0]:
+        return world
+    world = close_season(world)
+    if not world.court.works_days:
+        return world
+    return dataclasses.replace(
+        world, court=dataclasses.replace(world.court, works_days=0))
 
 
 def _at_seat(kernel, actor: str) -> bool:
@@ -361,3 +386,116 @@ def rank(world: World, order: tuple[str, ...]) -> World:
             continue
         world_ = _amend(world_, entry.cohort, precedence=len(order) - place)
     return world_
+
+
+# --- allocations, precedence, corvée and the fields --------------------------
+#
+# Five facts the court used to keep in mappings of its own: `allocations`,
+# `priority`, `corvee_days`, `corvee_sources` and `at_harvest`. They are all
+# facts about a body of people -- what it is allowed, when it is served, how
+# many of its days the crown has taken, and whether it is standing in a field
+# -- so they live on the cohort, and these are how the court reads them back.
+
+def _cohort_of(world: World, group: str):
+    kernel = getattr(world, "kernel", None)
+    if kernel is None:
+        return None
+    try:
+        entry = SP.placement(group)
+    except SP.Unmapped:
+        return None
+    return kernel.registry.cohorts.get(entry.cohort)
+
+
+def allowances(world: World) -> dict:
+    """Group -> qa the crown will hand it, for groups where an order stands."""
+    found = {}
+    for group in sorted(world.court.dependents):
+        cohort = _cohort_of(world, group)
+        if cohort is not None and cohort.allowance >= 0:
+            found[group] = cohort.allowance
+    return found
+
+
+def order_of_payment(world: World) -> tuple[str, ...]:
+    """The pay-down order the player set. Highest precedence first."""
+    ranked = []
+    for group in sorted(world.court.dependents):
+        cohort = _cohort_of(world, group)
+        if cohort is not None and cohort.precedence:
+            ranked.append((-cohort.precedence, group))
+    return tuple(group for _rank, group in sorted(ranked))
+
+
+def levy(world: World, sources: tuple[tuple[str, int], ...]) -> World:
+    """Write this season's corvée onto the people it is taken from."""
+    world_ = world
+    for group, days in sources:
+        try:
+            entry = SP.placement(group)
+        except SP.Unmapped:
+            continue
+        world_ = _amend(world_, entry.cohort, corvee=max(0, int(days)))
+    return world_
+
+
+def corvee_sources(world: World) -> tuple[tuple[str, int], ...]:
+    """Days raised this season, per group, in a stable order."""
+    found = []
+    for group in sorted(world.court.dependents):
+        cohort = _cohort_of(world, group)
+        if cohort is not None and cohort.corvee:
+            found.append((group, cohort.corvee))
+    return tuple(found)
+
+
+def corvee_days(world: World) -> int:
+    """Every day of corvée raised this season, wherever it came from."""
+    return sum(days for _group, days in corvee_sources(world))
+
+
+def to_fields(world: World, group: str, reaping: bool) -> World:
+    """Order a group to the harvest, or back to its own work."""
+    try:
+        entry = SP.placement(group)
+    except SP.Unmapped:
+        return world
+    world = _amend(world, entry.cohort, reaping=bool(reaping))
+    return _mirror_fields(world, {group: bool(reaping)})
+
+
+def _mirror_fields(world: World, wanted: dict) -> World:
+    """Carry `reaping` onto the court's groups, which the institutions read."""
+    groups = dict(world.court.dependents)
+    changed = False
+    for group, reaping in wanted.items():
+        now = groups.get(group)
+        if now is None or now.at_fields == reaping:
+            continue
+        groups[group] = dataclasses.replace(now, at_fields=reaping)
+        changed = True
+    if not changed:
+        return world
+    return dataclasses.replace(
+        world, court=dataclasses.replace(world.court, dependents=groups))
+
+
+def at_harvest(world: World) -> tuple[str, ...]:
+    """The groups standing in the fields instead of doing their own work."""
+    return tuple(
+        group for group in sorted(world.court.dependents)
+        if getattr(_cohort_of(world, group), "reaping", False))
+
+
+def close_season(world: World) -> World:
+    """Clear every cohort's season figures. `close_year` is the caller."""
+    world_ = world
+    kernel = getattr(world, "kernel", None)
+    if kernel is None:
+        return world
+    for cohort_id in sorted(kernel.registry.cohorts):
+        cohort = world_.kernel.registry.cohorts[cohort_id]
+        if cohort.corvee or cohort.reaping:
+            world_ = _amend(world_, cohort_id, corvee=0, reaping=False)
+    return _mirror_fields(
+        world_, {group: False for group in world_.court.dependents})

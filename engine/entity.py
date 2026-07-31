@@ -353,6 +353,13 @@ class Cohort:
     # Who the store empties on last. Higher is served first, ties by id, and
     # the ordinary case is that nobody was ranked and the order is the ledger's.
     precedence: int = 0
+    # Days of this season's corvée already taken from these people, and whether
+    # they are standing in the fields instead of doing their own work. Both are
+    # claims on the same heads, which is why they sit on the cohort: the court
+    # kept them in two mappings that could not see each other, and a group sent
+    # to reap could be levied for the canal on the same morning.
+    corvee: int = 0
+    reaping: bool = False
 
     def labour(self) -> int:
         # Hunger takes the strength before it takes the numbers, but never all

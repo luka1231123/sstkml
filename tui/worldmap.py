@@ -1148,6 +1148,7 @@ def compose(b: dict, width: int = 90, height: int = 30,
             "ctrl-d", "more", True, "world:routes:next"))
     actions.extend((
         style.FooterAction("tab", "layer", True, "world:layer:next"),
+        style.FooterAction("p", "sickness", True, "world:sickness"),
         style.FooterAction("+", "closer", wide > 1, "world:zoom:in"),
         style.FooterAction("-", "wider", wide < atlas.MAX_WIDE,
                            "world:zoom:out"),

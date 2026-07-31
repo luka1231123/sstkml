@@ -98,10 +98,11 @@ def _court_labour(world: World) -> int:
     days already raised and the groups sent to the fields. That absence is the
     duplication this row is about, so heads stand in for capacity here.
     """
-    return (world.court.corvee_days
-            + sum(world.court.dependents[group].size
-                  for group in world.court.at_harvest
-                  if group in world.court.dependents)
+    from engine import seat as seat_module
+
+    return (seat_module.corvee_days(world)
+            + sum(group.size for group in world.court.dependents.values()
+                  if group.at_fields)
             or _court_people(world))
 
 
@@ -146,7 +147,7 @@ ROWS: tuple[tuple[str, object, object, str], ...] = (
     ("ordinary people at the seat", _court_people, _kernel_people,
      "Court.dependents"),
     ("labour available at the seat", _court_labour, _kernel_labour,
-     "Court.corvee_days / corvee_sources / at_harvest"),
+     "Court.dependents (the last labour mirror)"),
     ("land under the seat", _court_land, _kernel_land,
      "Court.estates"),
     ("places", _stored("places"),

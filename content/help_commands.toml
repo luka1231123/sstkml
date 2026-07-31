@@ -8,7 +8,7 @@
 [[command]]
 id = "help"
 category = "interface"
-title = "Ask the Palace Tutor"
+title = "Ask for help"
 syntax = "[?] Help; type a question; [Enter] ask"
 answer = "Press ? in the Hall to open Help. Type any question about controls, orders, costs, or where to find something, then press Enter. Help costs no hours; Ctrl-U clears the question and Escape returns to the Hall."
 examples = ["How do I send troops on campaign?", "Where can I inspect the granary?"]
@@ -31,11 +31,11 @@ verbs = []
 id = "hall"
 category = "interface"
 title = "Hall and navigation"
-syntax = "[s] Inbox [d] Desk [t] Stores [r] Roll [c] Counsel [m] Muster [o] Oaths [l] Land [y] City [v] Altar [a] Archive [j] Justice [h] House [w] World [f] Relations [p] Sickness [:] Command"
-answer = "The Hall is home. Numbered matters open their evidence or prepare an order. Its letter keys open every place; D opens the Desk when a read letter is available, Space ends the fortnight, backslash reads the open windows to the terminal, and Q leaves the game. Printed controls can also be clicked."
-examples = ["Press c for Counsel.", "Click a numbered concern to follow it."]
+syntax = "[s] Inbox [t] Stores [m] Muster [y] Alu [j] Court [v] Shrine [w] World [d] Desk [a] Tablet House [r] Roll [l] Land [:] Command"
+answer = "The Hall is home. Numbered matters open their evidence or prepare an order. Its seven letter keys open the other rooms: the Scribes' Room, Storehouse, Muster, Alu, Court, Shrine, and World. Stations live inside their rooms rather than having doors of their own: Orders in the Alu, Counsel in the Court, Oaths in the Shrine, and Sickness in the World. D opens the Desk when a read letter is available, R and L are stations in the Storehouse, A is a station in the Scribes' Room, Space ends the fortnight, backslash reads the open windows to the terminal, ? opens Help, and Q leaves the game. Printed controls can also be clicked."
+examples = ["Press j for the Court, then c for Counsel.", "Click a numbered concern to follow it."]
 keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit"]
-keys = ["s", "d", "t", "r", "c", "m", "o", "l", "y", "v", "a", "j", "h", "w", "f", "p", "space", "\\", "q"]
+keys = ["s", "d", "t", "m", "y", "j", "v", "w", "r", "l", "a", "space", "\\", "?", "q"]
 verbs = []
 
 [[command]]
@@ -53,33 +53,33 @@ verbs = []
 id = "counsel"
 category = "interface"
 title = "Counsel and ordinary-language orders"
-syntax = "[c] Counsel; type an order or question; [Enter] tell Yabninu"
-answer = "Open Counsel with C and say what you want in ordinary language. Clear valid orders are carried out immediately; compound orders all succeed or none do. Questions cost one hour, while orders cost whatever their acts cost. Ctrl-U clears the line."
+syntax = "[j] Court, then [c] Counsel; type an order or question; [Enter] tell Yabninu"
+answer = "Counsel is a station in the Court: open the Court with J and press C. Say what you want in ordinary language. Clear valid orders are carried out immediately; compound orders all succeed or none do. Questions cost one hour, while orders cost whatever their acts cost. Ctrl-U clears the line."
 examples = ["Give the palace smiths 7000 qa.", "Send the household troops to campaign at Carchemish."]
 keywords = ["counsel", "yabninu", "order", "command", "ordinary", "language", "type", "question", "compound", "atomic"]
-keys = []
+keys = ["c"]
 verbs = []
 
 [[command]]
 id = "reports"
 category = "interface"
 title = "Kingdom reports"
-syntax = "[t] Stores [r] Roll [l] Land [m] Muster [o] Oaths [y] City [w] World [f] Relations [p] Sickness"
-answer = "Stores shows counted goods, Roll shows allocations and arrears, Land shows farming and labour, Muster shows formations, Oaths shows clauses, City shows institutions and works, World shows known routes and courts, Relations shows diplomatic dossiers, and Sickness shows known disease and quarantine state. Escape closes any of them."
+syntax = "[t] Stores [m] Muster [y] Alu [w] World — stations inside: [o] Orders [c] Counsel [o] Oaths [p] Sickness"
+answer = "Stores shows counted goods, and holds the Roll and Land stations; Muster shows formations; the Alu shows institutions and works, and holds the Orders station; World shows known routes and courts, and holds the Sickness station; Court holds Justice and the Counsel station; the Shrine holds the Altar and the Oaths station. Escape closes any of them."
 examples = ["Where do I see arrears?", "Where are my troops shown?"]
-keywords = ["report", "stores", "roll", "land", "muster", "oaths", "city", "world", "relations", "sickness", "plague", "quarantine", "arrears", "grain", "troops", "institution"]
+keywords = ["report", "stores", "roll", "land", "muster", "oaths", "alu", "city", "world", "relations", "sickness", "plague", "quarantine", "arrears", "grain", "troops", "institution"]
 keys = []
 verbs = []
 
 [[command]]
-id = "city_works"
+id = "alu_works"
 category = "interface"
-title = "City, institutions, and works"
-syntax = "[y] City; choose a building; [i] inspect; [r] repair; [w] Works"
-answer = "The City draws every institution from its reported condition. Select or click a building for its detail. Inspecting buys the true condition for one hour; repairing starts work, and the Works view shows projects already in hand."
+title = "The Alu, institutions, works, and orders"
+syntax = "[y] Alu; choose a building; [i] inspect; [r] repair; [w] Works; [o] Orders"
+answer = "The Alu draws every institution from its reported condition. Select or click a building for its detail. Inspecting buys the true condition for one hour; repairing starts work, and the Works view shows projects already in hand. The Orders station shows the orders the Alu stands on."
 examples = ["How do I inspect the tablet house?", "Where can I see building progress?"]
-keywords = ["city", "institution", "building", "condition", "inspect", "repair", "works", "project", "progress"]
-keys = ["i"]
+keywords = ["alu", "city", "institution", "building", "condition", "inspect", "repair", "works", "project", "progress", "orders"]
+keys = ["i", "o"]
 verbs = []
 
 [[command]]
@@ -96,20 +96,20 @@ verbs = []
 [[command]]
 id = "altar_room"
 category = "interface"
-title = "Altar and divination"
-syntax = "[v] Altar; choose harvest, route, or death; choose an offering"
-answer = "Open the Altar with V. Choose what the diviner should read and an offering, then consult him. A reading costs two hours. A larger offering does not buy a truer answer."
+title = "Shrine, divination, and oaths"
+syntax = "[v] Shrine; choose harvest, route, or death; choose an offering; [o] Oaths"
+answer = "Open the Shrine with V. Choose what the diviner should read and an offering, then consult him. A reading costs two hours. A larger offering does not buy a truer answer. The Oaths station shows the oath tablets sworn to the house."
 examples = ["How do I ask about the harvest?", "Can the diviner ask about a death?"]
-keywords = ["altar", "diviner", "omen", "harvest", "route", "death", "offering", "liver"]
-keys = []
+keywords = ["altar", "shrine", "diviner", "omen", "harvest", "route", "death", "offering", "liver", "oaths"]
+keys = ["o"]
 verbs = []
 
 [[command]]
 id = "justice_room"
 category = "interface"
 title = "Court of Justice"
-syntax = "[j] Justice; number chooses a case; [h] hear; [f/a/s/d] rule"
-answer = "Open Justice with J and choose a petition. H spends one hour to hear claim and counter-claim. F rules for the claimant, A against, S splits the judgement, and D defers it. The truth is never shown at judgement."
+syntax = "[j] Court; number chooses a case; [h] hear; [f/a/s/d] rule"
+answer = "Open the Court with J and choose a petition. H spends one hour to hear claim and counter-claim. F rules for the claimant, A against, S splits the judgement, and D defers it. The truth is never shown at judgement."
 examples = ["How do I hear a petition?", "How do I defer a ruling?"]
 keywords = ["justice", "petition", "case", "claim", "hear", "rule", "verdict", "defer", "split", "claimant"]
 keys = ["f", "d"]

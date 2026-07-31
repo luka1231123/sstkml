@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 from belief.distortion import p_error, transcribe
+from engine import seat as seat_door
 from engine.state import marks, lines
 from engine.systems import attention_available, sea_open
 
@@ -353,14 +354,101 @@ def _esteem_word(esteem: int) -> str:
     return "hostile"
 
 
+def _grain_stage(kernel, fortnight: int) -> str:
+    """What the grain year is doing now, in the ruler's own words (spec 6.4).
+
+    Ranges are the authored `kernel.seasons` map and do not overlap, so one
+    membership test in year order gives the word. Low water is the fallow
+    turning point; it comes last only to make the order a story.
+    """
+    from engine.kernel.farm import season
+
+    for name in ("sowing", "growing", "harvest", "threshing", "low_water"):
+        if season(kernel.seasons, fortnight, name):
+            return name
+    return "low_water"
+
+
 def _land(world, perr: int) -> dict:
     """What the ruler can learn about his own fields (spec 6.4).
 
-    C4: the court no longer holds its fields; the ground belongs to the kernel
-    (`Site(function="estate")` and `kernel/farm.py`). Belief re-points here at
-    C5 with the same keys, so the room reads empty until then.
+    C4 moved the crown's fields into the kernel: the ground is a `Site`
+    (`kernel/farm.py`), the seed is the kernel's Book, and `Court` keeps only
+    the ledger the harvest feeds it (`last_land_due`, `at_harvest`). Belief
+    re-points here at C5, reading the live kernel next to the court's record,
+    with the same keys the room already renders.
+
+    What is believed and what is known: the gauge passes through the same tired
+    hand as everything else, and the seed count is the scribe's (so the
+    Storehouse and this room always agree). What is in the ground, what the
+    ground can still take, and what the estate's fields hold are things he can
+    see from the gate, so those are exact.
     """
-    return {}
+    from engine.kernel import farm as F
+    from engine.kernel import seat_people as SP
+    from engine.legacy.land import gauge_reading
+
+    court = world.court
+    kernel = world.kernel
+    seat = SP.SEAT
+    controller = kernel.controller(seat)
+    site_id = kernel.field_site(seat, controller)
+    site = kernel.registry.sites.get(site_id)
+
+    estates = []
+    if site is not None:
+        field = kernel.registry.cohorts.get("cohort:ugarit_field_hands")
+        estates.append({
+            "id": site_id,
+            "name": site.name or "the palace fields",
+            "place": (site.settlement or seat).split(":")[-1],
+            "irrigated": False,
+            "canal_condition": None,
+            # The crown's own field hands, head count (spec 6.4).
+            "hands": field.people if field is not None else 0,
+            "extent": site.extent,
+            "capacity": site.capacity,
+            "under_crop": F.under_crop(kernel, site_id),
+            "seed": F.held(kernel.book, controller, F.SEED, seat),
+            "standing": F.held(kernel.book, controller, F.STANDING, site_id),
+            "sheaves": F.held(kernel.book, controller, F.SHEAVES, seat),
+            "grain": F.held(kernel.book, controller, F.GRAIN, seat),
+        })
+
+    now = world.date.absolute
+    sown = sum(e["under_crop"] for e in estates)
+    open_ground = max(0, (site.extent if site is not None else 0) - sown)
+    standing = sum(e["standing"] for e in estates)
+    sheaves = sum(e["sheaves"] for e in estates)
+    stage = _grain_stage(kernel, kernel.date.fortnight)
+
+    # What the fields ask in the fortnight that is. The ruler can count the
+    # standing crop; the ask is the days the moment needs on this estate.
+    ask = {
+        "sowing": open_ground // F.SOW_PER_DAY,
+        "growing": standing // F.TEND_PER_DAY,
+        "harvest": standing // F.REAP_PER_DAY,
+        "threshing": sheaves // F.THRESH_PER_DAY,
+        "low_water": 0,
+    }[stage]
+
+    return {
+        "estates": estates,
+        "stage": stage,
+        "gauge": transcribe(gauge_reading(world), world.seed, now,
+                            f"gauge:{now}", perr),
+        "last_land_due": court.last_land_due,
+        "land_due_rate": court.land_due_rate,
+        "land_due_base": court.land_due_base,
+        "seed_in_store": _stores(world, perr).get("seed_grain", 0),
+        "seed_in_ground": sown,
+        "seed_recommended": open_ground,
+        "hands_to_the_fields": list(seat_door.at_harvest(world)),
+        "corvee_days": seat_door.corvee_days(world),
+        "works_days": court.works_days,
+        "labour_days_this_turn": kernel.labour(seat),
+        "labour_days_needed": ask,
+    }
 
 
 def _institutions(world) -> list[dict]:
@@ -787,6 +875,7 @@ def project(world) -> dict:
         key=lambda it: -it["received_turn"])
     archive = sorted(items, key=lambda it: it["received_turn"])
     outbox = _outbox(world)
+    allowances = seat_door.allowances(world)
     groups = []
     for gid in sorted(c.dependents):
         g = c.dependents[gid]
@@ -795,7 +884,7 @@ def project(world) -> dict:
             "id": gid, "name": g.name, "size": g.size,
             "entitlement": g.entitlement, "function": g.function,
             "place": g.place,
-            "allocated": c.allocations.get(gid, owed),
+            "allocated": allowances.get(gid, owed),
             "arrears_qa": g.arrears,
             "arrears_weeks": g.arrears // max(1, owed),
             "loyalty": _loyalty_word(g.loyalty),
@@ -851,7 +940,7 @@ def project(world) -> dict:
         "unrest": c.unrest,
         "legitimacy": c.legitimacy,
         "stores": stores,
-        "priority": list(c.priority),
+        "priority": list(seat_door.order_of_payment(world)),
         "groups": groups,
         "relations": relations,
         "oaths": oaths,

@@ -98,9 +98,8 @@ def test_staff_headcount_changes_output() -> None:
 
 def test_harvest_workers_do_not_also_run_the_forge() -> None:
     world = _with_stores(_world(), bronze=0, copper=100_000, tin=100_000)
-    court = dataclasses.replace(
-        world.court, at_harvest=("smiths_palace",))
-    world = dataclasses.replace(world, court=court)
+    world = seat.to_fields(world, "smiths_palace", True)
+    court = world.court
     forge = court.institutions["forge_palace"]
 
     assert institution.effective(court, forge) == 0

@@ -175,7 +175,7 @@ def faults() -> list[str]:
 # action must not depend on.
 DIRECT_CONTEXTS = frozenset({
     "hall", "stack", "letter", "desk", "stores", "roll", "land", "muster",
-    "oaths", "works", "city", "institution", "justice", "house", "altar",
+    "oaths", "works", "alu", "institution", "justice", "house", "altar",
     "archive", "relations", "world", "plague",
 })
 

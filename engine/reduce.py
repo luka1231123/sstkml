@@ -21,17 +21,15 @@ def apply(world: World, action) -> tuple[World, list]:
         if action.group_id not in world.court.dependents:
             raise ValueError(f"unknown group: {action.group_id}")
         qa = max(0, action.qa)
-        allocations = dict(world.court.allocations)
-        allocations[action.group_id] = qa
         world = seat.allow(world, action.group_id, qa)
-        return replace_court(world, allocations=allocations), [A.AllocationSet(action.group_id, qa)]
+        return world, [A.AllocationSet(action.group_id, qa)]
 
     if isinstance(action, A.SetPriority):
         for gid in action.order:
             if gid not in world.court.dependents:
                 raise ValueError(f"unknown group in priority: {gid}")
         world = seat.rank(world, tuple(action.order))
-        return replace_court(world, priority=tuple(action.order)), [A.PrioritySet(tuple(action.order))]
+        return world, [A.PrioritySet(tuple(action.order))]
 
     if isinstance(action, A.EatSeed):
         stores = seat.held(world)
@@ -149,13 +147,8 @@ def apply(world: World, action) -> tuple[World, list]:
     if isinstance(action, A.SendToHarvest):
         if action.group_id not in world.court.dependents:
             raise ValueError(f"unknown group: {action.group_id}")
-        at_harvest = set(world.court.at_harvest)
-        if action.to_fields:
-            at_harvest.add(action.group_id)
-        else:
-            at_harvest.discard(action.group_id)
-        return (replace_court(world, at_harvest=tuple(sorted(at_harvest))),
-                [A.SentToHarvest(action.group_id, action.to_fields)])
+        world = seat.to_fields(world, action.group_id, action.to_fields)
+        return world, [A.SentToHarvest(action.group_id, action.to_fields)]
 
     if isinstance(action, A.AssignTroops):
         from engine.troops import assign
@@ -166,19 +159,15 @@ def apply(world: World, action) -> tuple[World, list]:
 
         rules = world.land_rules
         cap = rules.get("corvee_max_days", 6000)
-        wanted = max(0, min(action.days, cap - world.court.corvee_days))
+        wanted = max(0, min(action.days, cap - seat.corvee_days(world)))
         days, sources, incremental = source_corvee(world, wanted)
         if days <= 0:
             raise ValueError("no field-labour days remain to levy this season")
         delta = days * rules.get("corvee_unrest_per_1000_days", 40) // 1000
         unrest = min(1000, world.court.unrest + delta)
+        world = seat.levy(world, sources)
         return (
-            replace_court(
-                world,
-                corvee_days=world.court.corvee_days + days,
-                corvee_sources=sources,
-                unrest=unrest,
-            ),
+            replace_court(world, unrest=unrest),
             [A.CorveeRaised(
                 days, unrest - world.court.unrest, incremental)],
         )

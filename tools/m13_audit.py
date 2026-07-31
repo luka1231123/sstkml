@@ -6,6 +6,16 @@ World, compares material snapshots, and reconciles each changed stock with the
 structured events emitted by the engine.  It is a foundation harness, not the
 M13.1 multi-settlement conservation ledger.
 
+KNOWN GAP (Task 2 C5, 2026-08-01): the kernel farm flows for the seat --
+`reaped`/`threshed`/`set_aside`/`sown` -- arrive as kernel tuples, not A.*
+records, and this audit has not learned them yet.  It therefore flags the
+seat's sheaves/fodder/seed_grain/grain changes at threshing as unexplained
+(~29 findings over 96 turns).  The kernel's own conservation ledger
+(`engine/ownership.conservation`, green under
+`test_goods_are_conserved_across_a_run`) is the authority; these findings are
+the harness being stale, not the world leaking.  Teach `_store_explanation` to
+read the farm tuples when the M13.1 ledger lands.
+
 Usage:
 
     python3 tools/m13_audit.py
@@ -23,6 +33,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from engine import actions as A  # noqa: E402
+from engine import seat  # noqa: E402
 from engine.tick import advance  # noqa: E402
 from load import load_scenario    # noqa: E402
 
@@ -77,9 +88,9 @@ def snapshot(world) -> Snapshot:
             lot_id: (lot.owner, lot.place, lot.good, lot.quantity)
             for lot_id, lot in sorted(world.harbour_cargo.items())
         },
-        corvee_days=world.court.corvee_days,
+        corvee_days=seat.corvee_days(world),
         works_days=world.court.works_days,
-        corvee_sources=dict(world.court.corvee_sources),
+        corvee_sources=dict(seat.corvee_sources(world)),
     )
 
 

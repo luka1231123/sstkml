@@ -163,7 +163,7 @@ def test_old_standalone_room_geometry_compacts_once_but_world_does_not() -> None
         path.write_text(json.dumps({
             "geometry": {
                 "altar": {"x": 1, "y": 2, "columns": 79, "rows": 32},
-                "city": {"x": 3, "y": 4, "columns": 117, "rows": 37},
+                "alu": {"x": 3, "y": 4, "columns": 117, "rows": 37},
                 "counsel": {"x": 5, "y": 6, "columns": 64, "rows": 52},
                 "world": {"x": 7, "y": 8, "columns": 158, "rows": 32},
             },
@@ -172,8 +172,8 @@ def test_old_standalone_room_geometry_compacts_once_but_world_does_not() -> None
 
     assert (prefs.recall("altar")["columns"],
             prefs.recall("altar")["rows"]) == desktop.default_size("altar")
-    assert (prefs.recall("city")["columns"],
-            prefs.recall("city")["rows"]) == desktop.default_size("city")
+    assert (prefs.recall("alu")["columns"],
+            prefs.recall("alu")["rows"]) == desktop.default_size("alu")
     assert (prefs.recall("counsel")["columns"],
             prefs.recall("counsel")["rows"]) == desktop.default_size("counsel")
     assert (prefs.recall("world")["columns"],

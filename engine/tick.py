@@ -63,6 +63,8 @@ def advance(world: World) -> tuple[World, list]:
     world, e = step_kernel(world); events += e
     # The crown's grain year, said in the court's own vocabulary (C4/C5).
     world, e = seat.harvest(world, e); events += e
+    # The year closes: this season's labour figures belong to the season.
+    world = seat.close_year(world)
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)

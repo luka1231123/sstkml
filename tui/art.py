@@ -539,7 +539,7 @@ LAMP = (
 #
 # One drawing per kind of institution, all 13 columns wide and bottom-aligned so
 # they can stand in a row on the same ground line. This is the fourth station to
-# earn art (D34 named three): the CITY screen is a list of buildings, and a list
+# earn art (D34 named three): the ALU screen is a list of buildings, and a list
 # of buildings drawn as buildings is the one place where a picture carries the
 # information rather than decorating it.
 #
