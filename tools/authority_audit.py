@@ -11,8 +11,8 @@ asymmetry is the point: a duplicate authority is invisible until something count
 the two answers side by side, and "we removed the old field" is a claim a script
 can check rather than a claim a commit message can make.
 
-A row may also be *unmapped* -- a court entity with no kernel counterpart named
-in the id map. That is reported too, because an entity nobody owns is how a
+A row may also be *unmapped* -- a court entity that answers to no kernel
+counterpart. That is reported too, because an entity nobody owns is how a
 migration quietly loses a granary.
 
 Usage:
@@ -32,14 +32,25 @@ sys.path.insert(0, str(ROOT))
 
 from engine.kernel.world import Kernel          # noqa: E402
 from engine.state import World                  # noqa: E402
-from load import load_scenario                  # noqa: E402
-from load_kernel import load_kernel             # noqa: E402
+from load import kernel_settlement, load_scenario  # noqa: E402
 
 SEED = 8814402919
 
-# The settlement the legacy court is the seat of. Named once, because the whole
-# audit is about which of the two records for this place is the authority.
-SEAT = "settlement:ugarit"
+# The settlement the legacy court is the seat of. Asked of the world rather than
+# written down here, and the reason is a bug this line used to have: it said
+# "settlement:ugarit", which is the id in `content/kernel/world.toml`, an older
+# authored world that the live scenario no longer builds from. The scenario's
+# seat is `settlement:seat`. Every kernel-side count below therefore returned
+# zero, and an audit row is only a finding when both sides are non-empty -- so
+# goods, people, labour and land, the four rows Phase C is actually about,
+# reported nothing at all and looked like progress.
+FALLBACK_SEAT = "settlement:seat"
+
+
+def seat_of(kernel: Kernel) -> str:
+    """Which settlement is the court's. The kernel already knows (Task 2 C2)."""
+    goods = getattr(kernel, "seat_goods", None)
+    return getattr(goods, "seat", "") or FALLBACK_SEAT
 
 
 @dataclasses.dataclass(frozen=True)
@@ -66,7 +77,7 @@ def _court_goods(world: World) -> int:
 
 
 def _kernel_goods(kernel: Kernel) -> int:
-    return sum(lot.quantity for lot in kernel.book.at(SEAT))
+    return sum(lot.quantity for lot in kernel.book.at(seat_of(kernel)))
 
 
 def _court_people(world: World) -> int:
@@ -76,7 +87,7 @@ def _court_people(world: World) -> int:
 
 
 def _kernel_people(kernel: Kernel) -> int:
-    return kernel.people(SEAT)
+    return kernel.people(seat_of(kernel))
 
 
 def _court_labour(world: World) -> int:
@@ -95,7 +106,7 @@ def _court_labour(world: World) -> int:
 
 
 def _kernel_labour(kernel: Kernel) -> int:
-    return kernel.labour(SEAT)
+    return kernel.labour(seat_of(kernel))
 
 
 def _court_land(world: World) -> int:
@@ -104,10 +115,11 @@ def _court_land(world: World) -> int:
 
 
 def _kernel_land(kernel: Kernel) -> int:
+    seat = seat_of(kernel)
     return sum(
         kernel.registry.sites[site].extent
         for site in sorted(kernel.registry.sites)
-        if kernel.registry.sites[site].settlement == SEAT
+        if kernel.registry.sites[site].settlement == seat
         and kernel.registry.sites[site].function == "estate")
 
 
@@ -153,30 +165,33 @@ def findings(world: World, kernel: Kernel) -> list[Finding]:
 
 
 def unmapped(world: World, kernel: Kernel) -> list[Finding]:
-    """Court entities with no kernel counterpart under the current id grammar.
+    """Court places that answer to no kernel settlement (Task 2 C1).
 
-    Kernel ids carry a kind prefix and the court's do not, so this cannot be a
-    string comparison; it asks whether a kernel settlement exists whose id ends
-    in the court's own name. Crude on purpose -- the authored map that replaces
-    this guess is C2's deliverable, and until it exists an honest "nobody has
-    said" is better than a derived answer that looks authoritative.
+    Every court place names the Alu it belongs to, and every Alu is a kernel
+    settlement, so the question has an answer in the content and does not need
+    a hand-written table to supply one. It used to be asked by matching names
+    -- a place was mapped if some settlement's id looked like it -- which
+    reported twenty-six findings that were not defects: Mari answers to Dur
+    Katlimmu and Argos to Mycenae, and no amount of comparing the strings
+    "mari" and "dur_katlimmu" was ever going to discover that.
+
+    A finding here now means the content is genuinely broken: a place whose Alu
+    does not exist. `load.py` refuses to load such a scenario, so this is a
+    second reading of a fact the loader already enforces, which is what an
+    audit is for.
     """
-    names = {
-        settlement.split(":")[-1]
-        for settlement in kernel.registry.settlements
-    }
     missing = sorted(
-        place for place in world.places
-        if place.replace("_", "") not in {name.replace("_", "")
-                                          for name in names})
+        f"{place} (alu {kernel_settlement(world, place)[len('settlement:'):]})"
+        for place in world.places
+        if kernel_settlement(world, place) not in kernel.registry.settlements)
     if not missing:
         return []
     return [Finding(
         "court places with no kernel settlement",
         f"{len(missing)}: " + ", ".join(missing[:8])
         + ("..." if len(missing) > 8 else ""),
-        f"{len(names)} settlements authored",
-        "content/kernel/*.toml must author them, or the id map must say why not",
+        f"{len(kernel.registry.settlements)} settlements authored",
+        "author the Alu, or point the place at one that exists",
     )]
 
 
@@ -187,8 +202,9 @@ def run(seed: int = SEED) -> dict:
     from engine.kernel.world import advance as advance_kernel
     from engine.tick import advance as advance_court
 
-    world, _ = advance_court(load_scenario("ugarit", seed))
-    kernel, _ = advance_kernel(load_kernel("world", seed))
+    scenario = load_scenario("ugarit", seed)
+    world, _ = advance_court(scenario)
+    kernel, _ = advance_kernel(scenario.kernel)
     duplicates = findings(world, kernel)
     gaps = unmapped(world, kernel)
     return {

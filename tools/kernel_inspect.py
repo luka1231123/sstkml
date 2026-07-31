@@ -36,11 +36,18 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from engine.kernel.world import Kernel, advance_logged  # noqa: E402
-from load_kernel import load_kernel                     # noqa: E402
+from load import load_scenario                          # noqa: E402
+
+SCENARIO, SEED = "ugarit", 1
+
+
+def opening() -> Kernel:
+    """The world every query below replays from."""
+    return load_scenario(SCENARIO, SEED).kernel
 
 
 def replay(turns: int) -> tuple[Kernel, list]:
-    kernel = load_kernel()
+    kernel = opening()
     logs = []
     for _ in range(turns):
         kernel, _events, log = advance_logged(kernel)
@@ -56,7 +63,7 @@ def _lot_history(turns: int) -> dict:
     bread came from is a question about lots that mostly no longer exist. This
     is the only query that needs them, and it pays for them itself.
     """
-    kernel = load_kernel()
+    kernel = opening()
     seen = dict(kernel.book.lots)
     for _ in range(turns):
         kernel, _events, _log = advance_logged(kernel)

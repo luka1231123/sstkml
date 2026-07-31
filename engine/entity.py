@@ -164,6 +164,12 @@ class Polity:
     seat: EntityId = ""                      # settlement id
     controls: tuple[EntityId, ...] = ()      # settlements held
     claims: tuple[EntityId, ...] = ()        # settlements asserted, not held
+    # How this polity's people come by their food. Not a detail: it decides
+    # whether a hungry village beside a full granary is a possible state of the
+    # world or an arithmetic impossibility, and the Bronze Age ran both ways.
+    # See TENURES. Authored per polity because it is a claim about a society,
+    # and a claim about a society should be one line somebody can argue with.
+    tenure: str = "pooled"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -243,6 +249,31 @@ class Route:
 
 # --- people and organizations (spec 5.2, 5.3) ---------------------------------
 
+# How a body of people comes by its food. The whole of the difference is which
+# lots it may eat, which is a small rule with a large consequence: it is the
+# difference between a state that owes its people bread and a household that
+# owes the state a tax.
+#
+#   pooled          Everything at the settlement feeds everyone at it. Not a
+#                   society -- it is the absence of an authored answer, and the
+#                   behaviour every settlement had before tenure existed.
+#   redistributive  The people own no food. They eat from the palace store and
+#                   are owed a ration from it. Egypt, and the palace specialists
+#                   of a Mycenaean ta-ra-si-ja. A shortfall is the palace's
+#                   failure and is recorded against it.
+#   subsistence     The households hold their own harvest, eat from it first,
+#                   and render what is left over as a due. The Levantine
+#                   village, most of the Hittite countryside. A shortfall here
+#                   is a local famine, and the palace granary a street away is
+#                   not theirs to open.
+#   prebendal       Owns nothing, but is fed by the house it serves rather than
+#                   by the place it lives in: Mesopotamian temple dependents,
+#                   Ugarit's bns mlk. `Cohort.origin` names the house.
+#
+# Anything else is a content error and `check` says so.
+TENURES = ("pooled", "redistributive", "subsistence", "prebendal")
+
+
 @dataclasses.dataclass(frozen=True)
 class Cohort:
     """Ordinary population, persistent and counted (spec 5.3).
@@ -261,6 +292,29 @@ class Cohort:
     ration_per_head: int = 10    # units of grain per person per fortnight
     hunger: int = 0              # fortnights of shortfall; the cohort's memory
     grievance: int = 0           # scaled 1000
+    # This cohort's own tenure, where it differs from its polity's. Empty means
+    # the polity's, which is the ordinary case. What it is for is the body that
+    # does not live the way its country does: palace staff inside a countryside
+    # that feeds itself, which is what the court's dependents are.
+    tenure: str = ""
+    # The most the store will release to these people in a fortnight, and -1
+    # for the whole ration. Only redistributive tenure can answer it: a
+    # household eating its own grain is not allowed a quantity by anybody.
+    #
+    # It is not a smaller ration. What is owed stays `ration_per_head`, so the
+    # difference between the two is a debt and the hunger it causes is real --
+    # which is the entire point. A palace that cannot feed everyone chooses,
+    # and the choice is what it is answerable for.
+    allowance: int = -1
+    # Ration owed and never delivered, in qa, running. `hunger` counts
+    # fortnights and cannot hold this: a body short by one jar and a body short
+    # by a whole fortnight's bread both make it one, and the difference between
+    # them is grain somebody still owes. Only a body that is owed a ration can
+    # be short of one, so this is redistributive and prebendal arithmetic.
+    shortfall: int = 0
+    # Who the store empties on last. Higher is served first, ties by id, and
+    # the ordinary case is that nobody was ranked and the order is the ledger's.
+    precedence: int = 0
 
     def labour(self) -> int:
         # Hunger takes the strength before it takes the numbers.

@@ -4,6 +4,8 @@ from __future__ import annotations
 import dataclasses
 import json
 
+import pytest
+
 from belief.project import project
 from engine import actions as A
 from engine import divine, house, relations
@@ -74,19 +76,31 @@ def test_children_are_born_named_and_pregnancies_do_not_overlap():
         assert child.mother and child.father
 
 
-def test_child_mortality_is_high_enough_that_one_heir_is_none():
+@pytest.mark.parametrize("first", [SEED, SEED + 3, SEED + 6, SEED + 9])
+def test_child_mortality_is_high_enough_that_one_heir_is_none(first):
     """Spec 6.10: 'This is why heirs past the second are insurance.' If the
-    tables are gentle the whole succession system is decorative."""
+    tables are gentle the whole succession system is decorative.
+
+    Twelve ten-year runs, in four groups of three, and every group must show a
+    child buried. It was one test summing all twelve, which is the same evidence
+    and a weaker claim -- an aggregate of four can be carried by one unlucky
+    seed while the other eleven are gentle.
+
+    The groups also run at once instead of end to end. This was the slowest test
+    in the suite by a distance, 296s, which made it a floor no amount of
+    parallelism could get under; four groups put it at a quarter of that.
+    Observed at the time of writing: 2, 3, 1 and 2.
+    """
     died_young = 0
-    for seed in range(SEED, SEED + 12):
+    for seed in range(first, first + 3):
         world = load_scenario("ugarit", seed)
         for _ in range(240):                     # ten years
             world, events = advance(world)
             for event in events:
                 if isinstance(event, A.HouseMemberDied) and event.age_years < 16:
                     died_young += 1
-    assert died_young >= 4, (
-        f"only {died_young} children died across 12 ten-year runs; "
+    assert died_young >= 1, (
+        f"no child died across three ten-year runs from {first}; "
         "the mortality table is too kind for the succession to matter")
 
 

@@ -50,10 +50,16 @@ from engine.entity import Cohort, EntityId, Registry, check, mint
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
+from engine.kernel import seat_goods as SG
 from engine.kernel import turn as T
 from engine.kernel.intent import Intent, Snapshot, open_turn
 
 GRAIN = F.GRAIN
+
+# The site functions that are ground a settlement can sow. Two names for one
+# thing: the scenario map calls a grain mark a "food" capacity, the retired
+# hand-authored world called it an "estate", and the crop does not care.
+FIELD = frozenset({"estate", "food"})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -69,10 +75,22 @@ class Kernel:
     seasons: Mapping[str, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
     climate: tuple[int, ...] = ()     # by absolute turn; 100 is an ordinary year
+    # The same series, per region, where content authors one. A world that
+    # spans the Nile and the Aegean has no single weather: the flood peaks in
+    # the fortnights the Levant is driest, and a drought that emptied both
+    # would be a scripted event rather than a climate. A region absent here
+    # falls back to `climate` above.
+    region_climate: Mapping[EntityId, tuple[int, ...]] = dataclasses.field(
+        default_factory=dict)
     # Per good, per fortnight, scaled 1000. Authored in content/goods.toml and
     # carried here rather than looked up, because engine/ does not read files.
     # A good absent from this mapping does not spoil.
     spoilage: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # Which lots at the seat are the court's stores, and which goods it counts
+    # (Task 2 C2). A descriptor, not a second stock: the quantities live in the
+    # Book like everyone else's, and this says where to find them and what a
+    # figure of zero means. Empty until the court's goods have crossed.
+    seat_goods: "SG.SeatGoods | None" = None
     # Cargo at sea. The only thing in the world that is in neither of the places
     # it concerns, which is why it is state and the contracts that put it there
     # are not: a bargain is struck and settled in a fortnight, a crossing is not.
@@ -84,9 +102,23 @@ class Kernel:
         """The organization that decides for a settlement, or "" if none does."""
         for org_id in sorted(self.registry.orgs):
             org = self.registry.orgs[org_id]
-            if org.settlement == settlement and org.kind == "council":
+            if org.settlement == settlement and org.kind in ("council", "palace"):
                 return org_id
         return ""
+
+    def tenure_of(self, cohort: Cohort) -> str:
+        """How this cohort comes by its food. Its own answer, else its polity's.
+
+        Two levels rather than one because the common case is a whole country
+        arranged one way -- one authored word for Egypt covers every cohort in
+        it -- and the exception is a single household inside it that is not.
+        """
+        if cohort.tenure:
+            return cohort.tenure
+        settlement = self.registry.settlements.get(cohort.settlement)
+        polity = self.registry.polities.get(
+            settlement.polity) if settlement else None
+        return polity.tenure if polity else "pooled"
 
     def cohorts_of(self, settlement: EntityId) -> tuple[Cohort, ...]:
         return tuple(self.registry.cohorts[c] for c in sorted(self.registry.cohorts)
@@ -112,7 +144,7 @@ class Kernel:
         """
         estates = [i for i in sorted(self.registry.sites)
                    if self.registry.sites[i].settlement == settlement
-                   and self.registry.sites[i].function == "estate"]
+                   and self.registry.sites[i].function in FIELD]
         if actor:
             for site_id in estates:
                 if self.registry.sites[site_id].holder == actor:
@@ -141,10 +173,15 @@ class Kernel:
             s for s in sorted(self.registry.settlements)
             if self.registry.settlements[s].autonomous and self.controller(s))
 
-    def climate_at(self, absolute: int) -> int:
-        if not self.climate:
+    def climate_at(self, absolute: int, region: EntityId = "") -> int:
+        series = self.region_climate.get(region) or self.climate
+        if not series:
             return 100
-        return self.climate[absolute % len(self.climate)]
+        return series[absolute % len(series)]
+
+    def region_of(self, settlement: EntityId) -> EntityId:
+        found = self.registry.settlements.get(settlement)
+        return found.region if found else ""
 
 
 # --- policy (spec 10.11) ------------------------------------------------------
@@ -452,90 +489,236 @@ def _farm_steps(intents: tuple[Intent, ...],
         T.Step("production", "threshing",
                lambda k: F.thresh(k, intents, allocation)),
         T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
+        T.Step("production", "the share", F.share_out),
         T.Step("production", "the stack", F.keep),
     )
 
 
+def _food_owners(kernel: Kernel, cohort: Cohort) -> set[EntityId]:
+    """Whose grain this cohort may eat. The whole of what tenure decides.
+
+    A settlement is not one granary with a queue at it. Who may open which door
+    is the arrangement a society is, and these four are the ones the Late Bronze
+    Age actually ran (`entity.TENURES`).
+    """
+    settlement = cohort.settlement
+    controller = kernel.controller(settlement)
+    tenure = kernel.tenure_of(cohort)
+    if tenure == "subsistence":
+        # Its own harvest and nothing else. The palace store down the road is
+        # not theirs, and that is the point rather than an omission.
+        return {cohort.id}
+    if tenure == "redistributive":
+        # The state granary, and only it. They own no food to fall back on, so
+        # a palace that cannot deliver is a famine with somebody to blame.
+        return {controller}
+    if tenure == "prebendal":
+        # Fed by the house they serve, wherever they happen to live.
+        return {cohort.origin or controller}
+    return {settlement, controller}
+
+
 def _local_food(kernel: Kernel, book: W.Book,
-                settlement: EntityId) -> tuple[W.GoodsLot, ...]:
-    """What the households of a place may eat, in the order they will eat it.
+                cohort: Cohort) -> tuple[W.GoodsLot, ...]:
+    """What a body of people may eat, in the order they will eat it.
 
     Grain first, then the seed corn. Reaching the second is a real decision with
     a real price -- it is next year's harvest going into this fortnight's
     bread -- and households have always made it rather than starve.
 
-    Ownership bounds it, and bounds it tightly: the common stores of the place
-    and the stores of the body that governs it, and nothing else standing in the
-    same town.
+    Ownership bounds it, and bounds it tightly: `_food_owners` says whose, and
+    nothing else standing in the same town is reachable.
 
-    Two exclusions, for the same reason. Grain in Ma'hadu that belongs to the
-    crown because it was rendered as tribute is not Ma'hadu's to eat; taking it
-    would be a seizure, which is a political act with consequences. And the
-    temple's granary is not the town's either. A temple that feeds the hungry in
-    a bad year is doing something -- relief, patronage, a claim on those it
-    fed -- and spec 6.3 has it as a choice a household makes and an institution
-    grants. Letting it happen silently every fortnight would delete the choice
-    and, worse, would hide the case this world most wants to be able to show:
-    a full temple store beside a hungry town.
+    Two exclusions hold under every tenure, for the same reason. Grain in
+    Ma'hadu that belongs to the crown because it was rendered as tribute is not
+    Ma'hadu's to eat; taking it would be a seizure, which is a political act
+    with consequences. And the temple's granary is not the town's either. A
+    temple that feeds the hungry in a bad year is doing something -- relief,
+    patronage, a claim on those it fed -- and spec 6.3 has it as a choice a
+    household makes and an institution grants. Letting it happen silently every
+    fortnight would delete the choice and, worse, would hide the case this world
+    most wants to be able to show: a full temple store beside a hungry town.
 
     So the temple's grain accumulates here and nothing spends it. That is not
     an oversight, it is an unbuilt mechanism sitting in plain view, and M13.5's
-    petitions are what build it.
+    petitions are what build it. Subsistence tenure makes the same case out of
+    the palace rather than the temple, and wants the same mechanism.
     """
-    mine = {settlement, kernel.controller(settlement)}
-    return tuple(lot for good in (GRAIN, F.SEED)
-                 for lot in book.at(settlement)
+    mine = _food_owners(kernel, cohort)
+    return tuple(lot for good in _foods(kernel, cohort)
+                 for lot in _within_reach(kernel, book, cohort)
                  if lot.good == good and lot.owner in mine)
+
+
+def _foods(kernel: Kernel, cohort: Cohort) -> tuple[str, ...]:
+    """Grain, and the seed corn where reaching for it is theirs to decide.
+
+    A household eats its own seed rather than starve, and no one asks it. A body
+    on somebody's ration roll does not decide what is in the ration -- the store's
+    holder does, and issuing next year's sowing as this fortnight's bread is a
+    decision with a name. At the seat it already has one: `actions.EatSeed`, which
+    the player gives and the log records. Letting the roll reach the seed on its
+    own would spend the crown's sowing every hungry fortnight and delete the
+    order, which is the same argument as the temple's granary above.
+    """
+    if kernel.tenure_of(cohort) in ("redistributive", "prebendal"):
+        return (GRAIN,)
+    return (GRAIN, F.SEED)
+
+
+def _within_reach(kernel: Kernel, book: W.Book,
+                  cohort: Cohort) -> tuple[W.GoodsLot, ...]:
+    """Where the grain a body of people may eat is allowed to be standing.
+
+    Where they are, ordinarily: a household eats out of its own house, and a
+    town's people out of the town.
+
+    A body fed by a house rather than by a place also reaches that house's own
+    store, wherever it stands -- the garrison at Ma'hadu is the crown's, and the
+    crown's granary is at the seat. The carriage is not modelled and the
+    simplification is deliberate rather than overlooked: this is exactly what
+    the court's ration roll did before the kernel took the payroll over, and
+    inventing a supply line at the same time as moving the authority would make
+    it impossible to say which of the two changed the answer.
+    """
+    lots = list(book.at(cohort.settlement))
+    if kernel.tenure_of(cohort) not in ("redistributive", "prebendal"):
+        return tuple(lots)
+    seen = {lot.id for lot in lots}
+    for owner in sorted(_food_owners(kernel, cohort)):
+        org = kernel.registry.orgs.get(owner)
+        if org is None or not org.settlement or org.settlement == cohort.settlement:
+            continue
+        lots.extend(lot for lot in book.at(org.settlement)
+                    if lot.id not in seen)
+    return tuple(lots)
+
+
+def _mouths(kernel: Kernel) -> tuple[Cohort, ...]:
+    """Whose meal this phase is answerable for, in a stable order (spec 2.6).
+
+    Two kinds. The settlements the kernel drives, entire; and, at a settlement
+    it does not drive, the bodies of people that eat from a store the Book
+    already holds -- which is what redistributive tenure means and why it is the
+    line the seat's payroll crossed on.
+
+    The rest of the seat is left out, and the reason is land rather than people.
+    Its households are `pooled`: they would eat the palace's grain, because the
+    palace owns every lot standing there and nothing they work is theirs. They
+    get their own holding when the seat's fields become the kernel's (C4), and
+    feeding them out of the crown's store until then would be a famine invented
+    by the migration.
+    """
+    seen: set[EntityId] = set()
+    out: list[Cohort] = []
+    for settlement in kernel.autonomous():
+        for cohort in kernel.cohorts_of(settlement):
+            seen.add(cohort.id)
+            out.append(cohort)
+    return tuple(out)
+
+
+def kept_mouths(kernel: Kernel) -> tuple[Cohort, ...]:
+    """The bodies of people some house owes a ration, at a place it does not run.
+
+    The crown's payroll, and nothing else in this world yet. They are not in
+    `_mouths` because they do not eat on the kernel's clock; `feed` says why.
+
+    Served in the order the store's holder set, and the store runs out where it
+    runs out. Nobody ranked means everybody equal, which is the id order.
+    """
+    driven = {c.id for s in kernel.autonomous() for c in kernel.cohorts_of(s)}
+    fed: list[Cohort] = []
+    for cohort_id in sorted(kernel.registry.cohorts):
+        cohort = kernel.registry.cohorts[cohort_id]
+        if cohort.id in driven:
+            continue
+        if kernel.tenure_of(cohort) not in ("redistributive", "prebendal"):
+            continue
+        if not (kernel.controller(cohort.settlement) or cohort.origin):
+            continue
+        fed.append(cohort)
+    fed.sort(key=lambda c: (-c.precedence, c.id))
+    return tuple(fed)
 
 
 def _consume(kernel: Kernel) -> tuple[Kernel, list]:
     """Phase 7. People eat, and remember it when they do not."""
+    return feed(kernel, _mouths(kernel))
+
+
+def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
+         *, starve: bool = True) -> tuple[Kernel, list]:
+    """The meal itself, for a named body of people.
+
+    Taken apart from the phase because the crown's payroll eats on the
+    court's clock, not the kernel's: `engine/tick.py` spends the seat's
+    granary at A8, after spoilage and after the rites take their cut, and a
+    ration paid at A1 instead would be the same grain leaving in a different
+    order. The order is the thing being preserved (spec 6.1), so the seat's
+    cohorts are left out of the phase above and `engine/seat.py::feed` calls
+    this where the ration roll used to run.
+
+    `starve` is whether going short costs people here. It is off for the crown's
+    payroll, and not because they are spared: spec 6.3's band table is the
+    authored answer for what a ration debt does to the body that is owed it, and
+    it says desertion, loyalty and a failing workshop together. Applying that
+    table and this rule to the same hungry fortnight would take the same people
+    away twice. `engine/seat.py::mirror` runs the band.
+    """
     events: list = []
     book = kernel.book.at_phase(kernel.date.absolute, "consumption")
     cohorts = dict(kernel.registry.cohorts)
 
-    # Only the settlements the kernel actually drives. Ugarit's households are
-    # fed by the legacy court (spec 10.12), and eating their grain here as well
-    # would model the same mouths twice.
-    for settlement in kernel.autonomous():
-        for cohort in kernel.cohorts_of(settlement):
-            want = cohort.ration()
-            got = 0
-            ate_seed = 0
-            for lot in _local_food(kernel, book, settlement):
-                if want - got <= 0:
-                    break
-                current = book.lots.get(lot.id)
-                if current is None:
-                    continue
-                take = min(want - got, current.free)
-                if take <= 0:
-                    continue
-                book = book.consume(current.id, take, "consumed")
-                got += take
-                if current.good == F.SEED:
-                    ate_seed += take
-            if ate_seed:
-                events.append(("ate_the_seed", cohort.id, ate_seed))
-            if got >= want:
-                cohorts[cohort.id] = dataclasses.replace(
-                    cohort, hunger=max(0, cohort.hunger - 1))
+    for cohort in mouths:
+        want = cohort.ration()
+        # What is owed and what will be handed over are two figures, and only
+        # under redistributive tenure can they differ. Shortfall is measured
+        # against the first: a body cut to half rations is owed the other half
+        # and goes hungry for it.
+        # Not capped at `want`: a store that hands over more than a fortnight's
+        # ration is paying down what it already owed, and forbidding that would
+        # make a debt permanent the moment it was incurred.
+        cap = want if cohort.allowance < 0 else max(0, cohort.allowance)
+        got = 0
+        ate_seed = 0
+        for lot in _local_food(kernel, book, cohort):
+            if cap - got <= 0:
+                break
+            current = book.lots.get(lot.id)
+            if current is None:
                 continue
-
-            # Short. The memory first, then the people: a cohort that has been
-            # hungry for three fortnights starts to lose them.
-            hunger = cohort.hunger + 1
-            lost = 0
-            if hunger >= 3:
-                rng = stream(kernel.seed, kernel.date.absolute, "kernel.hunger",
-                             cohort.id)
-                lost = min(cohort.people,
-                           1 + rng.int(max(1, cohort.people // 20)))
+            take = min(cap - got, current.free)
+            if take <= 0:
+                continue
+            book = book.consume(current.id, take, "consumed")
+            got += take
+            if current.good == F.SEED:
+                ate_seed += take
+        if ate_seed:
+            events.append(("ate_the_seed", cohort.id, ate_seed))
+        if got >= want:
             cohorts[cohort.id] = dataclasses.replace(
-                cohort, hunger=hunger, people=cohort.people - lost,
-                households=min(cohort.households, cohort.people - lost),
-                grievance=min(1000, cohort.grievance + 50))
-            events.append(("hungry", cohort.id, want - got, lost))
+                cohort, hunger=max(0, cohort.hunger - 1),
+                shortfall=max(0, cohort.shortfall + want - got))
+            continue
+
+        # Short. The memory first, then the people: a cohort that has been
+        # hungry for three fortnights starts to lose them.
+        hunger = cohort.hunger + 1
+        lost = 0
+        if starve and hunger >= 3:
+            rng = stream(kernel.seed, kernel.date.absolute, "kernel.hunger",
+                         cohort.id)
+            lost = min(cohort.people,
+                       1 + rng.int(max(1, cohort.people // 20)))
+        cohorts[cohort.id] = dataclasses.replace(
+            cohort, hunger=hunger, people=cohort.people - lost,
+            households=min(cohort.households, cohort.people - lost),
+            shortfall=max(0, cohort.shortfall + want - got),
+            grievance=cohort.grievance if not starve
+            else min(1000, cohort.grievance + 50))
+        events.append(("hungry", cohort.id, want - got, lost))
 
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
     return dataclasses.replace(kernel, book=book, registry=registry), events

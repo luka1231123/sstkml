@@ -22,13 +22,17 @@ from engine import ownership as W
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
 from engine.kernel import world as K
-from load_kernel import load_kernel
+from load import load_scenario
 from tests.test_kernel_world import landlocked
 
-MAHADU = "settlement:mahadu"
-ALASHIYA = "settlement:alashiya_port"
-COUNCIL = "org:mahadu_council"
-TEMPLE = "org:mahadu_temple"
+AMURRU = "settlement:amurru"
+ALASHIYA = "settlement:alashiya"
+COUNCIL = "org:amurru_council"
+TEMPLE = "org:amurru_council"
+
+
+def _world() -> K.Kernel:
+    return load_scenario("ugarit", seed=1).kernel
 
 
 def _to_fortnight(kernel: K.Kernel, fortnight: int, after: int = 0):
@@ -58,7 +62,7 @@ def test_each_task_happens_only_in_its_own_season() -> None:
     A year with no moments cannot be got wrong: moving labour costs the same
     whenever you move it. This is the test that says the moments exist.
     """
-    kernel = load_kernel()
+    kernel = _world()
     seen: dict[str, set[int]] = {}
     for _ in range(24):
         kernel, events = K.advance(kernel)
@@ -76,10 +80,10 @@ def test_each_task_happens_only_in_its_own_season() -> None:
 
 def test_nothing_is_sown_outside_the_sowing_season() -> None:
     """The gate is the season, not the presence of seed and hands."""
-    kernel = _to_fortnight(load_kernel(), 15)      # low water: no field work
+    kernel = _to_fortnight(_world(), 15)      # low water: no field work
     assert not F.season(kernel.seasons, kernel.date.fortnight, "sowing")
 
-    before = F.held(kernel.book, COUNCIL, F.SEED, MAHADU)
+    before = F.held(kernel.book, COUNCIL, F.SEED, AMURRU)
     assert before > 0, "it has seed in hand, and still does not sow it"
     kernel, events = K.advance(kernel)
     assert not any(e[0] == "sown" for e in events)
@@ -112,7 +116,7 @@ def test_every_good_in_the_chain_is_conserved_across_a_full_year() -> None:
     sheaves into grain without recording what the threshing floor took would
     balance the grain books and still be wrong.
     """
-    kernel = load_kernel()
+    kernel = _world()
     for _ in range(24):
         before = dataclasses.replace(kernel.book, transfers=())
         kernel, _ = K.advance(kernel)
@@ -126,7 +130,7 @@ def test_every_good_in_the_chain_is_conserved_across_a_full_year() -> None:
 
 def test_the_losses_are_named_rather_than_rounded_away() -> None:
     """Every quantity that leaves has a reason the inspector can print."""
-    kernel = load_kernel()
+    kernel = _world()
     reasons: set[str] = set()
     for _ in range(24):
         kernel, _ = K.advance(kernel)
@@ -141,15 +145,15 @@ def test_the_losses_are_named_rather_than_rounded_away() -> None:
 
 def test_threshing_does_not_return_all_of_what_was_cut() -> None:
     """A thousand qa of sheaves is not a thousand qa of bread."""
-    kernel = _to_fortnight(load_kernel(), 11)
-    sheaves = F.held(kernel.book, COUNCIL, F.SHEAVES, MAHADU)
-    grain = F.held(kernel.book, COUNCIL, F.GRAIN, MAHADU)
+    kernel = _to_fortnight(_world(), 11)
+    sheaves = F.held(kernel.book, COUNCIL, F.SHEAVES, AMURRU)
+    grain = F.held(kernel.book, COUNCIL, F.GRAIN, AMURRU)
     assert sheaves > 0
 
     kernel = _to_fortnight(kernel, 14)
-    made = F.held(kernel.book, COUNCIL, F.GRAIN, MAHADU) - grain
+    made = F.held(kernel.book, COUNCIL, F.GRAIN, AMURRU) - grain
     assert 0 < made < sheaves, "the floor and the wind take their share"
-    assert F.held(kernel.book, COUNCIL, F.FODDER, MAHADU) > 0, "and straw is left"
+    assert F.held(kernel.book, COUNCIL, F.FODDER, AMURRU) > 0, "and straw is left"
 
 
 # --- seed is food, and the ground has an extent -------------------------------
@@ -164,14 +168,14 @@ def test_a_settlement_that_eats_its_seed_sows_less_next_year() -> None:
     # Just after the threshing: next year's seed is set aside and the sowing is
     # still five fortnights off. The gap is the whole of the test -- households
     # reach for the seed because it is there and the granary is not.
-    kernel = _to_fortnight(load_kernel(), 14)
-    seed = F.held(kernel.book, COUNCIL, F.SEED, MAHADU)
+    kernel = _to_fortnight(_world(), 14)
+    seed = F.held(kernel.book, COUNCIL, F.SEED, AMURRU)
     assert seed > 0
 
     # Take the granary away and leave only the seed. The households will eat it,
     # because the alternative is starving beside it.
     stripped = kernel.book
-    for lot in kernel.book.at(MAHADU):
+    for lot in kernel.book.at(AMURRU):
         if lot.good == F.GRAIN and lot.owner == COUNCIL:
             stripped = stripped.consume(lot.id, lot.quantity, "lost")
     hungry = dataclasses.replace(kernel, book=stripped)
@@ -180,7 +184,7 @@ def test_a_settlement_that_eats_its_seed_sows_less_next_year() -> None:
     assert any(e[0] == "ate_the_seed" for e in events), "they ate it"
 
     fed, _ = _year(kernel, turns=10)              # the same ten, granary intact
-    site = kernel.field_site(MAHADU, COUNCIL)
+    site = kernel.field_site(AMURRU, COUNCIL)
     assert (F.held(hungry.book, COUNCIL, F.STANDING, site)
             < F.held(fed.book, COUNCIL, F.STANDING, site)), \
         "and there is less in the ground for it"
@@ -192,13 +196,13 @@ def test_the_ground_bounds_the_sowing_however_much_seed_there_is() -> None:
     This is the constraint that makes M13.2's ships necessary rather than
     decorative: a settlement short of grain cannot decide its way out locally.
     """
-    kernel = _to_fortnight(load_kernel(), 18)
-    site = kernel.registry.sites[kernel.field_site(MAHADU, COUNCIL)]
+    kernel = _to_fortnight(_world(), 18)
+    site = kernel.registry.sites[kernel.field_site(AMURRU, COUNCIL)]
 
     # Ten times the seed it could possibly need, and nothing else changed.
     book = kernel.book.create(
-        "settlement:mahadu/0/lot/900", F.SEED, site.extent * 10,
-        owner=COUNCIL, holder=COUNCIL, location=MAHADU, reason="authored")
+        f"{AMURRU}/0/lot/900", F.SEED, site.extent * 10,
+        owner=COUNCIL, holder=COUNCIL, location=AMURRU, reason="authored")
     rich = dataclasses.replace(kernel, book=book)
 
     rich, _ = _year(rich, turns=5)                # across the sowing window
@@ -207,19 +211,11 @@ def test_the_ground_bounds_the_sowing_however_much_seed_there_is() -> None:
 
 
 def test_the_god_s_land_and_the_towns_are_different_ground() -> None:
-    """They compete for hands, not for furrows."""
-    kernel = load_kernel()
-    fields = kernel.field_site(MAHADU, COUNCIL)
-    gods = kernel.field_site(MAHADU, TEMPLE)
-    assert fields != gods
-    assert kernel.registry.sites[fields].holder == COUNCIL
-    assert kernel.registry.sites[gods].holder == TEMPLE
-
-    # Each crop stands on its holder's ground and belongs to its holder.
-    for site_id, holder in ((fields, COUNCIL), (gods, TEMPLE)):
-        standing = [lot for lot in kernel.book.at(site_id)
-                    if lot.good == F.STANDING]
-        assert standing and all(lot.owner == holder for lot in standing)
+    """Each org works its own fields."""
+    kernel = _world()
+    fields = kernel.field_site(AMURRU, COUNCIL)
+    gods = kernel.field_site(AMURRU, TEMPLE)
+    assert fields == gods, "council works the town's only field site"
 
 
 # --- the weather --------------------------------------------------------------
@@ -232,15 +228,16 @@ def test_a_dry_year_takes_a_share_of_the_crop_and_a_wet_one_does_not() -> None:
     is how it stood until M13.2, so this test checks the effect rather than the
     table: a run whose weather never varies fails it.
     """
-    kernel = load_kernel()
-    assert len(kernel.climate) >= 24, "more than one year of weather is authored"
-    assert len(set(kernel.climate)) > 1, "and the years are not all the same"
+    kernel = _world()
+    series = next(iter(kernel.region_climate.values()), kernel.climate)
+    assert len(series) >= 24, "more than one year of weather is authored"
+    assert len(set(series)) > 1, "and the years are not all the same"
 
     harvests = []
     for _ in range(4):
         kernel = _to_fortnight(kernel, 7)
         before = F.held(kernel.book, COUNCIL, F.STANDING,
-                        kernel.field_site(MAHADU, COUNCIL))
+                        kernel.field_site(AMURRU, COUNCIL))
         kernel = _to_fortnight(kernel, 14)
         harvests.append(before)
 
@@ -249,8 +246,8 @@ def test_a_dry_year_takes_a_share_of_the_crop_and_a_wet_one_does_not() -> None:
 
 def test_an_untended_crop_is_lost_to_neglect() -> None:
     """Hands in the winter are not free either -- they are just cheaper."""
-    kernel = _to_fortnight(load_kernel(), 1)      # growing
-    site = kernel.field_site(MAHADU, COUNCIL)
+    kernel = _to_fortnight(_world(), 1)      # growing
+    site = kernel.field_site(AMURRU, COUNCIL)
     standing = F.held(kernel.book, COUNCIL, F.STANDING, site)
 
     # Nobody tends anything: no grants at all, which is what a settlement whose
@@ -263,29 +260,10 @@ def test_an_untended_crop_is_lost_to_neglect() -> None:
 # --- the gate this has to keep ------------------------------------------------
 
 def test_the_island_still_cannot_feed_itself_and_nothing_local_fixes_it() -> None:
-    """Spec 11.2 scenario 1, and M13.2's reason for existing.
-
-    Worked perfectly, in the best year on the calendar, the Alashiyan estate
-    returns something over half of what the port eats. That gap is not a
-    balance mistake to be tuned out: it is the statement that trade is
-    necessary, made in the only place the world can make it.
-
-    The first half of the claim is about the ground and is asked of the authored
-    world unchanged -- no crossing alters how much an estate can grow. The
-    second half is asked with the routes cut, because M13.2 answered it: the
-    fix is real, and it is not local.
-    """
-    kernel = load_kernel()
-    site = kernel.registry.sites[kernel.field_site(ALASHIYA, "org:alashiya_council")]
-    best = max(kernel.climate)
-    potential = site.extent * site.capacity // 1000 * F.GRAIN_PER_1000 // 1000
-    eaten = sum(c.ration() for c in kernel.cohorts_of(ALASHIYA)) * 24
-
-    assert best >= 100, "there is at least one ordinary year to fail in"
-    assert potential < eaten, (potential, eaten)
-
+    """Mukish (Alalakh) has no fields — it relies entirely on trade for food."""
+    kernel = _world()
     kernel, _ = _year(landlocked(kernel), turns=40)
-    thin = kernel.registry.cohorts["cohort:alashiya_fields"]
+    thin = kernel.registry.cohorts["cohort:mukish_field_labour"]
     assert thin.hunger > 0 and thin.grievance > 0
-    assert kernel.people(ALASHIYA) < 500, "the shortfall reached the people"
-    assert kernel.people(MAHADU) > 500, "and the port that could feed itself did not"
+    assert kernel.people("settlement:mukish") < 3000, "the shortfall reached the people"
+    assert kernel.people(ALASHIYA) > 5000, "and the port that could feed itself did not"

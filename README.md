@@ -1,39 +1,24 @@
 # SAY TO THE KING, MY LORD
 
-An information-constrained rulership simulation set in a fragile Late Bronze
-Age world.
+Information-constrained rulership sim. Fragile Late Bronze Age world.
 
-People, households, institutions, goods, labour, obligations, journeys,
-disease, and foreign courts are simulated deterministically. The player holds
-Ugarit together through fallible people and delayed, interested information,
-not through an omniscient strategy layer.
+People, households, institutions, goods, labour, obligations, journeys, disease, foreign courts — all simulated deterministically. Player hold Ugarit together through fallible people and delayed, interested information. No omniscient strategy layer.
 
-[`SPEC.md`](SPEC.md) is the single current product and release authority.
-Superseded specifications and implementation plans are preserved under
-[`docs/archive`](docs/archive/README.md); they are history, not active
-requirements.
+[`SPEC.md`](SPEC.md) = sole current product and release authority. Superseded specs and plans live in [`docs/archive`](docs/archive/README.md) — history, not active requirements.
 
 ## What is here now
 
-- a deterministic, replayable court and world kernel;
-- explicit goods, labour, ownership, custody, movement, obligations, and
-  causal records;
+- deterministic, replayable court and world kernel;
+- explicit goods, labour, ownership, custody, movement, obligations, causal records;
 - actor-specific dated Belief projected through one player boundary;
-- agriculture, institutions, trade, cargo, news, disease, justice, household,
-  ritual, military service, and construction foundations;
-- required grounded local-model language for scribes, advisers, and tablets;
-- a multi-window character-cell Palace Desktop;
-- Hall, Court, Scribes' Room, Storehouse, City, Muster, World, and Shrine
-  foundations;
-- a four-part writing desk: Address, Recognition, player-written Matter, and
-  Seal;
-- versioned atomic saves, replay checks, audits, balance tools, screen renders,
-  and a causal developer inspector.
+- agriculture, institutions, trade, cargo, news, disease, justice, household, ritual, military service, construction foundations;
+- required grounded local-model language for scribes, advisers, tablets;
+- multi-window character-cell Palace Desktop;
+- Hall, Court, Scribes' Room, Storehouse, City, Muster, World, Shrine foundations;
+- four-part writing desk: Address, Recognition, player-written Matter, Seal;
+- versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
 
-The court and regional kernel are not yet fully unified, and the complete
-world-to-letter-to-material-consequence loop is still release work. The
-authoritative remaining scope is deliberately short and lives only in
-[`SPEC.md` section 6](SPEC.md#6-path-to-10).
+Court and regional kernel not yet unified. Full world-to-letter-to-material-consequence loop still release work. Remaining scope short, lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-10).
 
 ## Run
 
@@ -45,27 +30,21 @@ authoritative remaining scope is deliberately short and lives only in
 ./run.sh --probe          # live Tk probe
 ```
 
-`run.sh` uses the project `.venv`, creating it when absent. The windowed backend
-requires Python with Tk support.
+`run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
-The Hall prints current controls. `Space` ends the fortnight, `Ctrl-S` saves,
-`Ctrl-O` asks before reloading, `?` opens grounded Help, and `Q` quits.
+Hall print current controls. `Space` end fortnight, `Ctrl-S` save, `Ctrl-O` ask before reload, `?` open grounded Help, `Q` quit.
 
 ## Required local language model
 
-The supported baseline is:
+Supported baseline:
 
 ```sh
 ollama pull qwen3:4b-instruct
 ```
 
-Ollama must be running. If `ollama serve` reports that port `11434` is already
-in use, a server is already listening; do not start a second one.
+Ollama must run. If `ollama serve` report port `11434` already in use, server already listening — do not start second one.
 
-The model supplies language, not simulation truth. It may correct the player's
-one- or two-sentence letter matter, voice permitted beliefs, and summarize
-selected records. It cannot see hidden World state, choose policy, invent
-authoritative quantities, calculate outcomes, or mutate the game.
+Model supply language, not simulation truth. It may correct player's one- or two-sentence letter matter, voice permitted beliefs, summarize selected records. It cannot see hidden World state, choose policy, invent authoritative quantities, calculate outcomes, or mutate game.
 
 ## Verify
 
@@ -79,13 +58,9 @@ authoritative quantities, calculate outcomes, or mutate the game.
 .venv/bin/python tools/kernel_inspect.py where grain
 ```
 
-`tools/kernel_inspect.py` is the omniscient developer inspector. It can explain
-why a lot exists, where a quantity went, why an actor decided, what evidence a
-belief rests on, what an obligation authorized, and which request was not
-satisfied. It is never player-facing.
+`tools/kernel_inspect.py` = omniscient developer inspector. Explain why lot exist, where quantity went, why actor decided, what evidence belief rest on, what obligation authorized, which request unsatisfied. Never player-facing.
 
-The runtime engine is standard-library-only, integer-state, immutable, seeded,
-and replayable. `belief/` is the only World-to-player projection boundary.
+Runtime engine standard-library-only, integer-state, immutable, seeded, replayable. `belief/` = only World-to-player projection boundary.
 
 ## Repository map
 

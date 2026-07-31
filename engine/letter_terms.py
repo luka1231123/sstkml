@@ -19,6 +19,7 @@ import dataclasses
 from collections.abc import Iterable
 
 from engine import actions as A
+from engine import seat
 from engine import obligation as O
 from engine.state import GiftRecord, World
 
@@ -227,7 +228,7 @@ def reserve_terms_at_dispatch(
             raise ValueError(f"not enough {good} for all gifts on this letter")
 
     if new_gifts:
-        stores = dict(world.court.stores)
+        stores = seat.held(world)
         records = list(world.court.treasury_gifts_sent)
         for _index, term, reservation in new_gifts:
             stores[term.good] -= term.quantity
@@ -240,14 +241,13 @@ def reserve_terms_at_dispatch(
                 value=term.quantity * world.gift_values[term.good],
                 sent_turn=sent_turn,
             ))
-        world = dataclasses.replace(
+        world = seat.put(dataclasses.replace(
             world,
             court=dataclasses.replace(
                 world.court,
-                stores=stores,
                 treasury_gifts_sent=tuple(records),
             ),
-        )
+        ), stores, reason_down="expended")
     world = dataclasses.replace(
         world,
         letter_reservations=_merge_records(
@@ -472,7 +472,7 @@ def apply_incoming_terms(world: World, letter) -> tuple[World, list]:
     shipped = {record.id: record for record in world.letter_reservations}
     recorded: list[O.LetterObligation] = []
     landed: list[O.GoodsReservation] = []
-    stores = dict(world.court.stores)
+    stores = seat.held(world)
     for index, term in enumerate(terms):
         record_id = _term_id(source, index)
         if term.kind in {"promise_good", "service"}:
@@ -505,8 +505,7 @@ def apply_incoming_terms(world: World, letter) -> tuple[World, list]:
     if not recorded and not landed:
         return world, []
     if landed:
-        world = dataclasses.replace(
-            world, court=dataclasses.replace(world.court, stores=stores))
+        world = seat.put(world, stores)
     # An increase in the court's stores that no production explains needs an
     # event, or the conservation audit is right to call it grain from nowhere.
     events: list = [

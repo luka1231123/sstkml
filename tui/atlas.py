@@ -61,6 +61,10 @@ BRACKET = {
     "imperial": ("[", "]"),
     "royal": ("(", ")"),
     "town": ("", ""),
+    # A palace centre wears no bracket because it is nobody's seat: it is a
+    # holding of an Alu that happens to be big enough to have been written
+    # down with a name. The tablet beside the map says whose it is.
+    "centre": ("", ""),
 }
 
 # Whose empire answers for the place. Colour only ever repeats what the tablet
@@ -70,11 +74,12 @@ POWER_TONE = {
     "hatti": "flame",
     "ahhiyawa": "lapis",
     "free": "verdigris",
+    "assyria": "wine",
+    "karduniash": "sand",
 }
 
-# The hinterland, which has no names: a holding, an estate, a source of metal.
-# One glyph per kind of thing rather than per commodity -- the tablet beside
-# the map says which metal, and the map says only that there is one.
+# One glyph per kind of holding, not per commodity. Metal type and palace
+# names are given in the side tablet, not on the map.
 SITE_GLYPH = {
     "palace": "x",
     "grain": "%",
@@ -95,7 +100,7 @@ SITE_TONE = {
 METAL_TONE = "gold"
 
 SITE_WORD = {
-    "palace": "small palaces",
+    "palace": "palace centres",
     "grain": "grain estates",
     "copper": "copper",
     "tin": "tin",

@@ -4,16 +4,9 @@ Status: executable; subordinate to root `SPEC.md` (§6.2) and
 `docs/WORLD_AGENT_PLAN.md` §7. Retire when `tools/authority_audit.py` reports
 no findings.
 
-Phase C ends the state of affairs `content/kernel/world.toml` already names in
-its own comment: "the legacy court still owns Ugarit". Today two systems each
-hold an authoritative answer to the same question, and no test says which one is
-the truth. This file names the one authority and the one deletion target for
-every duplicated fact, so the migration is a list rather than a judgement call.
+Phase C end state `content/kernel/world.toml` already name in own comment: "the legacy court still owns Ugarit". Today two systems each hold authoritative answer to same question. No test say which one true. This file name the one authority and one deletion target per duplicated fact — migration become list, not judgement call.
 
-The rule for reading the table: **authority** is where the fact will live at the
-end of Phase C. **Deletion target** is what must be gone, not merely unused. A
-field that survives as a cache of the authority is still a second authoritative
-quantity the first time someone writes to it.
+Read table thus: **authority** = where fact live at end of Phase C. **Deletion target** = what must be gone, not merely unused. Field surviving as cache of authority still second authoritative quantity first time someone write to it.
 
 ## 1. The duplicate table
 
@@ -41,30 +34,15 @@ quantity the first time someone writes to it.
 
 ## 2. The identifier problem
 
-The two halves do not name the same things the same way. Court ids are bare
-authored strings (`seat`, `ma_hadu`, `hatti_king`); kernel ids are minted and
-parsed with a kind prefix (`settlement:ugarit`, `cohort:ugarit_fields`) and
-`engine/entity.py` refuses anything else.
+Two halves name same things differently. Court ids = bare authored strings (`seat`, `ma_hadu`, `hatti_king`); kernel ids minted and parsed with kind prefix (`settlement:ugarit`, `cohort:ugarit_fields`), `engine/entity.py` refuse anything else.
 
-So the migration needs an explicit, authored map from court id to kernel id,
-loaded rather than derived: deriving it would silently invent an entity the first
-time an authored name did not match a pattern. Correspondents, places, routes,
-estates, institutions, and dependent groups all need an entry. Anything without
-one is a fact nobody owns, and the audit should say so rather than guess.
+So migration need explicit authored map court id → kernel id, loaded not derived. Deriving would silently invent entity first time authored name miss pattern. Correspondents, places, routes, estates, institutions, dependent groups all need entry. Anything without one = fact nobody own; audit must say so, not guess.
 
 ## 3. What "done" means
 
-`tools/authority_audit.py` reports a finding whenever two sides both hold a
-non-empty authoritative answer to one row of the table. It fails today, on
-purpose: that is the inventory. Phase C is complete when it reports none, and
-`C4` may not close by narrowing the table.
+`tools/authority_audit.py` report finding whenever both sides hold non-empty authoritative answer to one table row. Fail today on purpose: that the inventory. Phase C complete when it report none. `C4` may not close by narrowing table.
 
-Two rules for the migration that the audit cannot check, and reviewers must:
+Two migration rules audit cannot check — reviewers must:
 
-1. A deleted court field may not come back as a cache. If a room needs a figure
-   fast, it comes through `belief/project.py`, which is allowed to precompute.
-2. Ugarit becomes autonomous in the kernel only when its decisions are the
-   player's orders. A council organization for Ugarit would make the kernel
-   decide what the king decides — the seat's intents come from the player, and
-   `autonomous = false` in `content/kernel/world.toml` stays until there is an
-   order pipeline behind it.
+1. Deleted court field may not return as cache. Room needing figure fast get it through `belief/project.py`, which may precompute.
+2. Ugarit become autonomous in kernel only when its decisions are player's orders. Council organization for Ugarit would make kernel decide what king decide — seat's intents come from player, and `autonomous = false` in `content/kernel/world.toml` stay until order pipeline behind it.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from engine import systems
+from engine import seat, systems
 from engine.state import World
 
 
@@ -24,6 +24,21 @@ def drain_schedule(world: World) -> tuple[World, list]:
     return dataclasses.replace(world, schedule=remaining), list(fired)
 
 
+def step_kernel(world: World) -> tuple[World, list]:
+    """A2: advance the autonomous world one fortnight (Task 2 C1).
+
+    Kernel events are tuples, not `engine.actions` records, and they describe
+    settlements the player has no standing to see. They are returned in the
+    turn's event list because dropping them would make the world's turn
+    unobservable to `tools/kernel_inspect.py`; every reader downstream
+    isinstance-filters on the action types, so they are inert until C6 gives
+    the belief layer somewhere to put them.
+    """
+    from engine.kernel import world as K
+    kernel, events = K.advance(world.kernel)
+    return dataclasses.replace(world, kernel=kernel), events
+
+
 def advance(world: World) -> tuple[World, list]:
     """Phase A + B(pre-belief). Returns the events describing this turn's advance."""
     events: list = []
@@ -35,6 +50,17 @@ def advance(world: World) -> tuple[World, list]:
         world, court=dataclasses.replace(
             world.court, inspected=(), searched=()))
     events.append(_turn_advanced(world))
+
+    # A2: the world outside the seat. Every other settlement crosses the same
+    # fortnight -- sows, tends, reaps, eats, and settles what it owes -- on its
+    # own region's weather. Kept here, immediately after A1, because the court
+    # phases below are the seat's own turn and the world does not wait on them.
+    #
+    # The kernel keeps its own date and steps it itself, so this is one advance
+    # per world advance and the two dates stay level. Nothing in the court reads
+    # kernel state yet (Task 2 C2 onward moves the readers over), so the seat's
+    # numbers are unchanged by this call.
+    world, e = step_kernel(world); events += e
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)
@@ -106,10 +132,28 @@ def advance(world: World) -> tuple[World, list]:
     # A8 spoilage (stock sitting through the fortnight), then rites take their
     # cut, then rations pay from the remainder. Grain enters only at threshing.
     court, e = systems.spoilage(court); events += e
+    # Spoilage crosses on its own, because it is the one sink here that is not
+    # somebody eating: spec 2.2 counts spoiled apart from consumed, and a
+    # single crossing for the whole block would file rot as a meal.
+    world = seat.record(world, court, reason_down="spoiled")
+    court = world.court
     court, e = systems.do_rites(court, world.date.fortnight); events += e
-    court, e = systems.pay_rations(court); events += e
+    # A8 rations. The payroll is a body of cohorts now and it eats in the
+    # kernel, out of the palace's lots (Task 2 C3); `seat.feed` is only the
+    # moment, kept where `systems.pay_rations` used to stand so the fortnight's
+    # grain still leaves after the rot and after the gods. `seat.mirror` writes
+    # the result back onto `Court.dependents` and raises the events the log,
+    # the hall and the advisors read. The retired system is in
+    # `engine/legacy/rations.py`.
+    world = seat.record(world, court, reason_down="consumed")
+    world = seat.feed(world)
+    world, e = seat.mirror(world); events += e
+    # The kernel spent lots directly, so the court's mapping is read back off
+    # the Book rather than written to it. Recording it instead would reconcile
+    # the Book to a figure taken before the meal, and put the ration back.
+    world = seat.refresh(world)
     # A9 unrest
-    court, e = systems.recompute_unrest(court); events += e
+    court, e = systems.recompute_unrest(world.court); events += e
     world = dataclasses.replace(world, court=court)
     # High land dues are an additional pressure, not part of ration arrears,
     # and flight is permanent even if the next order lowers the rate.
@@ -154,10 +198,18 @@ _HISTORY = 24                      # one full year, one column per fortnight
 
 
 def _record_stores(world: World) -> World:
+    """A year of readings, off the Book (Task 2 C2).
+
+    A projection and nothing else: the sparkline the player reads is a picture
+    of the seat's lots at the close of each fortnight, not a second record that
+    could disagree with them.
+    """
+    from engine import seat
+    stores = seat.held(world)
     history = dict(world.court.store_history)
-    for good in sorted(world.court.stores):
+    for good in sorted(stores):
         series = history.get(good, ())
-        history[good] = (series + (world.court.stores.get(good, 0),))[-_HISTORY:]
+        history[good] = (series + (stores.get(good, 0),))[-_HISTORY:]
     return dataclasses.replace(
         world, court=dataclasses.replace(world.court, store_history=history))
 

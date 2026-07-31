@@ -4,7 +4,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
-from engine import institution, land, metal
+from engine import institution, land, metal, seat
 from load import load_scenario
 
 SEED = 8814402919
@@ -15,10 +15,14 @@ def _world():
 
 
 def _with_stores(world, **goods):
-    stores = dict(world.court.stores)
+    """Set the seat's stores through the seam, not on the court.
+
+    `Court.stores` is a mirror since Task 2 C2 -- the systems read the Book --
+    so a fixture that writes only the court sets a figure nothing consults.
+    """
+    stores = seat.held(world)
     stores.update(goods)
-    return dataclasses.replace(
-        world, court=dataclasses.replace(world.court, stores=stores))
+    return seat.put(world, stores)
 
 
 def test_institution_upkeep_is_consumed_once_per_step() -> None:

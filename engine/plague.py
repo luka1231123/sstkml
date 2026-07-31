@@ -14,6 +14,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.core import stream
 from engine.state import Place, World
 
@@ -125,13 +126,13 @@ def expiate(world: World, oath_id: str, offering: int = 0) -> tuple[World, list]
     offering = max(0, offering)
     plague = world.plague
     court = world.court
-    stores = dict(court.stores)
+    stores = seat.held(world)
     if offering:
         stores["grain"] = max(0, stores.get("grain", 0) - offering)
-    court = dataclasses.replace(court, stores=stores)
     plague = dataclasses.replace(
         plague, expiated=plague.expiated + (oath_id,))
     world = dataclasses.replace(world, court=court, plague=plague)
+    world = seat.put(world, stores, reason_down="expended")
     return world, [A.OathExpiated(oath_id, offering)]
 
 
@@ -264,8 +265,19 @@ def _kill_dependents(world: World, deaths: int) -> tuple[World, list]:
         events.append(A.DependentsDied(
             group.id, group.place, share, "plague"))
         remaining -= share
-    return (
-        dataclasses.replace(
-            world, court=dataclasses.replace(court, dependents=dependents)),
-        events,
-    )
+    # The heads come off the cohort as well, and that is not bookkeeping: since
+    # Task 2 C3 the cohort is the authority and `Court.dependents` is written
+    # back from it every turn. Killing only the court's copy would have the
+    # mirror hand the dead their places back on the same turn, and the audit
+    # would see a burial nothing accounted for -- which is exactly how this was
+    # found.
+    from engine import seat as seat_door
+
+    world = dataclasses.replace(
+        world, court=dataclasses.replace(court, dependents=dependents))
+    for group_id, group in sorted(dependents.items()):
+        was = court.dependents[group_id]
+        if group.size >= was.size:
+            continue
+        world = seat_door.bury(world, group_id, was.size - group.size)
+    return world, events

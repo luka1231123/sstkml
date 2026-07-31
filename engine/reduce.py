@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.state import World, replace_court
 
 
@@ -22,20 +23,26 @@ def apply(world: World, action) -> tuple[World, list]:
         qa = max(0, action.qa)
         allocations = dict(world.court.allocations)
         allocations[action.group_id] = qa
+        world = seat.allow(world, action.group_id, qa)
         return replace_court(world, allocations=allocations), [A.AllocationSet(action.group_id, qa)]
 
     if isinstance(action, A.SetPriority):
         for gid in action.order:
             if gid not in world.court.dependents:
                 raise ValueError(f"unknown group in priority: {gid}")
+        world = seat.rank(world, tuple(action.order))
         return replace_court(world, priority=tuple(action.order)), [A.PrioritySet(tuple(action.order))]
 
     if isinstance(action, A.EatSeed):
-        stores = dict(world.court.stores)
+        stores = seat.held(world)
         moved = min(max(0, action.qa), stores.get("seed_grain", 0))
         stores["seed_grain"] = stores.get("seed_grain", 0) - moved
         stores["grain"] = stores.get("grain", 0) + moved
-        return replace_court(world, stores=stores), [A.SeedEaten(moved)]
+        # Seed becomes food. Nothing enters or leaves the world -- the same
+        # grain answers to a different name -- so the crossing nets to a lot
+        # spent and a lot minted, which is the shape until the Book learns to
+        # rename a good in place.
+        return seat.put(world, stores), [A.SeedEaten(moved)]
 
     if isinstance(action, A.RecordReplyText):
         # A reading is kept against the case that produced the answer, because
@@ -215,7 +222,7 @@ def apply(world: World, action) -> tuple[World, list]:
 
     if isinstance(action, A.ConsultDiviner):
         from engine.divine import consult
-        stores = dict(world.court.stores)
+        stores = seat.held(world)
         value = 0
         if action.offering_good:
             have = stores.get(action.offering_good, 0)
@@ -225,7 +232,7 @@ def apply(world: World, action) -> tuple[World, list]:
                     f"the storehouse holds only {have} {action.offering_good}")
             stores[action.offering_good] = have - quantity
             value = quantity * world.gift_values.get(action.offering_good, 0)
-            world = replace_court(world, stores=stores)
+            world = seat.put(world, stores, reason_down="expended")
         world, events = consult(world, action.question, action.subject, value)
         if action.offering_good and quantity:
             events.insert(0, A.OfferingConsumed(

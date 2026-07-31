@@ -20,6 +20,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.core import in_range, lerp_table, stream
 from engine.state import Court, Estate, World
 
@@ -195,7 +196,7 @@ def step(world: World) -> tuple[World, list]:
 
     events: list = []
     estates = dict(court.estates)
-    stores = dict(court.stores)
+    stores = seat.held(world)
 
     # Canals decay every turn regardless of season, and are dredged only in the
     # authored low-water window (that action lives in reduce.py).
@@ -311,8 +312,14 @@ def step(world: World) -> tuple[World, list]:
                 court, at_harvest=(), corvee_days=0,
                 corvee_sources=(), works_days=0)
 
-    court = dataclasses.replace(court, estates=estates, stores=stores)
-    return dataclasses.replace(world, court=court), events
+    court = dataclasses.replace(court, estates=estates)
+    world = dataclasses.replace(world, court=court)
+    # Seed leaves for the furrow and grain arrives off the threshing floor in
+    # the same step, so one crossing has to name both. `sown` is the sink that
+    # matters here -- it is what spec 2.2 distinguishes from eating -- and the
+    # harvest is the one place in the court where goods are honestly produced.
+    return seat.put(world, stores, reason_down="sown",
+                    reason_up="harvested"), events
 
 
 def gauge_reading(world: World) -> int:

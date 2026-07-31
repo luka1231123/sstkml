@@ -1,0 +1,34 @@
+# Entity ID map: court -> kernel. What the loader cannot derive.
+#
+# Places are not here any more. A court place names the Alu it belongs to and
+# every Alu is a settlement, so `load.kernel_settlement` reads the answer off
+# the content and the loader refuses a scenario where a mark's Alu does not
+# exist. The section it replaced listed six places, of which four were
+# derivable and one -- Gib'ala, filed under Amurru -- disagreed with the
+# scenario, which says its Alu is the seat. That is what a hand-written table
+# of derivable facts is for: being wrong quietly.
+#
+# What is left is the part that genuinely is not derivable, because the court's
+# vocabulary is its own and no rule turns one into the other. Each section
+# lands with the migration step that needs it (docs/TASK_2_TODO.md):
+#
+#   [actors]        14 correspondents -> org: ids. `hatti_king` is not a place
+#                   name, and `ura_merchant` sits at a mark that answers to
+#                   Tarhuntassa.                                        (C6)
+#   [estates]       3 court estates -> site: ids.                       (C4)
+#   [institutions]  court institutions -> org: or site:. The harbour is a
+#                   site and the temple is an org, and which is which is a
+#                   judgement rather than a rule.                       (C2/C4)
+#   [groups]        DependentGroup -> cohort: ids. The court's function
+#                   names are not the kernel's cohort kinds.            (C3)
+#
+# The loader raises on any entry naming an entity the registry lacks, so an
+# empty section is honest and a stale one is not.
+
+[actors]
+
+[estates]
+
+[institutions]
+
+[groups]
