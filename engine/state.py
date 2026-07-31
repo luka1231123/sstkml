@@ -752,7 +752,6 @@ class World:
     # Anything that "arrives later" is a Scheduled (spec 3.3). Sorted, stable.
     schedule: tuple["Scheduled", ...] = ()
     terrain: Terrain = Terrain()             # authored ground; no rule reads it
-    sites: tuple[Site, ...] = ()             # the hinterland of the hubs
     correspondents: tuple[Correspondent, ...] = ()
     season: Mapping[str, tuple[int, ...]] = dataclasses.field(default_factory=dict)
     letters_in_transit: tuple[Letter, ...] = ()
@@ -876,6 +875,16 @@ def _memo(cache: dict, on: tuple, build):
             cache.clear()
         found = cache[key] = (on, build())
     return found[1]
+
+
+def marks(world: World) -> Mapping[PlaceId, Place]:
+    """The map's marks off the registry. One derivation, two callers."""
+    return _places_of(world)
+
+
+def lines(world: World) -> tuple[Route, ...]:
+    """The map's roads and crossings off the registry."""
+    return _routes_of(world)
 
 
 def _places_of(world: World) -> Mapping[PlaceId, Place]:

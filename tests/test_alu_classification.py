@@ -44,13 +44,15 @@ def test_every_mark_has_a_classification_and_an_owning_alu() -> None:
         else:
             assert place.alu == ""
 
-    for site in world.sites:
-        assert site.role in ("palace_centre", "capacity")
-        assert site.alu in alu, f"site at {site.col},{site.row} owns to nothing"
-        assert bool(site.capacity) == (site.role == "capacity")
+    sites = world.kernel.registry.sites.values()
+    for site in sites:
+        assert site.settlement.split(":", 1)[1] in alu, \
+            f"site at {site.col},{site.row} owns to nothing"
 
-    counted = collections.Counter(site.role for site in world.sites)
-    assert counted == {"capacity": 149, "palace_centre": 59}
+    counted = collections.Counter(
+        "palace_centre" if site.function == "palace_centre" else "capacity"
+        for site in sites)
+    assert counted == {"capacity": 149, "palace_centre": 91}
 
 
 def test_an_unowned_or_unclassified_mark_is_a_load_error() -> None:

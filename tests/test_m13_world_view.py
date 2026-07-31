@@ -325,7 +325,7 @@ def test_the_ground_is_drawn_from_the_scenario_and_from_nowhere_else() -> None:
 def test_the_scenario_authors_ground_that_reaches_the_tablet() -> None:
     world = load_scenario("ugarit", seed=SEED)
     assert world.terrain.rows, "the scenario authors no ground"
-    assert world.sites, "the scenario authors no hinterland"
+    assert world.kernel.registry.sites, "the scenario authors no hinterland"
     graph = project(world)["world_graph"]
     assert graph["terrain"]["rows"], "Belief drops the authored ground"
 

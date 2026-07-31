@@ -250,7 +250,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
         reg_sites[site_id] = KernelSite(
             id=site_id, name=s.name if s.role == "palace_centre" else "",
             settlement=settlement_id, function=function,
-            col=s.col, row=s.row)
+            col=s.col, row=s.row, kind=s.kind)
         if s.role == "palace_centre":
             settlement_sites[s.alu].append(site_id)
         if function not in SITE_FUNCTIONS:
@@ -259,16 +259,24 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     # A palace centre authored as a `[[places]]` row rather than a `[[sites]]`
     # one is the same thing on the map and becomes a site too (C5). It keeps the
     # id the court knew it by, so a letter addressed to Gib'ala still lands.
+    # Some are authored in both tables -- Gib'ala and Ma'hadu are a `[[places]]`
+    # row and a `[[sites]]` row at the same cell. One mark, so the existing site
+    # is renamed and made addressable rather than drawn again beside itself.
+    at_cell = {(s.settlement, s.col, s.row): i for i, s in reg_sites.items()}
     for place in places.values():
         if place.kind != "palace_centre":
             continue
-        site_id = f"site:{place.id}"
+        settlement_id = f"settlement:{place.alu}"
+        site_id = at_cell.get((settlement_id, place.col, place.row),
+                              f"site:{place.id}")
         reg_sites[site_id] = KernelSite(
-            id=site_id, name=place.name, settlement=f"settlement:{place.alu}",
+            id=site_id, name=place.name, settlement=settlement_id,
             function="palace_centre", col=place.col, row=place.row,
-            glyph=place.glyph, role=place.role, harbour=place.harbour,
-            population=place.population, addressable=True)
-        settlement_sites[place.alu].append(site_id)
+            kind="palace", glyph=place.glyph, role=place.role,
+            harbour=place.harbour, population=place.population,
+            addressable=True)
+        if site_id not in settlement_sites[place.alu]:
+            settlement_sites[place.alu].append(site_id)
 
     settlements = {}
     cohorts = {}
@@ -841,7 +849,7 @@ def load_scenario(name: str, seed: int) -> World:
         date=date,
         court=court,
         kernel=kernel,
-        terrain=terrain, sites=sites,
+        terrain=terrain,
         correspondents=correspondents, season=seasons,
         relations=relations, oaths=oaths, foreign_courts=foreign_courts,
         plague=plague_state,

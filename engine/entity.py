@@ -224,6 +224,7 @@ class Site:
     # drawing, not rule.
     col: int = 0
     row: int = 0
+    kind: str = ""             # what the mark is drawn as: grain, copper, palace
     glyph: str = ""
     role: str = ""             # the line the tablet writes about it
     harbour: bool = False      # its Alu reaches the sea through this mark

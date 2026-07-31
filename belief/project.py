@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 from belief.distortion import p_error, transcribe
+from engine.state import marks, lines
 from engine.systems import attention_available, sea_open
 
 _MONTHS = tomllib.loads((Path(__file__).parent.parent / "content" / "months.toml").read_text())
@@ -136,7 +137,7 @@ def _known_legs(world, path) -> int:
     legs = 0
     for a, b in zip(path, path[1:]):
         route = next(
-            (item for item in world.routes
+            (item for item in lines(world)
              if {item.a, item.b} == {a, b}), None)
         legs += route.legs if route is not None else 1
     return max(1, legs) if len(tuple(path)) > 1 else 1
@@ -563,7 +564,7 @@ def _plague(world, perr: int) -> dict:
     with no verdict attached.
     """
     court = world.court
-    seat = world.places.get(court.seat)
+    seat = marks(world).get(court.seat)
     if seat is None:
         return {}
     return {
@@ -710,7 +711,7 @@ def _world_graph(world) -> dict:
                 "age_turns": max(0, now),
                 "certainty": "charted",
             }
-            for place in sorted(world.places.values(), key=lambda item: item.id)
+            for place in sorted(marks(world).values(), key=lambda item: item.id)
         ],
         "routes": [
             {
@@ -732,7 +733,7 @@ def _world_graph(world) -> dict:
                 "availability_as_of_turn": now,
             }
             for route in sorted(
-                world.routes,
+                lines(world),
                 key=lambda item: (
                     min(item.a, item.b), max(item.a, item.b),
                     item.mode, item.legs),
@@ -750,10 +751,17 @@ def _world_graph(world) -> dict:
             "legend": world.terrain.legend,
         },
         "sites": [
-            {"kind": site.kind, "alu": site.alu, "role": site.role,
-             "capacity": site.capacity, "name": site.name,
-             "col": site.col, "row": site.row}
-            for site in world.sites
+            {"kind": site.kind, "alu": site.settlement.split(":", 1)[1],
+             "role": ("palace_centre" if site.function == "palace_centre"
+                      else "capacity"),
+             "capacity": ("" if site.function == "palace_centre"
+                          else site.function),
+             "name": site.name, "col": site.col, "row": site.row}
+            # Addressable marks are drawn from `places` above; listing them
+            # here as well would put Ma'hadu in the hinterland twice.
+            for site in [world.kernel.registry.sites[i]
+                         for i in sorted(world.kernel.registry.sites)]
+            if not site.addressable
         ],
     }
 

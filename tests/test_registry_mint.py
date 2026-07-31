@@ -7,7 +7,7 @@ import pytest
 
 from engine.entity import check
 from load import CONTENT, mint_registry
-from load import load_scenario
+from load import load_scenario, parse_places, parse_sites
 
 
 def _mint():
@@ -15,8 +15,8 @@ def _mint():
     scenario_cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
     world_cfg = tomllib.loads((CONTENT / "world.toml").read_text())
     cfg = {**world_cfg, **scenario_cfg}
-    world = load_scenario(name, seed=1)
-    return cfg, mint_registry(world.places, world.sites, cfg)
+    places = parse_places(cfg)
+    return cfg, mint_registry(places, parse_sites(cfg, places), cfg)
 
 
 def test_settlement_and_region_counts():
@@ -58,12 +58,13 @@ def test_routes_are_minted_one_per_scenario_row():
 def test_bad_site_function_raises():
     name = "ugarit"
     cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
-    world = load_scenario(name, seed=1)
-    sites = list(world.sites)
+    full = {**tomllib.loads((CONTENT / "world.toml").read_text()), **cfg}
+    places = parse_places(full)
+    sites = list(parse_sites(full, places))
     index = next(i for i, s in enumerate(sites) if s.role != "palace_centre")
     sites[index] = dataclasses.replace(sites[index], capacity="bogus_resource")
     with pytest.raises(ValueError):
-        mint_registry(world.places, tuple(sites), cfg)
+        mint_registry(places, tuple(sites), full)
 
 
 # --- detail.toml: the numbers the map cannot carry (Task 2, C1) ----------------

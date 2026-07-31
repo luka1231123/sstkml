@@ -144,11 +144,27 @@ has been since C2, and the mirror is deleted with its readers in C5.
 
 ## C5 — places, routes, and the rooms
 
-- [ ] `World.places` -> `Settlement`/`Site`; `World.routes` -> `entity.Route`.
-- [ ] Plague compartments off `Place` onto layer keyed by settlement.
-- [ ] `mail.py` walk kernel routes.
-- [ ] `belief/project.py` read registry. Projection keys unchanged, so `tui/`
-      get no edit — verify by grepping `tui/` for `court.`/`world.`.
+- [x] `World.places` -> `Settlement`/`Site`; `World.routes` -> `entity.Route`.
+      The fields are gone; both are properties over the registry, memoised on
+      the identity of the records they read. `Settlement`/`Site` carry the
+      column, row, glyph, rank, role, harbour and population the tablet draws,
+      and `Route` carries its course and the two marks it was authored between.
+- [x] The 32 palace centres authored as `[[places]]` rows are sites too, marked
+      `addressable`: a courier, a correspondent or the sickness reaches those by
+      name and reaches the 59 `[[sites]]` marks not at all.
+- [x] `World.sites` deleted; the hinterland is `registry.sites`.
+- [x] Plague compartments off `Place` onto `PlagueState.sir`, keyed by place.
+      Absent means wholly susceptible at the authored size; `plague._record` is
+      the only writer.
+- [x] `belief/project.py` reads the registry. Projection keys unchanged and
+      `tui/` took no edit.
+- [ ] `mail.py` walk kernel routes. Not done and not a second authority:
+      `world.routes` is a view, so mail, `divine` and `relations` already read
+      the registry through it. What is left is swapping the court-shaped
+      `state.Route` for `entity.Route` at the eight call sites, which retires
+      the shim and buys nothing else.
+
+Closes: places, routes. The audit is 8 findings -> 6.
 
 ## C6 — foreign courts and actor belief
 
