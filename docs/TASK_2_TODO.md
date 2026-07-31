@@ -108,6 +108,17 @@ has been since C2, and the mirror is deleted with its readers in C5.
       redistributive arrangement, which is what a palace deciding who eats
       first is. `allowance` is deliberately not capped at the fortnight's
       ration: a store that hands over more is paying down a debt.
+- [x] The payroll's heads come out of the seat's own cohorts rather than on top
+      of them (`seat._make_room`). The crown's 1,010 already lived in that town;
+      naming them is not arriving.
+- [x] The ration is grain only (`world._foods`). A household eats its own seed
+      rather than starve and nobody asks it; a body being issued a ration does
+      not choose what is in it, and issuing the sowing as bread is `A.EatSeed`,
+      an order the player gives. The roll reaching the seed on its own deleted
+      that order and spent the crown's sowing every hungry fortnight.
+- [x] `plague._kill_dependents` goes through `seat.bury`. It took the dead off
+      the court's mapping only, and the mirror handed them their places back on
+      the same turn -- 128 of the m13 audit's findings.
 - [ ] `SP.PLACEMENTS` still names `settlement:mahadu`, which the live map does
       not have -- the third stale id out of the retired
       `content/kernel/world.toml`, after `seat_people.SEAT` and the audit's copy
