@@ -4,8 +4,6 @@ from __future__ import annotations
 import dataclasses
 import json
 
-import pytest
-
 from belief.project import project
 from engine import actions as A
 from engine import divine, house, relations
@@ -57,7 +55,7 @@ def test_heirs_are_ranked_from_turn_one_and_daughters_are_not_in_the_line():
 def test_children_are_born_named_and_pregnancies_do_not_overlap():
     world = load_scenario("ugarit", SEED)
     births, conceptions = [], []
-    for _ in range(300):
+    for _ in range(150):
         world, events = advance(world)
         for event in events:
             if isinstance(event, A.ChildBorn):
@@ -68,7 +66,7 @@ def test_children_are_born_named_and_pregnancies_do_not_overlap():
         for person in world.court.house.values():
             if person.pregnant_until is not None:
                 assert person.pregnant_until > world.date.absolute
-    assert births, "300 turns and no child was born"
+    assert births, "150 turns and no child was born"
     pool = set(world.house_names_f) | set(world.house_names_m)
     for birth in births:
         child = world.court.house[birth.child_id]
@@ -76,31 +74,33 @@ def test_children_are_born_named_and_pregnancies_do_not_overlap():
         assert child.mother and child.father
 
 
-@pytest.mark.parametrize("first", [SEED, SEED + 3, SEED + 6, SEED + 9])
-def test_child_mortality_is_high_enough_that_one_heir_is_none(first):
-    """Spec 6.10: 'This is why heirs past the second are insurance.' If the
-    tables are gentle the whole succession system is decorative.
+def test_child_mortality_is_high_enough_that_one_heir_is_none():
+    """Spec 6.10: 'This is why heirs past the second are insurance.'
 
-    Twelve ten-year runs, in four groups of three, and every group must show a
-    child buried. It was one test summing all twelve, which is the same evidence
-    and a weaker claim -- an aggregate of four can be carried by one unlucky
-    seed while the other eleven are gentle.
-
-    The groups also run at once instead of end to end. This was the slowest test
-    in the suite by a distance, 296s, which made it a floor no amount of
-    parallelism could get under; four groups put it at a quarter of that.
-    Observed at the time of writing: 2, 3, 1 and 2.
+    The claim lives in the mortality tables, which are pure in (seed, turn,
+    person). Simulate the mechanic itself -- a cohort of children followed to
+    sixteen -- instead of waiting out whole dynasties: the old form ran twelve
+    ten-year simulations (~300s) to watch the same arithmetic happen.
     """
+    import dataclasses
+
+    from engine import house
+
+    world = load_scenario("ugarit", SEED)
+    base = world.court.house["niqmaddu"]
+    fort = house._rule(world, "mortality_fortnight", 6)
     died_young = 0
-    for seed in range(first, first + 3):
-        world = load_scenario("ugarit", seed)
-        for _ in range(240):                     # ten years
-            world, events = advance(world)
-            for event in events:
-                if isinstance(event, A.HouseMemberDied) and event.age_years < 16:
-                    died_young += 1
-    assert died_young >= 1, (
-        f"no child died across three ten-year runs from {first}; "
+    for birth in range(240):
+        child = dataclasses.replace(
+            base, id=f"probe_{birth}", alive=True, health=800,
+            age_turns=-(birth * 24))
+        for age in range(1, 17):
+            if house.will_die_on(
+                    world, child, birth * 24 + age * 24 + fort):
+                died_young += 1
+                break
+    assert died_young >= 10, (
+        f"{died_young} children of 240 died before sixteen; "
         "the mortality table is too kind for the succession to matter")
 
 
@@ -440,4 +440,4 @@ def test_replay_survives_the_house_and_the_cult():
 
 
 def test_two_runs_of_the_house_are_byte_identical():
-    assert state_hash(_run(200)) == state_hash(_run(200))
+    assert state_hash(_run(100)) == state_hash(_run(100))

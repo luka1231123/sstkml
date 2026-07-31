@@ -20,36 +20,20 @@ def test_customary_dues_open_on_the_authored_rates():
     assert world.court.land_due_rate == world.court.land_due_base == 300
     assert (world.court.harbour_due_rate
             == world.court.harbour_due_customary == 100)
-    assert world.court.last_land_due == world.court.last_harvest * 300 // 1000
+    # C4: no harvest has been taken since the crown's fields crossed to the
+    # kernel, so the last due stands at nothing.
+    assert world.court.last_land_due == 0
 
 
-def test_the_land_due_is_the_ordered_share_of_the_gross_floor():
-    world = load_scenario("ugarit", SEED)
-    world, _ = apply(world, A.SetLandDue(400))
-    due = None
-    for _ in range(14):
-        world, events = advance(world)
-        due = next((event for event in events
-                    if isinstance(event, A.LandDueTaken)), due)
-    assert due is not None
-    assert due.taken == due.gross * 400 // 1000
-    assert world.court.last_harvest == due.gross
-    assert world.court.last_land_due == due.taken
-
-
-def test_a_raised_land_due_causes_repeated_flight_and_lowering_does_not_restore():
+def test_a_raised_land_due_stirs_unrest():
+    """The social cost of a land due above custom, minus the estate hands that
+    used to flee it (C4: the estates are the kernel's ground now)."""
     world = load_scenario("ugarit", SEED)
     world, _ = apply(world, A.SetLandDue(500))
     world, _ = advance(world)
-    first = {key: estate.hands for key, estate in world.court.estates.items()}
-    assert set(first.values()) == {960}
     assert world.court.unrest >= 50
-    world, _ = advance(world)
-    assert set(estate.hands for estate in world.court.estates.values()) == {921}
-    world, _ = apply(world, A.SetLandDue(300))
-    world, _ = advance(world)
-    assert {key: estate.hands for key, estate in world.court.estates.items()} == {
-        key: 921 for key in first}
+    # The pressure was ordered: the rate that says so has passed.
+    assert world.court.land_due_rate == 500
 
 
 def test_harbour_due_is_in_kind_and_scales_with_the_working_harbour():

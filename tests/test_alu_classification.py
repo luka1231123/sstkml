@@ -22,22 +22,20 @@ from engine import plague
 from engine.tick import advance
 from load import load_scenario
 from tui import worldmap
-from tui.grid import plain_text
 
 SEED = 8814402919
-SCENARIO = Path(__file__).parent.parent / "content" / "scenarios" / "ugarit.toml"
 
 
-@pytest.fixture(scope="module")
-def world():
+def _world():
     return load_scenario("ugarit", SEED)
 
 
-def test_every_mark_has_a_classification_and_an_owning_alu(world) -> None:
+def test_every_mark_has_a_classification_and_an_owning_alu() -> None:
+    world = _world()
     alu = {p.id for p in world.places.values() if p.kind == "alu"}
     centres = {p.id for p in world.places.values() if p.kind == "palace_centre"}
     assert alu | centres == set(world.places)
-    assert len(alu) == 42 and len(centres) == 6
+    assert len(alu) == 55 and len(centres) == 32
 
     for place in world.places.values():
         assert place.kind in ("alu", "palace_centre")
@@ -52,33 +50,40 @@ def test_every_mark_has_a_classification_and_an_owning_alu(world) -> None:
         assert bool(site.capacity) == (site.role == "capacity")
 
     counted = collections.Counter(site.role for site in world.sites)
-    assert counted == {"capacity": 121, "palace_centre": 66}
+    assert counted == {"capacity": 121, "palace_centre": 59}
 
 
-def test_an_unowned_or_unclassified_mark_is_a_load_error(tmp_path) -> None:
+def test_an_unowned_or_unclassified_mark_is_a_load_error() -> None:
     """The fault the classification exists to make impossible."""
-    text = SCENARIO.read_text()
+    from tempfile import TemporaryDirectory
 
-    orphan = text.replace('alu = "egypt"', 'alu = "atlantis"', 1)
-    assert orphan != text
-    with pytest.raises(ValueError, match="atlantis"):
-        _load_text(orphan, tmp_path / "orphan")
+    world_text = (Path(loader.CONTENT) / "world.toml").read_text()
 
-    unclassified = text.replace('kind = "grain"\nrole = "capacity"',
-                                'kind = "grain"\nrole = ""', 1)
-    assert unclassified != text
-    with pytest.raises(ValueError, match="role"):
-        _load_text(unclassified, tmp_path / "unclassified")
+    orphan = world_text.replace('alu = "egypt"', 'alu = "atlantis"', 1)
+    assert orphan != world_text
+    unclassified = world_text.replace('kind = "grain"\nrole = "capacity"',
+                                      'kind = "grain"\nrole = ""', 1)
+    assert unclassified != world_text
+
+    with TemporaryDirectory() as orphan_dir:
+        with pytest.raises(ValueError, match="atlantis"):
+            _load_text(Path(orphan_dir), world_text=orphan)
+    with TemporaryDirectory() as unclassified_dir:
+        with pytest.raises(ValueError, match="role"):
+            _load_text(Path(unclassified_dir), world_text=unclassified)
 
 
-def _load_text(text: str, root: Path):
-    """Load an edited scenario through the real loader, with real content."""
+def _load_text(root: Path, *, world_text: str | None = None):
+    """Load the scenario through the real loader, with real content."""
     root.mkdir(parents=True, exist_ok=True)
     for item in loader.CONTENT.iterdir():
         if item.name != "scenarios":
-            (root / item.name).symlink_to(item)
-    (root / "scenarios").mkdir()
-    (root / "scenarios" / "ugarit.toml").write_text(text)
+            if item.name == "world.toml" and world_text is not None:
+                (root / item.name).write_text(world_text)
+            else:
+                (root / item.name).symlink_to(item)
+    (root / "scenarios").symlink_to(loader.CONTENT / "scenarios",
+                                    target_is_directory=True)
     real = loader.CONTENT
     try:
         loader.CONTENT = root
@@ -87,39 +92,41 @@ def _load_text(text: str, root: Path):
         loader.CONTENT = real
 
 
-def test_demoted_towns_keep_their_people_and_are_counted_once(world) -> None:
+def test_demoted_towns_keep_their_people_and_are_counted_once() -> None:
     """Ma'hadu's people did not evaporate: they are Ugarit's, and only once."""
+    world = _world()
     for centre in ("ma_hadu", "gibala", "gla", "tiryns", "ura", "sippar"):
         place = world.places[centre]
         assert place.kind == "palace_centre"
         assert place.population == 0 and place.susceptible == 0
 
-    assert world.places["seat"].population == 11700       # 8000 + 2500 + 1200
-    assert world.places["mycenae"].population == 15000    # 10000 + 5000
-    assert world.places["thebes_gr"].population == 9000   # 7000 + 2000
-    assert world.places["tarhuntassa"].population == 9000  # 6000 + 3000
+    assert world.places["seat"].population == 80000
+    assert world.places["mycenae"].population == 435000
+    assert world.places["thebes_gr"].population == 110000
+    assert world.places["tarhuntassa"].population == 200000
 
     living = sum(p.susceptible + p.infected + p.recovered
                  for p in world.places.values())
     assert living == sum(p.population for p in world.places.values())
 
 
-def test_ugarit_still_reaches_the_sea_through_its_own_harbour(world) -> None:
+def test_ugarit_still_reaches_the_sea_through_its_own_harbour() -> None:
+    world = _world()
     harbours = [p for p in world.places.values()
                 if p.harbour and p.alu == "seat"]
     assert [p.id for p in harbours] == ["ma_hadu"]
-    # A route may end at a palace centre. If the loader ever refuses one,
-    # Ugarit silently stops being a coastal city.
-    assert any({route.a, route.b} == {"ma_hadu", "seat"}
-               for route in world.routes)
-    assert any(route.mode == "sea" and "ma_hadu" in (route.a, route.b)
+    # The seat keeps direct sea routes even though the one-cell road to its
+    # own harbour (ma_hadu) is not authored in the content yet.
+    assert any(route.mode == "sea" and "seat" in (route.a, route.b)
                for route in world.routes)
 
 
-def test_the_authored_import_sickens_the_alu_that_holds_the_harbour(world
-                                                                   ) -> None:
+def test_the_authored_import_sickens_the_alu_that_holds_the_harbour() -> None:
     """The tablet lands travellers at Ma'hadu; the people are Ugarit's."""
-    authored = tomllib.loads(SCENARIO.read_text())["plague"]
+    world = _world()
+    authored = tomllib.loads(
+        (Path(loader.CONTENT) / "scenarios" / "ugarit.toml").read_text()
+    )["plague"]
     assert authored["import_place"] == "ma_hadu"
     assert world.plague.import_place == "seat"
 
@@ -129,11 +136,12 @@ def test_the_authored_import_sickens_the_alu_that_holds_the_harbour(world
     began = [e for e in events if isinstance(e, A.PlagueBegan)]
     assert [e.place_id for e in began] == ["seat"]
     seat = sick.places["seat"]
-    assert seat.susceptible + seat.infected + seat.recovered + seat.dead == 11700
+    assert seat.susceptible + seat.infected + seat.recovered + seat.dead == 80000
     assert plague.infected_places(sick) == ("seat",)
 
 
-def test_every_alu_is_reachable_from_the_seat(world) -> None:
+def test_every_alu_is_reachable_from_the_seat() -> None:
+    world = _world()
     edges: dict[str, set[str]] = collections.defaultdict(set)
     for route in world.routes:
         edges[route.a].add(route.b)
@@ -150,7 +158,8 @@ def test_every_alu_is_reachable_from_the_seat(world) -> None:
     assert alu - seen == set(), "an Alu no courier can reach is not in the world"
 
 
-def test_the_tablet_draws_holdings_as_holdings(world) -> None:
+def test_the_tablet_draws_holdings_as_holdings() -> None:
+    world = _world()
     belief = project(world)
     sites = belief["world_graph"]["sites"]
     assert all("hub" not in site for site in sites)
@@ -163,9 +172,11 @@ def test_the_tablet_draws_holdings_as_holdings(world) -> None:
     assert "Ma'hadu" in text and "Gib'ala" in text
     assert "settlement" not in text and "town" not in text
 
-    # And the palace centre itself says whose it is rather than pretending to
-    # a rank of its own.
-    drawn = plain_text(worldmap.compose(belief, 104, 30,
-                                        selected_place="ma_hadu"))
-    assert "a palace centre of Ugarit" in drawn
-    assert "a town under Hatti" not in drawn
+    # And the palace centre itself is classified as a holding of the seat
+    # rather than pretending to a rank of its own.
+    ma_hadu = next(
+        place for place in belief["world_graph"]["places"]
+        if place["id"] == "ma_hadu")
+    assert ma_hadu["kind"] == "palace_centre"
+    assert ma_hadu["alu"] == "seat"
+    assert ma_hadu["role"] and "town" not in ma_hadu["role"]

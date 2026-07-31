@@ -1,8 +1,6 @@
 """Responsive contract for the Sickness and Closures ledger."""
 from __future__ import annotations
 
-import pytest
-
 from belief.project import project
 from load import load_scenario
 from tui import desktop, plague
@@ -26,37 +24,33 @@ def _assert_frame_is_intact(text: str, width: int, height: int) -> None:
                for row in rows[1:-1])
 
 
-@pytest.mark.parametrize(
-    ("label", "size"),
-    (
+def test_compact_sickness_layout_keeps_complete_dossier_and_controls():
+    for label, size in (
         ("compact", (64, 22)),
         ("default", desktop.default_size("plague")),
         ("minimum", desktop.minimum_size("plague")),
-    ),
-)
-def test_compact_sickness_layout_keeps_complete_dossier_and_controls(
-        label, size):
-    belief = _belief()
-    selected = plague.place_dossiers(belief)[0]["id"]
+    ):
+        belief = _belief()
+        selected = plague.place_dossiers(belief)[0]["id"]
 
-    view = plague.compose(
-        belief, selected_place=selected, width=size[0], height=size[1],
-        notice="route order refused",
-    )
-    text = plain_text(view)
+        view = plague.compose(
+            belief, selected_place=selected, width=size[0], height=size[1],
+            notice="route order refused",
+        )
+        text = plain_text(view)
 
-    _assert_frame_is_intact(text, *size)
-    assert "SELECTED PLACE DOSSIER" in text, label
-    assert "sickness · no current report is held" in text, label
-    assert "not a live view" in text, label
-    assert "KNOWN PLACES" in text, label
-    assert "[q] close" in text, label
-    assert "[esc] close" in text, label
-    assert "route order refused" in text, label
-    assert "│" not in text, "compact layout must not retain the crushed divider"
-    assert f"plague:select:{selected}" in {
-        hit.command for hit in view.hits if hit.enabled
-    }
+        _assert_frame_is_intact(text, *size)
+        assert "SELECTED PLACE DOSSIER" in text, label
+        assert "sickness · no current report is held" in text, label
+        assert "not a live view" in text, label
+        assert "KNOWN PLACES" in text, label
+        assert "[q] close" in text, label
+        assert "[esc] close" in text, label
+        assert "route order refused" in text, label
+        assert "│" not in text, "compact layout must not retain the crushed divider"
+        assert f"plague:select:{selected}" in {
+            hit.command for hit in view.hits if hit.enabled
+        }
 
 
 def test_wide_sickness_layout_retains_two_readable_panes():

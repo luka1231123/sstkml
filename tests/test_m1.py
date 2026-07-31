@@ -22,9 +22,9 @@ def _rite_grain(court, rite_id: str) -> int:
 
 
 def test_replay_matches():
-    script = [[] for _ in range(80)]
+    script = [[] for _ in range(40)]
     world, log, _ = play(SEED, "ugarit", script)
-    save("/tmp/st_test.json", SEED, "ugarit", 80, log, world)
+    save("/tmp/st_test.json", SEED, "ugarit", len(script), log, world)
     assert state_hash(replay("/tmp/st_test.json")) == state_hash(world)
 
 

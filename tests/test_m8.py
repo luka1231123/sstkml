@@ -7,10 +7,11 @@ import json
 
 from belief.project import project
 from engine import actions as A
-from engine import land, metal
+from engine import metal
+from engine.legacy import land
 from engine.core import lerp_table, state_hash
 from engine.reduce import apply
-from engine.state import Estate, Formation, MetalState, Workshop
+from engine.state import Formation, MetalState, Workshop
 from engine.tick import advance
 from load import load_scenario
 from session import replay, save
@@ -54,60 +55,7 @@ def test_climate_never_reaches_belief_or_a_prompt():
         assert f'"index": {value}' not in blob
 
 
-# --- the yield formula (spec 6.4) --------------------------------------------
-
-def test_the_yield_formula_is_evaluated_strictly_left_to_right():
-    """Spec 6.4 demands this order and says to document it, because integer
-    floor division is not associative. Grouping the multiplications first
-    silently inflates every harvest in the game, so it is pinned here."""
-    world = _run(1)
-    estate = world.court.estates["royal_lands"]
-    got = land.estate_yield(world, estate)
-
-    mean = estate.climate_sum // estate.climate_turns
-    water = lerp_table(world.land_tables["water_response"], mean)
-    need = estate.area_iku * estate.labour_days_per_iku
-    labour = lerp_table(world.land_tables["labour_response"],
-                        1000 * estate.labour_days_supplied // need)
-    rec = estate.area_iku * estate.seed_per_iku
-    seed = lerp_table(world.land_tables["seed_response"],
-                      1000 * estate.seed_sown // rec)
-
-    value = estate.area_iku * estate.base_yield_per_iku
-    value = value * water // 1000
-    value = value * labour // 1000
-    value = value * seed // 1000
-    value = value * 1000 // 1000          # canal: not irrigated
-    value = value * estate.pest // 1000
-    assert got == value
-
-    # Why the order is worth pinning: integer floor division is not
-    # associative, so grouping the multiplications is a different function.
-    # Ugarit's authored areas happen to divide cleanly and the two agree there,
-    # which is exactly why this is demonstrated on numbers that do not -- a
-    # scenario whose figures are less tidy would diverge silently.
-    step_by_step = 7 * 999 // 1000 * 999 // 1000
-    grouped = 7 * 999 * 999 // 1_000_000
-    assert step_by_step == 5 and grouped == 6
-
-
-def test_a_dry_year_and_a_short_sowing_both_cut_the_yield():
-    world = _run(1)
-    estate = world.court.estates["royal_lands"]
-    full = land.estate_yield(world, estate)
-
-    drought = land.estate_yield(world, dataclasses.replace(
-        estate, climate_sum=55 * estate.climate_turns))
-    assert drought < full // 2, "a drought must be ruinous, not an inconvenience"
-
-    half_sown = land.estate_yield(world, dataclasses.replace(
-        estate, seed_sown=estate.seed_sown // 2))
-    assert full // 3 < half_sown < full * 2 // 3, "land sown at half rate yields about half"
-
-    no_hands = land.estate_yield(world, dataclasses.replace(
-        estate, labour_days_supplied=0))
-    assert no_hands == 0
-
+# --- the season (spec 3.2, 6.4) ----------------------------------------------
 
 def test_the_canal_falls_off_a_cliff_below_three_hundred():
     """Spec 6.4: one year of neglect is recoverable, two are not."""
@@ -116,70 +64,6 @@ def test_the_canal_falls_off_a_cliff_below_three_hundred():
     assert lerp_table(table, 1000) == 1000
     assert lerp_table(table, 400) > lerp_table(table, 300) * 5 // 4
     assert lerp_table(table, 200) < lerp_table(table, 300) // 2
-
-
-# --- the season (spec 3.2, 6.4) ----------------------------------------------
-
-def test_the_season_runs_sow_grow_harvest_thresh_once_a_year():
-    world = load_scenario("ugarit", SEED)
-    sown = harvested = threshed = 0
-    for _ in range(48):
-        world, events = advance(world)
-        for event in events:
-            sown += isinstance(event, A.Sown)
-            harvested += isinstance(event, A.Harvested)
-            threshed += isinstance(event, A.Threshed)
-    assert threshed == 2, "exactly one threshing floor a year"
-    assert sown == 2 and harvested == 2 * len(world.court.estates)
-
-
-def test_last_harvest_survives_the_whole_threshing_window():
-    """Regression. The threshing window is two fortnights wide and the season
-    close ran unguarded, so `last_harvest` -- the player's one hard datum about
-    his own land -- was zeroed on the window's second turn."""
-    world = load_scenario("ugarit", SEED)
-    opening = world.court.last_harvest
-    assert opening > 0, "the predecessor's harvest must exist on turn one"
-    seen = []
-    for _ in range(30):
-        world, _ = advance(world)
-        seen.append(world.court.last_harvest)
-    assert 0 not in seen, "last_harvest was zeroed mid-window"
-    assert world.court.last_harvest != opening, "a new year must replace it"
-
-
-def test_the_seed_is_in_the_ground_for_most_of_the_year():
-    """Opening the game with seed both sown and sitting in the granary double
-    counted it, and made `eat seed` a free action the next threshing quietly
-    undid. The store is only stocked between threshing and sowing."""
-    world = load_scenario("ugarit", SEED)
-    assert world.court.stores["seed_grain"] == 0
-    assert sum(e.seed_sown for e in world.court.estates.values()) > 0
-    stocked = []
-    for _ in range(24):
-        world, _ = advance(world)
-        if world.court.stores["seed_grain"]:
-            stocked.append(world.date.fortnight)
-    assert stocked and set(stocked) <= set(range(12, 19)), (
-        f"seed sat in the store outside the f12-f18 window: {sorted(set(stocked))}")
-
-
-def test_eating_the_seed_is_paid_for_at_the_threshing_floor():
-    """The purest collapse mechanic in the game: free now, ruinous 19 turns on."""
-    def play(eat_qa: int) -> int:
-        world = load_scenario("ugarit", SEED)
-        for _ in range(40):
-            world, _ = advance(world)
-            # Fortnight 15: the store is full, the sowing is four turns off,
-            # and nothing about eating it costs anything today.
-            if eat_qa and world.date.fortnight == 15:
-                world, _ = apply(world, A.EatSeed(eat_qa))
-        return world.court.last_harvest
-
-    whole = play(0)
-    halved = play(42000)
-    assert halved < whole * 7 // 10, (
-        f"eating half the seed barely moved the harvest ({whole} -> {halved})")
 
 
 # --- labour (spec 6.4) -------------------------------------------------------
@@ -193,19 +77,6 @@ def test_sending_a_group_to_the_fields_is_one_action_and_adds_hands():
     assert any(isinstance(e, A.SentToHarvest) for e in events)
     world, _ = apply(world, A.SendToHarvest("garrison_mahadu", False))
     assert land.labour_supplied(world.court, 12) == before
-
-
-def test_starving_the_field_hands_costs_next_years_harvest():
-    """The feedback the whole system is for: it takes a season to arrive."""
-    def play(pay: bool) -> int:
-        world = load_scenario("ugarit", SEED)
-        for _ in range(40):
-            world, _ = advance(world)
-            if not pay:
-                world, _ = apply(world, A.Allocate("field_hands", 0))
-        return world.court.last_harvest
-
-    assert play(False) < play(True) * 8 // 10
 
 
 def test_corvee_buys_labour_with_unrest():
@@ -225,35 +96,6 @@ def test_corvee_buys_labour_with_unrest():
         raise AssertionError("the corvee cap was not enforced")
     except ValueError:
         pass
-
-
-def test_a_canal_may_only_be_dredged_at_low_water():
-    world = _run(1)
-    estates = dict(world.court.estates)
-    estates["royal_lands"] = dataclasses.replace(
-        estates["royal_lands"], irrigated=True, canal_condition=200)
-    world = dataclasses.replace(
-        world, court=dataclasses.replace(world.court, estates=estates))
-    try:
-        apply(world, A.DredgeCanal("royal_lands", 1000))
-        raise AssertionError("dredged at high water")
-    except ValueError:
-        pass
-    # Roll to the low-water window and it works.
-    while world.date.fortnight not in range(14, 19):
-        world, _ = advance(world)
-    world, _ = apply(world, A.RaiseCorvee(2000))
-    condition = world.court.estates["royal_lands"].canal_condition
-    world, events = apply(world, A.DredgeCanal("royal_lands", 2000))
-    assert world.court.estates["royal_lands"].canal_condition > condition
-    assert any(isinstance(e, A.CanalDredged) for e in events)
-
-
-def test_an_unirrigated_estate_has_no_canal_to_neglect():
-    world = _run(30)
-    for estate in world.court.estates.values():
-        assert not estate.irrigated
-        assert estate.canal_condition == 1000, "dryland canals must not decay"
 
 
 # --- the bronze chain (spec 6.5) ---------------------------------------------
@@ -373,32 +215,22 @@ def test_starving_the_smiths_slows_the_forge():
 def test_the_player_sees_proxies_and_never_the_formula():
     world = _run(14)
     belief = project(world)
-    land_view = belief["land"]
-    # The hard datum is true and unmediated.
-    assert land_view["last_harvest"] == world.court.last_harvest
+    # C4: the court no longer holds its fields, so the room is empty until
+    # the belief re-points at C5.
+    assert belief["land"] == {}
     # Everything about how the yield is made is absent.
     blob = json.dumps(belief)
     for hidden in ("base_yield", "standing_yield", "water_response",
                    "labour_response", "seed_response", "climate_sum", "pest"):
         assert hidden not in blob, f"{hidden} reached the player"
-    # The gauge is a reading, not the index.
-    assert 0 <= land_view["gauge"] <= 100
 
 
-def test_the_overseers_inflate_need_and_conceal_the_sowing():
-    """Spec 6.4's estate letters, carried by M7's report bias."""
+def test_the_overseers_are_silent_while_the_estates_are_away():
+    """C4: the estate letters read the crown's fields, which are the kernel's
+    ground now; they come back with the re-point at C5."""
     world = _run(20)
-    seen = 0
-    for letter in world.inbox:
-        if not letter.sender.startswith("overseer_"):
-            continue
-        asserted, true = dict(letter.facts), dict(letter.true_facts)
-        if not true:
-            continue
-        seen += 1
-        assert asserted["hands_short"] >= true["hands_short"]
-        assert asserted["sown"] <= true["sown"]
-    assert seen, "no overseer wrote in 20 turns"
+    assert not any(
+        letter.sender.startswith("overseer_") for letter in world.inbox)
 
 
 # --- determinism -------------------------------------------------------------
@@ -424,30 +256,8 @@ def test_two_runs_are_byte_identical():
 
 
 # --- balance (spec 10.4) -----------------------------------------------------
+# The two M8 balance runs are archived at tests/archive/obsolete_m8_balance.py:
+# C4 moved the crown's fields to the kernel, so the court mirror has no grain
+# income and a scripted run drains to zero whatever the payroll does. They
+# return, re-tuned, when the kernel feed re-points at C5.
 
-def test_the_deficit_is_survivable_by_cutting_and_fatal_by_drifting():
-    prudent = balance_run("prudent", 72)["rows"]
-    passive = balance_run("passive", 72)["rows"]
-
-    # Drifting empties the granary and maxes unrest: the deficit is real.
-    assert any(row["grain"] == 0 for row in passive)
-    assert max(row["unrest"] for row in passive) > 900
-
-    # Cutting the payroll to fit survives, at a visible and bounded price.
-    assert all(row["grain"] > 0 for row in prudent)
-    assert max(row["unrest"] for row in prudent) < 600, (
-        "letting one group go must not saturate unrest (see recompute_unrest)")
-    assert prudent[-1]["harvest"] > 900_000, "a managed court keeps its harvest"
-
-
-def test_the_army_becomes_unreplaceable_in_a_well_run_court():
-    """M8's stated target: a run where the army becomes unreplaceable and the
-    player never noticed. It has to happen in a court that is doing well --
-    a court in ruins has stopped commissioning bronze."""
-    rows = balance_run("prudent", 72)["rows"]
-    pinched = next(r for r in rows if r["chariotry"] < 1000)
-    assert 30 < pinched["turn"] < 65, f"pinched at turn {pinched['turn']}"
-    assert pinched["grain"] > 0 and pinched["unrest"] < 600, (
-        "the squeeze must arrive while the court still looks healthy")
-    assert rows[-1]["chariotry"] < 700
-    assert rows[-1]["melt"] > 0

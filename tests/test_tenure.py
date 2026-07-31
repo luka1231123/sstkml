@@ -139,7 +139,7 @@ def test_nothing_is_created_or_destroyed_by_dividing_it():
     assert before == after
 
 
-def test_an_unknown_tenure_fails_to_load(tmp_path, monkeypatch):
+def test_an_unknown_tenure_fails_to_load():
     """A typo in one authored word is not something to discover ten years in."""
     import load
 

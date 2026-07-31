@@ -12,7 +12,7 @@ from pathlib import Path
 
 from engine import obligation as O
 from engine import ownership as W
-from engine.core import Date, in_range, stream
+from engine.core import Date, stream
 from engine.entity import Cohort as KernelCohort
 from engine.entity import Leg as KernelLeg
 from engine.entity import Organization as KernelOrganization
@@ -35,9 +35,9 @@ from engine.kernel.world import Kernel
 # else's, which is the fact a flat mapping could not state.
 SEAT_SETTLEMENT = "settlement:seat"
 SEAT_OWNER = "org:seat_palace"
-from engine.land import climate_series
+from engine.legacy.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
-                          Document, Estate, ForeignCourt, Formation,
+                          Document, ForeignCourt, Formation,
                           HarbourCargoLot,
                           HouseMember, Institution, MetalState, Oath, Petition,
                           Place, PlagueState, Relation, Rite, Route, Site,
@@ -53,7 +53,8 @@ OVERLORDS = ("egypt", "hatti", "ahhiyawa", "assyria", "karduniash")
 # nothing in the allocator recognizes.
 SITE_FUNCTIONS = frozenset({
     "palace_centre", "food", "copper", "tin", "gold", "silver",
-    "cedar", "horses", "lapis",
+    "cedar", "horses", "lapis", "estate", "mine", "forest", "quarry",
+    "pasture", "harbour",
 })
 
 
@@ -614,11 +615,6 @@ def load_scenario(name: str, seed: int) -> World:
         for c in cfg.get("correspondents", [])
     )
     actor_places = {c.actor: c.place for c in correspondents}
-    # Estate overseers are not on a cadence -- their letters are generated from
-    # the state of the fields (spec 6.4) -- but they are relations like any
-    # other, and they live where their land is.
-    actor_places.update({f"overseer_{e['id']}": e["place"]
-                         for e in cfg.get("estates", [])})
     relations = {}
     for r in cfg.get("relations", []):
         other = r["other"]
@@ -668,35 +664,6 @@ def load_scenario(name: str, seed: int) -> World:
         for o in cfg.get("oaths", [])
     )
     land_cfg = tomllib.loads((CONTENT / "land.toml").read_text())
-
-    # Estates open the game with a crop already in the ground: the first harvest
-    # is the predecessor's, sown before the player had any say in it. Only the
-    # second year answers to his decisions, which is the lag the system is for.
-    # The scenario opens partway through a growing season the predecessor began.
-    # `opening_growing_turns` banks the labour and weather of the fortnights that
-    # elapsed before turn 1, so year one is a normal year rather than a short one
-    # -- otherwise the player's first harvest under-reports by the length of the
-    # gap, and `last_harvest` (his one hard datum) misleads him all year two.
-    banked = int(cfg.get("opening_growing_turns", 0))
-    growing_span = tuple(seasons.get("growing", ()))
-    growing = sum(1 for f in range(1, 25)
-                  if growing_span and in_range(f, growing_span)) or 1
-    estates = {}
-    for e in cfg.get("estates", []):
-        area = int(e["area_iku"])
-        need = area * int(e["labour_days_per_iku"])
-        estates[e["id"]] = Estate(
-            id=e["id"], name=e["name"], place=e["place"], area_iku=area,
-            base_yield_per_iku=int(e["base_yield_per_iku"]),
-            seed_per_iku=int(e["seed_per_iku"]),
-            labour_days_per_iku=int(e["labour_days_per_iku"]),
-            irrigated=bool(e.get("irrigated", False)),
-            canal_condition=int(e.get("canal_condition", 1000)),
-            seed_sown=area * int(e["seed_per_iku"])
-            * int(e.get("opening_sown_permille", 1000)) // 1000,
-            labour_days_supplied=need * banked // growing,
-            climate_sum=100 * banked, climate_turns=banked,
-        )
 
     workshops = tuple(
         Workshop(id=w["id"], name=w["name"], group_id=w["group_id"],
@@ -769,9 +736,7 @@ def load_scenario(name: str, seed: int) -> World:
         rites=rites,
         scribe_competence=int(scribe.get("competence", 850)),
         scribe_fatigue=int(scribe.get("fatigue", 300)),
-        estates=estates, workshops=workshops, formations=formations,
-        last_harvest=int(cfg.get("last_harvest", 0)),
-        previous_harvest=int(cfg.get("last_harvest", 0)),
+        workshops=workshops, formations=formations,
         institutions={
             inst["id"]: Institution(
                 id=inst["id"], name=inst["name"], kind=inst["kind"],
@@ -801,8 +766,7 @@ def load_scenario(name: str, seed: int) -> World:
         land_due_base=int(revenue_cfg["land"]["base_rate"]),
         harbour_due_rate=int(revenue_cfg["harbour"]["initial_rate"]),
         harbour_due_customary=int(revenue_cfg["harbour"]["customary_rate"]),
-        last_land_due=(int(cfg.get("last_harvest", 0))
-                       * int(revenue_cfg["land"]["initial_rate"]) // 1000),
+        last_land_due=0,
     )
     plague_cfg = cfg.get("plague", {})
     # The scenario may land infected travellers at a palace centre, because

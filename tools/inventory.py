@@ -51,6 +51,11 @@ EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched",
                          # put a phantom order in the palace.
                          "RecordReplyText"})
 
+# Intent that is deliberately not offered (C4): the canal is gone, and the
+# action survives only so the typed and voiced paths can be refused honestly
+# ("there is no canal to dredge") instead of never having heard of the verb.
+UNOFFERED = frozenset({"DredgeCanal"})
+
 
 def _player_action_types() -> list[type]:
     """Every dataclass in the action union that is player intent, not an event.
@@ -67,6 +72,8 @@ def _player_action_types() -> list[type]:
         if getattr(cls, "_registry_value", False):
             continue
         if name in EVENT_NAMES:
+            continue
+        if name in UNOFFERED:
             continue
         if any(name.endswith(suffix) for suffix in EVENT_SUFFIXES):
             continue

@@ -22,7 +22,7 @@ REQUIRED_ATTENTION = {
     "dictate_reply": 2, "dispatch_letter": 2,
     "inspect_ledger": 1, "send_gift": 1,
     "send_to_harvest": 1, "assign_troops": 1, "raise_corvee": 1,
-    "dredge_canal": 1, "marry_abroad": 2, "consult_diviner": 2,
+    "marry_abroad": 2, "consult_diviner": 2,
     "suppress_omen": 2, "defy_omen": 0, "swear_oath": 2, "quarantine": 1,
     "expiate": 2, "search_archive": 1, "hear_petition": 1, "rule_petition": 0,
     "set_land_due": 0, "set_harbour_due": 0, "place_person": 0,

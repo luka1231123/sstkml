@@ -345,24 +345,8 @@ def generate_incoming(world: World) -> tuple[World, list]:
               ("their_debt", abs(relation.obligation) // 100)),
              exaggerate=("regard",), understate=("their_debt",))
 
-    # Estate overseers (spec 6.4). The ruler cannot see his own fields; he gets
-    # these. They inflate need and conceal failure, and their `report_bias`
-    # (M7) is what turns that intent into numbers. This is the whole of the
-    # player's information about the land besides the gauge and last year's
-    # floor -- and it is written by men who want more hands sent to them.
-    for estate in sorted(world.court.estates.values(), key=lambda e: e.id):
-        overseer = f"overseer_{estate.id}"
-        if overseer not in world.relations:
-            continue
-        offset = sum(ord(ch) for ch in estate.id) % 6
-        if (now - offset) % 6:
-            continue
-        needed = estate.area_iku * estate.labour_days_per_iku
-        short = max(0, needed - estate.labour_days_supplied)
-        emit(overseer, estate.place, "estate_report",
-             (("estate", estate.name), ("hands_short", short // 100),
-              ("sown", estate.seed_sown // 100)),
-             exaggerate=("hands_short",), understate=("sown",))
+    # C4: the overseer letters read the court's estates, which are the
+    # kernel's ground now. They return when the belief re-points at C5.
 
     # A group deep in arrears: a named member writes. Sparse, offset by group.
     for gid in sorted(world.court.dependents):

@@ -119,7 +119,7 @@ has been since C2, and the mirror is deleted with its readers in C5.
 - [x] `plague._kill_dependents` goes through `seat.bury`. It took the dead off
       the court's mapping only, and the mirror handed them their places back on
       the same turn -- 128 of the m13 audit's findings.
-- [ ] `SP.PLACEMENTS` still names `settlement:mahadu`, which the live map does
+- [x] `SP.PLACEMENTS` still names `settlement:mahadu`, which the live map does
       not have -- the third stale id out of the retired
       `content/kernel/world.toml`, after `seat_people.SEAT` and the audit's copy
       of it. `seat.enrol` stands the garrison at the seat rather than nowhere,
@@ -138,9 +138,9 @@ has been since C2, and the mirror is deleted with its readers in C5.
 
 ## C4 — land
 
-- [ ] `Court.estates` -> `Site(function="estate")`.
-- [ ] `git mv engine/land.py engine/legacy/`; `kernel/farm.py` is harvest.
-- [ ] Delete `last_harvest`, `previous_harvest`.
+- [x] `Court.estates` -> `Site(function="estate")`.
+- [x] `git mv engine/land.py engine/legacy/`; `kernel/farm.py` is harvest.
+- [x] Delete `last_harvest`, `previous_harvest`.
 
 ## C5 — places, routes, and the rooms
 

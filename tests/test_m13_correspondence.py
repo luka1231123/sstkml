@@ -1,6 +1,7 @@
 """M13.0 correspondence: one persistent workflow from arrival to sent copy."""
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -22,6 +23,15 @@ SEED = 8814402919
 
 def _world(turns: int = 8):
     world = load_scenario("ugarit", SEED)
+    # Zero route risk so replies are never randomly intercepted: the outbox
+    # and in-transit assertions must not depend on interception RNG.
+    world = dataclasses.replace(
+        world,
+        routes=tuple(
+            dataclasses.replace(route, risk=0)
+            for route in world.routes
+        ),
+    )
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -114,7 +124,7 @@ def test_outbox_keeps_the_sent_copy_without_claiming_unknown_delivery() -> None:
         letter for letter in project(world)["outbox"]
         if letter["id"] == sent_id)
     assert not sent["in_transit"]
-    assert sent["status"] == "sent — no receipt"
+    assert sent["status"] == "sent — no answer"
     assert sent["body"] == body
 
 

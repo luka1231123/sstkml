@@ -54,14 +54,14 @@ def test_gift_arrival_gossip_insult_and_replay():
     world = load_scenario("ugarit", SEED)
     world, events = apply(world, A.SendGift("hatti_king", "copper", 1013))
     assert world.court.stores["copper"] == 36000 - 1013
-    assert events[0].arrival_turn == 7
+    assert events[0].arrival_turn == 12
     keys = [(item.at, canonical_json(item.payload)) for item in world.schedule]
     assert keys == sorted(keys)
-    for _ in range(7):
+    for _ in range(12):
         world, _ = advance(world)
     gift = world.court.treasury_gifts_sent[-1]
     assert gift.adequacy == 900
-    assert world.relations["hatti_king"].esteem == 550
+    assert world.relations["hatti_king"].esteem == 460
     assert world.relations["hatti_king"].obligation == -1987
     for _ in range(6):
         world, _ = advance(world)
@@ -72,7 +72,7 @@ def test_gift_arrival_gossip_insult_and_replay():
 
     insult = load_scenario("ugarit", SEED)
     insult, _ = apply(insult, A.SendGift("hatti_king", "oil", 1))
-    for _ in range(7):
+    for _ in range(12):
         insult, _ = advance(insult)
     assert insult.court.treasury_gifts_sent[-1].adequacy < 700
     assert any(letter.topic == "gift_insult"

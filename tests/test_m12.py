@@ -429,74 +429,23 @@ def test_nothing_drawn_reaches_the_list_below_it() -> None:
 # gets nothing back.
 
 def _working_world(turns: int = 14, corvee: int = 6000):
-    """A world in the low-water fortnights with the corvée called up."""
-    from engine import works
+    """A world in the low-water fortnights with the corvée called up and the
+    seat holding grain.
+
+    C4 moved the crown's fields to the kernel, so the mirror has no grain
+    income of its own; a working world is a fed seat, which is what the kernel
+    feed will be once the re-point at C5 lands.
+    """
+    from engine import seat, works
 
     world = _world(turns)
     assert works.working_season(world), "these tests need a working season"
+    stores = seat.held(world)
+    for good in ("grain", "seed_grain", "oil"):
+        stores[good] = max(stores.get(good, 0), 2_000_000)
+    world = seat.put(world, stores, reason_up="authored")
     world, _ = apply(world, A.RaiseCorvee(corvee))
     return world
-
-
-def test_a_building_site_takes_the_hands_the_fields_wanted() -> None:
-    """The whole cost of building (6.21). Not the goods -- the hands.
-
-    The debt is not paid on the turn it is incurred. Building runs in
-    `low_water` (fortnights 14-18), after this year's threshing has already
-    closed the fields, so there are no accumulated field days to take from
-    yet. `works_days` then stands until the *next* threshing clears it, which
-    means the hands come out of the harvest that follows. That is where the
-    cost has to be visible, and measuring on the turn the site opens reads
-    zero against zero.
-
-    `labour_supplied` is deliberately not the place to look either: it reports
-    what the cohorts give, and the public-works share is netted per estate
-    exactly once, in `effective_labour_days`, so `estate_yield` cannot deduct
-    it twice.
-    """
-    from engine.land import effective_labour_days
-
-    idle = _working_world()
-    busy, _ = apply(idle, A.BeginRepair("walls_seat"))
-
-    def to_harvest(world):
-        """Advance to the first fortnight of the following harvest window."""
-        for _ in range(24):
-            world, _ = advance(world)
-            if world.date.fortnight == 8:
-                return world
-        raise AssertionError("never reached the harvest window")
-
-    def days(world, field):
-        return sum(field(world, estate)
-                   for estate in world.court.estates.values())
-
-    effective = lambda w: days(w, effective_labour_days)
-    supplied = lambda w: days(w, lambda _, estate: estate.labour_days_supplied)
-
-    busy, idle = to_harvest(busy), to_harvest(idle)
-    assert busy.court.works_days > 0, "the site consumed corvee days"
-    assert idle.court.works_days == 0
-
-    # The cohorts gave the same days either way: building did not make anyone
-    # work less. It spent those days where the fields get no benefit.
-    assert supplied(busy) == supplied(idle)
-    assert effective(busy) < effective(idle)
-    # Very nearly `works_days` exactly: the share is floored per estate, so the
-    # sum can fall short by at most one day per estate. It may never exceed the
-    # days actually spent -- that would be inventing a cost.
-    lost = supplied(busy) - effective(busy)
-    assert lost <= busy.court.works_days
-    assert lost >= busy.court.works_days - len(busy.court.estates)
-
-    # And the grain is short by it, a season after the decision was made. The
-    # crop is read off the standing yield: `last_harvest` is not written until
-    # threshing (fortnight 12), and until then it still holds last year's.
-    def crop(world):
-        return sum(estate.standing_yield
-                   for estate in world.court.estates.values())
-
-    assert crop(busy) > 0 and crop(busy) < crop(idle)
 
 
 def test_the_men_eat_as_they_work_and_calling_them_off_returns_nothing() -> None:
@@ -582,16 +531,6 @@ def test_repairing_what_is_whole_is_refused() -> None:
     except ValueError:
         return
     raise AssertionError("a whole wall wants nothing doing")
-
-
-def test_the_season_closing_frees_the_hands_again() -> None:
-    """`works_days` is a claim on this season's corvée, so it resets with it."""
-    world, _ = apply(_working_world(), A.BeginRepair("walls_seat"))
-    for _ in range(24):
-        world, _ = advance(world)
-        if world.court.corvee_days == 0:
-            break
-    assert world.court.works_days == 0
 
 
 def test_the_new_orders_survive_a_save() -> None:

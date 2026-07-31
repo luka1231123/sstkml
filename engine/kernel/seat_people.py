@@ -128,8 +128,7 @@ class Placement:
 PLACEMENTS: tuple[Placement, ...] = (
     Placement("cult_baal", "cohort:ugarit_temple_servants", SEAT),
     Placement("field_hands", "cohort:ugarit_field_hands", SEAT),
-    Placement("garrison_mahadu", "cohort:mahadu_garrison",
-              "settlement:mahadu"),
+    Placement("garrison_mahadu", "cohort:mahadu_garrison", SEAT),
     Placement("household", "cohort:ugarit_household", SEAT),
     Placement("smiths_palace", "cohort:ugarit_smiths", SEAT),
     Placement("weavers", "cohort:ugarit_weavers", SEAT),

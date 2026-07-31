@@ -576,8 +576,8 @@ def test_clicking_a_mark_or_a_road_selects_a_place() -> None:
     # first endpoint.
     game.on_world_key(
         _Key(command=f"world:place:{game.belief['seat']}"))
-    game.on_world_key(_Key(command="world:route:ma_hadu:alashiya"))
-    assert game.world_place_pick == "alashiya"
+    game.on_world_key(_Key(command="world:route:carchemish:emar"))
+    assert game.world_place_pick == "emar"
 
 
 def test_the_route_tablet_turns_between_local_and_complete_views() -> None:

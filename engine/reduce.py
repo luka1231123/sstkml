@@ -162,7 +162,7 @@ def apply(world: World, action) -> tuple[World, list]:
         return assign(world, action)
 
     if isinstance(action, A.RaiseCorvee):
-        from engine.land import source_corvee
+        from engine.legacy.land import source_corvee
 
         rules = world.land_rules
         cap = rules.get("corvee_max_days", 6000)
@@ -192,29 +192,10 @@ def apply(world: World, action) -> tuple[World, list]:
         return works.abandon(world, action)
 
     if isinstance(action, A.DredgeCanal):
-        from engine.core import in_range
-        estate = world.court.estates.get(action.estate_id)
-        if estate is None:
-            raise ValueError(f"unknown estate: {action.estate_id}")
-        if not estate.irrigated:
-            raise ValueError(f"{action.estate_id} has no canal to dredge")
-        span = world.season.get("low_water")
-        if not span or not in_range(world.date.fortnight, tuple(span)):
-            raise ValueError("the water is too high to dredge")
-        days = max(0, action.days)
-        available = world.court.corvee_days - world.court.works_days
-        if days <= 0 or days > available:
-            raise ValueError(
-                f"only {max(0, available)} sourced corvee days remain")
-        gain = days * world.land_rules.get("canal_dredge_per_1000_days", 90) // 1000
-        condition = min(1000, estate.canal_condition + gain)
-        estates = dict(world.court.estates)
-        estates[action.estate_id] = dataclasses.replace(
-            estate, canal_condition=condition)
-        return (replace_court(
-                    world, estates=estates,
-                    works_days=world.court.works_days + days),
-                [A.CanalDredged(action.estate_id, days, condition)])
+        # C4: the canals were the court estates' and are gone; the kernel has
+        # no canal to dredge, and Ugarit authors none. The command stays in the
+        # vocabulary and answers truthfully.
+        raise ValueError(f"there is no canal at {action.estate_id} to dredge")
 
     if isinstance(action, A.MarryAbroad):
         from engine.house import marry_abroad

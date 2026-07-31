@@ -33,13 +33,10 @@ DEFAULT_TURNS = 96
 @dataclasses.dataclass(frozen=True)
 class Snapshot:
     stores: dict[str, int]
-    seed_ground: int
-    standing_grain: int
     bronze_service: int
     bronze_melted: int
     populations: dict[str, tuple[int, int, int, int, int]]
     dependents: dict[str, tuple[str, int, bool]]
-    estate_hands: dict[str, int]
     formations: dict[str, tuple[int, int, int]]
     cargo: dict[str, tuple[str, str, str, int]]
     corvee_days: int
@@ -59,10 +56,6 @@ class Finding:
 def snapshot(world) -> Snapshot:
     return Snapshot(
         stores=dict(world.court.stores),
-        seed_ground=sum(
-            estate.seed_sown for estate in world.court.estates.values()),
-        standing_grain=sum(
-            estate.standing_yield for estate in world.court.estates.values()),
         bronze_service=world.court.metals.bronze_in_circulation,
         bronze_melted=world.court.metals.melt_ledger,
         populations={
@@ -74,10 +67,6 @@ def snapshot(world) -> Snapshot:
         dependents={
             group_id: (group.place, group.size, group.revolting)
             for group_id, group in sorted(world.court.dependents.items())
-        },
-        estate_hands={
-            estate_id: estate.hands
-            for estate_id, estate in sorted(world.court.estates.items())
         },
         formations={
             formation.id: (
@@ -116,18 +105,12 @@ def _store_explanation(before_world, before: Snapshot, after: Snapshot,
     smelted = 0
     workshop_demand = 0
     workshop_from_stores = 0
-    threshed = False
     for event in events:
         name = type(event).__name__
         if isinstance(event, A.Spoiled):
             add(event.good, -event.amount, name)
         elif isinstance(event, A.RationsPaid):
             add("grain", -event.paid, name)
-        elif isinstance(event, A.LandDueTaken):
-            add("grain", event.taken, name)
-        elif isinstance(event, A.Threshed):
-            threshed = True
-            add("seed_grain", event.held_back_as_seed, name)
         elif isinstance(event, A.HarbourDueTaken):
             if event.taken and event.lot_id and event.owner and event.cleared:
                 add(event.good, event.taken, f"{name}:{event.lot_id}")
@@ -169,17 +152,6 @@ def _store_explanation(before_world, before: Snapshot, after: Snapshot,
         used_new = min(
             smelted, max(0, workshop_demand - workshop_from_stores))
         add("bronze", smelted - used_new, "BronzeSmelted:surplus")
-
-    # Sowing moves the same grain from the seed store into the ground.  The
-    # Sown event records the operation; the snapshot gives its exact incremental
-    # quantity because the legacy event carries the season-to-date total.
-    seed_ground_delta = after.seed_ground - before.seed_ground
-    if seed_ground_delta > 0 and any(isinstance(event, A.Sown)
-                                     for event in events):
-        add("seed_grain", -seed_ground_delta, "Sown")
-    if threshed and after.seed_ground != 0:
-        evidence.setdefault("seed_grain", []).append(
-            "Threshed left seed in the ground")
     return expected, evidence
 
 
@@ -203,31 +175,6 @@ def audit_transition(before_world, after_world, events: list) -> list[Finding]:
             findings.append(Finding(
                 turn, f"stores.{good}", got, explained,
                 tuple(evidence.get(good, ())) or ("no material event",)))
-
-    crop_expected = sum(
-        event.qa for event in events if isinstance(event, A.Harvested))
-    if any(isinstance(event, A.Threshed) for event in events):
-        crop_expected -= before.standing_grain
-    crop_actual = after.standing_grain - before.standing_grain
-    if crop_actual != crop_expected:
-        findings.append(Finding(
-            turn, "fields.standing_grain", crop_actual, crop_expected,
-            tuple(type(event).__name__ for event in events
-                  if isinstance(event, (A.Harvested, A.Threshed)))
-            or ("no harvest event",)))
-
-    seed_actual = after.seed_ground - before.seed_ground
-    if any(isinstance(event, A.Threshed) for event in events):
-        seed_expected = -before.seed_ground
-    elif any(isinstance(event, A.Sown) for event in events):
-        # Exact transfer is already cross-checked against the seed store.
-        seed_expected = seed_actual
-    else:
-        seed_expected = 0
-    if seed_actual != seed_expected:
-        findings.append(Finding(
-            turn, "fields.seed_grain", seed_actual, seed_expected,
-            ("Sown/Threshed evidence",)))
 
     worn = sum(event.amount for event in events
                if isinstance(event, A.BronzeWorn))
@@ -316,19 +263,6 @@ def audit_transition(before_world, after_world, events: list) -> list[Finding]:
             findings.append(Finding(
                 turn, f"dependents.{group_id}.revolt", int(new[2]),
                 int(old[2]), ("no GroupRevoltChanged",)))
-
-    flight = {
-        event.estate_id: event.after - event.before
-        for event in events if isinstance(event, A.EstateLabourFled)
-    }
-    for estate_id in sorted(set(before.estate_hands) | set(after.estate_hands)):
-        actual_delta = (
-            after.estate_hands.get(estate_id, 0)
-            - before.estate_hands.get(estate_id, 0))
-        if actual_delta != flight.get(estate_id, 0):
-            findings.append(Finding(
-                turn, f"estates.{estate_id}.hands", actual_delta,
-                flight.get(estate_id, 0), ("EstateLabourFled",)))
 
     capability = {
         event.formation_id: event.after - event.before

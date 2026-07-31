@@ -124,18 +124,10 @@ def pressure(world: World) -> tuple[World, list]:
         return world, []
     unrest_delta = excess // world.revenue_rules.get("unrest_divisor", 4)
     unrest = min(1000, court.unrest + unrest_delta)
-    flight = (excess // 100
-              * world.revenue_rules.get("flight_per_100", 20))
-    estates = {}
-    flight_events = []
-    for key, estate in sorted(court.estates.items()):
-        hands = max(0, estate.hands * (1000 - flight) // 1000)
-        estates[key] = dataclasses.replace(estate, hands=hands)
-        if hands != estate.hands:
-            flight_events.append(A.EstateLabourFled(
-                estate.id, estate.place, estate.hands, hands))
-    court = dataclasses.replace(court, unrest=unrest, estates=estates)
-    events = list(flight_events)
+    # C4: the estate hands that used to flee a heavy due are the kernel's
+    # ground now; the unrest stands, the flight goes with the estates.
+    court = dataclasses.replace(court, unrest=unrest)
+    events = []
     if unrest != world.court.unrest:
         events.append(A.UnrestChanged(
             unrest - world.court.unrest, "the raised land due"))

@@ -11,17 +11,6 @@ actor = "ammurapi"
 seat = "seat"
 attention_base = 10
 
-# The predecessor's harvest, and the one datum about the land the player can
-# actually trust on turn one (spec 6.4). Everything else he learns about the
-# fields is a proxy: a gauge reading copied by a tired hand, or an overseer with
-# an interest in the answer.
-last_harvest = 3500000
-
-# Turn one falls at fortnight 1, two fortnights into a growing season the
-# predecessor began. Bank those two, so year one is a normal year and the
-# player's first `last_harvest` is a number he can reason from.
-opening_growing_turns = 2
-
 # Names drawn for children born in play, so a new person is an authored name.
 house_names_f = [
   "Sharelli", "Tarriyelli", "Pidray", "Talaya", "Arsay", "Batshamem",
@@ -144,41 +133,6 @@ place = "seat"
 # the floor before high summer. low_water is authored but idle here -- Ugarit
 # has no canals, and the window exists for the Delta and Mesopotamian
 # scenarios that arrive in M12.
-[[estates]]
-id = "royal_lands"
-name = "the royal lands about the city"
-place = "seat"
-area_iku = 2400
-base_yield_per_iku = 483
-seed_per_iku = 10
-labour_days_per_iku = 6
-
-[[estates]]
-id = "siyannu"
-name = "the plain of Siyannu"
-place = "gibala"
-area_iku = 2200
-base_yield_per_iku = 467
-seed_per_iku = 10
-labour_days_per_iku = 6
-
-[[estates]]
-id = "ilishtamai"
-name = "the fields of Ilishtamai"
-place = "seat"
-area_iku = 2000
-base_yield_per_iku = 467
-seed_per_iku = 10
-labour_days_per_iku = 6
-
-[[estates]]
-id = "temple_lands"
-name = "the lands of the house of Baal"
-place = "ma_hadu"
-area_iku = 1800
-base_yield_per_iku = 467
-seed_per_iku = 10
-labour_days_per_iku = 6
 
 # ── Metal (spec 6.5). Copper is near, at Alashiya, and there is plenty of it.
 # Tin comes the long eastern road through Emar, Mari and Assur, and there is
@@ -685,42 +639,6 @@ their_status_claim = "lord"
 esteem = 580
 obligation = 0
 report_bias = 0   # your own overseer, with nothing to gain by lying
-
-# ── The estate overseers (spec 6.4). Your own servants, and still not honest:
-# they inflate the hands they need and play down what went into the ground,
-# because a man who reports a full sowing gets no more labour sent to him.
-# Yarimmu, closest to the palace and most watched, is the most nearly straight.
-[[relations]]
-other = "overseer_royal_lands"
-status_claim = "lord"
-their_status_claim = "lord"
-esteem = 700
-obligation = 0
-report_bias = 350   # under the king's eye, and it shows
-
-[[relations]]
-other = "overseer_siyannu"
-status_claim = "lord"
-their_status_claim = "lord"
-esteem = 620
-obligation = 0
-report_bias = 900   # a day's sail away, and asks for hands every season
-
-[[relations]]
-other = "overseer_ilishtamai"
-status_claim = "lord"
-their_status_claim = "lord"
-esteem = 650
-obligation = 0
-report_bias = 600
-
-[[relations]]
-other = "overseer_temple_lands"
-status_claim = "lord"
-their_status_claim = "lord"
-esteem = 660
-obligation = 0
-report_bias = 750   # answers to the god first and the king second
 
 [[oaths]]
 id = "oath_hatti_grain"

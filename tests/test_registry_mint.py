@@ -21,7 +21,7 @@ def _mint():
 
 def test_settlement_and_region_counts():
     cfg, registry = _mint()
-    assert len(registry.settlements) == 42
+    assert len(registry.settlements) == 55
     assert len(registry.regions) == 8
 
 

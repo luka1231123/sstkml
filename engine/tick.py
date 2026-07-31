@@ -106,10 +106,8 @@ def advance(world: World) -> tuple[World, list]:
     from engine import house
     world, e = house.step(world); events += e
 
-    # A6 agriculture, then A7 workshops and metals. Both run before rations,
-    # because the threshing floor is what the granary is paid out of.
-    from engine import land, metal
-    world, e = land.step(world); events += e
+    # A7 workshops and metals.
+    from engine import metal
     world, e = metal.step(world); events += e
     # A7b: the fabric of the city goes, a little, every fortnight. After the
     # workshops, because what a forge could do this turn is what it could do
@@ -179,8 +177,8 @@ def advance(world: World) -> tuple[World, list]:
     world, e = mail.generate_incoming(world); events += e
 
     # 6.17: file the pile. This runs LAST, after A15, because a correspondent
-    # who is standing in the same city has no transit to cross -- an estate
-    # overseer's letter is generated and delivered inside the same turn, and
+    # who is standing in the same city has no transit to cross -- a letter from
+    # the same settlement is generated and delivered inside the same turn, and
     # filing any earlier misses it. Every letter is offered, not only this
     # turn's arrivals: the scenario's opening inbox predates turn 1 and would
     # otherwise leave a hole exactly where the player's first correspondence

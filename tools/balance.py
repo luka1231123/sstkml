@@ -70,7 +70,6 @@ def run(policy: str = "prudent", turns: int = 72,
             "climate": world.climate[world.date.absolute],
             "grain": court.stores.get("grain", 0),
             "seed": court.stores.get("seed_grain", 0),
-            "harvest": court.last_harvest,
             "tin": court.stores.get("tin", 0),
             "circulation": court.metals.bronze_in_circulation,
             "melt": court.metals.melt_ledger,
@@ -87,13 +86,13 @@ def run(policy: str = "prudent", turns: int = 72,
 def report(result: dict) -> None:
     rows = result["rows"]
     print(f"  policy: {result['policy']}\n")
-    print(f"{'t':>4}{'fn':>4}{'clim':>6}{'grain':>10}{'seed':>8}{'harvest':>10}"
+    print(f"{'t':>4}{'fn':>4}{'clim':>6}{'grain':>10}{'seed':>8}"
           f"{'tin':>6}{'circ':>8}{'melted':>8}{'unrest':>7}{'chariot':>8}  events")
     for row in rows:
         if row["turn"] % 4 and not row["events"]:
             continue
         print(f"{row['turn']:>4}{row['fortnight']:>4}{row['climate']:>6}"
-              f"{row['grain']:>10}{row['seed']:>8}{row['harvest']:>10}"
+              f"{row['grain']:>10}{row['seed']:>8}"
               f"{row['tin']:>6}{row['circulation']:>8}{row['melt']:>8}"
               f"{row['unrest']:>7}{row['chariotry']:>8}  {','.join(row['events'])}")
 

@@ -61,19 +61,26 @@ def test_a_mark_whose_alu_does_not_exist_fails_to_load():
         parse_places(cfg)
 
 
-def test_the_id_map_cannot_name_an_entity_that_does_not_exist(tmp_path,
-                                                              monkeypatch):
+def test_the_id_map_cannot_name_an_entity_that_does_not_exist():
     """A stale name fails on the run that broke it, not when it is first read."""
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
     import load
 
     world = load_scenario("ugarit", SEED)
-    content = tmp_path / "kernel"
-    content.mkdir()
-    (content / "idmap.toml").write_text(
-        '[estates]\nnorth_field = "site:no_such_site"\n')
-    monkeypatch.setattr(load, "CONTENT", tmp_path)
-    with pytest.raises(ValueError, match="do not exist"):
-        load_idmap(world.kernel.registry)
+    with TemporaryDirectory() as directory:
+        content = Path(directory) / "kernel"
+        content.mkdir()
+        (content / "idmap.toml").write_text(
+            '[estates]\nnorth_field = "site:no_such_site"\n')
+        original = load.CONTENT
+        load.CONTENT = Path(directory)
+        try:
+            with pytest.raises(ValueError, match="do not exist"):
+                load_idmap(world.kernel.registry)
+        finally:
+            load.CONTENT = original
 
 
 def test_an_empty_section_is_not_an_error():
@@ -84,5 +91,14 @@ def test_an_empty_section_is_not_an_error():
     """
     world = load_scenario("ugarit", SEED)
     idmap = load_idmap(world.kernel.registry)
-    assert idmap == {"actors": {}, "estates": {}, "institutions": {},
-                     "groups": {}}
+    assert idmap == {
+        "actors": {},
+        "estates": {
+            "royal_lands": "site:seat_372_76",
+            "siyannu": "site:seat_374_80",
+            "ilishtamai": "site:seat_374_82",
+            "temple_lands": "site:seat_374_86",
+        },
+        "institutions": {},
+        "groups": {},
+    }

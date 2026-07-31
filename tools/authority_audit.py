@@ -110,8 +110,8 @@ def _kernel_labour(kernel: Kernel) -> int:
 
 
 def _court_land(world: World) -> int:
-    """Ground under the crown, in the court's unit: iku rather than qa of seed."""
-    return sum(estate.area_iku for estate in world.court.estates.values())
+    """Ground under the crown. C4: the court holds none; the kernel's sites do."""
+    return 0
 
 
 def _kernel_land(kernel: Kernel) -> int:

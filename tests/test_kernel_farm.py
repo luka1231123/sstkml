@@ -265,5 +265,5 @@ def test_the_island_still_cannot_feed_itself_and_nothing_local_fixes_it() -> Non
     kernel, _ = _year(landlocked(kernel), turns=40)
     thin = kernel.registry.cohorts["cohort:mukish_field_labour"]
     assert thin.hunger > 0 and thin.grievance > 0
-    assert kernel.people("settlement:mukish") < 3000, "the shortfall reached the people"
+    assert kernel.people("settlement:mukish") < 30000, "the shortfall reached the people"
     assert kernel.people(ALASHIYA) > 5000, "and the port that could feed itself did not"

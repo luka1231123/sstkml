@@ -12,7 +12,7 @@ from belief.project import project
 from engine import actions as A
 from engine import troops
 from engine.core import state_hash
-from engine.land import labour_supplied
+from engine.legacy.land import labour_supplied
 from engine.reduce import apply
 from engine.relations import audit_oaths
 from engine.state import Summons

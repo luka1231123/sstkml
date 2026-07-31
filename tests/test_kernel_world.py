@@ -90,7 +90,7 @@ def test_the_authored_kernel_world_loads_and_is_sound() -> None:
     assert K.faults(kernel) == ()
     assert SEAT not in kernel.autonomous()
     assert not kernel.registry.settlements[SEAT].autonomous
-    assert kernel.stores(ALASHIYA) == 960_000
+    assert kernel.stores(ALASHIYA) == 12_800_000
 
 
 def test_a_palace_controls_its_settlement_same_as_a_council() -> None:
@@ -152,7 +152,7 @@ def test_a_settlement_that_cannot_feed_itself_declines_without_anyone_deciding_i
     kernel, _ = _run(landlocked(_world()), turns=40)
     thin = kernel.registry.cohorts["cohort:mukish_field_labour"]
     assert thin.hunger > 0 and thin.grievance > 0
-    assert kernel.people(MUKISH) < 3000, "the shortfall reached the people"
+    assert kernel.people(MUKISH) < 30000, "the shortfall reached the people"
     assert kernel.stores(ALASHIYA) > 800_000, "and the port that could feed itself did not"
 
 

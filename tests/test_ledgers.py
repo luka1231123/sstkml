@@ -148,16 +148,6 @@ def test_the_land_raises_a_corvee_and_moves_the_due() -> None:
     assert _kinds(game)[-1] == "SetLandDue"
 
 
-def test_the_land_will_not_dredge_a_field_with_no_canal() -> None:
-    game = _game()
-    state = game.ledger_state["land"]
-    state["amount"] = 5
-    game.on_land_key(_Key("d"))
-    assert not game.log
-    assert game.notices["land"].kind == registry.REFUSAL
-    assert "canal" in game.notices["land"]
-
-
 def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
     game = _game()
     game.on_land_key(_Key("h"))
@@ -285,8 +275,13 @@ def test_the_workbenches_render_at_every_tier() -> None:
             text = plain_text(compose(belief, width=size[0], height=size[1],
                                       hours=6))
             assert text, (key, size)
-            # The list must never be squeezed away entirely.
+            # The list must never be squeezed away entirely. The land list is
+            # the one honest exception: since C4 the crown's fields are the
+            # kernel's ground, so there are no estates to pick until the
+            # re-point at C5.
             screen = compose(belief, width=size[0], height=size[1], hours=6)
             rows = [hit for hit in screen.hits
                     if hit.command.startswith("pick:")]
+            if key == "land":
+                continue
             assert rows, (key, size)

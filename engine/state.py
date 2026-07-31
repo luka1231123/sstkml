@@ -112,35 +112,6 @@ class Omen:
 
 
 @dataclasses.dataclass(frozen=True)
-class Estate:
-    """A block of crown or temple land (spec 6.4).
-
-    The authored fields are fixed; the four below the line are the season's
-    working state, reset at sowing. None of this is ever shown to the player:
-    he sees a gauge reading, an overseer's letter, and last year's harvest.
-    """
-    id: str
-    name: str
-    place: PlaceId
-    area_iku: int
-    base_yield_per_iku: int       # qa per iku in a normal year at full inputs
-    seed_per_iku: int             # the recommended sowing rate
-    labour_days_per_iku: int      # needed across the whole season
-    irrigated: bool = False       # canal mechanics apply (Mesopotamia, the Delta)
-    canal_condition: int = 1000   # 0..1000, decays every turn, dredged at low water
-    # --- per-season working state ---
-    seed_sown: int = 0
-    labour_days_supplied: int = 0
-    climate_sum: int = 0          # accumulated growing-season index...
-    climate_turns: int = 0        # ...and its divisor, for the mean
-    standing_yield: int = 0       # cut and standing in the field, awaiting threshing
-    pest: int = 1000              # event-driven modifier, 1000 = untouched
-    # Flight caused by high land dues never springs back when the rate falls.
-    # 1000 is the opening body of hands; revenue.step only moves this downward.
-    hands: int = 1000
-
-
-@dataclasses.dataclass(frozen=True)
 class Workshop:
     """A production shop with a standing bronze demand (spec 6.5)."""
     id: str
@@ -326,16 +297,11 @@ class Court:
     inspected: tuple[str, ...] = ()
     treasury_gifts_sent: tuple[GiftRecord, ...] = ()
     # --- M8: land and metal ---
-    estates: Mapping[str, Estate] = dataclasses.field(default_factory=dict)
     # Groups ordered to the fields instead of their own function. The garrison
     # on the harvest is the classic Bronze Age dilemma and is one action.
     at_harvest: tuple[GroupId, ...] = ()
     corvee_days: int = 0                 # sourced field-labour days called this season
     corvee_sources: tuple[tuple[GroupId, int], ...] = ()
-    # The only hard datum the player gets about the land (spec 6.4). True, and
-    # a year stale.
-    last_harvest: int = 0
-    previous_harvest: int = 0
     workshops: tuple[Workshop, ...] = ()
     formations: tuple[Formation, ...] = ()
     metals: MetalState = dataclasses.field(

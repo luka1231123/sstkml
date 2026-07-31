@@ -108,8 +108,9 @@ def test_the_oaths_show_the_figure_the_viceroy_will_exaggerate() -> None:
 
 def test_the_land_reports_no_yield_and_no_forecast() -> None:
     text = plain_text(document.land(_belief(20), 70, 24))
-    assert "the river gauge stands at" in text
-    assert "seed in the ground" in text
+    # C4: the crown's fields are the kernel's ground until the re-point at C5,
+    # so the page is honestly empty -- and still refuses yield and forecast.
+    assert "holds no estates" in text
     assert "expect" not in text.lower() and "forecast" not in text.lower()
 
 

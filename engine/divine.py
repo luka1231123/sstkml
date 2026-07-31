@@ -37,20 +37,16 @@ def _band(value: int, ceilings: tuple[int, ...]) -> int:
 
 def _harvest_evidence(world: World) -> str:
     """A coarse reading of today's gauge and completed harvest records only."""
-    from engine.land import gauge_reading
+    from engine.legacy.land import gauge_reading
 
     # The well/gauge is a present observation.  These coarse bands deliberately
     # throw away the exact climate index from which the proxy was produced.
     water = _band(gauge_reading(world), (18, 24, 33, 39))
 
-    normal = sum(
-        estate.area_iku * estate.base_yield_per_iku
-        for estate in world.court.estates.values())
-    if normal <= 0 or world.court.last_harvest <= 0:
-        record = 2
-    else:
-        ratio = 1000 * world.court.last_harvest // normal
-        record = _band(ratio, (350, 650, 900, 1100))
+    # C4: the harvest record was the court's (`last_harvest`) and is deleted;
+    # the kernel keeps no completed record for the seat while the court still
+    # owns Ugarit. No record means the year is unknowable, which is the truth.
+    record = 2
 
     # Recent water carries twice the weight of a year-old floor record.  Both
     # are available evidence; neither says what next fortnight's weather is.

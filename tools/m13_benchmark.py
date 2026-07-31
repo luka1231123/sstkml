@@ -29,9 +29,13 @@ DEFAULT_TURNS = 240
 FOUNDATION_BUDGET = {
     # Deliberately generous across development machines.  These are tripwires
     # for accidental superlinear work, not claims about final M13 scale.
-    "advance_ns": 2_000_000_000,
-    "hash_ns": 100_000_000,
-    "canonical_bytes": 2_000_000,
+    # Re-pinned after the kernel belief ledger (73 orgs, ~19 claims each per
+    # turn) landed: measured at 240 turns is ~25 s advance, ~2.1 s hash,
+    # ~112 MB canonical.  The 2.5x headroom keeps superlinear regressions
+    # visible without tripping on the linear journal.
+    "advance_ns": 60_000_000_000,
+    "hash_ns": 5_000_000_000,
+    "canonical_bytes": 300_000_000,
     "documents": 1_100,
 }
 

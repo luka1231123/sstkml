@@ -15,7 +15,7 @@
 #   [actors]        14 correspondents -> org: ids. `hatti_king` is not a place
 #                   name, and `ura_merchant` sits at a mark that answers to
 #                   Tarhuntassa.                                        (C6)
-#   [estates]       3 court estates -> site: ids.                       (C4)
+#   [estates]       4 court estates -> site: ids.                       (C4)
 #   [institutions]  court institutions -> org: or site:. The harbour is a
 #                   site and the temple is an org, and which is which is a
 #                   judgement rather than a rule.                       (C2/C4)
@@ -28,6 +28,10 @@
 [actors]
 
 [estates]
+royal_lands = "site:seat_372_76"
+siyannu = "site:seat_374_80"
+ilishtamai = "site:seat_374_82"
+temple_lands = "site:seat_374_86"
 
 [institutions]
 

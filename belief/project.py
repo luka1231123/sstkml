@@ -350,53 +350,11 @@ def _esteem_word(esteem: int) -> str:
 def _land(world, perr: int) -> dict:
     """What the ruler can learn about his own fields (spec 6.4).
 
-    Deliberately thin. He gets a gauge reading an official took and a scribe
-    copied, last year's actual harvest -- true, and the only hard datum in the
-    system -- and the orders he himself gave. He does NOT get the climate index,
-    the yield formula, any response value, or what is standing in the field.
-    Estate overseers write to him with their own report bias (6.8), and that is
-    the rest of his information.
+    C4: the court no longer holds its fields; the ground belongs to the kernel
+    (`Site(function="estate")` and `kernel/farm.py`). Belief re-points here at
+    C5 with the same keys, so the room reads empty until then.
     """
-    from engine.land import gauge_reading, labour_supplied
-
-    court = world.court
-    if not court.estates:
-        return {}
-    now = world.date.absolute
-    per_head = world.land_rules.get("labour_days_per_head", 12)
-    needed = sum(e.area_iku * e.labour_days_per_iku for e in court.estates.values())
-    recommended = sum(e.area_iku * e.seed_per_iku for e in court.estates.values())
-    return {
-        # The gauge passes through the same tired hand as everything else.
-        "gauge": transcribe(gauge_reading(world), world.seed, now,
-                            f"gauge:{now}", perr),
-        "last_harvest": court.last_harvest,
-        "previous_harvest": court.previous_harvest,
-        "land_due_rate": court.land_due_rate,
-        "land_due_base": court.land_due_base,
-        "last_land_due": court.last_land_due,
-        "seed_in_store": _stores(world, perr).get("seed_grain", 0),
-        # He watched it go into the ground, so he knows this one exactly. For
-        # most of the year it is where all the seed is, and the store reads nought.
-        "seed_in_ground": sum(e.seed_sown for e in court.estates.values()),
-        "seed_recommended": recommended,
-        # His own standing orders, which he knows exactly because he gave them.
-        "hands_to_the_fields": list(court.at_harvest),
-        "corvee_days": court.corvee_days,
-        # Days already given to a building site, and therefore not to the
-        # fields (6.21). He knows this one exactly: he gave the order.
-        "works_days": court.works_days,
-        "labour_days_this_turn": labour_supplied(court, per_head),
-        "labour_days_needed": needed,
-        "estates": [
-            {"id": e.id, "name": e.name, "place": e.place,
-             "irrigated": e.irrigated,
-             "hands": e.hands,
-             # A canal is a thing you can walk along and look at.
-             "canal_condition": e.canal_condition if e.irrigated else None}
-            for e in sorted(court.estates.values(), key=lambda e: e.id)
-        ],
-    }
+    return {}
 
 
 def _institutions(world) -> list[dict]:

@@ -1090,7 +1090,7 @@ extent = 45000
 id = "site:seat_372_76"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "food"
+function = "estate"
 capacity = 7000
 extent = 5280000
 
@@ -1098,7 +1098,7 @@ extent = 5280000
 id = "site:seat_374_80"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "food"
+function = "estate"
 capacity = 7000
 extent = 0
 
@@ -1106,7 +1106,7 @@ extent = 0
 id = "site:seat_374_82"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "food"
+function = "estate"
 capacity = 7000
 extent = 0
 
@@ -1114,7 +1114,7 @@ extent = 0
 id = "site:seat_374_86"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "food"
+function = "estate"
 capacity = 7000
 extent = 0
 

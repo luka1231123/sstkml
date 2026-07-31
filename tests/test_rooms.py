@@ -196,7 +196,7 @@ def test_the_map_greys_the_sea_when_the_sea_is_shut() -> None:
 
 def test_the_route_tablet_names_nodes_and_the_kind_of_link() -> None:
     text = plain_text(worldmap.compose(_belief(), 86, 30))
-    assert "Ugarit" in text and "Hattusa" in text and "Alashiya" in text
+    assert "Ugarit" in text and "Carchemish" in text and "Alashiya" in text
     assert "land" in text and "sea" in text
 
 

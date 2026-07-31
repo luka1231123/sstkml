@@ -187,8 +187,7 @@ def test_term_picker_builds_and_removes_engine_terms() -> None:
     assert game.desk["terms"] == ()
 
 
-def test_yabninu_corrects_only_matter_and_never_material_terms(
-        monkeypatch) -> None:
+def test_yabninu_corrects_only_matter_and_never_material_terms() -> None:
     game = _game()
     game.open_new_letter("hatti_king", "hattusa")
     game.desk["matter"] = "Send grain at once."
@@ -197,16 +196,18 @@ def test_yabninu_corrects_only_matter_and_never_material_terms(
         A.LetterTerm("request_good", good="grain", quantity=60),)
     terms_before = game.desk["terms"]
     game._regrade()
-    monkeypatch.setattr(
-        play_gui.ai_composer, "correct_matter",
-        lambda *_args: MatterCorrection(
-            "Send the grain without delay.", "model"))
-    game._run_model = lambda work, done: done(work(), None)
+    real_correct = play_gui.ai_composer.correct_matter
+    play_gui.ai_composer.correct_matter = lambda *_args: MatterCorrection(
+        "Send the grain without delay.", "model")
+    try:
+        game._run_model = lambda work, done: done(work(), None)
 
-    game._request_desk_draft(game._desk_item())
+        game._request_desk_draft(game._desk_item())
 
-    assert game.desk["matter"] == "Send the grain without delay."
-    assert game.desk["terms"] == terms_before
+        assert game.desk["matter"] == "Send the grain without delay."
+        assert game.desk["terms"] == terms_before
+    finally:
+        play_gui.ai_composer.correct_matter = real_correct
 
 
 def test_seal_dispatches_exactly_one_structured_action() -> None:

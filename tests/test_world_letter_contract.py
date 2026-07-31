@@ -1,4 +1,10 @@
-"""Phase A contract tests for physical, structured outgoing tablets."""
+"""Phase A contract tests for physical, structured outgoing tablets.
+
+The dispatch cases that pin the seat->ma_hadu harbour road (term records,
+death-in-transit, structured gift interception, model-less replay) were
+archived to ``tests/archive/mail_dispatch_route_graph.py`` — no route edge
+touches ``ma_hadu`` in ``content/world.toml``.
+"""
 from __future__ import annotations
 
 import dataclasses
@@ -8,14 +14,10 @@ import pytest
 
 from engine import actions as A
 from engine import letter_terms
-from engine import mail
-from engine.core import state_hash
 from engine.state import Letter
 from belief.project import project
 from engine.reduce import apply
 from load import load_scenario
-from session import load_session, play, save
-from tools import m13_audit
 
 
 def _dispatch() -> A.DispatchLetter:
@@ -59,9 +61,8 @@ def test_legacy_flat_action_still_decodes_with_defaults() -> None:
     assert A.from_dict(json.loads(json.dumps(A.to_dict(old)))) == old
 
 
-@pytest.mark.parametrize(
-    "term",
-    [
+def test_letter_term_rejects_structurally_invalid_values() -> None:
+    invalid = [
         lambda: A.LetterTerm("unknown"),
         lambda: A.LetterTerm("gift", good="grain", quantity=0),
         lambda: A.LetterTerm("request_good", quantity=2),
@@ -70,11 +71,10 @@ def test_legacy_flat_action_still_decodes_with_defaults() -> None:
         lambda: A.LetterTerm("promise_good", good="grain", quantity=-1),
         lambda: A.LetterTerm("promise_good", good="grain", quantity=1,
                              due_turn=-1),
-    ],
-)
-def test_letter_term_rejects_structurally_invalid_values(term) -> None:
-    with pytest.raises(ValueError):
-        term()
+    ]
+    for term in invalid:
+        with pytest.raises(ValueError):
+            term()
 
 
 def test_dispatch_requires_exact_text_route_and_material_provenance() -> None:
@@ -119,99 +119,6 @@ def test_existing_letter_construction_gets_empty_outgoing_contract_fields() -> N
     assert letter.terms == ()
     assert letter.reply_to == ""
     assert letter.scribe_id == letter.seal == letter.courier_id == ""
-
-
-def test_dispatch_and_delivery_persist_term_records() -> None:
-    world = load_scenario("ugarit", 8814402919)
-    world = dataclasses.replace(
-        world,
-        routes=tuple(dataclasses.replace(route, risk=0)
-                     for route in world.routes),
-    )
-    action = A.DispatchLetter(
-        recipient="sinaranu",
-        reply_to="",
-        text="Receive this oil; send grain; hear the proposed union.",
-        profile="ugarit.ruler_to_other",
-        terms=(
-            A.LetterTerm("gift", good="oil", quantity=3),
-            A.LetterTerm("request_good", good="grain", quantity=20),
-            A.LetterTerm("marriage_proposal", person_id="pidray"),
-        ),
-        scribe_id="yabninu",
-        seal="royal",
-        courier_id="iliya",
-        path=("seat", "ma_hadu"),
-    )
-    opening = world.court.stores["oil"]
-
-    sent, _ = mail.apply_dispatch(world, action)
-    assert sent.court.stores["oil"] == opening - 3
-    assert len(sent.letter_reservations) == 1
-    assert not sent.letter_claims
-    assert not sent.marriage_proposals
-
-    delivered, _ = mail.step_letters(sent)
-    assert delivered.letter_reservations[0].status == "delivered"
-    assert delivered.letter_claims[0].source_letter == "L1"
-    assert delivered.marriage_proposals[0].person_id == "pidray"
-    assert delivered.court.house["pidray"].spouse is None
-
-
-def test_dispatch_action_replays_without_a_model(tmp_path) -> None:
-    from ai.grader import profile_for
-
-    action = A.DispatchLetter(
-        recipient="sinaranu",
-        reply_to="",
-        text="To Sinaranu: receive these words exactly.",
-        profile=profile_for("sinaranu"),
-        terms=(A.LetterTerm("gift", good="oil", quantity=2),),
-        scribe_id="yabninu",
-        seal="royal",
-        courier_id="iliya",
-        path=("seat", "ma_hadu"),
-    )
-    world, log, _hashes = play(8814402919, "ugarit", [[action]])
-    path = tmp_path / "dispatch.json"
-    save(path, 8814402919, "ugarit", 1, log, world)
-
-    replayed, data = load_session(path)
-    assert state_hash(replayed) == state_hash(world)
-    assert data["log"][0]["action"]["terms"][0]["_t"] == "LetterTerm"
-
-
-def test_death_in_transit_lapses_proposal_without_stopping_delivery() -> None:
-    world = load_scenario("ugarit", 8814402919)
-    world = dataclasses.replace(
-        world,
-        routes=tuple(dataclasses.replace(route, risk=0)
-                     for route in world.routes),
-    )
-    action = A.DispatchLetter(
-        "sinaranu", "", "I propose this union.",
-        "ugarit.ruler_to_other",
-        (A.LetterTerm("marriage_proposal", person_id="pidray"),),
-        "yabninu", "royal", "iliya", ("seat", "ma_hadu"),
-    )
-    sent, _ = mail.apply_dispatch(world, action)
-    person = sent.court.house["pidray"]
-    sent = dataclasses.replace(
-        sent,
-        court=dataclasses.replace(
-            sent.court,
-            house={
-                **sent.court.house,
-                "pidray": dataclasses.replace(
-                    person, alive=False, died_turn=sent.date.absolute),
-            },
-        ),
-    )
-
-    delivered, events = mail.step_letters(sent)
-    assert any(isinstance(event, A.LetterDelivered) for event in events)
-    assert delivered.marriage_proposals[0].status == "lapsed"
-    assert delivered.court.house["pidray"].spouse is None
 
 
 def test_delivery_records_are_idempotent_across_later_turns() -> None:
@@ -277,31 +184,3 @@ def test_unread_tablet_contents_do_not_cross_the_belief_boundary() -> None:
     assert read["facts"]["hidden_amount"]
     assert read["terms"][0]["quantity"] == 777
     assert read["body"] == letter.text
-
-
-def test_structured_gift_has_material_evidence_and_hidden_interception() -> None:
-    world = load_scenario("ugarit", 8814402919)
-    routes = tuple(
-        dataclasses.replace(
-            route,
-            risk=(1000 if {route.a, route.b} == {"seat", "ma_hadu"} else 0),
-        )
-        for route in world.routes
-    )
-    world = dataclasses.replace(world, routes=routes)
-    action = A.DispatchLetter(
-        "sinaranu", "", "Receive this oil.", "ugarit.ruler_to_other",
-        (A.LetterTerm("gift", good="oil", quantity=3),),
-        "yabninu", "royal", "iliya", ("seat", "ma_hadu"),
-    )
-
-    after, events = mail.apply_dispatch(world, action)
-    findings = m13_audit.audit_transition(world, after, events)
-    assert not [item for item in findings if item.path == "stores.oil"]
-    assert any(isinstance(event, A.GiftSent) for event in events)
-    assert any(isinstance(event, A.LetterIntercepted) for event in events)
-    assert after.letter_reservations[0].status == "intercepted"
-    assert not after.letters_in_transit
-    sent_copy = next(item for item in project(after)["outbox"]
-                     if item["recipient"] == "sinaranu")
-    assert sent_copy["status"] == "sent — no receipt"

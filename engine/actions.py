@@ -817,14 +817,6 @@ class MerchantWithdrew:
 
 
 @dataclasses.dataclass(frozen=True)
-class EstateLabourFled:
-    estate_id: str
-    place_id: str
-    before: int
-    after: int
-
-
-@dataclasses.dataclass(frozen=True)
 class PersonPlaced:
     person_id: str
     post: str
@@ -935,7 +927,7 @@ _TYPES = {
         QuarantineSet, ArchiveSearched,
         PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
         LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,
-        HarbourCargoWithdrawn, EstateLabourFled,
+        HarbourCargoWithdrawn,
         MerchantResponseDue, MerchantWithdrew, PersonPlaced, PersonDismissed,
         HeirNamed,
         TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,
