@@ -55,6 +55,27 @@ SITE_FUNCTIONS = frozenset({
 })
 
 
+def kernel_settlement(world_or_places, place_id: str) -> str:
+    """The kernel settlement a court place answers to (Task 2 C1).
+
+    One definition, because the loader enforces it and the audit checks it, and
+    two readings of "which settlement is this place" is the kind of pair this
+    whole task exists to stop. Every mark answers to one Alu (spec 8.3) and
+    every Alu is a settlement, so the content already carries the answer: Mari
+    is a mark of Dur Katlimmu, Argos of Mycenae, and the port quarter of the
+    seat is the seat.
+
+    Takes a World or a bare mapping of places, so the loader can call it before
+    a World exists.
+    """
+    places = getattr(world_or_places, "places", world_or_places)
+    place = places.get(place_id)
+    if place is None:
+        return ""
+    alu = place_id if place.kind == "alu" else place.alu
+    return f"settlement:{alu}"
+
+
 def parse_places(cfg: dict) -> dict:
     """The scenario's map marks, checked (spec 8.3).
 
@@ -251,6 +272,13 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     registry = Registry(regions=regions, polities=polities,
                         settlements=settlements, sites=reg_sites,
                         routes=routes, cohorts=cohorts)
+
+    # No check that every mark answers to a settlement: `parse_places` already
+    # refuses a palace centre of an unknown Alu, and every Alu becomes a
+    # settlement here, so the property holds by construction. A second check
+    # would be unreachable, and unreachable code that looks like enforcement is
+    # worse than none -- it is the line somebody trusts when they change the
+    # rule that actually holds.
     faults = check_registry(registry)
     if faults:
         raise ValueError("; ".join(faults))
@@ -406,6 +434,35 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
     return registry, book, tuple(obligations), seasons, region_climate, drought_curve
 
 
+def load_idmap(registry: Registry) -> dict[str, dict[str, str]]:
+    """The court-to-kernel names no rule derives (Task 2 C1).
+
+    Every value must name an entity the registry has. An id map is read at the
+    moment a court record is handed to the kernel, which is deep inside a turn
+    and a long way from the file; a name that resolves to nothing there fails as
+    a missing estate or a correspondent nobody can answer, and the content that
+    caused it is not in the traceback. So it is checked once, here, where the
+    error can say which line of which section is wrong.
+
+    An empty section is not an error. The sections fill up as the migration
+    reaches them, and a section that is empty because its step has not run yet
+    is a different thing from one that is wrong.
+    """
+    path = CONTENT / "kernel" / "idmap.toml"
+    if not path.exists():
+        return {}
+    idmap = tomllib.loads(path.read_text())
+    bad = sorted(
+        f"[{section}] {court} -> {kernel}"
+        for section, entries in idmap.items()
+        for court, kernel in entries.items()
+        if kernel and not registry.exists(kernel))
+    if bad:
+        raise ValueError("idmap.toml names entities that do not exist: "
+                         + "; ".join(bad))
+    return idmap
+
+
 def _controller(orgs: dict, settlement: str) -> str:
     for org_id in sorted(orgs):
         org = orgs[org_id]
@@ -520,6 +577,10 @@ def load_scenario(name: str, seed: int) -> World:
     sites = parse_sites(cfg, places)
     registry = mint_registry(places, sites, cfg)
     kernel_registry, book, obligations, seasons, region_climate, drought_curve = load_detail(registry)
+    # Read for its check. Nothing consumes the map yet -- the sections it will
+    # carry belong to steps that have not run -- but a name that has gone stale
+    # should fail on the run that broke it, not on the one that first needs it.
+    load_idmap(kernel_registry)
     correspondents = tuple(
         Correspondent(
             actor=c["actor"], place=c["place"], cadence=int(c["cadence"]),

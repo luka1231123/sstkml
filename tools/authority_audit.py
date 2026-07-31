@@ -11,8 +11,8 @@ asymmetry is the point: a duplicate authority is invisible until something count
 the two answers side by side, and "we removed the old field" is a claim a script
 can check rather than a claim a commit message can make.
 
-A row may also be *unmapped* -- a court entity with no kernel counterpart named
-in the id map. That is reported too, because an entity nobody owns is how a
+A row may also be *unmapped* -- a court entity that answers to no kernel
+counterpart. That is reported too, because an entity nobody owns is how a
 migration quietly loses a granary.
 
 Usage:
@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.kernel.world import Kernel          # noqa: E402
 from engine.state import World                  # noqa: E402
-from load import load_scenario                  # noqa: E402
+from load import kernel_settlement, load_scenario  # noqa: E402
 
 SEED = 8814402919
 
@@ -152,28 +152,33 @@ def findings(world: World, kernel: Kernel) -> list[Finding]:
 
 
 def unmapped(world: World, kernel: Kernel) -> list[Finding]:
-    """Court places with no kernel counterpart, checked against idmap."""
-    import tomllib
-    idmap_path = ROOT / "content" / "kernel" / "idmap.toml"
-    idmap = tomllib.loads(idmap_path.read_text()) if idmap_path.exists() else {}
+    """Court places that answer to no kernel settlement (Task 2 C1).
 
-    mapped = set(idmap.get("places", {}))
-    names = {
-        settlement.split(":")[-1]
-        for settlement in kernel.registry.settlements
-    }
+    Every court place names the Alu it belongs to, and every Alu is a kernel
+    settlement, so the question has an answer in the content and does not need
+    a hand-written table to supply one. It used to be asked by matching names
+    -- a place was mapped if some settlement's id looked like it -- which
+    reported twenty-six findings that were not defects: Mari answers to Dur
+    Katlimmu and Argos to Mycenae, and no amount of comparing the strings
+    "mari" and "dur_katlimmu" was ever going to discover that.
+
+    A finding here now means the content is genuinely broken: a place whose Alu
+    does not exist. `load.py` refuses to load such a scenario, so this is a
+    second reading of a fact the loader already enforces, which is what an
+    audit is for.
+    """
     missing = sorted(
-        place for place in world.places
-        if place not in mapped
-        and place.replace("_", "") not in {n.replace("_", "") for n in names})
+        f"{place} (alu {kernel_settlement(world, place)[len('settlement:'):]})"
+        for place in world.places
+        if kernel_settlement(world, place) not in kernel.registry.settlements)
     if not missing:
         return []
     return [Finding(
         "court places with no kernel settlement",
         f"{len(missing)}: " + ", ".join(missing[:8])
         + ("..." if len(missing) > 8 else ""),
-        f"{len(names)} settlements authored",
-        "add to content/kernel/idmap.toml [places] section",
+        f"{len(kernel.registry.settlements)} settlements authored",
+        "author the Alu, or point the place at one that exists",
     )]
 
 

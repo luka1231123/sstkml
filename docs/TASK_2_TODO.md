@@ -34,12 +34,19 @@ Decisions: archive by `git mv` into `engine/legacy/` (no comment-out in place); 
       places to sit. Settlement food ground is one estate on first of its
       food marks — actor sow estate it can see, extent spread over three
       marks leave two thirds of crop untended.
-- [ ] `content/kernel/idmap.toml`: legacy kernel names, 14 correspondent actors,
-      3 estates, institutions, dependent groups. Loader raise on any unmapped
-      entity and on any entry naming nonexistent one.
-- [ ] `World.kernel: Kernel`. Nothing read it yet.
-- [ ] Delete `load_kernel.py`; point `tools/` at `load_scenario(...).kernel`.
-- [ ] `authority_audit.unmapped()` read id map instead of string matching.
+- [x] `content/kernel/idmap.toml`: loader raises on any entry naming a
+      nonexistent entity (`load_idmap`). The `[places]` section is gone: a mark
+      answers to its Alu and every Alu is a settlement, so `kernel_settlement`
+      derives the join and `parse_places` already refuses a mark whose Alu does
+      not exist. The old section had six entries, four derivable and one wrong.
+      The 14 correspondent actors, 3 estates, institutions and dependent groups
+      are still to author, and land with C6, C4 and C3 respectively.
+- [x] `World.kernel: Kernel`. Read by the court's goods systems since C2, and
+      advanced every turn by `tick.step_kernel`.
+- [x] Delete `load_kernel.py`; point `tools/` at `load_scenario(...).kernel`.
+- [x] `authority_audit.unmapped()` resolves through the Alu instead of string
+      matching. Closes 26 findings that were never defects -- Mari answers to
+      Dur Katlimmu, and comparing the two names was never going to say so.
 - [x] Autonomy: drop `settlement:mahadu`, `ari`, `alashiya_port`; other 41
       Alu autonomous; Ugarit stay false. `Kernel.controller()` accept
       `("palace", "council")`.

@@ -138,7 +138,7 @@ Not derivable, needs authored `content/kernel/idmap.toml`:
 
 | Section | Entries | Why not derivable |
 |---|---|---|
-| `[places]` | `mahadu = "site:ma_hadu_harbour"`, `ari`, `alashiya_port` | existing kernel names differ from scenario's (`mahadu` vs `ma_hadu`), and two of three stop being settlements |
+| ~~`[places]`~~ | none — dropped in C1 | derivable after all: a mark names its Alu and every Alu is a settlement, so `load.kernel_settlement` reads the join off the content. The three legacy names this row was written for stopped being settlements, which removed the case it existed to handle |
 | `[actors]` | 14 correspondents → `org:` ids | `hatti_king` → `org:hattusa_palace`; actor name is not place name |
 | `[estates]` | 3 court estates → `site:` ids | court estate ids are own vocabulary |
 | `[institutions]` | court institutions → `org:` or `site:` | harbour is site, temple is org; split is judgement |
@@ -187,7 +187,7 @@ Each step ends green: full test run, `tools/authority_audit.py` with one fewer f
 
 | Step | Does | Closes |
 |---|---|---|
-| C1 | build the registry from the scenario; `World.kernel`; `idmap.toml`; loader checks | unmapped (47) |
+| C1 | build the registry from the scenario; `World.kernel`; `idmap.toml`; loader checks | unmapped (26, all false) |
 | C2 | goods: `Court.stores` → `Book` at the seat | stock of goods |
 | C3 | people and labour: `dependents` → `Cohort` | ordinary people, labour |
 | C4 | land: `Court.estates` → `Site` | land |
