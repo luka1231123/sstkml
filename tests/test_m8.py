@@ -10,6 +10,7 @@ from engine import actions as A
 from engine import metal
 from engine.legacy import land
 from engine.core import lerp_table, state_hash
+from engine import seat
 from engine.reduce import apply
 from engine.state import Formation, MetalState, Workshop
 from engine.tick import advance
@@ -83,14 +84,14 @@ def test_corvee_buys_labour_with_unrest():
     world = _run(2)
     unrest = world.court.unrest
     world, events = apply(world, A.RaiseCorvee(4000))
-    assert world.court.corvee_days == 4000
+    assert seat.corvee_days(world) == 4000
     assert world.court.unrest > unrest
     assert any(isinstance(e, A.CorveeRaised) for e in events)
     # Capped per season, and the cap is refused outright rather than silently
     # clamped to nothing -- a levy that raises no one should say so.
     cap = world.land_rules["corvee_max_days"]
     world, _ = apply(world, A.RaiseCorvee(cap))
-    assert world.court.corvee_days == cap
+    assert seat.corvee_days(world) == cap
     try:
         apply(world, A.RaiseCorvee(1))
         raise AssertionError("the corvee cap was not enforced")
@@ -153,9 +154,9 @@ def test_starving_the_smiths_slows_the_forge():
 def test_the_player_sees_proxies_and_never_the_formula():
     world = _run(14)
     belief = project(world)
-    # C4: the court no longer holds its fields, so the room is empty until
-    # the belief re-points at C5.
-    assert belief["land"] == {}
+    # C5: the belief re-points the room at the kernel's ground; the formula
+    # that makes the yield is still nowhere near the player.
+    assert belief["land"].get("estates")
     # Everything about how the yield is made is absent.
     blob = json.dumps(belief)
     for hidden in ("base_yield", "standing_yield", "water_response",

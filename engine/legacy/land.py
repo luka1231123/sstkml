@@ -79,7 +79,7 @@ def labour_supplied(court: Court, per_head: int) -> int:
         group = court.dependents[gid]
         if (not group.revolting
                 and (group.function == "field_labour"
-                     or gid in court.at_harvest)):
+                     or group.at_fields)):
             total += group.size * per_head * group.output_modifier // 1000
     return total + harvest_hands(court, per_head)
 
@@ -108,7 +108,9 @@ def source_corvee(world: World, requested: int
 
     Returns ``(raised, aggregate_sources, incremental_sources)``.
     """
-    existing = dict(world.court.corvee_sources)
+    from engine import seat
+
+    existing = dict(seat.corvee_sources(world))
     incremental: dict[str, int] = {}
     remaining = max(0, requested)
     for group_id, capacity in sorted(corvee_source_capacity(world).items()):

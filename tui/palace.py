@@ -736,6 +736,8 @@ def compose(b: dict, view: str = "court", selected: str = "",
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
         title = f"THE PALACE — A POST FOR {named.upper()}"
         note = "choose a post, or [esc] to think better of it"
+    else:
+        note = f"{note}   ·   [c] counsel"
 
     # Once testimony is heard, the room yields architecture before it yields
     # the words a verdict acts upon. Supported sizes fit ordinary cases in a

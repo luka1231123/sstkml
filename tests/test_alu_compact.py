@@ -1,7 +1,7 @@
-"""The City's minimum geometry is a real, playable street."""
+"""The Alu's minimum geometry is a real, playable street."""
 from belief.project import project
 from load import load_scenario
-from tui import city, desktop
+from tui import alu, desktop
 from tui.grid import cells, plain_text
 
 
@@ -16,13 +16,13 @@ def _lines(screen):
     return plain_text(cells(screen)).splitlines()
 
 
-def test_city_minimum_keeps_four_drawn_and_actionable_houses():
-    width, height = desktop.minimum_size("city")
+def test_alu_minimum_keeps_four_drawn_and_actionable_houses():
+    width, height = desktop.minimum_size("alu")
     assert (width, height) == (70, 25)
-    assert city.table_room(height) == 4
-    assert city.table_room(city.COMPACT_HEIGHT) == 4
+    assert alu.table_room(height) == 4
+    assert alu.table_room(alu.COMPACT_HEIGHT) == 4
 
-    screen = city.compose(_belief(), width=width, height=height)
+    screen = alu.compose(_belief(), width=width, height=height)
     lines = _lines(screen)
 
     # These are labels below four full-size building models, not a replacement
@@ -40,9 +40,9 @@ def test_city_minimum_keeps_four_drawn_and_actionable_houses():
     assert "the men are out on" not in "\n".join(lines)
 
 
-def test_city_minimum_pages_the_same_art_and_rows_together():
-    width, height = desktop.minimum_size("city")
-    lines = _lines(city.compose(
+def test_alu_minimum_pages_the_same_art_and_rows_together():
+    width, height = desktop.minimum_size("alu")
+    lines = _lines(alu.compose(
         _belief(), width=width, height=height, scroll=2))
 
     assert "3–6 OF 6" in lines[14]

@@ -7,7 +7,7 @@ language interpreter the only route to half the game's mechanics, despite its
 lack of simulation authority. This module exists to put exact actions beside
 their evidence while the required model remains the court's language.
 
-The shape is the City's, because the City is the screen that already works: a
+The shape is the Alu's, because the Alu is the screen that already works: a
 thing to look at, a table to compare it against, and the exact order beside the
 evidence for it. Here that is a scrolling list on the left, the selected row's
 detail on the right, and a footer of the actions this screen actually offers --

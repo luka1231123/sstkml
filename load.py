@@ -758,8 +758,6 @@ def load_scenario(name: str, seed: int) -> World:
         attention_base=int(cfg["attention_base"]),
         stores=stores,
         dependents=groups,
-        allocations={},                       # default: pay full entitlement
-        priority=tuple(cfg["priority"]),
         rites=rites,
         scribe_competence=int(scribe.get("competence", 850)),
         scribe_fatigue=int(scribe.get("fatigue", 300)),
@@ -906,4 +904,8 @@ def load_scenario(name: str, seed: int) -> World:
     # The crown's payroll joins the registry (Task 2 C3). After this the kernel
     # holds those heads and feeds them, and the court's mapping is the mirror.
     from engine import seat as seat_door
-    return seat_door.enrol(world)
+    world = seat_door.enrol(world)
+    # The authored pay-down order is a fact about those people, so it is
+    # written on them (Task 2 C3). `enrol` has to have run first: the cohorts
+    # it ranks are the ones enrolment just put in the registry.
+    return seat_door.rank(world, tuple(cfg["priority"]))

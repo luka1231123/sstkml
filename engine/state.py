@@ -56,6 +56,10 @@ class DependentGroup:
     output_modifier: int = 1000  # 0..1000, derived + cached
     member_name: str = ""     # the face of a cut (spec 6.3); assigned at load
     revolting: bool = False   # withdraws all labour until arrears leave the revolt band
+    # Standing in the fields instead of doing its own work. The cohort holds
+    # this fact; the flag is the court's mirror of it, the way `size` is, and
+    # it is here so the institutions can read it without the kernel.
+    at_fields: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -283,8 +287,6 @@ class Court:
     attention_base: int                          # hours per fortnight
     stores: Mapping[GoodId, int]                 # includes "grain" and "seed_grain"
     dependents: Mapping[GroupId, DependentGroup]
-    allocations: Mapping[GroupId, int]           # target qa to pay each group this turn
-    priority: tuple[GroupId, ...]                # pay-down order when grain is short
     rites: tuple[Rite, ...]
     unrest: int = 0                              # seat unrest, 0..1000
     legitimacy: int = 700                        # 0..1000
@@ -298,11 +300,11 @@ class Court:
     inspected: tuple[str, ...] = ()
     treasury_gifts_sent: tuple[GiftRecord, ...] = ()
     # --- M8: land and metal ---
-    # Groups ordered to the fields instead of their own function. The garrison
-    # on the harvest is the classic Bronze Age dilemma and is one action.
-    at_harvest: tuple[GroupId, ...] = ()
-    corvee_days: int = 0                 # sourced field-labour days called this season
-    corvee_sources: tuple[tuple[GroupId, int], ...] = ()
+    # What the crown allows each group, who it pays first, the days of corvée
+    # it has raised and who is standing in the fields are all facts about a
+    # body of people, and Task 2 C3 moved them onto the cohorts. `engine.seat`
+    # reads them back: `allowances`, `order_of_payment`, `corvee_days`,
+    # `corvee_sources`, `at_harvest`.
     workshops: tuple[Workshop, ...] = ()
     formations: tuple[Formation, ...] = ()
     metals: MetalState = dataclasses.field(

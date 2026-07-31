@@ -383,13 +383,11 @@ def land(b: dict, width: int = 70, height: int = 24) -> Screen:
     seed, ground = data["seed_in_store"], data["seed_in_ground"]
     lines: list[tuple[int, str, str]] = [
         (0, f"the river gauge stands at {data['gauge']}", "sky"),
+        (0, f"the fields are in {data['stage']}", "verdigris"),
         (0, "─", "faint"),
-        (0, f"last year's threshing floor   "
-            f"{render.fmt_good('grain', data['last_harvest'])}", "barley"),
-        (0, f"the year before               "
-            f"{render.fmt_good('grain', data['previous_harvest'])}", "dim"),
-        (0, f"land due ordered              {data['land_due_rate']}/1000"
-            f"   last taken {render.fmt_good('grain', data['last_land_due'])}",
+        (0, f"last year the land gave the crown   "
+            f"{render.fmt_good('grain', data['last_land_due'])}", "barley"),
+        (0, f"land due ordered              {data['land_due_rate']}/1000",
          "gold"),
         (0, "", "clay"),
         (0, f"seed in store                 "
@@ -458,6 +456,6 @@ def muster(b: dict, width: int = 62, height: int = 18) -> Screen:
             (_spoken_id(summons["oath_id"]), "dim"),
         ))
     return ledger(
-        "THE CORVÉE — LEVY AND SPEAR",
+        "THE MUSTER — LEVY AND SPEAR",
         ("levy / formation / summons", "heads", "duty", "place"),
         rows, (26, -5, 10, 12), width, height)

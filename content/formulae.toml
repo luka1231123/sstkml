@@ -9,6 +9,10 @@ carchemish_viceroy = "hatti.servant_to_lord"
 pharaoh = "peer.equal_to_equal"
 assyria_king = "peer.equal_to_equal"
 babylon_king = "peer.equal_to_equal"
+overseer_royal_lands = "ugarit.lord_to_servant"
+overseer_siyannu = "ugarit.lord_to_servant"
+overseer_ilishtamai = "ugarit.lord_to_servant"
+overseer_temple_lands = "ugarit.lord_to_servant"
 
 [weights]
 address = 250
@@ -18,11 +22,28 @@ forbidden_term = 250
 extra_topic = 100
 excuse_and_request = 90
 oath_gods = 120
+wellbeing = 90
+quotation = 60
+closing = 60
 
 [hatti.servant_to_lord]
 label = "servant writing to the Great King"
+# Which way the tablet travels in rank. It fixes which blocks the desk offers
+# and which of them the grader insists on (see `content/corpus/historical.toml`
+# for the exemplar of each convention).
+direction = "up"
+wellbeing = "May it be well with my lord and with the house of my lord."
+wellbeing_required = false
+wellbeing_forbidden = false
+quotation_form = "As to what my lord wrote me, saying:"
+closing = "Yabninu wrote it; the palace courier bears the sealed tablet."
+closing_required = true
+deities = ["Storm God of Hatti", "Sun Goddess of Arinna"]
+blocks = ["address", "prostration", "quotation", "matter", "oath", "seal"]
 opening = "To the Sun, Great King, my lord: thus says Ammurapi, your servant."
-opening_regex = "^To the Sun,? Great King, my lord"
+# Both the Sun himself and his viceroy at Carchemish are addressed as lord;
+# the register is the same and the epithet is not.
+opening_regex = "^To (the Sun,? Great King|the king of Carchemish, viceroy of the Sun), my lord"
 requires_self_designation = "your servant"
 prostration = "At the feet of my lord, seven times and seven times I fall."
 prostration_regex = "seven times and seven times"
@@ -43,6 +64,15 @@ request = ["I ask", "send me", "grant me"]
 
 [peer.equal_to_equal]
 label = "one king writing to an equal king"
+direction = "level"
+wellbeing = "May it be well with my brother and with his house."
+wellbeing_required = true
+wellbeing_forbidden = false
+quotation_form = "As to what my brother wrote me, saying:"
+closing = "Yabninu wrote it; the palace courier bears the sealed tablet."
+closing_required = true
+deities = []
+blocks = ["address", "wellbeing", "quotation", "matter", "oath", "seal"]
 opening = "To {recipient}, my brother: thus says Ammurapi, your brother."
 opening_regex = "^To .+, my brother: thus says Ammurapi, your brother"
 requires_self_designation = ""
@@ -64,6 +94,15 @@ request = ["I ask", "send me", "grant me"]
 
 [ugarit.ruler_to_other]
 label = "the king of Ugarit writing without a status formula"
+direction = "level"
+wellbeing = "Let your heart be reassured."
+wellbeing_required = false
+wellbeing_forbidden = false
+quotation_form = "As to what you wrote me, saying:"
+closing = "Yabninu wrote it; the palace courier bears the sealed tablet."
+closing_required = true
+deities = ["Baal of Ugarit", "Dagan"]
+blocks = ["address", "wellbeing", "quotation", "matter", "oath", "seal"]
 opening = "To {recipient}: thus says Ammurapi, king of Ugarit."
 opening_regex = "^To .+: thus says Ammurapi, king of Ugarit"
 requires_self_designation = ""
@@ -82,3 +121,36 @@ reassurance = ["heart be reassured", "do not fear"]
 refusal = ["I refuse", "cannot grant", "cannot send"]
 promise = ["I shall", "I promise"]
 warning = ["danger", "enemy", "ships approach"]
+
+# The king writing to his own men. Downward the tablet carries no wish for the
+# servant's health and no prostration, and it ends in an instruction rather
+# than a plea (Mari palace instructions; see historical.toml `lord_instruction`).
+[ugarit.lord_to_servant]
+label = "the king of Ugarit writing to his own officer"
+direction = "down"
+opening = "To {recipient}: thus says Ammurapi, king of Ugarit, your lord."
+opening_regex = "^To .+: thus says Ammurapi, king of Ugarit, your lord"
+requires_self_designation = "your lord"
+prostration = ""
+prostration_regex = ""
+wellbeing = ""
+wellbeing_required = false
+wellbeing_forbidden = true
+quotation_form = "As to what you wrote me, saying:"
+closing = "Yabninu wrote it; the palace courier bears the sealed tablet."
+closing_required = true
+deities = ["Baal of Ugarit", "Dagan"]
+blocks = ["address", "quotation", "matter", "instruction", "seal"]
+forbidden_terms = ["my lord", "at the feet", "my brother", "I ask"]
+max_topics = 2
+forbidden_pattern_excuse_and_request = false
+excuse_terms = ["because", "closed sea", "season prevented"]
+request_terms = ["I ask", "send me", "grant me"]
+oath_terms = ["oath", "sworn"]
+gods_required_if_oath_mentioned = []
+
+[ugarit.lord_to_servant.topics]
+instruction = ["take", "send me", "open", "write to me"]
+account = ["the count", "in parisu", "before the month"]
+reprimand = ["twice I have written", "you have not answered"]
+promise = ["I shall", "I promise"]

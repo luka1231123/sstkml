@@ -172,7 +172,7 @@ def test_the_corvee_window_holds_labour_and_military_evidence_together() -> None
     text = plain_text(screen)
     actions = {hit.command for hit in screen.hits if hit.enabled}
 
-    assert "THE CORVÉE — LEVY AND SPEAR" in text
+    assert "THE MUSTER — LEVY AND SPEAR" in text
     assert "corvée called" in text
     assert "hands ·" in text
     assert formation["name"] in text

@@ -36,15 +36,16 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
 from session import load_session, new_seed, save as save_session
-from ai import (composer as ai_composer, counsel as ai_counsel, help_agent,
-                librarian, parser as ai_parser, voicer as ai_voicer)
+from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
+                help_agent, librarian, parser as ai_parser,
+                voicer as ai_voicer)
 from tui import advice, collection, palace
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
 from tui import plague as plague_page
 from tui import orders as orders_page
 from tui import works as works_page
-from tui import (altar, archive, atlas, city, command as command_page,
+from tui import (altar, archive, atlas, alu, command as command_page,
                  composer, counsel, desktop, document, hall,
                  help as help_page, render, style, switcher, worldmap)
 import manual
@@ -70,13 +71,12 @@ TABLETS: dict[str, tuple[str, str, object]] = {
     "s": ("stack", "The Scribes' Room", inbox_page.compose),
 }
 
-# The five ledgers. They were tablets -- read and closed, with every order they
+# The workbenches. They were tablets -- read and closed, with every order they
 # described given through Counsel -- and are now workbenches with their own key
-# handler, like the City (UI/UX spec 15, phase 4).
+# handler, like the Alu (UI/UX spec 15, phase 4).
 LEDGERS: dict[str, tuple[str, str, str]] = {
     "t": ("stores", "The Storehouse", "on_storehouse_key"),
-    "m": ("muster", "The Corvée — Levy and Spear", "on_muster_key"),
-    "o": ("oaths", "The Oaths", "on_oaths_key"),
+    "m": ("muster", "The Muster — Levy and Spear", "on_muster_key"),
 }
 
 # The windows that hold a conversation: they own their own keys, because most
@@ -84,20 +84,18 @@ LEDGERS: dict[str, tuple[str, str, str]] = {
 # door list. key -> (window key, title, size, which handler)
 ROOMS: dict[str, tuple[str, str, str]] = {
     "w": ("world", "The Known World", "on_world_key"),
-    "c": ("counsel", "Counsel", "on_counsel_key"),
     "v": ("altar", "The Altar", "on_altar_key"),
-    "y": ("city", "The City", "on_city_key"),
+    "y": ("alu", "The Alu", "on_alu_key"),
     "j": ("palace", "The Palace", "on_palace_key"),
-    "p": ("plague", "Sickness and Closures", "on_plague_key"),
-    "g": ("orders", "Orders", "on_orders_key"),
-    "?": ("help", "Help", "on_help_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
 # never strand the player). The two lists must not drift, so the controller
 # reads the hall's rather than keeping a second one. Writing and archive search
 # are stations inside the Scribes' Room; labour and land are stations inside
-# the Storehouse, so none of those are top-level windows.
+# the Storehouse; Orders is a station inside the Alu, Counsel inside the
+# Court, Oaths inside the Shrine, and Sickness inside the World, so none of
+# those are top-level windows.
 assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
     {window_key for window_key, _t, _how in TABLETS.values()}
     | {window_key for window_key, _t, _h in LEDGERS.values()}
@@ -147,7 +145,7 @@ class Game:
 
     inbox_notice = _window_notice("stack")
     plague_notice = _window_notice("plague")
-    city_notice = _window_notice("city")
+    alu_notice = _window_notice("alu")
     altar_notice = _window_notice("altar")
     switcher_notice = _window_notice("switcher")
 
@@ -208,7 +206,7 @@ class Game:
         self.plague_pick = plague_places[0] if plague_places else ""
         self.plague_scroll = 0
         self.plague_notice = ""
-        self.city_notice = ""
+        self.alu_notice = ""
         self.world_place_pick = self.world.court.seat
         self.world_route_scroll = 0
         self.world_all_routes = False
@@ -402,7 +400,7 @@ class Game:
     # How far each paged list has been scrolled. Presentation only: no scroll
     # position is a fact about the kingdom, so none of it is saved or logged.
     SCROLLS = ("archive_scroll", "works_scroll", "works_plan_scroll",
-               "city_scroll")
+               "alu_scroll")
 
     def scroll_of(self, name: str) -> int:
         return int(getattr(self, name, 0) or 0)
@@ -589,7 +587,7 @@ class Game:
         self.inbox_filter = "all"
         self.archive_open_ref = ""
         self.inbox_notice = ""
-        self.city_notice = ""
+        self.alu_notice = ""
         self.plague_notice = ""
         self.plague_scroll = 0
         delegate_people = [
@@ -619,7 +617,7 @@ class Game:
         self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
         self.inbox_notice = ""
-        self.city_notice = ""
+        self.alu_notice = ""
         self.plague_notice = ""
         self.stack_order = document.order_of(self.belief, self.stack_order)
         if "voicer" in self.__dict__:
@@ -685,6 +683,9 @@ class Game:
                         advisor_undo="advisor_origin" in self.desk,
                         term_builder=self.desk.get("term_builder"),
                         term_focus=self.desk.get("term_focus", "kind"),
+                        block_order=self.desk.get("block_order"),
+                        block_edits=self.desk.get("block_edits"),
+                        bound=self._desk_bound(),
                         seal_data={
                             "scribe": self.desk.get("scribe_id", "yabninu"),
                             "courier": self.desk.get("courier_id", "iliya"),
@@ -727,9 +728,9 @@ class Game:
                 self.world_place_pick, notice=notice, wide=self.world_wide,
                 layer=self.world_layer, focus=self.world_focus,
                 all_routes=getattr(self, "world_all_routes", False))
-        if key == "city":
-            return city.compose(b, None, width, height, notice=notice,
-                                scroll=self.scroll_of("city_scroll"))
+        if key == "alu":
+            return alu.compose(b, None, width, height, notice=notice,
+                                scroll=self.scroll_of("alu_scroll"))
         if key == "works":
             return works_page.compose(
                 b, self.works_pick, width, height, notice=notice,
@@ -751,7 +752,7 @@ class Game:
             inst = next((i for i in b.get("institutions", [])
                          if i["id"] == key.split(":", 1)[1]), None)
             if inst is not None:
-                return city.detail(b, inst, inst.get("history"), width, height)
+                return alu.detail(b, inst, inst.get("history"), width, height)
         if key == "counsel":
             suggestions = [
                 concern.order_prompt or concern.suggestion
@@ -795,7 +796,7 @@ class Game:
                 scroll=state["scroll"], notice=notice,
                 width=width, height=height)
         if key in ({w for w, _t, _h in LEDGERS.values()}
-                   | {"roll", "land"}):
+                   | {"roll", "land", "oaths"}):
             return self.compose_ledger(key, b, width, height, notice)
         for _, (window_key, _title, how) in TABLETS.items():
             if key == window_key:
@@ -911,7 +912,7 @@ class Game:
             return f"{unread} unread" if unread else self.inbox_filter
         if key.startswith("letter:") or key.startswith("archive:"):
             return "tablet"
-        if key == "city":
+        if key == "alu":
             return "the seat"
         if key == "counsel":
             return "order pending" if self.counsel_pending else "advice"
@@ -1219,6 +1220,10 @@ class Game:
             self.desk["blocks"] = composer.normalize_blocks(
                 saved.get("blocks"), recipient)
             self.desk["block_focus"] = saved.get("block_focus", "matter")
+            self.desk["block_order"] = composer.normalise_order(
+                saved.get("block_order") or composer.opening_order(recipient),
+                recipient)
+            self.desk["block_edits"] = dict(saved.get("block_edits") or {})
             self.desk["matter"] = saved.get("matter", saved.get("buffer", ""))
             self.desk["terms"] = tuple(saved.get("terms", ()))
             self.desk["term_builder"] = dict(
@@ -1253,6 +1258,8 @@ class Game:
                 "term_builder": builder,
                 "term_focus": "kind",
                 "blocks": composer.default_blocks(),
+                "block_order": composer.opening_order(recipient),
+                "block_edits": {},
                 "block_focus": "matter",
                 "scribe_id": "yabninu",
                 "courier_id": "iliya",
@@ -1352,7 +1359,29 @@ class Game:
             self.desk["matter"] = self.desk.get("buffer", "")
         self.desk["draft"] = composer.assemble(
             item["sender"], self.desk.get("blocks"),
-            self.desk.get("matter", ""), source="player")
+            self.desk.get("matter", ""), source="player",
+            order=self.desk.get("block_order"),
+            edits=self.desk.get("block_edits"))
+
+    def _desk_commitments(self) -> tuple:
+        """What the matter as written binds the crown to (`ai/commitments.py`).
+
+        Read fresh on every paint rather than stored: the player's words are the
+        only record, so a stale list would be a promise nobody made.
+        """
+        if self.desk is None:
+            return ()
+        return commitments.read(self.desk.get("matter", ""), self.belief)
+
+    def _desk_bound(self) -> tuple[str, ...]:
+        return tuple(item.describe() for item in self._desk_commitments())
+
+    def _desk_blocks(self) -> tuple[str, ...]:
+        """The pieces on the wet tablet, in the order they lie on it."""
+        if self.desk is None:
+            return ()
+        return composer.normalise_order(
+            self.desk.get("block_order"), self._desk_item()["sender"])
 
     @staticmethod
     def _move_desk_cursor(text: str, cursor: int, vertical: int) -> int:
@@ -1386,24 +1415,65 @@ class Game:
         def item_for_desk() -> dict:
             return self._desk_item(desk)
 
+        def laid() -> list[str]:
+            """The pieces actually on this tablet. Focus never leaves them."""
+            return list(self._desk_blocks())
+
         def move_block(by: int) -> None:
+            pieces = laid()
             current = desk.get("block_focus", "matter")
-            if current not in composer.FOCI:
+            if current not in pieces:
                 current = "matter"
-            desk["block_focus"] = composer.FOCI[
-                (composer.FOCI.index(current) + by) % len(composer.FOCI)]
+            desk["block_focus"] = pieces[
+                (pieces.index(current) + by) % len(pieces)]
 
         def move_choice(by: int) -> None:
             block = desk.get("block_focus", "matter")
-            if block == "terms":
-                move_term_value(by)
-                return
             if block == "matter":
                 return
-            choices = composer.block_choices(item_for_desk()["sender"])[block]
+            choices = composer.block_choices(item_for_desk()["sender"]).get(block)
+            if not choices:
+                return
+            # Cycling away from an edited piece restores the canned forms; the
+            # king's own words are only lost when he asks for another form.
+            desk.setdefault("block_edits", {}).pop(block, None)
             selected = desk.setdefault("blocks", composer.default_blocks())
             selected[block] = (
                 int(selected.get(block, 0)) + by) % len(choices)
+            self._regrade()
+
+        def add_block() -> None:
+            """Put the next piece this register allows onto the tablet."""
+            recipient = item_for_desk()["sender"]
+            on = laid()
+            spare = [name for name in composer.permitted_blocks(recipient)
+                     if name not in on]
+            if not spare:
+                self.notify(
+                    "every piece this register allows is already on the clay.",
+                    registry.REFUSAL, window="stack")
+                return
+            chosen = spare[0]
+            desk["block_order"] = composer.normalise_order(
+                on + [chosen], recipient)
+            desk["block_focus"] = chosen
+            self._regrade()
+            self.notify(
+                f"{composer.BLOCK_LABELS.get(chosen, chosen).lower()} added.",
+                registry.SUCCESS, window="stack")
+
+        def remove_block() -> None:
+            block = desk.get("block_focus", "matter")
+            if block in ("matter", "address"):
+                self.notify(
+                    "the address and the matter stay on the tablet.",
+                    registry.REFUSAL, window="stack")
+                return
+            recipient = item_for_desk()["sender"]
+            on = [name for name in laid() if name != block]
+            desk["block_order"] = composer.normalise_order(on, recipient)
+            desk.setdefault("block_edits", {}).pop(block, None)
+            desk["block_focus"] = "matter"
             self._regrade()
 
         def term_option_ids(field: str) -> list[str]:
@@ -1521,6 +1591,12 @@ class Game:
         if desk["dictating"]:
             if event.keysym == "Escape":
                 desk["buffer"] = desk.pop("edit_origin_text")
+                if desk.pop("editing_block", ""):
+                    desk["dictating"] = False
+                    desk["dictated"] = desk.pop("edit_origin_dictated", False)
+                    self._regrade()
+                    self.repaint()
+                    return
                 desk["matter"] = desk["buffer"]
                 desk["dictated"] = desk.pop("edit_origin_dictated", False)
                 desk["cursor"] = min(
@@ -1536,6 +1612,13 @@ class Game:
                 desk["dictated"] = True
                 desk.pop("edit_origin_text", None)
                 desk.pop("edit_origin_dictated", None)
+                written = desk.pop("editing_block", "")
+                if written and written != "matter":
+                    desk.setdefault("block_edits", {})[written] = \
+                        desk["buffer"].strip()
+                    self._regrade()
+                    self.repaint()
+                    return
                 desk["matter"] = desk["buffer"].strip()
                 desk["buffer"] = desk["matter"]
                 desk["cursor"] = min(desk["cursor"], len(desk["buffer"]))
@@ -1635,14 +1718,12 @@ class Game:
             move_term_value(1)
             self.repaint()
             return
-        if command == "desk:term:add" or (
-                char == "+" and desk.get("block_focus") == "terms"):
-            add_term()
+        if command == "desk:block:add" or char == "+":
+            add_block()
             self.repaint()
             return
-        if command == "desk:term:remove" or (
-                char == "-" and desk.get("block_focus") == "terms"):
-            remove_term()
+        if command == "desk:block:remove" or char == "-":
+            remove_block()
             self.repaint()
             return
         if command == "desk:block:previous" or event.keysym == "Up":
@@ -1688,6 +1769,25 @@ class Game:
             self.repaint()
             return
         if command == "desk:edit" or char in {"e", "d"}:
+            block = desk.get("block_focus", "matter")
+            if block != "matter":
+                # Editing a piece writes over its canned form. The piece keeps
+                # its place and its name; only the words become the king's.
+                picked = composer.selected_blocks(
+                    item_for_desk()["sender"], desk.get("blocks"),
+                    desk.get("block_edits"))
+                desk["editing_block"] = block
+                desk["edit_origin_text"] = desk.setdefault(
+                    "block_edits", {}).get(
+                        block, picked.get(block).text if block in picked else "")
+                desk["edit_origin_dictated"] = desk["dictated"]
+                desk["dictating"] = True
+                desk["buffer"] = desk["edit_origin_text"]
+                desk["cursor"] = len(desk["buffer"])
+                desk["history"] = []
+                desk["future"] = []
+                self.repaint()
+                return
             desk["block_focus"] = "matter"
             desk["edit_origin_text"] = desk.get("matter", "")
             desk["edit_origin_dictated"] = desk["dictated"]
@@ -1989,7 +2089,7 @@ class Game:
 
         Read back off the composed screen's own hit regions rather than
         recomputed here: two ideas about what row three is, is exactly the bug
-        the City had, and the screen is the one that knows.
+        the Alu had, and the screen is the one that knows.
         """
         return self.window_rows(key)
 
@@ -2000,6 +2100,47 @@ class Game:
             window_key, title, width, height,
             on_key=getattr(self, handler), on_resize=self.on_resize,
             on_close=lambda k=window_key: self.app.close(k))
+        self.repaint()
+        window.focus()
+
+    def open_orders(self) -> None:
+        """The Alu's station of standing orders (UI/UX spec 15, phase 4)."""
+        window_key, title, handler = "orders", "Orders", "on_orders_key"
+        width, height = desktop.default_size(window_key)
+        window = self.app.window(
+            window_key, title, width, height,
+            on_key=getattr(self, handler), on_resize=self.on_resize,
+            on_close=lambda k=window_key: self.app.close(k))
+        self.repaint()
+        window.focus()
+
+    def open_counsel(self) -> None:
+        """The Court's station for a word with the scribe."""
+        width, height = desktop.default_size("counsel")
+        window = self.app.window(
+            "counsel", "Counsel", width, height,
+            on_key=self.on_counsel_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("counsel"))
+        self.repaint()
+        window.focus()
+
+    def open_oaths(self) -> None:
+        """The Shrine's station for the oaths sworn to the house."""
+        width, height = desktop.default_size("oaths")
+        window = self.app.window(
+            "oaths", "The Oaths", width, height,
+            on_key=self.on_oaths_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("oaths"))
+        self.repaint()
+        window.focus()
+
+    def open_plague(self) -> None:
+        """The World's station for sickness and physical closures."""
+        width, height = desktop.default_size("plague")
+        window = self.app.window(
+            "plague", "Sickness and Closures", width, height,
+            on_key=self.on_plague_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("plague"))
         self.repaint()
         window.focus()
 
@@ -2366,7 +2507,13 @@ class Game:
         topics = self.help_topics()
         if topics and self.help_pick not in {t.id for t in topics}:
             self.help_pick = topics[0].id
-        self.open_room("?")
+        width, height = desktop.default_size("help")
+        window = self.app.window(
+            "help", "Help", width, height,
+            on_key=self.on_help_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("help"))
+        self.repaint()
+        window.focus()
 
     def _focused_screen(self) -> str:
         """Whichever window the player was last in, for Help's context."""
@@ -2865,6 +3012,9 @@ class Game:
                 self.altar_notice = ""
                 self.repaint()
                 return
+        if char == "o":
+            self.open_oaths()
+            return
         if event.keysym == "Return":
             if self.hours < OMEN_COST:
                 self.altar_notice = (
@@ -2970,7 +3120,7 @@ class Game:
     def on_institution_key(self, event, key: str, institution: str) -> None:
         """One verb: [r], set the men to it. Everything else closes the window.
 
-        The order is given here rather than on the CITY list because repair is
+        The order is given here rather than on the ALU list because repair is
         a thing you decide about *one* building, standing in front of it, and
         the list is for comparing."""
         if event.keysym == "Escape":
@@ -2984,24 +3134,27 @@ class Game:
         self.do(action, window=window)
         self.repaint()
 
-    def on_city_key(self, event) -> None:
+    def on_alu_key(self, event) -> None:
         """Numbers walk down to the thing and look at it. An hour, every time.
 
         The head's figure is on the list; the true one is only ever bought. A
         failed inspection stays on this screen with its reason visible.
         """
         if event.keysym == "Escape":
-            self.app.close("city")
+            self.app.close("alu")
             return
         char = event.char or ""
         if char.lower() == "n":
             self.open_works()
             return
+        if char.lower() == "o":
+            self.open_orders()
+            return
         institutions = self.belief.get("institutions", [])
-        _width, height = self._size("city")
-        room = city.table_room(height)
+        _width, height = self._size("alu")
+        room = alu.table_room(height)
         if event.keysym in self.STEPS:
-            if self.scrolled("city_scroll", len(institutions), room,
+            if self.scrolled("alu_scroll", len(institutions), room,
                              self.STEPS[event.keysym]):
                 self.repaint()
             return
@@ -3009,7 +3162,7 @@ class Game:
             # The digit means the nth row *shown*, which after a scroll is not
             # the nth institution. The screen's own page resolves it.
             page = collection.page(
-                len(institutions), room, self.scroll_of("city_scroll"))
+                len(institutions), room, self.scroll_of("alu_scroll"))
             index = page.absolute(int(char))
             if index < 0:
                 return
@@ -3017,9 +3170,9 @@ class Game:
             if not inst["inspected"]:
                 if not self.do(
                         A.InspectLedger(f"institution:{inst['id']}"),
-                        window="city"):
+                        window="alu"):
                     return
-            self.city_notice = ""
+            self.alu_notice = ""
             key = f"institution:{inst['id']}"
             window = self.app.window(
                 key, inst["name"], 68, 22,
@@ -3194,6 +3347,10 @@ class Game:
             elif number <= len(rows):
                 state["pick"][listing] = rows[number - 1]
             self.repaint()
+            return
+
+        if lower == "c" and not state["choosing"]:
+            self.open_counsel()
             return
 
         if state["choosing"] == "post":
@@ -3381,6 +3538,9 @@ class Game:
         if command.startswith("world:open:"):
             self.open_door_for(command.split(":", 2)[2])
             return
+        if command == "world:sickness" or char == "p":
+            self.open_plague()
+            return
         if command == "world:routes:scope" or (
                 char == "a"):
             self.world_all_routes = not all_routes
@@ -3475,6 +3635,18 @@ class Game:
         if room == "archive":
             self.inbox_filter = "records"
             self.open_tablet("s")
+            return
+        if room == "orders":
+            self.open_orders()
+            return
+        if room == "counsel":
+            self.open_counsel()
+            return
+        if room == "oaths":
+            self.open_oaths()
+            return
+        if room == "plague":
+            self.open_plague()
             return
         for char, (key, _title, _handler) in {
                 **LEDGERS, **ROOMS, **TABLETS}.items():
@@ -3817,7 +3989,16 @@ class Game:
         if concern.destination == "counsel":
             self.counsel_typed = concern.order_prompt
             self.counsel_typing = bool(concern.order_prompt)
-            self.open_room("c")
+            self.open_counsel()
+            return
+        if concern.destination == "oaths":
+            self.open_oaths()
+            return
+        if concern.destination == "plague":
+            self.open_plague()
+            return
+        if concern.destination == "orders":
+            self.open_orders()
             return
         if concern.destination in {"roll", "land"}:
             self.storehouse_view = concern.destination

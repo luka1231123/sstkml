@@ -169,7 +169,7 @@ def step(world: World) -> tuple[World, list]:
     events: list = []
     projects = dict(court.projects)
     works_days = court.works_days
-    available = max(0, court.corvee_days - works_days)
+    available = max(0, seat.corvee_days(world) - works_days)
 
     for key in sorted(projects):
         project = projects[key]

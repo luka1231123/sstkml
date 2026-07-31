@@ -123,7 +123,7 @@ def test_asking_help_changes_neither_hours_nor_the_action_log() -> None:
     game.log = []
     game.help_query = ""
     game.help_pick = ""
-    game.help_screen = "city"
+    game.help_screen = "alu"
     game.client = None
     game.repaint = lambda: None
     before_hours = game.hours

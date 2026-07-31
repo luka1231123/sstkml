@@ -71,9 +71,11 @@ def digest(b: dict, remembered: dict) -> str:
     land = b.get("land") or {}
     if land:
         lines.append(
-            f"the land: gauge {land['gauge']}, last threshing floor "
-            f"{land['last_harvest']:,}, seed in store {land['seed_in_store']:,},"
-            f" seed in the ground {land['seed_in_ground']:,}, hands supplied "
+            f"the land: gauge {land['gauge']}, the fields are in "
+            f"{land.get('stage', 'low water')}, last year the land gave the "
+            f"crown {land['last_land_due']:,}, seed in store "
+            f"{land['seed_in_store']:,}, seed in the ground "
+            f"{land['seed_in_ground']:,}, hands supplied "
             f"{land['labour_days_this_turn']:,} against "
             f"{land['labour_days_needed']:,} wanted")
 

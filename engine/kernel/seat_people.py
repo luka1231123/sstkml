@@ -634,6 +634,16 @@ def kernel_draws(people: Roster) -> tuple[Draw, ...]:
                  for c in people.cohorts)
 
 
+def _corvee_of(people: Roster) -> tuple[tuple[GroupId, int], ...]:
+    """This season's corvée, per group, off the cohorts that owe it."""
+    found = []
+    for residue in people.residues:
+        cohort = people.cohort(residue.cohort)
+        if cohort is not None and cohort.corvee:
+            found.append((residue.group, cohort.corvee))
+    return tuple(sorted(found))
+
+
 def court_draws(court, people: Roster,
                 staffed_by: Mapping[str, GroupId] = STAFFED_BY,
                 ) -> tuple[Draw, ...]:
@@ -643,9 +653,9 @@ def court_draws(court, people: Roster,
     can see each other today:
 
         the ration roll        `systems.pay_rations` feeds every group
-        `Court.at_harvest`     groups ordered to the fields instead of their
+        `at_fields`            groups ordered to the fields instead of their
                                own work, which is all of their heads
-        `Court.corvee_sources` days already raised from a group this season
+        `Cohort.corvee`        days already raised from a group this season
         formations at harvest  `troops.harvest_hands`, which counts a soldier's
                                person-days and knows nothing about the payroll
                                group he eats from
@@ -667,14 +677,14 @@ def court_draws(court, people: Roster,
         draws.append(Draw(residue.cohort, "food", BY_COURT, group.size))
 
     by_group = {r.group: r.cohort for r in people.residues}
-    for group_id in sorted(set(court.at_harvest)):
+    for group_id in sorted(court.dependents):
+        group = court.dependents[group_id]
         cohort_id = by_group.get(group_id)
-        group = court.dependents.get(group_id)
-        if cohort_id is None or group is None or group.size <= 0:
+        if cohort_id is None or not group.at_fields or group.size <= 0:
             continue
         draws.append(Draw(cohort_id, "work", "reap", group.size))
 
-    for group_id, days in sorted(court.corvee_sources):
+    for group_id, days in sorted(_corvee_of(people)):
         cohort_id = by_group.get(group_id)
         if cohort_id is None or days <= 0:
             continue

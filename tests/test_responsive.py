@@ -14,7 +14,7 @@ from __future__ import annotations
 from belief.project import project
 from engine.tick import advance
 from load import load_scenario
-from tui import (altar, archive, city, counsel, desktop, document, hall,
+from tui import (altar, archive, alu, counsel, desktop, document, hall,
                  help as help_page, inbox, orders, palace, plague, works,
                  worldmap)
 from tui.grid import cells, plain_text
@@ -42,7 +42,7 @@ def _screens(world, b):
         "land": lambda w, h: document.land(b, w, h),
         "world": lambda w, h: worldmap.compose(
             b, w, h, 0, world.court.seat),
-        "city": lambda w, h: city.compose(b, None, w, h),
+        "alu": lambda w, h: alu.compose(b, None, w, h),
         "works": lambda w, h: works.compose(b, "", w, h),
         "palace": lambda w, h: palace.compose(b, view="court", width=w,
                                               height=h),
@@ -52,7 +52,7 @@ def _screens(world, b):
         "altar": lambda w, h: altar.compose(b, [], "harvest", None, w, h),
         "counsel": lambda w, h: counsel.compose(
             b, [], 10, "", False, w, h, [], None),
-        "help": lambda w, h: help_page.compose(w, h, "repair", "", "city"),
+        "help": lambda w, h: help_page.compose(w, h, "repair", "", "alu"),
         "fortnight": lambda w, h: document.fortnight(b, [], w, h),
     }
 
@@ -71,7 +71,7 @@ def test_shrinking_to_the_minimum_keeps_the_actions_reachable():
     """Decoration may go; a control may not (spec 6, contraction order)."""
     world, b = _belief()
     screens = _screens(world, b)
-    for key in ("hall", "stack", "city", "palace", "works", "orders"):
+    for key in ("hall", "stack", "alu", "palace", "works", "orders"):
         small = plain_text(cells(screens[key](*desktop.minimum_size(key))))
         assert "[" in small and "]" in small, key
 
@@ -81,14 +81,14 @@ def test_a_screen_at_its_minimum_still_answers_the_mouse():
     luxury (spec 8, "mouse and keyboard invoke the same commands")."""
     world, b = _belief()
     screens = _screens(world, b)
-    for key in ("hall", "stack", "city"):
+    for key in ("hall", "stack", "alu"):
         screen = screens[key](*desktop.minimum_size(key))
         assert getattr(screen, "hits", ()), key
 
 
 def test_the_widest_and_narrowest_screens_land_in_the_expected_tiers():
-    assert desktop.tier(desktop.default_size("city")[0]) == desktop.STANDARD
-    assert desktop.tier(desktop.minimum_size("city")[0]) == desktop.STANDARD
+    assert desktop.tier(desktop.default_size("alu")[0]) == desktop.STANDARD
+    assert desktop.tier(desktop.minimum_size("alu")[0]) == desktop.STANDARD
     assert desktop.tier(desktop.default_size("world")[0]) == desktop.WIDE
     assert desktop.tier(desktop.default_size("help")[0]) == desktop.MINIMUM
     assert desktop.tier(desktop.minimum_size("help")[0]) == desktop.MINIMUM

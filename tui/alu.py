@@ -1,4 +1,4 @@
-"""The city: the machine, drawn, and its condition as a history (spec 6.18, M12).
+"""The Alu: the machine, drawn, and its condition as a history (spec 6.18, M12).
 
 The screen exists because of a specific failure mode. A system with two hidden
 multipliers, a head who flatters one of them, and decay measured in years can
@@ -10,7 +10,7 @@ So condition is shown **as a shape, not a number**, twice over.
 *As a skyline.* Every institution is a building standing on the same ground
 line, and the building is eroded to match its condition (`art.weather`): dressed
 stone at 800, hollowed at 400, a dithered footprint at 100. A player who has
-never read a figure on this screen can still see which quarter of his city is
+never read a figure on this screen can still see which quarter of his Alu is
 going. This is the fourth station to earn art (D34 named three), and it earns it
 because here the picture *is* the information.
 
@@ -230,7 +230,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
             width: int = 96, height: int = 36,
             notice: str = "", scroll: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
-    style.panel(surface, 0, 0, width, height, title="THE CITY",
+    style.panel(surface, 0, 0, width, height, title="THE ALU",
                 note="[esc] close", drop=False)
 
     institutions = b.get("institutions") or []
@@ -361,12 +361,13 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     if compact:
         if shown:
             footer = (f" [1-{len(shown)}] go and look — one hour"
-                      "   [n] the works   [esc] close")
+                      "   [n] the works   [o] orders   [esc] close")
         else:
-            footer = " no houses stand here   [n] the works   [esc] close"
+            footer = (" no houses stand here   [n] the works"
+                      "   [o] orders   [esc] close")
     else:
         footer = (" [1-9] go and look for yourself — one hour"
-                  "   [n] the works   [esc] close")
+                  "   [n] the works   [o] orders   [esc] close")
     style.bar(surface, 2, height - 2, width - 4, footer,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

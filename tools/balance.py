@@ -30,16 +30,19 @@ from load import load_scenario             # noqa: E402
 
 def _prudent_allocations(world, budget: int) -> list:
     """Pay down the priority list until the budget is gone; cut the rest."""
+    from engine import seat
+
     court = world.court
-    order = list(court.priority)
-    order += sorted(g for g in court.dependents if g not in court.priority)
+    order = list(seat.order_of_payment(world))
+    order += sorted(g for g in court.dependents if g not in order)
+    allowances = seat.allowances(world)
     actions, left = [], budget
     for gid in order:
         group = court.dependents[gid]
         owed = group.size * group.entitlement
         give = min(owed, max(0, left))
         left -= give
-        if court.allocations.get(gid, owed) != give:
+        if allowances.get(gid, owed) != give:
             actions.append(A.Allocate(gid, give))
     return actions
 
@@ -62,7 +65,7 @@ def run(policy: str = "prudent", turns: int = 72,
             # Hands to the fields when the granary is thin and the crop is standing.
             if court.stores.get("grain", 0) < annual // 4:
                 for gid in ("weavers", "garrison_mahadu"):
-                    if gid in court.dependents and gid not in court.at_harvest:
+                    if gid in court.dependents and not court.dependents[gid].at_fields:
                         world, _ = apply(world, A.SendToHarvest(gid, True))
         court = world.court
         rows.append({

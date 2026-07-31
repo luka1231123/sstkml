@@ -232,7 +232,7 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
        (Field("kind", "plan"), Field("place", "place")),
        mnemonic="b", help_topic="build", confirm=True),
     _d("begin_repair", A.BeginRepair, "Repair", "Repair",
-       ("city", "institution", "works"), ("repair <institution>",), 1,
+       ("alu", "institution", "works"), ("repair <institution>",), 1,
        (Field("institution", "institution"),), mnemonic="r",
        help_topic="repair", confirm=True),
     _d("abandon_work", A.AbandonWork, "Abandon", "Abandon", ("works",),

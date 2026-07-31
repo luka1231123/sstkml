@@ -1,0 +1,262 @@
+# Exemplars drawn from published Late Bronze Age letter corpora, rendered in
+# the game's English register. Each one is here because it demonstrates one
+# convention the scribe must reproduce; `convention` names it and `source` names
+# the corpus the form comes from. These are models of FORM, not quotations: the
+# names, quantities and business are the game's.
+#
+# Read by `ai/composer.py` as few-shot material and by the tests as fixtures.
+# Every text must pass its own profile's grader and fit the clay envelope
+# (25-90 words), because a model the scribe is shown must be a tablet he could
+# have written.
+
+[[letters]]
+id = "servant_address"
+profile = "hatti.servant_to_lord"
+recipient = "hatti_king"
+direction = "up"
+convention = "address_and_prostration"
+source = "Amarna (EA), vassal letters"
+note = """The vassal names his lord first and himself second, and falls before
+answering. The prostration is the fixed number, seven and seven."""
+text = """To the Sun, Great King, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+The command of my lord rests before me. I shall perform it as my lord has
+written, and my house will not be found wanting in the matter. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "servant_quotation"
+profile = "hatti.servant_to_lord"
+recipient = "hatti_king"
+direction = "up"
+convention = "quotation_of_incoming"
+source = "Mari (ARM); Amarna (EA)"
+note = """The answer repeats the lord's own words before it answers them, so
+that the tablet is intelligible without the tablet it replies to."""
+text = """To the Sun, Great King, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+As to what my lord wrote me, saying: "Where are the ships you owe me?" -- two
+ships have sailed and the rest are held by the season. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "servant_oath"
+profile = "hatti.servant_to_lord"
+recipient = "hatti_king"
+direction = "up"
+convention = "oath_by_named_gods"
+source = "Hittite (KBo, KUB), vassal treaties and letters"
+note = """An oath is sworn by the gods of the lord's pantheon, named in full.
+A vassal swearing by his own gods alone is a defective oath."""
+text = """To the Sun, Great King, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+By the Storm God of Hatti and the Sun Goddess of Arinna, I attend to my oath,
+and what I swore before my lord I do not set aside. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "servant_single_topic"
+profile = "hatti.servant_to_lord"
+recipient = "carchemish_viceroy"
+direction = "up"
+convention = "one_subject_upward"
+source = "Amarna (EA); Ugarit (RS) Carchemish correspondence"
+note = """Upward letters carry one subject. A vassal who bundles an excuse with
+a request is heard as bargaining, which is why the two do not share a tablet."""
+text = """To the king of Carchemish, viceroy of the Sun, my lord: thus says Ammurapi, your servant.
+At the feet of my lord, seven times and seven times I fall.
+The grain my lord appointed is counted and sealed at my quay. It waits only for
+the ship my lord sends. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_greeting"
+profile = "peer.equal_to_equal"
+recipient = "pharaoh"
+direction = "level"
+convention = "wellbeing_between_peers"
+source = "Amarna (EA), great-king correspondence"
+note = """Between equals the tablet opens with brotherhood and a wish for the
+other house before any business. No prostration appears."""
+text = """To Pharaoh, the Sun, my brother: thus says Ammurapi, your brother.
+May it be well with my brother, with your house, your wives, your sons and your
+horses. It is well with me.
+Let your heart be reassured; friendship stands between our houses as before. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_gift"
+profile = "peer.equal_to_equal"
+recipient = "babylon_king"
+direction = "level"
+convention = "gift_named_by_quantity"
+source = "Amarna (EA), gift-exchange letters"
+note = """A gift is counted on the tablet. The quantity, the unit and the bearer
+are named, because the recipient's scribe will check them against the goods."""
+text = """To the king of Karduniash, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+I send my brother forty jars of oil and two talents of copper by the hand of my
+servant Anantenu. Let my brother receive them and be glad. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_detained_messenger"
+profile = "peer.equal_to_equal"
+recipient = "assyria_king"
+direction = "level"
+convention = "messenger_as_subject"
+source = "Amarna (EA), complaints of held messengers"
+note = """A detained messenger is itself a matter of state, raised plainly and
+by name. Silence is treated as an act."""
+text = """To the king of Assur, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+My messenger Ilimilku went to you in the spring and has not returned. Send him
+back to me with your answer, and do not hold him a second season. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_warning"
+profile = "peer.equal_to_equal"
+recipient = "pharaoh"
+direction = "level"
+convention = "warning_as_service"
+source = "Ugarit (RS), the Alashiya and ship-sighting letters"
+note = """A warning is given as a service performed for the other house, with
+the count of what was seen and where."""
+text = """To Pharaoh, the Sun, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+Twenty ships not our own were seen off my coast and went south. I write so that
+danger does not surprise my brother. Set your watch. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_refusal"
+profile = "peer.equal_to_equal"
+recipient = "babylon_king"
+direction = "level"
+convention = "refusal_without_excuse"
+source = "Amarna (EA), refusals between great kings"
+note = """A refusal between equals is stated once and not padded with reasons.
+Reasons invite a second asking."""
+text = """To the king of Karduniash, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+What my brother asks of my grain I cannot grant this season. Let my brother ask
+of me in another matter and he will not be refused. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "peer_marriage"
+profile = "peer.equal_to_equal"
+recipient = "assyria_king"
+direction = "level"
+convention = "marriage_as_a_letter_matter"
+source = "Amarna (EA), marriage negotiations"
+note = """A marriage is proposed in the body of an ordinary letter, naming the
+woman, the house she goes to, and what accompanies her."""
+text = """To the king of Assur, my brother: thus says Ammurapi, your brother.
+May it be well with my brother and with his house.
+I give my daughter Sharelli to the house of my brother, and I send with her the
+goods proper to her rank. Let my brother send word by his messenger. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "ruler_reassure"
+profile = "ugarit.ruler_to_other"
+recipient = "alashiya_gov"
+direction = "level"
+convention = "plain_register"
+source = "Ugarit (RS), ruler-to-official letters"
+note = """Where no status formula governs, the king writes plainly: his own
+title, no prostration, no brotherhood claimed."""
+text = """To Abdi-milki, governor at Alashiya: thus says Ammurapi, king of Ugarit.
+Let your heart be reassured. Your words have reached my house and were read
+before me.
+Do not fear; I have not forgotten you, and my answer follows this tablet. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "ruler_promise"
+profile = "ugarit.ruler_to_other"
+recipient = "sinaranu"
+direction = "level"
+convention = "promise_with_a_term"
+source = "Ugarit (RS 16.238 and the Sinaranu exemption texts)"
+note = """A promise names what is given, to whom, and the condition under which
+it stands. An exemption is granted in the same breath as its limit."""
+text = """To Sinaranu the merchant: thus says Ammurapi, king of Ugarit.
+Your ship that comes in from Crete is free of the due for this year, and the
+king's men shall not touch it.
+This stands while your oil and your copper serve my house and no other. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "ruler_warning"
+profile = "ugarit.ruler_to_other"
+recipient = "tyre_king"
+direction = "level"
+convention = "concrete_report"
+source = "Amarna (EA), coastal correspondence"
+note = """The report is countable: how many, from where, how long ago. No
+adjectives stand in for a number."""
+text = """To Abimilki, king of Tyre: thus says Ammurapi, king of Ugarit.
+Ships were seen off my coast, seven of them, in the last days of the month.
+They stood off and did not land.
+Set your watch and send me word of what passes your own shore. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "ruler_refusal"
+profile = "ugarit.ruler_to_other"
+recipient = "amurru_king"
+direction = "level"
+convention = "refusal_stated_once"
+source = "Ugarit (RS), Amurru correspondence"
+note = """The refusal is placed where the request was, so the tablet answers in
+the order it was asked."""
+text = """To the king of Amurru: thus says Ammurapi, king of Ugarit.
+As to the men you asked of me for your watch: I cannot send them while my own
+coast stands open.
+When the season closes, look for my word in this matter again. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "lord_instruction"
+profile = "ugarit.lord_to_servant"
+recipient = "overseer_royal_lands"
+direction = "down"
+convention = "downward_instruction"
+source = "Mari (ARM), palace instructions to officials"
+note = """Downward the tablet opens with the servant named and the king's
+title, carries no wish for his health, and ends in an instruction."""
+text = """To Yarimmu, overseer of the royal lands: thus says Ammurapi, king of Ugarit, your lord.
+Take one hundred men to the canal at the second estate and open it before the
+water rises.
+Write to me when it is done, and write the count of the days spent. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "lord_demand_account"
+profile = "ugarit.lord_to_servant"
+recipient = "overseer_siyannu"
+direction = "down"
+convention = "account_demanded_with_a_deadline"
+source = "Mari (ARM); Kültepe / kārum Kanesh accounts"
+note = """An order downward names the deadline and the unit of account, so that
+the answer can be checked rather than believed."""
+text = """To Abdi-hagab, overseer of Siyannu: thus says Ammurapi, king of Ugarit, your lord.
+Send me the count of the grain on your threshing floor, in parisu, before the
+month turns.
+The figure you sent before does not agree with my scribe's. Send the true one. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "lord_reprimand"
+profile = "ugarit.lord_to_servant"
+recipient = "overseer_ilishtamai"
+direction = "down"
+convention = "reprimand_without_threat"
+source = "Mari (ARM), letters of rebuke"
+note = """The rebuke states the fact and the remedy. A threat is not written
+where an instruction will serve."""
+text = """To Kurwanu, overseer of Ilishtamai: thus says Ammurapi, king of Ugarit, your lord.
+Twice I have written to you about the men held back from the harvest, and twice
+you have not answered.
+Send them to the fields, and send your answer with the same courier. Yabninu wrote it; the palace courier bears the sealed tablet."""
+
+[[letters]]
+id = "merchant_register"
+profile = "ugarit.ruler_to_other"
+recipient = "ura_merchant"
+direction = "level"
+convention = "merchant_plainness"
+source = "Kültepe / kārum Kanesh merchant letters"
+note = """Trade letters are the plainest register in the corpus: goods, amount,
+price, deadline, and nothing else."""
+text = """To Kilya, grain-factor of Ura: thus says Ammurapi, king of Ugarit.
+Eight thousand parisu of grain at the price we agreed, delivered at my quay
+before the sea shuts.
+If you cannot bring it whole, bring what you have and write me the rest. Yabninu wrote it; the palace courier bears the sealed tablet."""

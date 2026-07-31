@@ -6,32 +6,30 @@ from tui.grid import INDEX, InteractiveScreen, sparkline, Surface
 
 C = INDEX
 
+# Eight rooms. Orders lives inside the Alu, Counsel inside the Court,
+# Oaths inside the Shrine, and Sickness inside the World, so the halls of the
+# kingdom are the Hall, the Scribes' Room, the Storehouse, the Alu, the
+# Court, the Shrine, the World, and the Muster. Help is a utility, not a door.
 DOORS = (
     ("s", "Scribes", "stack"),
-    ("g", "Orders", "orders"),
-    ("c", "Counsel", "counsel"),
     ("t", "Storehouse", "stores"),
-    ("y", "City", "city"),
-    ("m", "Corvee", "muster"),
-    ("o", "Oaths", "oaths"),
+    ("m", "Muster", "muster"),
+    ("y", "Alu", "alu"),
     ("j", "Court", "palace"),
     ("v", "Shrine", "altar"),
     ("w", "World", "world"),
-    ("p", "Sickness", "plague"),
-    ("?", "Help", "help"),
 )
 
 BUILT = frozenset({
-    "stack", "stores", "muster", "oaths", "help",
-    "orders", "altar", "world", "plague", "counsel",
-    "city", "palace",
+    "stack", "stores", "muster",
+    "alu", "palace", "altar", "world",
 })
 
 GROUPS = (
-    ("KINGDOM", (("t", "Storehouse"), ("y", "City"))),
-    ("DUTY", (("m", "Corvee"), ("o", "Oaths"))),
-    ("COURT", (("j", "Court"), ("v", "Shrine"), ("c", "Counsel"))),
-    ("BEYOND", (("w", "World"), ("p", "Sickness"), ("?", "Help"))),
+    ("KINGDOM", (("t", "Storehouse"), ("y", "Alu"))),
+    ("DUTY", (("m", "Muster"),)),
+    ("COURT", (("j", "Court"), ("v", "Shrine"))),
+    ("BEYOND", (("w", "World"),)),
 )
 
 _TARGET_OF = {key: target for key, _label, target in DOORS}
@@ -269,8 +267,9 @@ def compose(b: dict, width: int = 84, height: int = 28,
                      _trunc(f"+ {rest} wait beyond the doors", left_width - 2),
                      C["ash"], C["ink"])
 
-    # Tablet wing and palace passages. Scribes and Orders live together at the
-    # top rather than being repeated again in a generic navigation group.
+    # Tablet wing. Scribes keeps its place at the top of the passages rather
+    # than being repeated again in a generic navigation group; Orders is not a
+    # door here, it is a station inside the Alu.
     unread = [item for item in b.get("stack", []) if not item["read"]]
     style.bar(surface, rx, 5, rw, f" INBOX · {len(unread)} UNREAD",
               fg=C["bone"], bg=C["faint"])
@@ -284,8 +283,7 @@ def compose(b: dict, width: int = 84, height: int = 28,
     else:
         surface.text(rx + 1, 6, "no unread tablets", C["ash"], C["ink"])
     column = rx + 1
-    column += style.keycap(surface, column, 7, "s", "Scribes") + 1
-    style.keycap(surface, column, 7, "g", "Orders")
+    style.keycap(surface, column, 7, "s", "Scribes")
     surface.text(rx, 8, "─" * rw, C["faint"], C["ink"])
 
     y = 9
@@ -305,6 +303,7 @@ def compose(b: dict, width: int = 84, height: int = 28,
         style.FooterAction("ctrl-o", "reload"),
         style.FooterAction(":", "command"),
         style.FooterAction("\\", "read out"),
+        style.FooterAction("?", "help"),
         style.FooterAction("Q", "leave the hall", command="q"),
     ])
     return surface.interactive()

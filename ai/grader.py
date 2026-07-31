@@ -40,8 +40,22 @@ def profile_for(recipient: str, data: dict | None = None) -> str:
     return data["recipients"].get(recipient, "ugarit.ruler_to_other")
 
 
+# A wish for the other house takes several forms across the corpus; any of them
+# counts as one having been offered.
+_WELLBEING_MARKS = (
+    "may it be well with",
+    "your health",
+    "heart be reassured",
+)
+
+
 def _has(text: str, term: str) -> bool:
     return term.casefold() in text.casefold()
+
+
+def _quotes(text: str) -> bool:
+    """Does the tablet repeat the other party's own words back at them?"""
+    return '"' in text or "saying:" in text.casefold()
 
 
 def grade(text: str, profile: dict, weights: dict,
@@ -93,6 +107,28 @@ def grade(text: str, profile: dict, weights: dict,
     if oath and any(not _has(text, god) for god in gods):
         violations.append("wrong_oath_gods")
         penalty += weights["oath_gods"]
+
+    # The conventions the corpus documents beyond address and rank: a wish for
+    # the other house, a quotation of what is being answered, and a closing.
+    # Each is graded only where the register asks for it -- a wellbeing wish
+    # sent down to an officer is as wrong as its absence between brothers.
+    wellbeing = profile.get("wellbeing", "")
+    said_well = any(_has(text, phrase) for phrase in _WELLBEING_MARKS)
+    if wellbeing:
+        said_well = said_well or _has(text, wellbeing.rstrip("."))
+    if profile.get("wellbeing_required") and not said_well:
+        violations.append("missing_wellbeing")
+        penalty += weights.get("wellbeing", 0)
+    if profile.get("wellbeing_forbidden") and said_well:
+        violations.append("wellbeing_downward")
+        penalty += weights.get("wellbeing", 0)
+    if profile.get("closing_required") and not _has(text, "seal"):
+        violations.append("missing_closing")
+        penalty += weights.get("closing", 0)
+    quoting = profile.get("quotation_form", "")
+    if quoting and _quotes(text) and not _has(text, quoting.rstrip(":")):
+        violations.append("unmarked_quotation")
+        penalty += weights.get("quotation", 0)
 
     return ProtocolScore(
         address_ok, prostration_ok, self_ok, topic_count,

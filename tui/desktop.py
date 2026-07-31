@@ -62,7 +62,7 @@ def _spec(key, title, window_class, default=None, minimum=None) -> WindowSpec:
     """A window's size, defaulting to its class but free to state its own.
 
     Several screens in specification section 15 name a size that is not exactly
-    their class default -- City wants 96 columns for the skyline, the Inbox 90
+    their class default -- Alu wants 96 columns for the skyline, the Inbox 90
     for its columns -- so the class is the rule and the pair is the exception.
     """
     cls = CLASSES[window_class]
@@ -80,9 +80,9 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("hall", "The Hall", "anchor", (84, 28), (84, 26)),
         _spec("stack", "The Scribes' Room", "workbench", (80, 27), (78, 26)),
         # Four full-size houses, their labels and their matching ledger rows
-        # all fit at this floor. A shorter City used to cover those labels
+        # all fit at this floor. A shorter Alu used to cover those labels
         # with the Works band while still advertising the hidden number keys.
-        _spec("city", "The City", "workbench", (74, 25), (70, 25)),
+        _spec("alu", "The Alu", "workbench", (74, 25), (70, 25)),
         _spec("orders", "Orders", "workbench", (72, 24), (66, 22)),
         # The World is intentionally exempt from the compact desktop pass.
         _spec("world", "The Known World", "workbench", (104, 32), (68, 22)),
@@ -90,8 +90,12 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("works", "Works", "ledger", (66, 23), (62, 21)),
         _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
         _spec("roll", "The Roll", "ledger", (66, 23), (62, 21)),
-        _spec("land", "The Land", "ledger", (64, 23), (60, 21)),
-        _spec("muster", "The Corvée", "ledger", (64, 22), (60, 20)),
+        # The Land carries the full estate dossier -- gauge, season, last
+        # year's crop, the seed and the ground -- which the compact stacked
+        # geometry cut to half a page. Taller by default so the whole dossier
+        # sits on one screen (spec 6.4).
+        _spec("land", "The Land", "ledger", (64, 30), (60, 24)),
+        _spec("muster", "The Muster", "ledger", (64, 22), (60, 20)),
         _spec("oaths", "The Oaths", "ledger", (62, 22), (58, 20)),
         _spec("stores", "The Storehouse", "workbench", (78, 25), (76, 24)),
         # The Shrine keeps enough vertical room for its medium altar vignette

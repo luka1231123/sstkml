@@ -7,8 +7,9 @@ from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_scenario
-from tui import altar, archive, city, counsel, inbox, plague, render
+from tui import altar, archive, alu, counsel, inbox, plague, render
 from tui.grid import plain_text
+from engine import seat
 
 SEED = 8814402919
 
@@ -169,16 +170,16 @@ def test_counsel_preview_is_non_mutating_until_confirmed() -> None:
     game.counsel_typed = ""
     game.counsel_typing = True
     game.counsel_pending = None
-    before = game.world.court.allocations.get("smiths_palace")
+    before = seat.allowances(game.world).get("smiths_palace")
 
     game.submit_counsel("allocate smiths_palace 7000")
-    assert game.world.court.allocations.get("smiths_palace") == before
+    assert seat.allowances(game.world).get("smiths_palace") == before
     assert game.log == []
     assert game.counsel_pending is not None
     assert "smiths" in game.counsel_pending["descriptions"][0].lower()
 
     game.confirm_counsel_order()
-    assert game.world.court.allocations["smiths_palace"] == 7000
+    assert seat.allowances(game.world)["smiths_palace"] == 7000
     assert game.log[-1]["action"]["_t"] == "Allocate"
 
 
@@ -275,15 +276,15 @@ def test_answer_refusal_is_visible_in_the_inbox() -> None:
 def test_failed_city_inspection_stays_put_and_explains_itself() -> None:
     game = _controller()
     game.hours = 0
-    game.city_notice = ""
+    game.alu_notice = ""
     game.session_notice = ""
     before = game.world
 
-    game.on_city_key(_Key("1"))
+    game.on_alu_key(_Key("1"))
     assert game.world is before
-    assert "requires 1 hour" in game.city_notice
-    assert game.city_notice in plain_text(
-        city.compose(game.belief, notice=game.city_notice))
+    assert "requires 1 hour" in game.alu_notice
+    assert game.alu_notice in plain_text(
+        alu.compose(game.belief, notice=game.alu_notice))
 
 
 def test_divination_ui_calls_it_a_forecast_not_future_access() -> None:

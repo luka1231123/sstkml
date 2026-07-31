@@ -110,7 +110,7 @@ def _staff_factor(court, inst) -> int:
     if not inst.group:
         return UNASSIGNED_STAFF_OUTPUT
     if (group is None or group.size <= 0 or group.revolting
-            or inst.group in court.at_harvest):
+            or group.at_fields):
         return 0
     heads, reference_capacity = _STAFFING_NORMS.get(
         inst.kind, (100, 1000))
