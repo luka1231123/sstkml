@@ -127,6 +127,11 @@ def _inbox_items(world, perr: int) -> list[dict]:
     return items
 
 
+def _seasonal(route) -> bool:
+    """Whether the route shuts outside a named season, as the tablet says it."""
+    return bool(route.legs and route.legs[0].season)
+
+
 def _known_legs(world, path) -> int:
     """Courier legs along a route, from the court's own route tablet.
 
@@ -138,8 +143,8 @@ def _known_legs(world, path) -> int:
     for a, b in zip(path, path[1:]):
         route = next(
             (item for item in lines(world)
-             if {item.a, item.b} == {a, b}), None)
-        legs += route.legs if route is not None else 1
+             if set(item.ends) == {a, b}), None)
+        legs += route.fortnights() if route is not None else 1
     return max(1, legs) if len(tuple(path)) > 1 else 1
 
 
@@ -715,11 +720,11 @@ def _world_graph(world) -> dict:
         ],
         "routes": [
             {
-                "a": route.a,
-                "b": route.b,
-                "mode": route.mode,
-                "seasonal": route.seasonal,
-                "legs": route.legs,
+                "a": route.ends[0],
+                "b": route.ends[1],
+                "mode": route.legs[0].mode,
+                "seasonal": _seasonal(route),
+                "legs": route.fortnights(),
                 # Scenery on the same terms as the terrain: the course is the
                 # inherited map of where the road runs, not a live report.
                 "course": [list(turn) for turn in route.course],
@@ -728,15 +733,15 @@ def _world_graph(world) -> dict:
                 "age_turns": max(0, now),
                 "certainty": "charted",
                 "availability": (
-                    "closed" if route.seasonal and not sailing else "open"),
+                    "closed" if _seasonal(route) and not sailing else "open"),
                 "availability_source": "court calendar",
                 "availability_as_of_turn": now,
             }
             for route in sorted(
                 lines(world),
                 key=lambda item: (
-                    min(item.a, item.b), max(item.a, item.b),
-                    item.mode, item.legs),
+                    min(item.ends), max(item.ends),
+                    item.legs[0].mode, item.fortnights()),
             )
         ],
         # The ground, drawn on the same inherited tablet as the place names,

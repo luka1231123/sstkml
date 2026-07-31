@@ -13,6 +13,7 @@ from engine.core import Date
 
 if TYPE_CHECKING:
     from engine.actions import LetterTerm
+    from engine.entity import Route
     from engine.kernel.world import Kernel
     from engine.obligation import (
         GoodsReservation,
@@ -467,21 +468,6 @@ class Document:
 
 
 @dataclasses.dataclass(frozen=True)
-class Route:
-    a: PlaceId
-    b: PlaceId
-    legs: int          # fortnights to cross
-    mode: str          # "sea" | "land" | "river"
-    seasonal: bool     # sea legs shut outside the sailing window
-    risk: int          # 0..1000 base interception/loss weight
-    # The ground the route actually crosses, as (col, row) turns on the map.
-    # A road is not a straight line: it follows the valley and goes round the
-    # mountain, and `tools/route_geography.py` is what decides where. Empty
-    # means nobody has laid it yet, and the tablet falls back to a straight one.
-    course: tuple[tuple[int, int], ...] = ()
-
-
-@dataclasses.dataclass(frozen=True)
 class Terrain:
     """The ground itself: one character per cell, authored in `content/`.
 
@@ -837,7 +823,7 @@ class World:
         return _places_of(self)
 
     @property
-    def routes(self) -> tuple[Route, ...]:
+    def routes(self) -> tuple["Route", ...]:
         return _routes_of(self)
 
 
@@ -882,7 +868,7 @@ def marks(world: World) -> Mapping[PlaceId, Place]:
     return _places_of(world)
 
 
-def lines(world: World) -> tuple[Route, ...]:
+def lines(world: World) -> tuple["Route", ...]:
     """The map's roads and crossings off the registry."""
     return _routes_of(world)
 
@@ -929,8 +915,8 @@ def _build_places(registry, plague: PlagueState) -> Mapping[PlaceId, Place]:
     return places
 
 
-def with_routes(world: World, routes: tuple[Route, ...]) -> World:
-    """Put court-shaped routes back on the registry, which owns them (C5).
+def with_routes(world: World, routes: tuple["Route", ...]) -> World:
+    """Put altered routes back on the registry, which owns them (C5).
 
     For callers that want to alter the map -- a test shutting the risk off, a
     scenario tool. Anything not named here keeps whatever the registry had.
@@ -938,35 +924,20 @@ def with_routes(world: World, routes: tuple[Route, ...]) -> World:
     registry = world.kernel.registry
     updated = dict(registry.routes)
     for route in routes:
-        rid = f"route:{route.a}_{route.b}"
-        found = updated.get(rid)
-        if found is None:
-            continue
-        legs = tuple(dataclasses.replace(
-            leg, mode=route.mode, fortnights=route.legs,
-            season="sailing_open" if route.seasonal else "")
-            for leg in found.legs)
-        updated[rid] = dataclasses.replace(
-            found, legs=legs, risk=route.risk, course=route.course)
+        if route.id in updated:
+            updated[route.id] = route
     kernel = dataclasses.replace(
         world.kernel, registry=dataclasses.replace(registry, routes=updated))
     return dataclasses.replace(world, kernel=kernel)
 
 
-def _routes_of(world: World) -> tuple[Route, ...]:
+def _routes_of(world: World) -> tuple["Route", ...]:
     registry = world.kernel.registry
     return _memo(_ROUTE_CACHE, (registry,), lambda: _build_routes(registry))
 
 
-def _build_routes(registry) -> tuple[Route, ...]:
-    out = []
-    for rid in sorted(registry.routes):
-        route = registry.routes[rid]
-        if not route.legs or len(route.ends) != 2:
-            continue
-        leg = route.legs[0]
-        out.append(Route(a=route.ends[0], b=route.ends[1],
-                         legs=leg.fortnights, mode=leg.mode,
-                         seasonal=bool(leg.season), risk=route.risk,
-                         course=route.course))
-    return tuple(out)
+def _build_routes(registry) -> tuple["Route", ...]:
+    """The routes a courier can walk: two named ends and at least one leg."""
+    return tuple(registry.routes[rid] for rid in sorted(registry.routes)
+                 if registry.routes[rid].legs
+                 and len(registry.routes[rid].ends) == 2)

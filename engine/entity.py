@@ -250,8 +250,8 @@ class Leg:
 class Route:
     """A connection that carries journeys, cargo, people, news, and disease.
 
-    Distinct from `engine.state.Route`, which is the pre-kernel letter edge and
-    is retired with the legacy adapter (spec 9, migration table).
+    The only route there is. `World.routes` hands out these records, and the
+    court's letter edge is gone (Task 2 C5).
     """
     id: EntityId
     name: str

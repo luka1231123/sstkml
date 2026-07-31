@@ -119,7 +119,7 @@ def test_ugarit_still_reaches_the_sea_through_its_own_harbour() -> None:
     assert [p.id for p in harbours] == ["ma_hadu"]
     # The seat keeps direct sea routes even though the one-cell road to its
     # own harbour (ma_hadu) is not authored in the content yet.
-    assert any(route.mode == "sea" and "seat" in (route.a, route.b)
+    assert any(route.legs[0].mode == "sea" and "seat" in route.ends
                for route in world.routes)
 
 
@@ -146,8 +146,9 @@ def test_every_alu_is_reachable_from_the_seat() -> None:
     world = _world()
     edges: dict[str, set[str]] = collections.defaultdict(set)
     for route in world.routes:
-        edges[route.a].add(route.b)
-        edges[route.b].add(route.a)
+        a, b = route.ends
+        edges[a].add(b)
+        edges[b].add(a)
 
     seen, queue = {"seat"}, ["seat"]
     while queue:

@@ -29,7 +29,7 @@ def test_closed_sea_backlogs_then_releases_distinct_tablets():
                 r = _route_between(world.routes, a, b)
                 # A letter sitting at a harbour before a shut sea leg is backlogged.
                 # (One already mid-crossing when the season turned finishes it.)
-                if r and r.mode == "sea" and L.legs_into_edge == 0:
+                if r and r.legs[0].mode == "sea" and L.legs_into_edge == 0:
                     winter_sea_backlog += 1
         sea_arrivals = sum(1 for e in events if isinstance(e, A.LetterArrived)
                            and e.sender in ("alashiya_gov", "pharaoh"))

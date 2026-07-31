@@ -9,8 +9,8 @@ autumn tablet.
 
 Two things make this module worth writing rather than reusing.
 
-The court's `engine.state.Route` is one hop with a leg count, a mode, and a
-boolean that means "the sailing window applies". The kernel's is a named chain:
+The court's route, retired in C5, was one hop with a leg count, a mode, and a
+boolean that meant "the sailing window applies". The kernel's is a named chain:
 each `Leg` says which span it is open in, so a route may be a road that runs all
 year to a harbour and a crossing that shuts, and the journey stops at the quay
 rather than at the far shore. Nothing in the court's shape can say that.

@@ -19,7 +19,7 @@ from engine.entity import Organization as KernelOrganization
 from engine.entity import Polity as KernelPolity
 from engine.entity import Region as KernelRegion
 from engine.entity import Registry
-from engine.entity import Route as KernelRoute
+from engine.entity import Route
 from engine.entity import Settlement as KernelSettlement
 from engine.entity import Site as KernelSite
 from engine.entity import TENURES
@@ -40,7 +40,7 @@ from engine.state import (Clause, Correspondent, Court, DependentGroup,
                           Document, ForeignCourt, Formation,
                           HarbourCargoLot,
                           HouseMember, Institution, MetalState, Oath, Petition,
-                          Place, PlagueState, Relation, Rite, Route, Site,
+                          Place, PlagueState, Relation, Rite, Site,
                           Terrain, Workshop, World)
 
 # The five overlords a place's `power` may name. "free" is not among them: a
@@ -309,7 +309,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     routes = {}
     for r in cfg.get("routes", []):
         route_id = f"route:{r['a']}_{r['b']}"
-        routes[route_id] = KernelRoute(
+        routes[route_id] = Route(
             id=route_id, name=f"{r['a']}-{r['b']}",
             legs=(KernelLeg(
                 origin=route_settlement(r["a"]), destination=route_settlement(r["b"]),

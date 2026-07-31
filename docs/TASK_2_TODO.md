@@ -158,11 +158,14 @@ has been since C2, and the mirror is deleted with its readers in C5.
       the only writer.
 - [x] `belief/project.py` reads the registry. Projection keys unchanged and
       `tui/` took no edit.
-- [ ] `mail.py` walk kernel routes. Not done and not a second authority:
-      `world.routes` is a view, so mail, `divine` and `relations` already read
-      the registry through it. What is left is swapping the court-shaped
-      `state.Route` for `entity.Route` at the eight call sites, which retires
-      the shim and buys nothing else.
+- [x] `mail.py` walk kernel routes. `state.Route` is gone: `World.routes` and
+      `lines` hand out `entity.Route` itself, and mail, `divine` and
+      `project` read `ends` and the legs. Two rules the shim used to flatten
+      are named where they are applied: `mail.crossing` is the fortnights to
+      cross, and `mail.sea_entry` is the seasonal-entry rule, which is about
+      the first leg because a courier stopped by winter is stopped before he
+      sets out. `with_routes` keys on `Route.id` and puts the record back
+      whole.
 
 Closes: places, routes. The audit is 8 findings -> 6.
 

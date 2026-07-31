@@ -67,7 +67,7 @@ def _death_evidence(world: World, subject: str) -> str:
 
 def _route_evidence(world: World, place: str) -> str:
     """Known route topology plus the court's seasonal sailing tradition."""
-    from engine.mail import shortest_path
+    from engine.mail import sea_entry, shortest_path
     from engine.systems import sea_open
 
     path = shortest_path(world.routes, world.court.seat, place) if place else ()
@@ -78,8 +78,7 @@ def _route_evidence(world: World, place: str) -> str:
         (b, a) for a, b in zip(path, path[1:]))
     seasonal_sea = (
         not place
-        or any((route.a, route.b) in edges
-               and route.seasonal and route.mode == "sea"
+        or any(route.ends in edges and sea_entry(route)
                for route in world.routes)
     )
     if not seasonal_sea:

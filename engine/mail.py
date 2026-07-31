@@ -24,11 +24,27 @@ from engine.systems import sea_open
 
 
 # --- graph -------------------------------------------------------------------
+def crossing(route) -> int:
+    """Fortnights to cross a route. A letter edge is the whole route."""
+    return max(1, route.fortnights())
+
+
+def sea_entry(route) -> bool:
+    """Whether entering this route means entering a seasonal sea leg.
+
+    The rule is about the boundary, so it is the first leg that decides: a
+    courier stopped by the winter is stopped before he sets out.
+    """
+    leg = route.legs[0] if route.legs else None
+    return bool(leg and leg.season and leg.mode == "sea")
+
+
 def _adjacency(routes) -> dict[str, list]:
     adj: dict[str, list] = {}
     for r in routes:
-        adj.setdefault(r.a, []).append((r.b, r.legs, r))
-        adj.setdefault(r.b, []).append((r.a, r.legs, r))
+        a, b = r.ends
+        adj.setdefault(a, []).append((b, crossing(r), r))
+        adj.setdefault(b, []).append((a, crossing(r), r))
     return adj
 
 
@@ -63,7 +79,7 @@ def shortest_path(routes, src: str, dst: str) -> tuple[str, ...]:
 
 def _route_between(routes, a: str, b: str):
     for r in routes:
-        if (r.a == a and r.b == b) or (r.a == b and r.b == a):
+        if set(r.ends) == {a, b}:
             return r
     return None
 
@@ -77,14 +93,14 @@ def route_latency(routes, src: str, dst: str, season,
     elapsed = 0
     for a, b in zip(path, path[1:]):
         route = _route_between(routes, a, b)
-        legs = route.legs if route else 1
+        legs = crossing(route) if route else 1
         progress = 0
         while progress < legs:
             elapsed += 1
             fortnight = (start_fortnight + elapsed - 1) % 24 + 1
             blocked = (
                 progress == 0 and route is not None
-                and route.seasonal and route.mode == "sea"
+                and sea_entry(route)
                 and not sea_open(season, fortnight)
             )
             if not blocked:
@@ -128,7 +144,7 @@ def step_letters(world: World) -> tuple[World, list]:
         at_boundary = L.legs_into_edge == 0
         seasonal_block = (
             at_boundary and r is not None
-            and r.seasonal and r.mode == "sea"
+            and sea_entry(r)
             and not sea_open(world.season, fn)
         )
         quarantine_block = (
@@ -139,7 +155,7 @@ def step_letters(world: World) -> tuple[World, list]:
         if blocked:
             still.append(L)                        # waits at the boundary
             continue
-        legs = r.legs if r else 1
+        legs = crossing(r) if r else 1
         lie = L.legs_into_edge + 1
         if lie >= legs:                            # reached node b
             if L.disease_exposed:
@@ -490,7 +506,7 @@ def apply_dispatch(world: World,
     world = archive.file_letter(world, letter)
 
     journey = sum(
-        (_route_between(world.routes, a, b).legs
+        (crossing(_route_between(world.routes, a, b))
          for a, b in zip(letter.path, letter.path[1:])),
         start=0,
     )
