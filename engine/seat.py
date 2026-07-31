@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from engine.entity import GoodId
+from engine.entity import GoodId, Site
 from engine.kernel import seat_goods as SG
 from engine.kernel import seat_people as SP
 from engine.state import World
@@ -167,6 +167,58 @@ def _make_room(kernel, cohorts: dict, moved: dict[str, int]) -> dict:
                 host, people=people,
                 households=min(host.households, people))
     return cohorts
+
+
+# --- the seat's land (Task 2 C4) ----------------------------------------------
+
+def settle(world: World) -> World:
+    """Put the court's estates into the registry as ground, once, at load.
+
+    The first half of the same move C2 made for the stores and C3 for the
+    payroll: the fact enters the kernel before the system that works it does.
+    After this the crown's four estates are `Site`s the registry knows the
+    extent and the holder of, and the audit can count the crown's ground on
+    both sides instead of on neither.
+
+    The season stays the court's for now. `Site.capacity` is left at 0 --
+    unmodelled -- deliberately: it is what `farm.under_crop` divides the
+    standing crop by, and a number invented here would have the kernel sowing
+    ground the court is already sowing. Two agronomies over one field is the
+    mistake C3 caught late (`feed(starve=False)`), and it is cheaper to not
+    make it. What crosses now is the ground; what works it crosses next.
+    """
+    kernel = getattr(world, "kernel", None)
+    if kernel is None:
+        return world
+    crown = kernel.controller(SP.SEAT)
+    sites = dict(kernel.registry.sites)
+    for estate_id in sorted(world.court.estates):
+        estate = world.court.estates[estate_id]
+        settlement = f"settlement:{estate.place}"
+        if settlement not in kernel.registry.settlements:
+            # `gibala` and `ma_hadu`, and the same answer `enrol` gives: the
+            # ground stands with the crown rather than at a place the map does
+            # not have. Two of the four -- the third and fourth stale ids out
+            # of the retired `content/kernel/world.toml`, after the `SEAT`
+            # constant and the garrison's placement.
+            settlement = SP.SEAT
+        site_id = f"site:estate_{estate_id}"
+        sites[site_id] = Site(
+            id=site_id, name=estate.name, settlement=settlement,
+            function="food", region=_region_of(kernel, settlement),
+            # In qa of seed, which is what `Site.extent` is measured in and what
+            # the sowing decision is made in. The court holds iku and a rate per
+            # iku; the ground itself is the product of the two.
+            extent=estate.area_iku * estate.seed_per_iku,
+            holder=crown)
+    registry = dataclasses.replace(kernel.registry, sites=sites)
+    return dataclasses.replace(
+        world, kernel=dataclasses.replace(kernel, registry=registry))
+
+
+def _region_of(kernel, settlement: str) -> str:
+    place = kernel.registry.settlements.get(settlement)
+    return place.region if place is not None else ""
 
 
 def feed(world: World) -> World:

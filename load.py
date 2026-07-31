@@ -914,5 +914,7 @@ def load_scenario(name: str, seed: int) -> World:
 
     # The crown's payroll joins the registry (Task 2 C3). After this the kernel
     # holds those heads and feeds them, and the court's mapping is the mirror.
+    # The crown's ground follows them (Task 2 C4). The registry learns the
+    # extent and the holder; the season is still the court's.
     from engine import seat as seat_door
-    return seat_door.enrol(world)
+    return seat_door.settle(seat_door.enrol(world))

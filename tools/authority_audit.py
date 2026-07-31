@@ -110,17 +110,30 @@ def _kernel_labour(kernel: Kernel) -> int:
 
 
 def _court_land(world: World) -> int:
-    """Ground under the crown, in the court's unit: iku rather than qa of seed."""
-    return sum(estate.area_iku for estate in world.court.estates.values())
+    """Ground under the crown, in qa of seed, which is what `Site.extent` holds.
+
+    The court keeps iku and a sowing rate per iku; the ground itself is the
+    product of the two. Counting the iku alone would have the two sides of this
+    row measured in different units and neither figure meaning the other.
+    """
+    return sum(estate.area_iku * estate.seed_per_iku
+               for estate in world.court.estates.values())
 
 
 def _kernel_land(kernel: Kernel) -> int:
+    """Arable at the seat. `"food"` is the vocabulary's word for it.
+
+    This read `"estate"` until Task 2 C4, which `load.SITE_FUNCTIONS` does not
+    contain and no site has ever been. The row counted zero on this side and so
+    could never be a finding -- the fourth stale id of the same family, after
+    `seat_people.SEAT`, this file's copy of it, and `PLACEMENTS`' mahadu.
+    """
     seat = seat_of(kernel)
     return sum(
         kernel.registry.sites[site].extent
         for site in sorted(kernel.registry.sites)
         if kernel.registry.sites[site].settlement == seat
-        and kernel.registry.sites[site].function == "estate")
+        and kernel.registry.sites[site].function == "food")
 
 
 # Each row: the fact, how to count it on each side, and what Phase C deletes.

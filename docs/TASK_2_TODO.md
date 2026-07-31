@@ -138,7 +138,29 @@ has been since C2, and the mirror is deleted with its readers in C5.
 
 ## C4 — land
 
-- [ ] `Court.estates` -> `Site(function="estate")`.
+The ground has crossed; the season has not. `Court.estates` is still the
+authority on sowing and reaping — it is not a mirror yet.
+
+- [x] The crown's four estates are registry `Site`s. `seat.settle` mints them
+      at load, after `enrol`: `function="food"`, held by the seat's palace,
+      `extent` in qa of seed, which is `area_iku * seed_per_iku`.
+      `capacity` stays 0 — unmodelled, deliberately. It is what
+      `farm.under_crop` divides the standing crop by, and a number invented
+      here would have the kernel sowing ground the court is already sowing.
+      Two agronomies over one field is the mistake the ration roll made in C3.
+      The seat is not in `kernel.deciders()`, so nothing sows these anyway.
+- [x] The audit was reporting a false all-clear on land. `_kernel_land` counted
+      sites with `function == "estate"`, which `load.SITE_FUNCTIONS` does not
+      contain and no site has ever been, so the kernel side counted zero and
+      the row could never be a finding. Fourth stale id of the same family,
+      after `seat_people.SEAT`, the audit's copy of it, and `PLACEMENTS`'
+      mahadu. `_court_land` now returns qa of seed as well, so the two figures
+      measure the same thing. Findings 8 -> 9: honest, not a regression.
+- [ ] Two of the four estates name `gibala` and `ma_hadu`, which the live map
+      has no settlement for. `settle` stands them at the seat, the answer
+      `enrol` gives the garrison. Same content decision as the mahadu row in C3.
+- [ ] The season: reconcile `engine/land.py` (spec 6.4) with `kernel/farm.py`,
+      give the sites their capacity, and make `Court.estates` a mirror.
 - [ ] `git mv engine/land.py engine/legacy/`; `kernel/farm.py` is harvest.
 - [ ] Delete `last_harvest`, `previous_harvest`.
 
