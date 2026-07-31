@@ -25,7 +25,14 @@ from engine.entity import Site as KernelSite
 from engine.entity import check as check_registry
 from engine.entity import mint as mint_id
 from engine.entity import parse as parse_id
+from engine.kernel import seat_goods
 from engine.kernel.world import Kernel
+
+# Where the court's goods sit in the kernel, and whose they are. The palace of
+# the seat is the court: `Court.stores` is that org's granary and nobody
+# else's, which is the fact a flat mapping could not state.
+SEAT_SETTLEMENT = "settlement:seat"
+SEAT_OWNER = "org:seat_palace"
 from engine.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
                           Document, Estate, ForeignCourt, Formation,
@@ -742,9 +749,20 @@ def load_scenario(name: str, seed: int) -> World:
     }
 
     date = Date(year=1, fortnight=0, absolute=0)   # turn 1 begins with an advance
+
+    # Task 2 C2: the court's flat figures cross into the Book as lots at the
+    # seat, owned and held by the palace. `detail.toml` authors no granary for
+    # the seat precisely so that this is the only one, and `seat_goods.in_hand`
+    # reads them straight back -- the seam is a view, not a copy, so the court's
+    # mapping and the Book's lots are the same quantities counted twice over
+    # rather than two stocks that have to be kept level.
+    book, seat_view = seat_goods.deposit(
+        book, court.stores, seat=SEAT_SETTLEMENT, owner=SEAT_OWNER,
+        authority=SEAT_OWNER)
+
     kernel = Kernel(
         seed=seed, date=date, registry=kernel_registry, book=book,
-        obligations=obligations, seasons=seasons,
+        obligations=obligations, seasons=seasons, seat_goods=seat_view,
         region_climate=region_climate, spoilage=load_spoilage())
 
     return World(

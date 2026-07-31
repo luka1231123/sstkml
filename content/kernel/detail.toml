@@ -3162,11 +3162,6 @@ quantity = 36960000
 
 [[stores]]
 settlement = "settlement:seat"
-good = "grain"
-quantity = 16000000
-
-[[stores]]
-settlement = "settlement:seat"
 owner = "org:seat_merchants"
 good = "copper"
 quantity = 3000

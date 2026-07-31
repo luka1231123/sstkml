@@ -168,6 +168,9 @@ MERCHANT_COPPER = 3000
 TRIBUTE_PER_HEAD = 3
 FREE = "free"
 
+# The player's own settlement. What the scenario authors, this file does not.
+SEAT = "settlement:seat"
+
 
 def _split(total, shares):
     """Divide total by percentage shares, giving the remainder to the first."""
@@ -262,8 +265,17 @@ def build():
         # No opening seed: the crop is in the ground already, and next year's
         # seed is what the threshing floor sets aside out of it. A settlement
         # that eats its seed has made that decision itself.
-        stores.append({"settlement": sid, "good": "grain",
-                       "quantity": int(pop * GRAIN_PER_HEAD * yld)})
+        #
+        # The seat is the exception, and it is not a special case so much as the
+        # rule about who authors what. Every other settlement is described here
+        # and nowhere else; the seat is the player's, described by the scenario,
+        # and `Court.stores` is that description. Authoring a granary for it
+        # here as well would put two figures for one fact at one place with one
+        # owner, which is the whole thing Task 2 exists to stop. The scenario's
+        # figures cross into the Book at load, through `kernel.seat_goods`.
+        if sid != SEAT:
+            stores.append({"settlement": sid, "good": "grain",
+                           "quantity": int(pop * GRAIN_PER_HEAD * yld)})
 
         orgs.append({
             "id": f"org:{slug}_{ORG_KIND[rank]}", "name": f"the {ORG_KIND[rank]} of {place['name']}"

@@ -50,6 +50,7 @@ from engine.entity import Cohort, EntityId, Registry, check, mint
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
+from engine.kernel import seat_goods as SG
 from engine.kernel import turn as T
 from engine.kernel.intent import Intent, Snapshot, open_turn
 
@@ -85,6 +86,11 @@ class Kernel:
     # carried here rather than looked up, because engine/ does not read files.
     # A good absent from this mapping does not spoil.
     spoilage: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # Which lots at the seat are the court's stores, and which goods it counts
+    # (Task 2 C2). A descriptor, not a second stock: the quantities live in the
+    # Book like everyone else's, and this says where to find them and what a
+    # figure of zero means. Empty until the court's goods have crossed.
+    seat_goods: "SG.SeatGoods | None" = None
     # Cargo at sea. The only thing in the world that is in neither of the places
     # it concerns, which is why it is state and the contracts that put it there
     # are not: a bargain is struck and settled in a fortnight, a crossing is not.
