@@ -297,6 +297,24 @@ class Cohort:
     # does not live the way its country does: palace staff inside a countryside
     # that feeds itself, which is what the court's dependents are.
     tenure: str = ""
+    # The most the store will release to these people in a fortnight, and -1
+    # for the whole ration. Only redistributive tenure can answer it: a
+    # household eating its own grain is not allowed a quantity by anybody.
+    #
+    # It is not a smaller ration. What is owed stays `ration_per_head`, so the
+    # difference between the two is a debt and the hunger it causes is real --
+    # which is the entire point. A palace that cannot feed everyone chooses,
+    # and the choice is what it is answerable for.
+    allowance: int = -1
+    # Ration owed and never delivered, in qa, running. `hunger` counts
+    # fortnights and cannot hold this: a body short by one jar and a body short
+    # by a whole fortnight's bread both make it one, and the difference between
+    # them is grain somebody still owes. Only a body that is owed a ration can
+    # be short of one, so this is redistributive and prebendal arithmetic.
+    shortfall: int = 0
+    # Who the store empties on last. Higher is served first, ties by id, and
+    # the ordinary case is that nobody was ranked and the order is the ledger's.
+    precedence: int = 0
 
     def labour(self) -> int:
         # Hunger takes the strength before it takes the numbers.

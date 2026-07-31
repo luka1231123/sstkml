@@ -23,12 +23,14 @@ def apply(world: World, action) -> tuple[World, list]:
         qa = max(0, action.qa)
         allocations = dict(world.court.allocations)
         allocations[action.group_id] = qa
+        world = seat.allow(world, action.group_id, qa)
         return replace_court(world, allocations=allocations), [A.AllocationSet(action.group_id, qa)]
 
     if isinstance(action, A.SetPriority):
         for gid in action.order:
             if gid not in world.court.dependents:
                 raise ValueError(f"unknown group in priority: {gid}")
+        world = seat.rank(world, tuple(action.order))
         return replace_court(world, priority=tuple(action.order)), [A.PrioritySet(tuple(action.order))]
 
     if isinstance(action, A.EatSeed):

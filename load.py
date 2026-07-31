@@ -853,7 +853,7 @@ def load_scenario(name: str, seed: int) -> World:
     # threshing floor came round and would starve on the calendar.
     kernel, _ = farm.divide(kernel)
 
-    return World(
+    world = World(
         seed=seed, scenario=cfg["scenario"],
         date=date,
         court=court,
@@ -911,3 +911,8 @@ def load_scenario(name: str, seed: int) -> World:
         house_names_f=tuple(cfg.get("house_names_f", [])),
         house_names_m=tuple(cfg.get("house_names_m", [])),
     )
+
+    # The crown's payroll joins the registry (Task 2 C3). After this the kernel
+    # holds those heads and feeds them, and the court's mapping is the mirror.
+    from engine import seat as seat_door
+    return seat_door.enrol(world)

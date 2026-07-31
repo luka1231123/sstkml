@@ -138,10 +138,23 @@ def advance(world: World) -> tuple[World, list]:
     world = seat.record(world, court, reason_down="spoiled")
     court = world.court
     court, e = systems.do_rites(court, world.date.fortnight); events += e
-    court, e = systems.pay_rations(court); events += e
-    # A9 unrest
-    court, e = systems.recompute_unrest(court); events += e
+    # A8 rations. The payroll is a body of cohorts now and it eats in the
+    # kernel, out of the palace's lots (Task 2 C3); `seat.feed` is only the
+    # moment, kept where `systems.pay_rations` used to stand so the fortnight's
+    # grain still leaves after the rot and after the gods. `seat.mirror` writes
+    # the result back onto `Court.dependents` and raises the events the log,
+    # the hall and the advisors read. The retired system is in
+    # `engine/legacy/rations.py`.
     world = seat.record(world, court, reason_down="consumed")
+    world = seat.feed(world)
+    world, e = seat.mirror(world); events += e
+    # The kernel spent lots directly, so the court's mapping is read back off
+    # the Book rather than written to it. Recording it instead would reconcile
+    # the Book to a figure taken before the meal, and put the ration back.
+    world = seat.refresh(world)
+    # A9 unrest
+    court, e = systems.recompute_unrest(world.court); events += e
+    world = dataclasses.replace(world, court=court)
     # High land dues are an additional pressure, not part of ration arrears,
     # and flight is permanent even if the next order lowers the rate.
     world, e = revenue.pressure(world); events += e

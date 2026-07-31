@@ -67,12 +67,14 @@ Closes: 47 unmapped places.
       Blocked on C4. The Book spoils at a flat authored rate; the court's rate
       moves with the state of the granary (6.18), and the institution does not
       cross until then. For now `farm.keep` skips the seat's lots, so the seat
-      spoils once, in the place that knows about the roof.
+      spoils once, in the place that knows about the roof. C3 does not lift
+      this: the exemption is about the granary's roof, not about who eats.
 - [x] `store_history` become projection only.
 
 ## C3 — people and labour
 
-Groundwork landed; the migration itself has not.
+The payroll has crossed. `Court.dependents` is a mirror, the way `Court.stores`
+has been since C2, and the mirror is deleted with its readers in C5.
 
 - [x] Tenure: `Polity.tenure` / `Cohort.tenure`, `Kernel.tenure_of`,
       `world._food_owners`, `farm.share_out` / `divide` / `_sowable`.
@@ -85,17 +87,37 @@ Groundwork landed; the migration itself has not.
       The audit had the same constant and the same bug; its goods, people,
       labour and land rows counted zero on the kernel side and reported a false
       all-clear. Fixed, and the audit is 5 findings -> 8 as a result.
-- [ ] The seat's two populations. The court's 1,010 dependents and the
-      generator's 80,000 people still eat one granary, which is why
-      `farm.keep` and `world._consume` both carry a seat exemption. Tenure is
-      what lets them stop: the 1,010 are redistributive and eat the palace's
-      lots, the 80,000 are the Alu's own. `divide` skips the seat today because
-      it iterates `kernel.autonomous()` and the seat is not.
-- [ ] `Court.dependents` -> `Cohort`; arrears -> `hunger`/`grievance`.
-- [ ] `pay_rations` to legacy; kernel `_consume` feed seat.
-- [ ] `recompute_unrest` stay, read cohort grievance.
+- [x] `Court.dependents` -> `Cohort`. `seat.enrol` puts the six groups in the
+      registry at load; `seat.mirror` writes the court's mapping back from them
+      every turn. The garrison at Ma'hadu is `prebendal` rather than
+      `redistributive`, because it stands in a place that does not owe it
+      dinner -- and `world._within_reach` is what lets it eat from the seat.
+- [x] `pay_rations` -> `engine/legacy/rations.py`; `seat.feed` calls
+      `kernel.world.feed` at A8, where the roll used to stand. The moment
+      matters: the same grain leaving before the rot and the rites instead of
+      after is a different fortnight (spec 6.1).
+- [x] Two consequence models, not one. The kernel says how much was not
+      delivered (`Cohort.shortfall`, in qa, because `hunger` counts fortnights
+      and rounds a part-paid ration up to a whole one). Spec 6.3's band table
+      says what the debt costs, still in `systems._BANDS`, still the court's,
+      applied in `mirror` and handed back to the cohort. `feed(starve=False)`
+      is what stops the kernel's own hunger rule taking the same people twice.
+- [x] The ration lever kept working. `pay_rations` retiring left `Allocate` and
+      `SetPriority` attached to nothing, which `test_m8` caught. They are
+      `Cohort.allowance` and `Cohort.precedence` now -- both facts about a
+      redistributive arrangement, which is what a palace deciding who eats
+      first is. `allowance` is deliberately not capped at the fortnight's
+      ration: a store that hands over more is paying down a debt.
+- [ ] The seat's other 80,000. Its own households are `pooled` and still eat
+      nothing here, so `world._consume` keeps a seat exemption. Not people --
+      land: the palace owns every lot standing there, so feeding them would be
+      the crown's store, and they get a holding of their own when the seat's
+      fields become the kernel's (C4).
+- [ ] `recompute_unrest` still reads the mirror's arrears. Reads cohort
+      grievance when the mirror goes (C5).
 - [ ] Delete `allocations`, `priority`, `corvee_days`, `corvee_sources`,
-      `at_harvest`.
+      `at_harvest`. The first two are mirrors now; the last three are labour
+      and wait on C4.
 
 ## C4 — land
 
