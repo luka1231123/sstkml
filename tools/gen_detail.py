@@ -50,7 +50,18 @@ RETURN_PER_1000 = 7000
 # Qa of seed the ground takes in a year, per head, and what is in the granary
 # on the opening day: twenty fortnights of ration, which is the year with a
 # margin and not a year and a half.
-EXTENT_PER_HEAD = 80
+#
+# Divided by the region's yield, which is the correction that matters. Held
+# flat, a man on the Anatolian plateau sowed the same ground as a man in the
+# Delta and ate two thirds as much every year of his life, so the plateau
+# emptied and the Delta filled without one bad harvest anywhere. That is not
+# what poor country does to the people farming it. They work more of it: the
+# yield decides how much ground a household needs to feed itself, not whether
+# it is fed. So the poor regions carry more land per head and every region
+# sits near subsistence, and what separates them is not the average year but
+# how far a bad one drops -- which is the drought series, region by region,
+# and is where the difference belongs.
+EXTENT_PER_HEAD = 66
 GRAIN_PER_HEAD = 200
 
 # Play does not begin at the beginning of a story. It opens in the growing
@@ -148,7 +159,7 @@ def build():
         if food:
             cap = int(RETURN_PER_1000 * yld)
             for i, site in enumerate(food):
-                extent = pop * EXTENT_PER_HEAD if i == 0 else 0
+                extent = int(pop * EXTENT_PER_HEAD / yld) if i == 0 else 0
                 sites.append({
                     "id": site.id, "settlement": sid, "region": f"region:{region}",
                     "function": "food", "capacity": cap, "extent": extent,

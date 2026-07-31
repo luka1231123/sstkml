@@ -28,7 +28,7 @@ settlement = "settlement:abdju"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 12000000
+extent = 6187500
 
 [[sites]]
 id = "site:abdju_278_216"
@@ -68,7 +68,7 @@ settlement = "settlement:alashiya"
 region = "region:alashiya"
 function = "food"
 capacity = 5600
-extent = 6400000
+extent = 6600000
 
 [[sites]]
 id = "site:alashiya_318_88"
@@ -116,7 +116,7 @@ settlement = "settlement:amurru"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 4000000
+extent = 3300000
 
 [[sites]]
 id = "site:amurru_378_92"
@@ -140,7 +140,7 @@ settlement = "settlement:apasa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 10400000
+extent = 12257142
 
 [[sites]]
 id = "site:apasa_158_50"
@@ -164,7 +164,7 @@ settlement = "settlement:ashkelon"
 region = "region:south_levant"
 function = "food"
 capacity = 6300
-extent = 4000000
+extent = 3666666
 
 [[sites]]
 id = "site:ashkelon_344_136"
@@ -188,7 +188,7 @@ settlement = "settlement:assur"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 20000000
+extent = 14999999
 
 [[sites]]
 id = "site:assur_556_78"
@@ -236,7 +236,7 @@ settlement = "settlement:athens"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 7200000
+extent = 9138461
 
 [[sites]]
 id = "site:athens_72_46"
@@ -268,7 +268,7 @@ settlement = "settlement:babylon"
 region = "region:lower_mesopotamia"
 function = "food"
 capacity = 10500
-extent = 38400000
+extent = 21120000
 
 [[sites]]
 id = "site:babylon_586_122"
@@ -308,7 +308,7 @@ settlement = "settlement:byblos"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 6400000
+extent = 5280000
 
 [[sites]]
 id = "site:byblos_372_98"
@@ -340,7 +340,7 @@ settlement = "settlement:carchemish"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 19200000
+extent = 15840000
 
 [[sites]]
 id = "site:carchemish_426_58"
@@ -380,7 +380,7 @@ settlement = "settlement:dur_katlimmu"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 14400000
+extent = 10800000
 
 [[sites]]
 id = "site:dur_katlimmu_498_80"
@@ -404,7 +404,7 @@ settlement = "settlement:dur_kurigalzu"
 region = "region:lower_mesopotamia"
 function = "food"
 capacity = 10500
-extent = 9600000
+extent = 5280000
 
 [[sites]]
 id = "site:dur_kurigalzu_584_110"
@@ -436,7 +436,7 @@ settlement = "settlement:egypt"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 74400000
+extent = 38362500
 
 [[sites]]
 id = "site:egypt_270_148"
@@ -476,7 +476,7 @@ settlement = "settlement:emar"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 4800000
+extent = 3599999
 
 [[sites]]
 id = "site:emar_430_72"
@@ -508,7 +508,7 @@ settlement = "settlement:gaza"
 region = "region:south_levant"
 function = "food"
 capacity = 6300
-extent = 4800000
+extent = 4400000
 
 [[sites]]
 id = "site:gaza_342_138"
@@ -532,7 +532,7 @@ settlement = "settlement:halab"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 9600000
+extent = 7920000
 
 [[sites]]
 id = "site:halab_402_76"
@@ -572,7 +572,7 @@ settlement = "settlement:hattusa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 70400000
+extent = 82971428
 
 [[sites]]
 id = "site:hattusa_340_6"
@@ -604,7 +604,7 @@ settlement = "settlement:iolcos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 6000000
+extent = 7615384
 
 [[sites]]
 id = "site:iolcos_48_28"
@@ -628,7 +628,7 @@ settlement = "settlement:kanesh"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 21600000
+extent = 25457142
 
 [[sites]]
 id = "site:kanesh_370_32"
@@ -660,7 +660,7 @@ settlement = "settlement:khemenu"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 30400000
+extent = 15675000
 
 [[sites]]
 id = "site:khemenu_248_192"
@@ -700,7 +700,7 @@ settlement = "settlement:knossos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 12800000
+extent = 16246153
 
 [[sites]]
 id = "site:knossos_116_84"
@@ -740,7 +740,7 @@ settlement = "settlement:kydonia"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 4400000
+extent = 5584615
 
 [[sites]]
 id = "site:kydonia_78_86"
@@ -764,7 +764,7 @@ settlement = "settlement:lachish"
 region = "region:south_levant"
 function = "food"
 capacity = 6300
-extent = 4000000
+extent = 3666666
 
 [[sites]]
 id = "site:lachish_346_136"
@@ -788,7 +788,7 @@ settlement = "settlement:megiddo"
 region = "region:south_levant"
 function = "food"
 capacity = 6300
-extent = 4000000
+extent = 3666666
 
 [[sites]]
 id = "site:megiddo_354_120"
@@ -812,7 +812,7 @@ settlement = "settlement:memphis"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 48000000
+extent = 24750000
 
 [[sites]]
 id = "site:memphis_256_162"
@@ -844,7 +844,7 @@ settlement = "settlement:millawanda"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 3600000
+extent = 4569230
 
 [[sites]]
 id = "site:millawanda_158_48"
@@ -868,7 +868,7 @@ settlement = "settlement:mira"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 7200000
+extent = 8485714
 
 [[sites]]
 id = "site:mira_212_46"
@@ -900,7 +900,7 @@ settlement = "settlement:mycenae"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 34800000
+extent = 44169230
 
 [[sites]]
 id = "site:mycenae_46_46"
@@ -956,7 +956,7 @@ settlement = "settlement:nineveh"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 16000000
+extent = 11999999
 
 [[sites]]
 id = "site:nineveh_554_72"
@@ -996,7 +996,7 @@ settlement = "settlement:nuzi"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 4000000
+extent = 2999999
 
 [[sites]]
 id = "site:nuzi_586_84"
@@ -1020,7 +1020,7 @@ settlement = "settlement:pylos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 14800000
+extent = 18784615
 
 [[sites]]
 id = "site:pylos_24_58"
@@ -1052,7 +1052,7 @@ settlement = "settlement:sau"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 14400000
+extent = 7425000
 
 [[sites]]
 id = "site:sau_244_152"
@@ -1092,7 +1092,7 @@ settlement = "settlement:seat"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 6400000
+extent = 5280000
 
 [[sites]]
 id = "site:seat_374_80"
@@ -1180,7 +1180,7 @@ settlement = "settlement:sidon"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 4000000
+extent = 3300000
 
 [[sites]]
 id = "site:sidon_368_110"
@@ -1204,7 +1204,7 @@ settlement = "settlement:tarhuntassa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 16000000
+extent = 18857142
 
 [[sites]]
 id = "site:tarhuntassa_322_70"
@@ -1268,7 +1268,7 @@ settlement = "settlement:tarsa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 8000000
+extent = 9428571
 
 [[sites]]
 id = "site:tarsa_352_60"
@@ -1292,7 +1292,7 @@ settlement = "settlement:thebes_gr"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 8800000
+extent = 11169230
 
 [[sites]]
 id = "site:thebes_gr_58_36"
@@ -1340,7 +1340,7 @@ settlement = "settlement:tjaru"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 6400000
+extent = 3300000
 
 [[sites]]
 id = "site:tjaru_288_150"
@@ -1364,7 +1364,7 @@ settlement = "settlement:tyre"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 4800000
+extent = 3960000
 
 [[sites]]
 id = "site:tyre_364_114"
@@ -1388,7 +1388,7 @@ settlement = "settlement:waset"
 region = "region:nile"
 function = "food"
 capacity = 11200
-extent = 45600000
+extent = 23512500
 
 [[sites]]
 id = "site:waset_292_222"
@@ -1436,7 +1436,7 @@ settlement = "settlement:wilusa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 14400000
+extent = 16971428
 
 [[sites]]
 id = "site:wilusa_134_14"
@@ -2621,7 +2621,7 @@ people = 18000
 settlement = "settlement:abdju"
 site = "site:abdju_270_216"
 good = "standing_grain"
-quantity = 134400000
+quantity = 69300000
 
 [[stores]]
 settlement = "settlement:abdju"
@@ -2637,7 +2637,7 @@ quantity = 6000000
 settlement = "settlement:alashiya"
 site = "site:alashiya_318_84"
 good = "standing_grain"
-quantity = 35840000
+quantity = 36960000
 
 [[stores]]
 settlement = "settlement:alashiya"
@@ -2653,7 +2653,7 @@ quantity = 12800000
 settlement = "settlement:amurru"
 site = "site:amurru_374_90"
 good = "standing_grain"
-quantity = 28000000
+quantity = 23100000
 
 [[stores]]
 settlement = "settlement:amurru"
@@ -2664,7 +2664,7 @@ quantity = 10000000
 settlement = "settlement:apasa"
 site = "site:apasa_158_42"
 good = "standing_grain"
-quantity = 50960000
+quantity = 60059995
 
 [[stores]]
 settlement = "settlement:apasa"
@@ -2675,7 +2675,7 @@ quantity = 18200000
 settlement = "settlement:ashkelon"
 site = "site:ashkelon_340_142"
 good = "standing_grain"
-quantity = 25200000
+quantity = 23099995
 
 [[stores]]
 settlement = "settlement:ashkelon"
@@ -2686,7 +2686,7 @@ quantity = 9000000
 settlement = "settlement:assur"
 site = "site:assur_552_80"
 good = "standing_grain"
-quantity = 154000000
+quantity = 115499992
 
 [[stores]]
 settlement = "settlement:assur"
@@ -2702,7 +2702,7 @@ quantity = 55000000
 settlement = "settlement:athens"
 site = "site:athens_60_44"
 good = "standing_grain"
-quantity = 32760000
+quantity = 41579997
 
 [[stores]]
 settlement = "settlement:athens"
@@ -2718,7 +2718,7 @@ quantity = 11700000
 settlement = "settlement:babylon"
 site = "site:babylon_582_124"
 good = "standing_grain"
-quantity = 403200000
+quantity = 221760000
 
 [[stores]]
 settlement = "settlement:babylon"
@@ -2734,7 +2734,7 @@ quantity = 144000000
 settlement = "settlement:byblos"
 site = "site:byblos_370_98"
 good = "standing_grain"
-quantity = 44800000
+quantity = 36960000
 
 [[stores]]
 settlement = "settlement:byblos"
@@ -2750,7 +2750,7 @@ quantity = 16000000
 settlement = "settlement:carchemish"
 site = "site:carchemish_422_60"
 good = "standing_grain"
-quantity = 134400000
+quantity = 110880000
 
 [[stores]]
 settlement = "settlement:carchemish"
@@ -2766,7 +2766,7 @@ quantity = 12000000
 settlement = "settlement:dur_katlimmu"
 site = "site:dur_katlimmu_494_84"
 good = "standing_grain"
-quantity = 110880000
+quantity = 83160000
 
 [[stores]]
 settlement = "settlement:dur_katlimmu"
@@ -2777,7 +2777,7 @@ quantity = 39600000
 settlement = "settlement:dur_kurigalzu"
 site = "site:dur_kurigalzu_576_114"
 good = "standing_grain"
-quantity = 100800000
+quantity = 55440000
 
 [[stores]]
 settlement = "settlement:dur_kurigalzu"
@@ -2788,7 +2788,7 @@ quantity = 36000000
 settlement = "settlement:egypt"
 site = "site:egypt_266_150"
 good = "standing_grain"
-quantity = 833280000
+quantity = 429660000
 
 [[stores]]
 settlement = "settlement:egypt"
@@ -2799,7 +2799,7 @@ quantity = 297600000
 settlement = "settlement:emar"
 site = "site:emar_426_70"
 good = "standing_grain"
-quantity = 36960000
+quantity = 27719992
 
 [[stores]]
 settlement = "settlement:emar"
@@ -2815,7 +2815,7 @@ quantity = 13200000
 settlement = "settlement:gaza"
 site = "site:gaza_334_142"
 good = "standing_grain"
-quantity = 30240000
+quantity = 27720000
 
 [[stores]]
 settlement = "settlement:gaza"
@@ -2831,7 +2831,7 @@ quantity = 12600000
 settlement = "settlement:halab"
 site = "site:halab_400_74"
 good = "standing_grain"
-quantity = 67200000
+quantity = 55440000
 
 [[stores]]
 settlement = "settlement:halab"
@@ -2842,7 +2842,7 @@ quantity = 24000000
 settlement = "settlement:hattusa"
 site = "site:hattusa_338_8"
 good = "standing_grain"
-quantity = 344960000
+quantity = 406559997
 
 [[stores]]
 settlement = "settlement:hattusa"
@@ -2863,7 +2863,7 @@ quantity = 12000000
 settlement = "settlement:iolcos"
 site = "site:iolcos_44_22"
 good = "standing_grain"
-quantity = 27300000
+quantity = 34649997
 
 [[stores]]
 settlement = "settlement:iolcos"
@@ -2884,7 +2884,7 @@ quantity = 10000000
 settlement = "settlement:kanesh"
 site = "site:kanesh_366_36"
 good = "standing_grain"
-quantity = 105840000
+quantity = 124739995
 
 [[stores]]
 settlement = "settlement:kanesh"
@@ -2900,7 +2900,7 @@ quantity = 37800000
 settlement = "settlement:khemenu"
 site = "site:khemenu_244_200"
 good = "standing_grain"
-quantity = 340480000
+quantity = 175560000
 
 [[stores]]
 settlement = "settlement:khemenu"
@@ -2911,7 +2911,7 @@ quantity = 121600000
 settlement = "settlement:knossos"
 site = "site:knossos_100_88"
 good = "standing_grain"
-quantity = 58240000
+quantity = 73919996
 
 [[stores]]
 settlement = "settlement:knossos"
@@ -2922,7 +2922,7 @@ quantity = 20800000
 settlement = "settlement:kydonia"
 site = "site:kydonia_68_82"
 good = "standing_grain"
-quantity = 20020000
+quantity = 25409998
 
 [[stores]]
 settlement = "settlement:kydonia"
@@ -2933,7 +2933,7 @@ quantity = 7150000
 settlement = "settlement:lachish"
 site = "site:lachish_342_142"
 good = "standing_grain"
-quantity = 25200000
+quantity = 23099995
 
 [[stores]]
 settlement = "settlement:lachish"
@@ -2944,7 +2944,7 @@ quantity = 9000000
 settlement = "settlement:megiddo"
 site = "site:megiddo_350_122"
 good = "standing_grain"
-quantity = 25200000
+quantity = 23099995
 
 [[stores]]
 settlement = "settlement:megiddo"
@@ -2955,7 +2955,7 @@ quantity = 9000000
 settlement = "settlement:memphis"
 site = "site:memphis_252_164"
 good = "standing_grain"
-quantity = 537600000
+quantity = 277200000
 
 [[stores]]
 settlement = "settlement:memphis"
@@ -2966,7 +2966,7 @@ quantity = 192000000
 settlement = "settlement:millawanda"
 site = "site:millawanda_154_50"
 good = "standing_grain"
-quantity = 16380000
+quantity = 20789996
 
 [[stores]]
 settlement = "settlement:millawanda"
@@ -2977,7 +2977,7 @@ quantity = 5850000
 settlement = "settlement:mira"
 site = "site:mira_208_40"
 good = "standing_grain"
-quantity = 35280000
+quantity = 41579998
 
 [[stores]]
 settlement = "settlement:mira"
@@ -2998,7 +2998,7 @@ quantity = 6000000
 settlement = "settlement:mycenae"
 site = "site:mycenae_42_44"
 good = "standing_grain"
-quantity = 158340000
+quantity = 200969996
 
 [[stores]]
 settlement = "settlement:mycenae"
@@ -3014,7 +3014,7 @@ quantity = 26400000
 settlement = "settlement:nineveh"
 site = "site:nineveh_550_68"
 good = "standing_grain"
-quantity = 123200000
+quantity = 92399992
 
 [[stores]]
 settlement = "settlement:nineveh"
@@ -3030,7 +3030,7 @@ quantity = 63000000
 settlement = "settlement:nuzi"
 site = "site:nuzi_582_88"
 good = "standing_grain"
-quantity = 30800000
+quantity = 23099992
 
 [[stores]]
 settlement = "settlement:nuzi"
@@ -3046,7 +3046,7 @@ quantity = 9100000
 settlement = "settlement:pylos"
 site = "site:pylos_18_54"
 good = "standing_grain"
-quantity = 67340000
+quantity = 85469998
 
 [[stores]]
 settlement = "settlement:pylos"
@@ -3057,7 +3057,7 @@ quantity = 24050000
 settlement = "settlement:sau"
 site = "site:sau_240_148"
 good = "standing_grain"
-quantity = 161280000
+quantity = 83160000
 
 [[stores]]
 settlement = "settlement:sau"
@@ -3068,7 +3068,7 @@ quantity = 57600000
 settlement = "settlement:seat"
 site = "site:seat_372_76"
 good = "standing_grain"
-quantity = 44800000
+quantity = 36960000
 
 [[stores]]
 settlement = "settlement:seat"
@@ -3084,7 +3084,7 @@ quantity = 7200000
 settlement = "settlement:sidon"
 site = "site:sidon_364_112"
 good = "standing_grain"
-quantity = 28000000
+quantity = 23100000
 
 [[stores]]
 settlement = "settlement:sidon"
@@ -3100,7 +3100,7 @@ quantity = 11000000
 settlement = "settlement:tarhuntassa"
 site = "site:tarhuntassa_316_72"
 good = "standing_grain"
-quantity = 78400000
+quantity = 92399995
 
 [[stores]]
 settlement = "settlement:tarhuntassa"
@@ -3116,7 +3116,7 @@ quantity = 28000000
 settlement = "settlement:tarsa"
 site = "site:tarsa_344_60"
 good = "standing_grain"
-quantity = 39200000
+quantity = 46199997
 
 [[stores]]
 settlement = "settlement:tarsa"
@@ -3127,7 +3127,7 @@ quantity = 14000000
 settlement = "settlement:thebes_gr"
 site = "site:thebes_gr_54_42"
 good = "standing_grain"
-quantity = 40040000
+quantity = 50819996
 
 [[stores]]
 settlement = "settlement:thebes_gr"
@@ -3138,7 +3138,7 @@ quantity = 14300000
 settlement = "settlement:tjaru"
 site = "site:tjaru_284_154"
 good = "standing_grain"
-quantity = 71680000
+quantity = 36960000
 
 [[stores]]
 settlement = "settlement:tjaru"
@@ -3149,7 +3149,7 @@ quantity = 25600000
 settlement = "settlement:tyre"
 site = "site:tyre_360_116"
 good = "standing_grain"
-quantity = 33600000
+quantity = 27720000
 
 [[stores]]
 settlement = "settlement:tyre"
@@ -3170,7 +3170,7 @@ quantity = 78000000
 settlement = "settlement:waset"
 site = "site:waset_288_228"
 good = "standing_grain"
-quantity = 510720000
+quantity = 263340000
 
 [[stores]]
 settlement = "settlement:waset"
@@ -3186,7 +3186,7 @@ quantity = 182400000
 settlement = "settlement:wilusa"
 site = "site:wilusa_130_20"
 good = "standing_grain"
-quantity = 70560000
+quantity = 83159997
 
 [[stores]]
 settlement = "settlement:wilusa"

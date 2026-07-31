@@ -24,6 +24,21 @@ def drain_schedule(world: World) -> tuple[World, list]:
     return dataclasses.replace(world, schedule=remaining), list(fired)
 
 
+def step_kernel(world: World) -> tuple[World, list]:
+    """A2: advance the autonomous world one fortnight (Task 2 C1).
+
+    Kernel events are tuples, not `engine.actions` records, and they describe
+    settlements the player has no standing to see. They are returned in the
+    turn's event list because dropping them would make the world's turn
+    unobservable to `tools/kernel_inspect.py`; every reader downstream
+    isinstance-filters on the action types, so they are inert until C6 gives
+    the belief layer somewhere to put them.
+    """
+    from engine.kernel import world as K
+    kernel, events = K.advance(world.kernel)
+    return dataclasses.replace(world, kernel=kernel), events
+
+
 def advance(world: World) -> tuple[World, list]:
     """Phase A + B(pre-belief). Returns the events describing this turn's advance."""
     events: list = []
@@ -35,6 +50,17 @@ def advance(world: World) -> tuple[World, list]:
         world, court=dataclasses.replace(
             world.court, inspected=(), searched=()))
     events.append(_turn_advanced(world))
+
+    # A2: the world outside the seat. Every other settlement crosses the same
+    # fortnight -- sows, tends, reaps, eats, and settles what it owes -- on its
+    # own region's weather. Kept here, immediately after A1, because the court
+    # phases below are the seat's own turn and the world does not wait on them.
+    #
+    # The kernel keeps its own date and steps it itself, so this is one advance
+    # per world advance and the two dates stay level. Nothing in the court reads
+    # kernel state yet (Task 2 C2 onward moves the readers over), so the seat's
+    # numbers are unchanged by this call.
+    world, e = step_kernel(world); events += e
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)
