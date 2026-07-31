@@ -72,6 +72,25 @@ Closes: 47 unmapped places.
 
 ## C3 — people and labour
 
+Groundwork landed; the migration itself has not.
+
+- [x] Tenure: `Polity.tenure` / `Cohort.tenure`, `Kernel.tenure_of`,
+      `world._food_owners`, `farm.share_out` / `divide` / `_sowable`.
+      A dependent group is a redistributive body by definition -- it owns no
+      grain and is owed a ration -- and `seat_people.as_cohort` now says so, so
+      the converted groups land beside the seat's own households instead of
+      into one pooled granary with them.
+- [x] `seat_people.SEAT` was `settlement:ugarit`, which the live scenario does
+      not have. Every placement silently matched nothing. Now `settlement:seat`.
+      The audit had the same constant and the same bug; its goods, people,
+      labour and land rows counted zero on the kernel side and reported a false
+      all-clear. Fixed, and the audit is 5 findings -> 8 as a result.
+- [ ] The seat's two populations. The court's 1,010 dependents and the
+      generator's 80,000 people still eat one granary, which is why
+      `farm.keep` and `world._consume` both carry a seat exemption. Tenure is
+      what lets them stop: the 1,010 are redistributive and eat the palace's
+      lots, the 80,000 are the Alu's own. `divide` skips the seat today because
+      it iterates `kernel.autonomous()` and the seat is not.
 - [ ] `Court.dependents` -> `Cohort`; arrears -> `hunger`/`grievance`.
 - [ ] `pay_rations` to legacy; kernel `_consume` feed seat.
 - [ ] `recompute_unrest` stay, read cohort grievance.
