@@ -273,6 +273,12 @@ class Route:
 # Anything else is a content error and `check` says so.
 TENURES = ("pooled", "redistributive", "subsistence", "prebendal")
 
+# Ceiling on `Cohort.hunger`. Nothing reads a value above 10, and an uncapped
+# counter meant recovery took as many fortnights as the famine lasted.
+HUNGER_MAX = 10
+# The least of a body's strength hunger may take. See `Cohort.labour`.
+HUNGER_FLOOR = 200
+
 
 @dataclasses.dataclass(frozen=True)
 class Cohort:
@@ -317,8 +323,10 @@ class Cohort:
     precedence: int = 0
 
     def labour(self) -> int:
-        # Hunger takes the strength before it takes the numbers.
-        able = max(0, 1000 - self.hunger * 100)
+        # Hunger takes the strength before it takes the numbers, but never all
+        # of it: a cohort supplying no days cannot reap, so cannot ever stop
+        # being hungry.
+        able = max(HUNGER_FLOOR, 1000 - min(self.hunger, HUNGER_MAX) * 100)
         return self.people * self.labour_per_head * min(1000, able) // 1000
 
     def ration(self) -> int:

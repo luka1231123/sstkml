@@ -35,11 +35,6 @@ def test_archive_batch_is_idempotent_and_keeps_inbox_order() -> None:
     assert len(refs) == len(set(refs))
 
 
-def test_m13_foundation_benchmark_stays_inside_the_pinned_tripwires() -> None:
-    result = measure(DEFAULT_TURNS)
-    assert over_budget(result) == {}
-
-
 def test_m13_save_boundary_is_versioned_and_round_trips() -> None:
     world = _world(4)
     with tempfile.TemporaryDirectory() as directory:

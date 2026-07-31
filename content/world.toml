@@ -686,7 +686,13 @@ population = 435000
 col = 44
 row = 48    # 37.73N 22.75E
 power = "ahhiyawa"
-rank = "royal"
+# Imperial because Ahhiyawa needs a seat, not because Mycenae ruled the Aegean
+# the way Hattusa ruled Anatolia. Every other power on this map has one Alu
+# ranked imperial, and what that rank does is name the place tribute is carried
+# to. Nine Aegean towns already answer to Ahhiyawa here; leaving it the one
+# power with nowhere to carry a due would mean their grain was rendered and then
+# stood in their own granaries forever, owned by nobody who eats.
+rank = "imperial"
 kind = "alu"
 glyph = "M"
 role = "the richest palace, and hegemon when it suits it"
@@ -2966,6 +2972,237 @@ capacity = "food"
 alu = "tjaru"
 col = 284
 row = 154
+
+# The grain ground of the fourteen Alu that had none. Every settlement here
+# feeds itself off marks like these, and a town drawn without them could not
+# sow, reap, or eat anything but its opening store -- so it starved on a
+# missing row rather than on a bad year. Two marks each, which is the floor
+# the rest of the map already keeps, placed on ground the terrain has as
+# sown, dry, or river.
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "akko"
+col = 352
+row = 124
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "akko"
+col = 356
+row = 118
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "damascus"
+col = 382
+row = 115
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "damascus"
+col = 386
+row = 109
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "gezer"
+col = 348
+row = 139
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "gezer"
+col = 348
+row = 131
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "hazor"
+col = 364
+row = 122
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "hazor"
+col = 368
+row = 116
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "jerusalem"
+col = 356
+row = 141
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "jerusalem"
+col = 356
+row = 133
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "kadesh"
+col = 388
+row = 99
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "kadesh"
+col = 388
+row = 91
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "mukish"
+col = 384
+row = 74
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "mukish"
+col = 384
+row = 66
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nagar"
+col = 502
+row = 68
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nagar"
+col = 502
+row = 60
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nippur"
+col = 606
+row = 136
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "nippur"
+col = 606
+row = 128
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "orchomenos"
+col = 52
+row = 40
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "orchomenos"
+col = 52
+row = 32
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "shechem"
+col = 357
+row = 134
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "shechem"
+col = 357
+row = 126
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tabetu"
+col = 491
+row = 78
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "tabetu"
+col = 491
+row = 70
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "ur"
+col = 628
+row = 152
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "ur"
+col = 628
+row = 144
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "uruk"
+col = 616
+row = 148
+
+[[sites]]
+kind = "grain"
+role = "capacity"
+capacity = "food"
+alu = "uruk"
+col = 616
+row = 140
 
 # ── The farming year. These are the same for every campaign in this world:
 # the Levantine agricultural calendar that defines when fields are sown,

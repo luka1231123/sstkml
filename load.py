@@ -220,12 +220,22 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
                                          seat=settlement_id,
                                          tenure=tenure_for(pid))
             settlement_polity[place.id] = pid
+    # Where an overlord sits, which is the place a tribute is carried to. Its
+    # own Alu where one is named after it -- Egypt is a country and a city on
+    # this map -- and otherwise the one Alu it holds that is ranked imperial:
+    # Hattusa for Hatti, Assur for Assyria, Babylon for Karduniash. The rank is
+    # authored and only ever one per power, so this is reading the content
+    # rather than guessing at a capital from a name.
+    imperial = {p.power: p.id for p in alus.values()
+                if p.power in OVERLORDS and p.rank == "imperial"}
     for overlord in OVERLORDS:
         controlled = tuple(sorted(overlord_controls[overlord]))
         seat = ""
         overlord_place = alus.get(overlord)
         if overlord_place is not None and overlord_place.power == overlord:
             seat = f"settlement:{overlord}"
+        elif overlord in imperial:
+            seat = f"settlement:{imperial[overlord]}"
         pid = f"polity:{overlord}"
         polities[pid] = KernelPolity(
             id=pid, name=overlord, seat=seat, controls=controlled,

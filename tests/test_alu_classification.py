@@ -50,7 +50,7 @@ def test_every_mark_has_a_classification_and_an_owning_alu() -> None:
         assert bool(site.capacity) == (site.role == "capacity")
 
     counted = collections.Counter(site.role for site in world.sites)
-    assert counted == {"capacity": 121, "palace_centre": 59}
+    assert counted == {"capacity": 149, "palace_centre": 59}
 
 
 def test_an_unowned_or_unclassified_mark_is_a_load_error() -> None:

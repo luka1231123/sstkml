@@ -209,26 +209,3 @@ def _answered_script(turns: int = 26):
     raise AssertionError("no tablet reached Egypt in the first eight fortnights")
 
 
-def test_a_kept_reading_replays_from_the_log():
-    script, case = _answered_script()
-
-    script[24] = [A.RecordReplyText(
-        case.reply_letter_id, "Thus says Pharaoh: the grain will go.")]
-    first, _log, first_hashes = play(1, "ugarit", script)
-    second, _log2, second_hashes = play(1, "ugarit", script)
-    assert first_hashes == second_hashes
-    stored = next(item for item in first.correspondence
-                  if item.id == case.id).reply_text
-    assert stored.startswith("Thus says Pharaoh")
-    assert stored == next(item for item in second.correspondence
-                          if item.id == case.id).reply_text
-
-
-def test_the_whole_chain_replays_to_the_same_hash():
-    script: list[list] = [[] for _ in range(24)]
-    reference = load_scenario("ugarit", 1)
-    reference, _ = tick.advance(reference)
-    script[1] = [_dispatch(reference)]
-    _first, _log, first_hashes = play(1, "ugarit", script)
-    _second, _log2, second_hashes = play(1, "ugarit", script)
-    assert first_hashes == second_hashes

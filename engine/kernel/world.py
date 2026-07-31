@@ -46,7 +46,7 @@ from engine import obligation as O
 from engine import observe as OB
 from engine import ownership as W
 from engine.core import Date, stream
-from engine.entity import Cohort, EntityId, Registry, check, mint
+from engine.entity import HUNGER_MAX, Cohort, EntityId, Registry, check, mint
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
@@ -166,6 +166,23 @@ class Kernel:
             if self.registry.orgs[org_id].policy in POLICIES
             and self.registry.settlements[
                 self.registry.orgs[org_id].settlement].autonomous)
+
+    def farmers(self) -> tuple[EntityId, ...]:
+        """Every organization that works ground, in a stable order.
+
+        `deciders` plus the controller of a settlement that has fields but no
+        policy -- the seat. Such an actor gets the field work and nothing else:
+        it does not render, trade, or decide anything the player decides.
+        """
+        driven = set(self.deciders())
+        out = list(driven)
+        for sid in sorted(self.registry.settlements):
+            if sid in {self.registry.orgs[o].settlement for o in driven}:
+                continue
+            holder = self.controller(sid)
+            if holder and self.field_site(sid, holder):
+                out.append(holder)
+        return tuple(sorted(out))
 
     def autonomous(self) -> tuple[EntityId, ...]:
         """The settlements that decide for themselves, in a stable order."""
@@ -362,7 +379,7 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
     world: Kernel = snapshot.world
     beliefs = dict(kernel.beliefs)
     turn = snapshot.turn
-    for actor in world.deciders():
+    for actor in world.farmers():
         settlement = world.registry.orgs[actor].settlement
         need = sum(c.ration() for c in world.cohorts_of(settlement))
         owed = sum(o.outstanding() for o in world.obligations
@@ -452,10 +469,19 @@ def _abroad(world: Kernel, belief: B.Belief, actor: EntityId,
 def _intents(kernel: Kernel, snapshot: Snapshot) -> tuple[Intent, ...]:
     """Phase 4. Every council decides from its own belief, from one snapshot."""
     world: Kernel = snapshot.world
+    driven = set(world.deciders())
     produced: list[Intent] = []
-    for actor in world.deciders():
-        policy = POLICIES[world.registry.orgs[actor].policy]
-        produced.extend(policy(actor, kernel.beliefs[actor]))
+    for actor in world.farmers():
+        belief = kernel.beliefs[actor]
+        if actor in driven:
+            policy = POLICIES[world.registry.orgs[actor].policy]
+            produced.extend(policy(actor, belief))
+        else:
+            # Field work only. `feeds_town` is false as for a temple: the crown
+            # feeds its payroll, not the Alu, so the town's ration is not the
+            # reserve it holds back before setting seed aside.
+            produced.extend(_farm(actor, belief, C.home(belief),
+                                  feeds_town=False))
     return tuple(sorted(produced, key=lambda i: i.id))
 
 
@@ -705,7 +731,7 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
 
         # Short. The memory first, then the people: a cohort that has been
         # hungry for three fortnights starts to lose them.
-        hunger = cohort.hunger + 1
+        hunger = min(HUNGER_MAX, cohort.hunger + 1)
         lost = 0
         if starve and hunger >= 3:
             rng = stream(kernel.seed, kernel.date.absolute, "kernel.hunger",
@@ -724,6 +750,28 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
     return dataclasses.replace(kernel, book=book, registry=registry), events
 
 
+def _collectors(kernel: Kernel) -> dict[EntityId, tuple[EntityId, EntityId]]:
+    """Who actually takes a tribute owed to a polity, and where they take it.
+
+    An obligation names the power it is owed to, because that is what a vassal
+    owes and what the letters say. A power cannot hold grain: it has no
+    granary, no people, and no fortnight in which it eats. The house that
+    collects is the palace at its seat, and the grain goes there.
+
+    A polity with no seat collects nothing, and its dues stay where they were
+    rendered. That is a content fault rather than a rule -- a power on this map
+    is expected to have one Alu ranked imperial -- and it fails visibly, as
+    tribute piling up in the vassal's own store, rather than silently.
+    """
+    found: dict[EntityId, tuple[EntityId, EntityId]] = {}
+    for pid in sorted(kernel.registry.polities):
+        seat = kernel.registry.polities[pid].seat
+        holder = kernel.controller(seat) if seat else ""
+        if holder:
+            found[pid] = (holder, seat)
+    return found
+
+
 def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
     """Phase 10. Obligations fall due, are rendered, or are not."""
     events: list = []
@@ -737,6 +785,7 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
             events.append(("due", obligation.id, obligation.owed()))
 
     offered = {i.subject: i.quantity for i in intents if i.kind == "render"}
+    collector = _collectors(kernel)
     # Ordinal counters for the parts split off by a levy, one per place. Kept
     # per party because the id's parent is the party: two settlements rendering
     # on the same turn cannot collide, and two lots split for the same
@@ -750,15 +799,17 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
         if offer <= 0:
             continue
         moved = 0
+        taker, where = collector.get(
+            obligation.beneficiary, (obligation.beneficiary, ""))
         for lot in book.at(obligation.party):
             if lot.good != obligation.good or moved >= offer:
                 continue
-            # A party cannot render what the beneficiary already owns. The
-            # crown's own grain sits in Ma'hadu after every tribute -- it has
-            # been paid but nothing has carried it away -- and levying it again
+            # A party cannot render what the collector already owns. Where the
+            # due is carried away this is nearly moot, but a power with no seat
+            # still takes ownership in place, and levying its own heap again
             # would be both a double payment and, since ownership would not
             # change, an outright error.
-            if lot.owner == obligation.beneficiary:
+            if lot.owner == taker:
                 continue
             take = min(offer - moved, lot.free)
             if take <= 0:
@@ -769,10 +820,23 @@ def _settle(kernel: Kernel, intents: tuple[Intent, ...]) -> tuple[Kernel, list]:
             # from 200 to just past 1000 at the same parent on the same turn.
             part = mint(obligation.party, kernel.date.absolute, "lot",
                         2000 + ordinal)
+            whole = take == lot.quantity
             book = book.give(
-                lot.id, take, obligation.beneficiary, "levied",
+                lot.id, take, taker, "levied",
                 authority=obligation.id,
-                new_id=None if take == lot.quantity else part)
+                new_id=None if whole else part)
+            # And it is carried. A tribute that changed owner and stayed in the
+            # vassal's own granary was grain nobody could ever eat: a polity has
+            # no mouths and no store, and the lot stood in a town that was no
+            # longer allowed to touch it. Every harvest put another year's due
+            # beyond reach, so the world's grain drained into a heap at the
+            # place that grew it. The carriage is not modelled -- the due
+            # arrives in the fortnight it is rendered, with no journey and no
+            # risk -- and that is the same simplification the crown's payroll
+            # eats under. `carry.py` is where a cargo has to make a crossing.
+            if where:
+                book = book.relocate(lot.id if whole else part, where,
+                                     "levied", authority=obligation.id)
             moved += take
         if moved > 0:
             obligations[i] = O.render(obligation, moved)

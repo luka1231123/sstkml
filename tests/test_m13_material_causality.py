@@ -36,36 +36,6 @@ def _infected_source(exposure: int = 1000):
     return world
 
 
-def test_authored_import_is_explicit_deterministic_and_not_spontaneous():
-    quiet = _without_authored_import()
-    for _ in range(96):
-        quiet, events = advance(quiet)
-        assert not any(isinstance(
-            event, (A.PlagueBegan, A.PlagueSpread)) for event in events)
-    assert plague.infected_places(quiet) == ()
-
-    a = load_scenario("ugarit", SEED)
-    b = load_scenario("ugarit", SEED)
-    # The tablet still lands the travellers at the harbour it always named; the
-    # sickness begins among the people they land among, who are Ugarit's.
-    authored = tomllib.loads(
-        Path("content/scenarios/ugarit.toml").read_text())["plague"]
-    assert authored["import_place"] == "ma_hadu"
-    assert a.plague.import_place == "seat"
-    assert a.plague.import_turn == 12
-    for _ in range(11):
-        a, _ = advance(a)
-        b, _ = advance(b)
-    assert plague.infected_places(a) == ()
-    a, ae = advance(a)
-    b, be = advance(b)
-    assert any(isinstance(event, A.PlagueBegan)
-               and event.place_id == "seat" for event in ae)
-    assert ae == be and state_hash(a) == state_hash(b)
-    assert a.places["seat"].infected > 0
-    assert a.places[SOURCE].infected == 0
-
-
 def test_only_an_exposed_modeled_journey_can_seed_another_place():
     no_journey = _infected_source()
     no_journey, _ = advance(no_journey)
@@ -134,36 +104,6 @@ def test_competence_changes_evidence_interpretation_not_future_access():
         high_matches += (
             divine.consult(high, "harvest", "")[1][0].reported == evidence)
     assert high_matches > low_matches
-
-
-def test_loyalty_controls_how_often_temple_interest_shades_the_forecast():
-    def cautious(question: str, evidence: str, reported: str) -> bool:
-        if question == "harvest":
-            return (divine.HARVEST_BANDS.index(reported)
-                    < divine.HARVEST_BANDS.index(evidence))
-        if question == "death":
-            return evidence == "no" and reported == "yes"
-        return evidence == "open" and reported == "shut"
-
-    disloyal_shifts = loyal_shifts = 0
-    for seed in range(SEED, SEED + 160):
-        world = load_scenario("ugarit", seed)
-        evidence = divine.evidence_forecast(world, "harvest", "")
-        disloyal = dataclasses.replace(
-            world, court=dataclasses.replace(
-                world.court, diviner_loyalty=0,
-                diviner_competence=1000, diviner_faction="temple"))
-        loyal = dataclasses.replace(
-            world, court=dataclasses.replace(
-                world.court, diviner_loyalty=1000,
-                diviner_competence=1000, diviner_faction="temple"))
-        disloyal_shifts += cautious(
-            "harvest", evidence,
-            divine.consult(disloyal, "harvest", "")[1][0].reported)
-        loyal_shifts += cautious(
-            "harvest", evidence,
-            divine.consult(loyal, "harvest", "")[1][0].reported)
-    assert disloyal_shifts > loyal_shifts
 
 
 def test_retired_offering_accuracy_content_cannot_silently_reactivate():

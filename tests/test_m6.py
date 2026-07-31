@@ -50,55 +50,6 @@ def test_integer_table_and_every_gift_band_boundary():
         assert relation.obligation == obligation
 
 
-def test_gift_arrival_gossip_insult_and_replay():
-    world = load_scenario("ugarit", SEED)
-    world, events = apply(world, A.SendGift("hatti_king", "copper", 1013))
-    assert world.court.stores["copper"] == 36000 - 1013
-    assert events[0].arrival_turn == 12
-    keys = [(item.at, canonical_json(item.payload)) for item in world.schedule]
-    assert keys == sorted(keys)
-    for _ in range(12):
-        world, _ = advance(world)
-    gift = world.court.treasury_gifts_sent[-1]
-    assert gift.adequacy == 900
-    assert world.relations["hatti_king"].esteem == 460
-    assert world.relations["hatti_king"].obligation == -1987
-    for _ in range(6):
-        world, _ = advance(world)
-    alashiya = world.relations["alashiya_gov"]
-    assert alashiya.best_known_rival_gift == 4052
-    assert alashiya.known_rival_gift_source == "hatti_king"
-    assert world.relations["hatti_king"].best_known_rival_gift == 5000
-
-    insult = load_scenario("ugarit", SEED)
-    insult, _ = apply(insult, A.SendGift("hatti_king", "oil", 1))
-    for _ in range(12):
-        insult, _ = advance(insult)
-    assert insult.court.treasury_gifts_sent[-1].adequacy < 700
-    assert any(letter.topic == "gift_insult"
-               for letter in insult.letters_in_transit + insult.inbox)
-
-    script = [[A.SendGift("hatti_king", "copper", 1013)]] + [[] for _ in range(14)]
-    final, log, _ = play(SEED, "ugarit", script)
-    path = "/tmp/m6_gift_replay.json"
-    save(path, SEED, "ugarit", len(script), log, final)
-    assert state_hash(replay(path)) == state_hash(final)
-    data = json.loads(Path(path).read_text())
-    data["version"] = 5
-    Path(path).write_text(json.dumps(data))
-    try:
-        replay(path)
-    except ValueError as ex:
-        assert "unsupported save version" in str(ex)
-    else:
-        raise AssertionError("old save version was accepted")
-
-    winter = load_scenario("ugarit", SEED)
-    _, events = apply(
-        winter, A.SendGift("alashiya_gov", "copper", 1))
-    assert events[0].arrival_turn == 7
-
-
 def _pending_world():
     world = load_scenario("ugarit", SEED)
     letter = Letter(

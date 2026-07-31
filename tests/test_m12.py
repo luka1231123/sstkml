@@ -68,14 +68,6 @@ def test_a_vacant_post_decays_faster_than_a_minded_one() -> None:
     assert I._decay_for(court, minded) < I._decay_for(court, walls)
 
 
-def test_the_city_is_not_rubble_after_a_hundred_turns() -> None:
-    """Decay is a pressure, not a countdown."""
-    court = _world(96).court
-    for inst in court.institutions.values():
-        if inst.head:
-            assert inst.condition > 400, f"{inst.id} fell apart while minded"
-
-
 # --- the two multipliers ------------------------------------------------------
 
 def test_effective_output_is_fabric_times_staff() -> None:

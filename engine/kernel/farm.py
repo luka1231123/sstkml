@@ -250,7 +250,7 @@ def _farmers(kernel) -> tuple[EntityId, ...]:
     def rank(actor: EntityId) -> tuple:
         org = kernel.registry.orgs.get(actor)
         return (-(org.authority if org else 0), actor)
-    return tuple(sorted(kernel.deciders(), key=rank))
+    return tuple(sorted(kernel.farmers(), key=rank))
 
 
 def _settlement_of(kernel, actor: EntityId) -> EntityId:

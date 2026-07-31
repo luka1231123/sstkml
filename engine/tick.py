@@ -61,6 +61,8 @@ def advance(world: World) -> tuple[World, list]:
     # kernel state yet (Task 2 C2 onward moves the readers over), so the seat's
     # numbers are unchanged by this call.
     world, e = step_kernel(world); events += e
+    # The crown's grain year, said in the court's own vocabulary (C4/C5).
+    world, e = seat.harvest(world, e); events += e
 
     # A3: drain the schedule
     world, fired = drain_schedule(world)

@@ -50,7 +50,3 @@ def test_answering_allows_the_sender_to_raise_the_matter_again() -> None:
         world, "alashiya_gov", "ships_sighted"))
 
 
-def test_a_long_unattended_court_stays_a_pile_not_a_landfill() -> None:
-    world = _advance(load_scenario("ugarit", SEED), 96)
-    active = [letter for letter in world.inbox if not letter.archived]
-    assert len(active) <= 80

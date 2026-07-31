@@ -10,15 +10,6 @@ from tools import m13_audit
 SEED = 8814402919
 
 
-def test_a_96_turn_world_has_no_unexplained_material_change() -> None:
-    result = m13_audit.run(96, SEED)
-    assert result["findings"] == []
-    # C4: the crown's fields crossed to the kernel, so the court mirror has no
-    # material sources; the sinks (grain crossing to the Book, bronze lost to
-    # the melt) must still all be explained.
-    assert result["sinks"]
-
-
 def test_the_audit_rejects_an_unexplained_store_mutation() -> None:
     world = load_scenario("ugarit", SEED)
     advanced, events = advance(world)

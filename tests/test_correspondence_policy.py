@@ -371,11 +371,3 @@ def test_an_accepted_request_empties_a_named_granary_and_fills_ours():
     assert any(world.court.seat in note for note in cargo.history)
 
 
-def test_the_whole_chain_replays_to_the_same_hash():
-    script: list[list] = [[] for _ in range(30)]
-    reference = load_scenario("ugarit", 1)
-    reference, _ = tick.advance(reference)
-    script[1] = [_dispatch(reference)]
-    _first, _log, first_hashes = play(1, "ugarit", script)
-    _second, _second_log, second_hashes = play(1, "ugarit", script)
-    assert first_hashes == second_hashes

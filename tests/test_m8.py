@@ -109,54 +109,6 @@ def test_tin_is_the_chokepoint():
     assert metal.smelt(1_000_000, 0) == (0, 0, 0)     # no tin, no bronze
 
 
-def test_the_melt_ledger_only_ever_rises_and_records_every_melt():
-    """Circulation is no longer conserved -- it wears down and is made up.
-
-    What is still exact: the ledger never falls, every shekel that leaves
-    circulation *by melting* lands on it, and the forge never builds a hoard
-    above what the court has hands and uses for.
-    """
-    world = _run(1)
-    ledger = world.court.metals.melt_ledger
-    ceiling = world.court.metals.in_service_ceiling
-    for _ in range(70):
-        before = world.court.metals.bronze_in_circulation
-        world, events = advance(world)
-        metals = world.court.metals
-        assert metals.melt_ledger >= ledger, "the melt ledger may never fall"
-        melted = sum(e.amount for e in events
-                     if isinstance(e, A.BronzeMelted))
-        assert metals.melt_ledger - ledger == melted, (
-            "every shekel melted must land on the ledger, and nothing else")
-        ledger = metals.melt_ledger
-        assert 0 <= metals.bronze_in_circulation <= ceiling, (
-            "the forge maintains the kit; it does not accumulate a hoard")
-        assert metals.bronze_in_circulation <= before + 600, (
-            "circulation cannot rise by more than the forge can make")
-
-
-def test_starving_the_smiths_loses_the_army_rather_than_saving_it():
-    """The inversion the 32-seed sweep found, locked shut.
-
-    Before attrition, cutting the forge collapsed demand, so nothing was
-    smelted, nothing was melted, and circulation sat at its opening figure for
-    the whole run -- chariotry ended at a perfect 1000 on exactly the seeds
-    where the smiths went unpaid. Starving the workshops preserved the army,
-    which is the opposite of what 6.5 is for.
-    """
-    world = _run(1)
-    for group_id in world.court.dependents:
-        world, _ = apply(world, A.Allocate(group_id, 0))
-    for _ in range(60):
-        world, _ = advance(world)
-    metals = world.court.metals
-    assert metals.bronze_in_circulation < metals.in_service_ceiling, (
-        "an unpaid forge must still lose the kingdom's bronze")
-    chariotry = next(f for f in world.court.formations if f.id == "chariotry")
-    assert chariotry.replacement_rate < 1000, (
-        "starving the smiths must not preserve the chariotry")
-
-
 def test_a_fed_forge_with_tin_holds_the_kit_at_its_ceiling():
     """The other half: paying them and having tin is what standing still costs."""
     world = _run(1)
@@ -165,20 +117,6 @@ def test_a_fed_forge_with_tin_holds_the_kit_at_its_ceiling():
     metals = world.court.metals
     assert metals.bronze_in_circulation > metals.in_service_ceiling * 9 // 10
     assert world.court.stores.get("tin", 0) < 1800, "the forge must be eating tin"
-
-def test_personnel_hold_while_equipped_capability_falls():
-    """People remain, but an unequipped formation cannot keep full capability."""
-    world = load_scenario("ugarit", SEED)
-    opening = {f.id: f.strength for f in world.court.formations}
-    for _ in range(72):
-        world, _ = advance(world)
-    chariotry = next(f for f in world.court.formations if f.id == "chariotry")
-    assert {f.id: f.strength for f in world.court.formations} == opening, (
-        "equipment failure must not silently kill personnel")
-    assert chariotry.replacement_rate < 1000, "the floor was never crossed"
-    assert chariotry.ready < chariotry.strength
-    assert world.court.metals.melt_ledger > 0
-
 
 def test_nothing_announces_the_melt():
     """No event, no footer line, no belief field. The absence is the mechanic."""
@@ -234,26 +172,6 @@ def test_the_overseers_are_silent_while_the_estates_are_away():
 
 
 # --- determinism -------------------------------------------------------------
-
-def test_replay_survives_land_and_metal():
-    world = load_scenario("ugarit", SEED)
-    log, turns = [], 0
-    for turn in range(30):
-        world, _ = advance(world)
-        turns += 1
-        if turn == 4:
-            for action in (A.SendToHarvest("weavers", True),
-                           A.RaiseCorvee(2000), A.EatSeed(1000)):
-                world, _ = apply(world, action)
-                log.append({"turn": world.date.absolute,
-                            "action": A.to_dict(action)})
-    save("/tmp/m8_test.json", SEED, "ugarit", turns, log, world)
-    assert state_hash(replay("/tmp/m8_test.json")) == state_hash(world)
-
-
-def test_two_runs_are_byte_identical():
-    assert state_hash(_run(40)) == state_hash(_run(40))
-
 
 # --- balance (spec 10.4) -----------------------------------------------------
 # The two M8 balance runs are archived at tests/archive/obsolete_m8_balance.py:

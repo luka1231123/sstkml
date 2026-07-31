@@ -63,6 +63,22 @@ capacity = 7500
 extent = 37500
 
 [[sites]]
+id = "site:akko_352_124"
+settlement = "settlement:akko"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 1980000
+
+[[sites]]
+id = "site:akko_356_118"
+settlement = "settlement:akko"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
 id = "site:alashiya_318_84"
 settlement = "settlement:alashiya"
 region = "region:alashiya"
@@ -375,6 +391,22 @@ capacity = 12000
 extent = 60000
 
 [[sites]]
+id = "site:damascus_382_115"
+settlement = "settlement:damascus"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 3960000
+
+[[sites]]
+id = "site:damascus_386_109"
+settlement = "settlement:damascus"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
 id = "site:dur_katlimmu_494_84"
 settlement = "settlement:dur_katlimmu"
 region = "region:upper_mesopotamia"
@@ -527,6 +559,22 @@ capacity = 6000
 extent = 30000
 
 [[sites]]
+id = "site:gezer_348_131"
+settlement = "settlement:gezer"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 5133333
+
+[[sites]]
+id = "site:gezer_348_139"
+settlement = "settlement:gezer"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
 id = "site:halab_400_74"
 settlement = "settlement:halab"
 region = "region:north_levant"
@@ -599,6 +647,22 @@ capacity = 300
 extent = 0
 
 [[sites]]
+id = "site:hazor_364_122"
+settlement = "settlement:hazor"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 3960000
+
+[[sites]]
+id = "site:hazor_368_116"
+settlement = "settlement:hazor"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
 id = "site:iolcos_44_22"
 settlement = "settlement:iolcos"
 region = "region:aegean"
@@ -621,6 +685,38 @@ region = "region:aegean"
 function = "palace_centre"
 capacity = 7500
 extent = 37500
+
+[[sites]]
+id = "site:jerusalem_356_133"
+settlement = "settlement:jerusalem"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 2933333
+
+[[sites]]
+id = "site:jerusalem_356_141"
+settlement = "settlement:jerusalem"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
+id = "site:kadesh_388_91"
+settlement = "settlement:kadesh"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 3300000
+
+[[sites]]
+id = "site:kadesh_388_99"
+settlement = "settlement:kadesh"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
 
 [[sites]]
 id = "site:kanesh_366_36"
@@ -895,6 +991,22 @@ capacity = 600
 extent = 0
 
 [[sites]]
+id = "site:mukish_384_66"
+settlement = "settlement:mukish"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 1980000
+
+[[sites]]
+id = "site:mukish_384_74"
+settlement = "settlement:mukish"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
 id = "site:mycenae_42_44"
 settlement = "settlement:mycenae"
 region = "region:aegean"
@@ -951,6 +1063,22 @@ capacity = 21750
 extent = 108750
 
 [[sites]]
+id = "site:nagar_502_60"
+settlement = "settlement:nagar"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 7199999
+
+[[sites]]
+id = "site:nagar_502_68"
+settlement = "settlement:nagar"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
 id = "site:nineveh_550_68"
 settlement = "settlement:nineveh"
 region = "region:upper_mesopotamia"
@@ -991,6 +1119,22 @@ capacity = 10000
 extent = 50000
 
 [[sites]]
+id = "site:nippur_606_128"
+settlement = "settlement:nippur"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 9240000
+
+[[sites]]
+id = "site:nippur_606_136"
+settlement = "settlement:nippur"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
 id = "site:nuzi_582_88"
 settlement = "settlement:nuzi"
 region = "region:upper_mesopotamia"
@@ -1013,6 +1157,22 @@ region = "region:upper_mesopotamia"
 function = "palace_centre"
 capacity = 5000
 extent = 25000
+
+[[sites]]
+id = "site:orchomenos_52_32"
+settlement = "settlement:orchomenos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 6467999
+
+[[sites]]
+id = "site:orchomenos_52_40"
+settlement = "settlement:orchomenos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
 
 [[sites]]
 id = "site:pylos_18_54"
@@ -1090,15 +1250,15 @@ extent = 45000
 id = "site:seat_372_76"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "estate"
+function = "food"
 capacity = 7000
-extent = 5280000
+extent = 84000
 
 [[sites]]
 id = "site:seat_374_80"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "estate"
+function = "food"
 capacity = 7000
 extent = 0
 
@@ -1106,7 +1266,7 @@ extent = 0
 id = "site:seat_374_82"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "estate"
+function = "food"
 capacity = 7000
 extent = 0
 
@@ -1114,7 +1274,7 @@ extent = 0
 id = "site:seat_374_86"
 settlement = "settlement:seat"
 region = "region:north_levant"
-function = "estate"
+function = "food"
 capacity = 7000
 extent = 0
 
@@ -1175,6 +1335,22 @@ capacity = 2000
 extent = 10000
 
 [[sites]]
+id = "site:shechem_357_126"
+settlement = "settlement:shechem"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 2933333
+
+[[sites]]
+id = "site:shechem_357_134"
+settlement = "settlement:shechem"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
 id = "site:sidon_364_112"
 settlement = "settlement:sidon"
 region = "region:north_levant"
@@ -1197,6 +1373,22 @@ region = "region:north_levant"
 function = "palace_centre"
 capacity = 5000
 extent = 25000
+
+[[sites]]
+id = "site:tabetu_491_70"
+settlement = "settlement:tabetu"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 2999999
+
+[[sites]]
+id = "site:tabetu_491_78"
+settlement = "settlement:tabetu"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
 
 [[sites]]
 id = "site:tarhuntassa_316_72"
@@ -1381,6 +1573,38 @@ region = "region:north_levant"
 function = "palace_centre"
 capacity = 6000
 extent = 30000
+
+[[sites]]
+id = "site:ur_628_144"
+settlement = "settlement:ur"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 8800000
+
+[[sites]]
+id = "site:ur_628_152"
+settlement = "settlement:ur"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
+id = "site:uruk_616_140"
+settlement = "settlement:uruk"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 11440000
+
+[[sites]]
+id = "site:uruk_616_148"
+settlement = "settlement:uruk"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
 
 [[sites]]
 id = "site:waset_288_228"
@@ -2180,22 +2404,22 @@ people = 3000
 id = "cohort:mycenae_field_labour"
 settlement = "settlement:mycenae"
 kind = "field_labour"
-households = 60900
-people = 304500
+households = 52200
+people = 261000
 
 [[cohorts]]
 id = "cohort:mycenae_craft"
 settlement = "settlement:mycenae"
 kind = "craft"
-households = 17400
-people = 87000
+households = 21750
+people = 108750
 
 [[cohorts]]
 id = "cohort:mycenae_palace"
 settlement = "settlement:mycenae"
 kind = "palace"
-households = 8700
-people = 43500
+households = 13050
+people = 65250
 
 [[cohorts]]
 id = "cohort:nagar_field_labour"
@@ -2630,6 +2854,12 @@ quantity = 48000000
 
 [[stores]]
 settlement = "settlement:akko"
+site = "site:akko_352_124"
+good = "standing_grain"
+quantity = 13860000
+
+[[stores]]
+settlement = "settlement:akko"
 good = "grain"
 quantity = 6000000
 
@@ -2789,6 +3019,12 @@ quantity = 48000000
 
 [[stores]]
 settlement = "settlement:damascus"
+site = "site:damascus_382_115"
+good = "standing_grain"
+quantity = 27720000
+
+[[stores]]
+settlement = "settlement:damascus"
 good = "grain"
 quantity = 12000000
 
@@ -2860,6 +3096,12 @@ quantity = 10800000
 
 [[stores]]
 settlement = "settlement:gezer"
+site = "site:gezer_348_131"
+good = "standing_grain"
+quantity = 32339997
+
+[[stores]]
+settlement = "settlement:gezer"
 good = "grain"
 quantity = 12600000
 
@@ -2898,6 +3140,12 @@ quantity = 123199999
 
 [[stores]]
 settlement = "settlement:hazor"
+site = "site:hazor_364_122"
+good = "standing_grain"
+quantity = 27720000
+
+[[stores]]
+settlement = "settlement:hazor"
 good = "grain"
 quantity = 12000000
 
@@ -2920,8 +3168,20 @@ quantity = 3000
 
 [[stores]]
 settlement = "settlement:jerusalem"
+site = "site:jerusalem_356_133"
+good = "standing_grain"
+quantity = 18479997
+
+[[stores]]
+settlement = "settlement:jerusalem"
 good = "grain"
 quantity = 7200000
+
+[[stores]]
+settlement = "settlement:kadesh"
+site = "site:kadesh_388_91"
+good = "standing_grain"
+quantity = 23100000
 
 [[stores]]
 settlement = "settlement:kadesh"
@@ -3063,6 +3323,12 @@ quantity = 12600000
 
 [[stores]]
 settlement = "settlement:mukish"
+site = "site:mukish_384_66"
+good = "standing_grain"
+quantity = 13860000
+
+[[stores]]
+settlement = "settlement:mukish"
 good = "grain"
 quantity = 6000000
 
@@ -3085,6 +3351,12 @@ quantity = 3000
 
 [[stores]]
 settlement = "settlement:nagar"
+site = "site:nagar_502_60"
+good = "standing_grain"
+quantity = 55439992
+
+[[stores]]
+settlement = "settlement:nagar"
 good = "grain"
 quantity = 26400000
 
@@ -3101,6 +3373,12 @@ quantity = 44000000
 
 [[stores]]
 settlement = "settlement:nippur"
+site = "site:nippur_606_128"
+good = "standing_grain"
+quantity = 97020000
+
+[[stores]]
+settlement = "settlement:nippur"
 good = "grain"
 quantity = 63000000
 
@@ -3114,6 +3392,12 @@ quantity = 23099992
 settlement = "settlement:nuzi"
 good = "grain"
 quantity = 11000000
+
+[[stores]]
+settlement = "settlement:orchomenos"
+site = "site:orchomenos_52_32"
+good = "standing_grain"
+quantity = 29429395
 
 [[stores]]
 settlement = "settlement:orchomenos"
@@ -3158,13 +3442,19 @@ quantity = 3000
 settlement = "settlement:seat"
 site = "site:seat_372_76"
 good = "standing_grain"
-quantity = 36960000
+quantity = 588000
 
 [[stores]]
 settlement = "settlement:seat"
 owner = "org:seat_merchants"
 good = "copper"
 quantity = 3000
+
+[[stores]]
+settlement = "settlement:shechem"
+site = "site:shechem_357_126"
+good = "standing_grain"
+quantity = 18479997
 
 [[stores]]
 settlement = "settlement:shechem"
@@ -3181,6 +3471,12 @@ quantity = 23100000
 settlement = "settlement:sidon"
 good = "grain"
 quantity = 10000000
+
+[[stores]]
+settlement = "settlement:tabetu"
+site = "site:tabetu_491_70"
+good = "standing_grain"
+quantity = 23099992
 
 [[stores]]
 settlement = "settlement:tabetu"
@@ -3267,8 +3563,20 @@ quantity = 12000000
 
 [[stores]]
 settlement = "settlement:ur"
+site = "site:ur_628_144"
+good = "standing_grain"
+quantity = 92400000
+
+[[stores]]
+settlement = "settlement:ur"
 good = "grain"
 quantity = 60000000
+
+[[stores]]
+settlement = "settlement:uruk"
+site = "site:uruk_616_140"
+good = "standing_grain"
+quantity = 120120000
 
 [[stores]]
 settlement = "settlement:uruk"
@@ -3687,7 +3995,7 @@ name = "the palace of Mycenae"
 settlement = "settlement:mycenae"
 kind = "palace"
 policy = "subsistence"
-authority = 600
+authority = 900
 
 [[orgs]]
 id = "org:mycenae_merchants"

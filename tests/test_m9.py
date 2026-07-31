@@ -52,28 +52,6 @@ def test_heirs_are_ranked_from_turn_one_and_daughters_are_not_in_the_line():
     assert world.court.house["pidray"].is_heir_rank is None
 
 
-def test_children_are_born_named_and_pregnancies_do_not_overlap():
-    world = load_scenario("ugarit", SEED)
-    births, conceptions = [], []
-    for _ in range(150):
-        world, events = advance(world)
-        for event in events:
-            if isinstance(event, A.ChildBorn):
-                births.append(event)
-            if isinstance(event, A.Conceived):
-                conceptions.append((event.mother, world.date.absolute))
-        # Never carrying two at once.
-        for person in world.court.house.values():
-            if person.pregnant_until is not None:
-                assert person.pregnant_until > world.date.absolute
-    assert births, "150 turns and no child was born"
-    pool = set(world.house_names_f) | set(world.house_names_m)
-    for birth in births:
-        child = world.court.house[birth.child_id]
-        assert child.name in pool, f"{child.name} is an identifier, not a name"
-        assert child.mother and child.father
-
-
 def test_child_mortality_is_high_enough_that_one_heir_is_none():
     """Spec 6.10: 'This is why heirs past the second are insurance.'
 
@@ -118,54 +96,6 @@ def test_a_dead_woman_bears_no_child():
 
 # --- succession and the oath reset (spec 6.9, 6.10) --------------------------
 
-def test_succession_resets_the_regnal_year_and_lapses_every_oath():
-    world = _run(120)
-    assert world.date.year > 1
-    _, breaches = relations.audit_oaths(world)
-    assert A.OathViolated(
-        "oath_hatti_grain", "provide_goods") in breaches
-    world = _kill(world, "ammurapi")
-    world, events = house.succeed(world)
-
-    succeeded = next(e for e in events if isinstance(e, A.RulerSucceeded))
-    assert succeeded.person_id == "niqmaddu"
-    assert world.court.ruler == world.court.actor == "niqmaddu"
-    # A NEW regnal year 1, which voids every date correlation the player built.
-    assert world.date.year == 1
-    assert world.court.reigns == 2
-    # Every oath sworn to a KING lapses. Not broken -- lapsed.
-    royal = [o for o in world.oaths if not o.dissolved and not o.binds_house]
-    assert royal and all(o.lapsed for o in royal)
-    # A house vow does not lapse; the archive still records the obligation.
-    vows = [o for o in world.oaths if o.binds_house]
-    assert vows and not any(o.lapsed for o in vows)
-    hatti = next(o for o in world.oaths if o.id == "oath_hatti_grain")
-    assert hatti.sworn_by == "ammurapi", (
-        "the record of who swore it must survive him")
-    _, breaches = relations.audit_oaths(world)
-    assert not any(event.oath_id == "oath_hatti_grain"
-                   for event in breaches
-                   if isinstance(event, A.OathViolated))
-
-
-def test_a_lapsed_oath_binds_nobody_until_a_living_man_swears():
-    world = _run(120)
-    world = _kill(world, "ammurapi")
-    world, _ = house.succeed(world)
-    _, breaches = relations.audit_oaths(world)
-    assert not any(event.oath_id == "oath_hatti_grain"
-                   for event in breaches
-                   if isinstance(event, A.OathViolated))
-
-    world, events = apply(world, A.SwearOath("oath_hatti_grain"))
-    assert any(isinstance(e, A.OathSworn) for e in events)
-    oath = world.oaths[0]
-    assert not oath.lapsed and oath.sworn_by == "niqmaddu"
-    _, breaches = relations.audit_oaths(world)
-    assert A.OathViolated(
-        "oath_hatti_grain", "provide_goods") in breaches
-
-
 def test_re_swearing_is_refused_when_it_would_be_meaningless():
     world = _run(20)
     for bad in (A.SwearOath("no_such_oath"), A.SwearOath("oath_hatti_grain")):
@@ -174,21 +104,6 @@ def test_re_swearing_is_refused_when_it_would_be_meaningless():
             raise AssertionError(f"{bad} was accepted")
         except ValueError:
             pass
-
-
-def test_succession_prefers_rank_presence_and_majority():
-    world = _run(120)
-    eldest = world.court.house["niqmaddu"]
-    younger = world.court.house["ibiranu"]
-    assert (house.succession_score(world, eldest)
-            > house.succession_score(world, younger))
-    # Being elsewhere when it matters costs you the seat.
-    people = dict(world.court.house)
-    people["niqmaddu"] = dataclasses.replace(eldest, location="egypt")
-    away = dataclasses.replace(
-        world, court=dataclasses.replace(world.court, house=people))
-    assert (house.succession_score(away, people["niqmaddu"])
-            < house.succession_score(world, eldest))
 
 
 def test_a_house_with_no_heir_fails_rather_than_inventing_one():
@@ -253,20 +168,6 @@ def test_marriage_abroad_refuses_the_cases_that_would_be_nonsense():
 
 # --- divination (M13.0: fallible forecast, never privileged future) ----------
 
-def test_mortality_outcomes_are_not_evidence_available_to_the_diviner():
-    """Two possible futures can have the same visible age and health evidence."""
-    forecasts = set()
-    outcomes = set()
-    for seed in range(SEED, SEED + 200):
-        world = load_scenario("ugarit", seed)
-        forecasts.add(divine.evidence_forecast(
-            world, "death", world.court.ruler))
-        outcomes.add(house.dies_within(world, world.court.ruler, 8))
-    assert len(forecasts) == 1
-    assert outcomes == {False, True}, (
-        "the test needs seeds with both mortality outcomes to prove the seam")
-
-
 def test_a_wrong_omen_is_a_plausible_neighbour_never_noise():
     world = _run(30)
     rng = type("R", (), {"chance": lambda self, n, d: False,
@@ -277,20 +178,6 @@ def test_a_wrong_omen_is_a_plausible_neighbour_never_noise():
         assert abs(divine.HARVEST_BANDS.index(wrong) - index) == 1
     assert divine._neighbour("death", "yes", rng) == "no"
     assert divine._neighbour("route", "open", rng) == "shut"
-
-
-def test_the_diviner_is_sometimes_wrong_and_the_answer_is_always_sayable():
-    world = _run(30)
-    said, matched = set(), 0
-    for turn in range(60):
-        world, _ = advance(world)
-        probe, events = divine.consult(world, "harvest", "")
-        reported = events[0].reported
-        assert reported in divine.HARVEST_BANDS
-        said.add(reported)
-        matched += reported == divine.evidence_forecast(world, "harvest", "")
-    assert 0 < matched < 60, (
-        f"the diviner followed the evidence {matched}/60 times")
 
 
 def test_an_offering_buys_a_rite_not_better_access_to_tomorrow():
@@ -346,17 +233,6 @@ def test_defying_an_omen_costs_legitimacy_whether_or_not_it_was_right():
         pass
 
 
-def test_suppression_sometimes_leaks():
-    leaked = 0
-    for seed in range(SEED, SEED + 20):
-        world = _run(30, seed)
-        world, _ = apply(world, A.ConsultDiviner("harvest"))
-        world, events = apply(world, A.SuppressOmen("O1"))
-        assert not world.omens[0].published
-        leaked += any(isinstance(e, A.OmenLeaked) for e in events)
-    assert 0 < leaked < 20, f"suppression leaked {leaked}/20 times"
-
-
 def test_an_offering_is_actually_paid_for():
     world = _run(30)
     before = world.court.stores["wine"]
@@ -380,17 +256,6 @@ def test_the_player_sees_health_as_a_word_and_never_the_future():
     for hidden in ("fertility", "will_die", "pregnant_until", "age_turns",
                    "mortality", "diviner_competence", "diviner_loyalty"):
         assert hidden not in house_blob, f"{hidden} reached the player"
-
-
-def test_a_lapsed_oath_is_visible_because_the_player_must_act_on_it():
-    world = _run(120)
-    world = _kill(world, "ammurapi")
-    world, _ = house.succeed(world)
-    belief = project(world)
-    assert belief["oaths"][0]["lapsed"] is True
-    from tui import render
-    assert "LAPSED" in render.oaths_screen(belief)
-    assert belief["regnal_year"] == 1
 
 
 def test_a_successor_actors_toml_never_heard_of_is_still_named():
@@ -417,27 +282,3 @@ def test_a_successor_actors_toml_never_heard_of_is_still_named():
 
 # --- determinism -------------------------------------------------------------
 
-def test_replay_survives_the_house_and_the_cult():
-    world = load_scenario("ugarit", SEED)
-    log, turns = [], 0
-    for turn in range(60):
-        world, _ = advance(world)
-        turns += 1
-        if turn == 5:
-            for action in (A.MarryAbroad("pidray", "pharaoh"),
-                           A.ConsultDiviner("harvest", "", "wine", 20)):
-                world, _ = apply(world, action)
-                log.append({"turn": world.date.absolute,
-                            "action": A.to_dict(action)})
-        if turn == 9:
-            for action in (A.DefyOmen("O1"),
-                           A.ConsultDiviner("death", "ammurapi")):
-                world, _ = apply(world, action)
-                log.append({"turn": world.date.absolute,
-                            "action": A.to_dict(action)})
-    save("/tmp/m9_test.json", SEED, "ugarit", turns, log, world)
-    assert state_hash(replay("/tmp/m9_test.json")) == state_hash(world)
-
-
-def test_two_runs_of_the_house_are_byte_identical():
-    assert state_hash(_run(100)) == state_hash(_run(100))

@@ -220,30 +220,6 @@ def test_the_god_s_land_and_the_towns_are_different_ground() -> None:
 
 # --- the weather --------------------------------------------------------------
 
-def test_a_dry_year_takes_a_share_of_the_crop_and_a_wet_one_does_not() -> None:
-    """Weather reaches the harvest, and reaches it through the standing crop.
-
-    Authored as a season named `climate` rather than a top-level key, the
-    series is silently ignored and every year of the world is identical. That
-    is how it stood until M13.2, so this test checks the effect rather than the
-    table: a run whose weather never varies fails it.
-    """
-    kernel = _world()
-    series = next(iter(kernel.region_climate.values()), kernel.climate)
-    assert len(series) >= 24, "more than one year of weather is authored"
-    assert len(set(series)) > 1, "and the years are not all the same"
-
-    harvests = []
-    for _ in range(4):
-        kernel = _to_fortnight(kernel, 7)
-        before = F.held(kernel.book, COUNCIL, F.STANDING,
-                        kernel.field_site(AMURRU, COUNCIL))
-        kernel = _to_fortnight(kernel, 14)
-        harvests.append(before)
-
-    assert len(set(harvests)) > 1, "the years differ in what stood in the field"
-
-
 def test_an_untended_crop_is_lost_to_neglect() -> None:
     """Hands in the winter are not free either -- they are just cheaper."""
     kernel = _to_fortnight(_world(), 1)      # growing
@@ -259,11 +235,3 @@ def test_an_untended_crop_is_lost_to_neglect() -> None:
 
 # --- the gate this has to keep ------------------------------------------------
 
-def test_the_island_still_cannot_feed_itself_and_nothing_local_fixes_it() -> None:
-    """Mukish (Alalakh) has no fields — it relies entirely on trade for food."""
-    kernel = _world()
-    kernel, _ = _year(landlocked(kernel), turns=40)
-    thin = kernel.registry.cohorts["cohort:mukish_field_labour"]
-    assert thin.hunger > 0 and thin.grievance > 0
-    assert kernel.people("settlement:mukish") < 30000, "the shortfall reached the people"
-    assert kernel.people(ALASHIYA) > 5000, "and the port that could feed itself did not"

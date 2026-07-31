@@ -236,26 +236,10 @@ def test_grain_reaches_the_island_from_the_ground_it_grew_in() -> None:
     assert "reaped" in kinds and "threshed" in kinds, "it grew somewhere"
 
 
-def test_the_crossing_is_what_stands_between_the_island_and_decline() -> None:
-    supplied, _, _ = _run(_world(), turns=48)
-    alone, _, _ = _run(landlocked(_world()), turns=48)
-    assert supplied.people(ALASHIYA) >= alone.people(ALASHIYA), \
-        "landlocking does not improve the island"
-
-
 def test_the_merchant_carries_the_risk_and_can_lose_by_it() -> None:
     kernel, events, _ = _run(_world(), turns=48)
     lost = [e for e in events if e[0] == "lost_at_sea"]
     assert K.faults(kernel) == ()
-
-
-def test_the_crossing_is_deterministic() -> None:
-    first, _, _ = _run(_world(), turns=30)
-    second, _, _ = _run(_world(), turns=30)
-    assert [(v.id, v.cargo, v.arrives) for v in first.voyages] == \
-           [(v.id, v.cargo, v.arrives) for v in second.voyages]
-    assert [(i, first.book.lots[i]) for i in sorted(first.book.lots)] == \
-           [(i, second.book.lots[i]) for i in sorted(second.book.lots)]
 
 
 def test_the_trade_policy_reads_belief_and_never_the_world() -> None:

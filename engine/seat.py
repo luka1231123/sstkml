@@ -197,6 +197,44 @@ def refresh(world: World) -> World:
         world, court=dataclasses.replace(world.court, stores=held(world)))
 
 
+def harvest(world: World, events: list) -> tuple[World, list]:
+    """Court records for the grain year the kernel ran on the crown's fields.
+
+    The kernel is the authority (Task 2 C4/C5); this only says what happened in
+    the vocabulary the log, the hall and the archive read. `last_land_due` keeps
+    its meaning -- what the land gave the crown last year -- and is what
+    `tools/balance.py` budgets against.
+    """
+    from engine import actions as A
+
+    kernel = getattr(world, "kernel", None)
+    if kernel is None:
+        return world, []
+    seat_id = SP.SEAT
+    out: list = []
+    grain = straw = held_back = 0
+    for event in events:
+        if not isinstance(event, tuple) or len(event) < 2:
+            continue
+        if event[0] == "reaped" and event[2] == seat_id:
+            out.append(A.Harvested(event[1], event[3]))
+        elif event[0] == "threshed" and event[2] == seat_id:
+            grain += event[3]
+            straw += event[4]
+        elif event[0] == "set_aside" and _at_seat(kernel, event[1]):
+            held_back += event[2]
+    if not grain and not held_back:
+        return world, out
+    out.append(A.Threshed(grain, held_back))
+    court = dataclasses.replace(world.court, last_land_due=grain - held_back)
+    return dataclasses.replace(world, court=court), out
+
+
+def _at_seat(kernel, actor: str) -> bool:
+    org = kernel.registry.orgs.get(actor)
+    return bool(org) and org.settlement == SP.SEAT
+
+
 def mirror(world: World) -> tuple[World, list]:
     """Write the payroll back onto the court, and say what changed.
 

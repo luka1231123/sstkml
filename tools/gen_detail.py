@@ -171,6 +171,28 @@ FREE = "free"
 # The player's own settlement. What the scenario authors, this file does not.
 SEAT = "settlement:seat"
 
+# The crown's own ground, in qa of seed a year, and it is not the seat's.
+#
+# Every other settlement here farms the whole extent its people need, because
+# every other settlement's people are the ones farming it. The seat's are not:
+# the kernel works the seat's fields for the crown, and the eighty thousand who
+# live in the Alu of Ugarit do not yet hold or eat anything (`world._mouths`).
+# Sizing the seat like the others would hand the crown the entire kingdom's
+# harvest -- some thirty-five million qa a year against a payroll that eats
+# under a million -- which is not a balance figure, it is a different game.
+#
+# So the crown farms the crown's estates and nothing else. The four the
+# scenario authored before C4 retired them are 8,400 iku at 10 qa of seed the
+# iku: the royal lands about the city, the plain of Siyannu, the fields of
+# Ilishtamai, and the lands of the house of Baal. `content/kernel/idmap.toml`
+# still names the four sites they became.
+#
+# The rest of the Alu's ground is real and is left unsown, which understates
+# what this one settlement produces. That is the honest state of the migration
+# rather than a rate: the fields are there, and nobody in the model works them
+# until the seat's own people cross.
+SEAT_EXTENT = 84000
+
 
 def _split(total, shares):
     """Divide total by percentage shares, giving the remainder to the first."""
@@ -215,7 +237,8 @@ def build():
             cap = int(RETURN_PER_1000 * yld)
             for i, site in enumerate(food):
                 per_head = EXTENT_PER_HEAD / yld * ARABLE_CEILING.get(region, 1.0)
-                extent = int(pop * per_head) if i == 0 else 0
+                whole = SEAT_EXTENT if sid == SEAT else int(pop * per_head)
+                extent = whole if i == 0 else 0
                 sites.append({
                     "id": site.id, "settlement": sid, "region": f"region:{region}",
                     "function": "food", "capacity": cap, "extent": extent,

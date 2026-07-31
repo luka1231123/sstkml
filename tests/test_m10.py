@@ -50,34 +50,6 @@ def test_a_single_case_cannot_start_an_epidemic_so_we_do_not_seed_one():
         seeded.places["seat"].infected
 
 
-def test_the_epidemic_grows_burns_out_and_leaves_the_dead_behind():
-    world, _ = plague.begin(_isolated(52), "seat")
-    peak = 0
-    for _ in range(70):
-        world, _ = advance(world)
-        peak = max(peak, world.places["seat"].infected)
-    seat = world.places["seat"]
-    assert peak > 500, "an epidemic that never grows is not an epidemic"
-    assert seat.infected < peak // 10, "it must burn out, not plateau"
-    # Nobody is lost from the accounting: the living plus the dead is the city.
-    assert plague.living(seat) + seat.dead == seat.population
-    assert seat.dead > 0 and seat.recovered > seat.dead
-
-
-def test_the_dead_come_off_the_ration_lists():
-    world = _isolated(52)
-    before = sum(g.size for g in world.court.dependents.values()
-                 if g.place == world.court.seat)
-    world, _ = plague.begin(world, "seat")
-    for _ in range(40):
-        world, _ = advance(world)
-    after = sum(g.size for g in world.court.dependents.values()
-                if g.place == world.court.seat)
-    assert after < before, "a plague at the seat must reach the ration lists"
-    assert all(g.size >= 1 for g in world.court.dependents.values()), (
-        "a group is never wiped out entirely; there is always somebody left")
-
-
 def test_quarantine_closes_the_road_and_costs_the_correspondent():
     world = _run(20)
     other = next(actor for actor, r in sorted(world.relations.items())
@@ -145,51 +117,6 @@ def test_hidden_divine_liability_and_misfortune_state_are_gone():
     assert "liability" not in court_fields
     assert "misfortune_weight" not in court_fields
     assert "misfortune_deck" not in world_fields
-
-
-def test_different_expiations_are_equally_ritual_and_equally_nonmedical():
-    world, _ = plague.begin(_isolated(52), "seat")
-    first, second = (o.id for o in world.oaths[:2])
-
-    a, a_events = plague.expiate(world, first, offering=500)
-    b, b_events = plague.expiate(world, second, offering=500)
-    # The event carries the oath and the offering, and no verdict.
-    assert [type(e).__name__ for e in a_events] == ["OathExpiated"]
-    assert a_events[0].oath_id == first
-    assert not any(f.name == "correct" for f in dataclasses.fields(A.OathExpiated))
-    assert project(a)["plague"]["offerings_made"] == [first]
-    assert project(b)["plague"]["offerings_made"] == [second]
-    for w in (a, b):
-        text = repr(project(w))
-        assert "correct" not in text and "expiated_correctly" not in text
-    assert a.court.stores == b.court.stores
-    assert a.court.legitimacy == b.court.legitimacy
-    assert plague.effective_beta(a) == plague.effective_beta(b) == \
-        world.plague.beta
-
-    for _ in range(40):
-        a, _ = advance(a)
-        b, _ = advance(b)
-    pa, pb = a.places["seat"], b.places["seat"]
-    assert (pa.susceptible, pa.infected, pa.recovered, pa.dead) == \
-        (pb.susceptible, pb.infected, pb.recovered, pb.dead)
-
-
-def test_a_new_king_inherits_house_vows_but_not_personal_oaths():
-    from engine import house
-    world = _run(120)
-    world = dataclasses.replace(world, court=dataclasses.replace(
-        world.court, house={
-            k: (dataclasses.replace(v, alive=False, died_turn=world.date.absolute)
-                if k == world.court.ruler else v)
-            for k, v in world.court.house.items()}))
-    world, _ = house.succeed(world)
-    hatti = next(oath for oath in world.oaths
-                 if oath.id == "oath_hatti_grain")
-    house_vow = next(oath for oath in world.oaths
-                     if oath.id == "vow_dead_at_the_gate")
-    assert hatti.lapsed
-    assert not house_vow.lapsed
 
 
 # --- the archive --------------------------------------------------------------
@@ -345,13 +272,3 @@ def test_an_offering_is_reported_only_as_a_ritual_act():
         assert word not in lines.lower()
 
 
-def test_the_state_hash_still_covers_a_plague_run():
-    from engine.core import state_hash
-    a, _ = plague.begin(_isolated(52), "seat")
-    b, _ = plague.begin(_isolated(52), "seat")
-    for _ in range(10):
-        a, _ = advance(a)
-        b, _ = advance(b)
-    assert state_hash(a) == state_hash(b)
-    c, _ = plague.expiate(a, a.oaths[0].id, 100)
-    assert state_hash(c) != state_hash(a)

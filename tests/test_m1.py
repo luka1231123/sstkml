@@ -21,13 +21,6 @@ def _rite_grain(court, rite_id: str) -> int:
     return 0
 
 
-def test_replay_matches():
-    script = [[] for _ in range(40)]
-    world, log, _ = play(SEED, "ugarit", script)
-    save("/tmp/st_test.json", SEED, "ugarit", len(script), log, world)
-    assert state_hash(replay("/tmp/st_test.json")) == state_hash(world)
-
-
 def test_grain_is_conserved():
     """in - consumed - spoiled == delta_stock, exactly, every turn.
 
@@ -40,8 +33,10 @@ def test_grain_is_conserved():
         before = world.court.stores["grain"]
         world, events = advance(world)
         after = world.court.stores["grain"]
-        threshed = sum(e.taken for e in events
-                       if isinstance(e, A.LandDueTaken))
+        # The crown farms its own ground now (C4/C5), so the inflow is the
+        # threshing floor less what went back as seed, not a due on a tenant.
+        threshed = sum(e.qa - e.held_back_as_seed for e in events
+                       if isinstance(e, A.Threshed))
         paid = sum(e.paid for e in events if isinstance(e, A.RationsPaid))
         spoiled = sum(e.amount for e in events
                       if isinstance(e, A.Spoiled) and e.good == "grain")

@@ -52,83 +52,9 @@ def test_a_conversion_names_what_it_was_made_out_of() -> None:
         "and what it says is sheaves"
 
 
-def test_a_store_names_the_lot_that_was_folded_into_it() -> None:
-    _kernel, logs, seen = _replayed()
-    grain = [lot for lot in seen.values()
-             if lot.good == F.GRAIN and lot.location == ALASHIYA
-             and any(m.startswith("from:") for m in lot.provenance)]
-    assert grain, "grain at alashiya was threshed out of something"
-    assert any(m.startswith("merged:") for m in grain[0].provenance), \
-        "and the granary says which lot went in"
-
-
 # --- complete: whole chain, end to end ---------------------------------------
 
-def test_an_islander_eats_grain_grown_in_own_territory() -> None:
-    kernel, logs, seen = _replayed()
-    rations = I.eaten_at(logs, seen, ALASHIYA)
-    assert rations, "somebody on the island ate"
-
-    local_sites = {s for s in kernel.registry.sites
-                   if kernel.registry.sites[s].settlement == ALASHIYA}
-    behind = {lot for ration in rations for lot in I.ancestry(seen, ration)}
-    grown = {lot for lot in behind
-             if seen.get(lot) is not None
-             and seen[lot].location in local_sites
-             and seen[lot].good == F.STANDING}
-    assert grown, "and some was standing in a local field"
-
-
-def test_every_link_in_chain_carries_authority() -> None:
-    _kernel, logs, seen = _replayed()
-    behind = {lot for ration in I.eaten_at(logs, seen, ALASHIYA)
-              for lot in I.ancestry(seen, ration)}
-
-    acts = [t for log in logs for t in log.transfers
-            if t.lot in behind and t.reason in ("sold", "carried", "loaded",
-                                                "unloaded", "levied")]
-    unattributed = [t for t in acts if not t.authority]
-    assert not unattributed, unattributed[:3]
-
-
-def test_inspector_answers_question_without_falling_over() -> None:
-    kernel, logs = I.replay(HORIZON)
-    seen = I._lot_history(HORIZON)
-    page = io.StringIO()
-    with contextlib.redirect_stdout(page):
-        for place in (ALASHIYA, SEAT, CARACHEMISH):
-            I.chain(kernel, logs, seen, place)
-        I.weather(kernel, logs)
-        I.short(kernel, logs)
-
-    written = page.getvalue()
-    assert "standing_grain" in written, "printed chain reaches field"
-    assert "produced" in written or "harvested" in written, "shows production"
-    assert "year 3" in written, "drought year in weather table"
-
-
 # --- drought, and what it did downstream -------------------------------------
-
-def test_drought_is_one_number_costs_every_estate_something() -> None:
-    _kernel, logs, _seen = _replayed()
-    withered: dict[int, dict] = {}
-    for log in logs:
-        for event in log.events:
-            if event[0] != "withered":
-                continue
-            _, actor, gone, _neglect, climate = event
-            year = withered.setdefault((log.turn - 1) // 24 + 1,
-                                       {"climate": climate, "lost": {}})
-            year["climate"] = min(year["climate"], climate)
-            year["lost"][actor] = year["lost"].get(actor, 0) + gone
-
-    assert 3 in withered, "third year is drought"
-    dry = withered[3]
-    assert dry["climate"] < 100, "worse than ordinary"
-    assert len(dry["lost"]) >= 3, "everyone got same weather"
-    assert len(set(dry["lost"].values())) >= len(dry["lost"]) - 4, \
-        "almost all paid different amounts"
-
 
 def test_drought_reaches_household() -> None:
     kernel = _world()

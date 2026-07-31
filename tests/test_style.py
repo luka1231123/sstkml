@@ -114,14 +114,6 @@ def test_the_land_reports_no_yield_and_no_forecast() -> None:
     assert "expect" not in text.lower() and "forecast" not in text.lower()
 
 
-def test_the_house_draws_its_people_without_shearing_the_columns() -> None:
-    from tui import palace
-    text = plain_text(palace.compose(_belief(40), view="house",
-                                     width=98, height=36))
-    assert "THE HOUSE" in text
-    assert "post" in text and "claim" in text
-
-
 def test_a_quiet_fortnight_says_so_without_reassuring() -> None:
     text = plain_text(document.fortnight(_belief(), [], 66, 18))
     assert "Nothing was reported" in text

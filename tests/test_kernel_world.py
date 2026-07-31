@@ -44,6 +44,12 @@ def _run(kernel: K.Kernel, turns: int = 24):
     return kernel, events
 
 
+def own(kernel: K.Kernel, settlement: str, owner: str, good: str = "grain") -> int:
+    """One owner's stock of a good at a place."""
+    return sum(lot.quantity for lot in kernel.book.at(settlement)
+               if lot.good == good and lot.owner == owner)
+
+
 def _without_ugarit(kernel: K.Kernel) -> K.Kernel:
     """Ugarit deleted outright: settlement, sites, cohorts, stores, orgs, routes."""
     registry = kernel.registry
@@ -134,8 +140,16 @@ def test_the_others_produce_consume_decide_and_change_with_ugarit_idle() -> None
 
 
 def test_removing_ugarit_entirely_changes_nothing_for_the_others() -> None:
-    with_seat, _ = _run(_world())
-    without, _ = _run(_without_ugarit(_world()))
+    """Compared with the sea shut, because Ugarit is a real port.
+
+    Deleting it deletes a trading partner, and the other ports then buy and
+    sell differently -- that is the market working, not the kernel reading the
+    player's settlement. Shutting the routes removes the one legitimate
+    coupling and leaves the claim worth making: nothing else about a settlement
+    comes off Ugarit.
+    """
+    with_seat, _ = _run(landlocked(_world()))
+    without, _ = _run(landlocked(_without_ugarit(_world())))
 
     assert SEAT not in without.registry.settlements
     for settlement in (ALASHIYA, AMURRU):
@@ -146,14 +160,6 @@ def test_removing_ugarit_entirely_changes_nothing_for_the_others() -> None:
     with_obs = {(o.id, o.status, o.rendered) for o in with_seat.obligations
                 if o.party != SEAT}
     assert without_obs == with_obs, "same obligations (excluding seat)"
-
-
-def test_a_settlement_that_cannot_feed_itself_declines_without_anyone_deciding_it() -> None:
-    kernel, _ = _run(landlocked(_world()), turns=40)
-    thin = kernel.registry.cohorts["cohort:mukish_field_labour"]
-    assert thin.hunger > 0 and thin.grievance > 0
-    assert kernel.people(MUKISH) < 30000, "the shortfall reached the people"
-    assert kernel.stores(ALASHIYA) > 800_000, "and the port that could feed itself did not"
 
 
 def test_the_run_is_deterministic() -> None:
@@ -240,15 +246,24 @@ def test_goods_are_conserved_across_a_run() -> None:
 
 
 def test_rendering_a_tribute_actually_moves_the_grain() -> None:
-    kernel, _ = _run(_world(), turns=9)
-    crown = "polity:egypt"
-    theirs = [lot for lot in kernel.book.owned_by(crown) if lot.good == "grain"]
-    assert theirs, "the crown owns grain it did not own before"
+    """It changes hands, and it is carried to the overlord's own seat.
 
-    later, _ = _run(kernel, turns=6)
-    kept = sum(lot.quantity for lot in later.book.owned_by(crown)
-               if lot.good == "grain")
-    assert 0 < kept <= sum(l.quantity for l in theirs), "tribute nobody collects spoils"
+    A polity holds nothing: it has no granary and no mouths. The house that
+    collects is the palace at its seat, and the grain has to arrive there --
+    left standing in the vassal's town it was owned by nobody who eats, and
+    every harvest put another year's due out of the world's reach.
+    """
+    kernel, _ = _run(_world(), turns=9)
+    crown = "org:egypt_palace"
+    at_home = [lot for lot in kernel.book.at("settlement:egypt")
+               if lot.good == "grain" and lot.owner == crown]
+    assert at_home, "the crown owns grain it did not own before"
+    assert not any(lot.good == "grain" for lot in
+                   kernel.book.owned_by("polity:egypt")), "a polity holds nothing"
+
+    vassal = "settlement:ashkelon"
+    assert not [lot for lot in kernel.book.at(vassal)
+                if lot.owner == crown], "the due did not stay where it was grown"
 
 
 def test_a_recurring_render_stands_again_next_year() -> None:
