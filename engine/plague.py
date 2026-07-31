@@ -90,6 +90,20 @@ def seed_cases(place: Place) -> int:
     return max(SEED_FLOOR, living(place) // SEED_DIVISOR)
 
 
+def _record(world: World, changed: dict[str, Place]) -> World:
+    """Write compartments back onto the epidemic (Task 2 C5).
+
+    The map is the registry's; only S/I/R/dead are the plague's, so this is the
+    one channel by which a place's numbers move.
+    """
+    sir = dict(world.plague.sir)
+    for place_id, place in changed.items():
+        sir[place_id] = (place.susceptible, place.infected, place.recovered,
+                         place.dead)
+    return dataclasses.replace(
+        world, plague=dataclasses.replace(world.plague, sir=sir))
+
+
 def seed_place(world: World, place_id: str, cases: int = 0) -> World:
     """Put the first cases into a settlement. Idempotent in spirit: seeding a
     place that already has the sickness does nothing new."""
@@ -99,10 +113,9 @@ def seed_place(world: World, place_id: str, cases: int = 0) -> World:
     cases = max(0, cases) or seed_cases(place)
     if place.infected > 0 or place.susceptible < cases:
         return world
-    places = dict(world.places)
-    places[place_id] = dataclasses.replace(
-        place, susceptible=place.susceptible - cases, infected=place.infected + cases)
-    return dataclasses.replace(world, places=places)
+    return _record(world, {place_id: dataclasses.replace(
+        place, susceptible=place.susceptible - cases,
+        infected=place.infected + cases)})
 
 
 def begin(world: World, place_id: str, cases: int = 0) -> tuple[World, list]:
@@ -194,7 +207,8 @@ def step(world: World) -> tuple[World, list]:
     if not beta:
         return world, events
 
-    places = dict(world.places)
+    places = world.places
+    changed: dict[str, Place] = {}
     deaths_by_place: dict[str, int] = {}
     progress: list = []
     for place_id in sorted(places):
@@ -202,7 +216,9 @@ def step(world: World) -> tuple[World, list]:
         if before.infected <= 0:
             continue
         after = step_place(before, beta, plague.gamma, plague.mortality)
-        places[place_id] = after
+        if after == before:
+            continue
+        changed[place_id] = after
         new_infections = before.susceptible - after.susceptible
         recovered = after.recovered - before.recovered
         if new_infections or recovered:
@@ -211,9 +227,9 @@ def step(world: World) -> tuple[World, list]:
         died = after.dead - before.dead
         if died:
             deaths_by_place[place_id] = died
-    if not deaths_by_place and places == dict(world.places):
+    if not changed:
         return world, events
-    world = dataclasses.replace(world, places=places)
+    world = _record(world, changed)
     events += progress
 
     # The dead at the seat are the ruler's own dependents, and they come off the

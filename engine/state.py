@@ -429,6 +429,12 @@ class PlagueState:
     # and cleared by the disease phase.  Sorting by both ids makes results
     # independent of container iteration order.
     infectious_arrivals: tuple[tuple[str, PlaceId], ...] = ()
+    # The compartments, keyed by place (Task 2 C5). `(S, I, R, dead)`, and a
+    # place absent from here is wholly susceptible at its authored size. They
+    # live on the epidemic rather than on the map because a settlement is the
+    # registry's now and the disease is not a property of geography.
+    sir: Mapping[PlaceId, tuple[int, int, int, int]] = dataclasses.field(
+        default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -745,9 +751,6 @@ class World:
     kernel: "Kernel"
     # Anything that "arrives later" is a Scheduled (spec 3.3). Sorted, stable.
     schedule: tuple["Scheduled", ...] = ()
-    # Mail (spec 6.6). Places/routes/correspondents authored; the rest is live.
-    places: Mapping[PlaceId, Place] = dataclasses.field(default_factory=dict)
-    routes: tuple[Route, ...] = ()
     terrain: Terrain = Terrain()             # authored ground; no rule reads it
     sites: tuple[Site, ...] = ()             # the hinterland of the hubs
     correspondents: tuple[Correspondent, ...] = ()
@@ -825,6 +828,19 @@ class World:
     # Debug-only breadcrumb of rng draws; excluded from the state hash.
     rng_ledger: tuple[str, ...] = ()
 
+    # --- the map, read off the registry (Task 2 C5) -------------------------
+    # `World.places` and `World.routes` were the second copy of the geography.
+    # They are views now: the registry is the authority, and these say the same
+    # thing in the vocabulary the court's systems and the tablet already use.
+
+    @property
+    def places(self) -> Mapping[PlaceId, Place]:
+        return _places_of(self)
+
+    @property
+    def routes(self) -> tuple[Route, ...]:
+        return _routes_of(self)
+
 
 # Placed after World so the forward ref in schedule resolves; payload is any Event.
 @dataclasses.dataclass(frozen=True)
@@ -835,3 +851,113 @@ class Scheduled:
 
 def replace_court(w: World, **changes) -> World:
     return dataclasses.replace(w, court=dataclasses.replace(w.court, **changes))
+
+
+# The views are rebuilt per call and memoised on the identity of the two frozen
+# records they read. Both are replaced whenever anything in them changes, so a
+# hit is a guarantee that nothing has moved.
+_PLACE_CACHE: dict = {}
+_ROUTE_CACHE: dict = {}
+_CACHE_LIMIT = 8
+
+
+def _memo(cache: dict, on: tuple, build):
+    """Memoise on the identity of frozen records, keeping them alive.
+
+    The references are the point: an entry that held only ids would go on
+    matching after its objects were collected and CPython handed the same
+    addresses to something else, and the view would then describe a world that
+    no longer exists.
+    """
+    key = tuple(id(o) for o in on)
+    found = cache.get(key)
+    if found is None:
+        if len(cache) >= _CACHE_LIMIT:
+            cache.clear()
+        found = cache[key] = (on, build())
+    return found[1]
+
+
+def _places_of(world: World) -> Mapping[PlaceId, Place]:
+    registry = world.kernel.registry
+    return _memo(_PLACE_CACHE, (registry, world.plague),
+                 lambda: _build_places(registry, world.plague))
+
+
+def _build_places(registry, plague: PlagueState) -> Mapping[PlaceId, Place]:
+    places: dict[PlaceId, Place] = {}
+
+    def compartments(place_id: PlaceId, population: int):
+        return plague.sir.get(place_id, (population, 0, 0, 0))
+
+    for sid in sorted(registry.settlements):
+        s = registry.settlements[sid]
+        place_id = sid.split(":", 1)[1]
+        susceptible, infected, recovered, dead = compartments(
+            place_id, s.population)
+        places[place_id] = Place(
+            id=place_id, name=s.name, col=s.col, row=s.row, power=s.power,
+            rank=s.rank, glyph=s.glyph, role=s.role, kind="alu",
+            harbour=s.harbour, population=s.population,
+            susceptible=susceptible, infected=infected, recovered=recovered,
+            dead=dead)
+    for site_id in sorted(registry.sites):
+        site = registry.sites[site_id]
+        if not site.addressable:
+            continue
+        place_id = site_id.split(":", 1)[1]
+        alu = site.settlement.split(":", 1)[1]
+        owner = registry.settlements.get(site.settlement)
+        susceptible, infected, recovered, dead = compartments(
+            place_id, site.population)
+        places[place_id] = Place(
+            id=place_id, name=site.name, col=site.col, row=site.row,
+            power=owner.power if owner else "", rank="centre",
+            glyph=site.glyph, role=site.role, kind="palace_centre", alu=alu,
+            harbour=site.harbour, population=site.population,
+            susceptible=susceptible, infected=infected,
+            recovered=recovered, dead=dead)
+    return places
+
+
+def with_routes(world: World, routes: tuple[Route, ...]) -> World:
+    """Put court-shaped routes back on the registry, which owns them (C5).
+
+    For callers that want to alter the map -- a test shutting the risk off, a
+    scenario tool. Anything not named here keeps whatever the registry had.
+    """
+    registry = world.kernel.registry
+    updated = dict(registry.routes)
+    for route in routes:
+        rid = f"route:{route.a}_{route.b}"
+        found = updated.get(rid)
+        if found is None:
+            continue
+        legs = tuple(dataclasses.replace(
+            leg, mode=route.mode, fortnights=route.legs,
+            season="sailing_open" if route.seasonal else "")
+            for leg in found.legs)
+        updated[rid] = dataclasses.replace(
+            found, legs=legs, risk=route.risk, course=route.course)
+    kernel = dataclasses.replace(
+        world.kernel, registry=dataclasses.replace(registry, routes=updated))
+    return dataclasses.replace(world, kernel=kernel)
+
+
+def _routes_of(world: World) -> tuple[Route, ...]:
+    registry = world.kernel.registry
+    return _memo(_ROUTE_CACHE, (registry,), lambda: _build_routes(registry))
+
+
+def _build_routes(registry) -> tuple[Route, ...]:
+    out = []
+    for rid in sorted(registry.routes):
+        route = registry.routes[rid]
+        if not route.legs or len(route.ends) != 2:
+            continue
+        leg = route.legs[0]
+        out.append(Route(a=route.ends[0], b=route.ends[1],
+                         legs=leg.fortnights, mode=leg.mode,
+                         seasonal=bool(leg.season), risk=route.risk,
+                         course=route.course))
+    return tuple(out)

@@ -21,13 +21,9 @@ SEED = 8_814_402_919
 
 def _world():
     world = load_scenario("ugarit", SEED)
-    return dataclasses.replace(
-        world,
-        routes=tuple(
-            dataclasses.replace(route, risk=0)
-            for route in world.routes
-        ),
-    )
+    from engine.state import with_routes
+    return with_routes(world, tuple(
+        dataclasses.replace(route, risk=0) for route in world.routes))
 
 
 def _dispatch(

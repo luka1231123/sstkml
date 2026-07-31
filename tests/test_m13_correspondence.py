@@ -13,6 +13,7 @@ from engine.core import state_hash
 from engine.reduce import apply
 from engine.state import Document
 from engine.tick import advance
+from engine.state import with_routes
 from load import load_scenario
 from session import play, replay, save
 from tui import archive, inbox
@@ -25,13 +26,8 @@ def _world(turns: int = 8):
     world = load_scenario("ugarit", SEED)
     # Zero route risk so replies are never randomly intercepted: the outbox
     # and in-transit assertions must not depend on interception RNG.
-    world = dataclasses.replace(
-        world,
-        routes=tuple(
-            dataclasses.replace(route, risk=0)
-            for route in world.routes
-        ),
-    )
+    world = with_routes(world, tuple(
+        dataclasses.replace(route, risk=0) for route in world.routes))
     for _ in range(turns):
         world, _ = advance(world)
     return world

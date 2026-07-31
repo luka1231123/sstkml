@@ -246,19 +246,29 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     for s in sites:
         site_id = f"site:{s.alu}_{s.col}_{s.row}"
         settlement_id = f"settlement:{s.alu}"
+        function = "palace_centre" if s.role == "palace_centre" else s.capacity
+        reg_sites[site_id] = KernelSite(
+            id=site_id, name=s.name if s.role == "palace_centre" else "",
+            settlement=settlement_id, function=function,
+            col=s.col, row=s.row)
         if s.role == "palace_centre":
-            function = "palace_centre"
-            reg_sites[site_id] = KernelSite(
-                id=site_id, name=s.name, settlement=settlement_id,
-                function=function)
             settlement_sites[s.alu].append(site_id)
-        else:
-            function = s.capacity
-            reg_sites[site_id] = KernelSite(
-                id=site_id, name="", settlement=settlement_id,
-                function=function)
         if function not in SITE_FUNCTIONS:
             raise ValueError(f"{site_id}: unknown site function {function!r}")
+
+    # A palace centre authored as a `[[places]]` row rather than a `[[sites]]`
+    # one is the same thing on the map and becomes a site too (C5). It keeps the
+    # id the court knew it by, so a letter addressed to Gib'ala still lands.
+    for place in places.values():
+        if place.kind != "palace_centre":
+            continue
+        site_id = f"site:{place.id}"
+        reg_sites[site_id] = KernelSite(
+            id=site_id, name=place.name, settlement=f"settlement:{place.alu}",
+            function="palace_centre", col=place.col, row=place.row,
+            glyph=place.glyph, role=place.role, harbour=place.harbour,
+            population=place.population, addressable=True)
+        settlement_sites[place.alu].append(site_id)
 
     settlements = {}
     cohorts = {}
@@ -270,6 +280,9 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
             polity=settlement_polity[place.id],
             sites=tuple(sorted(settlement_sites[place.id])),
             autonomous=place.id != cfg.get("seat", ""),
+            col=place.col, row=place.row, power=place.power, rank=place.rank,
+            glyph=place.glyph, role=place.role, harbour=place.harbour,
+            population=place.population,
         )
         cohort_id = f"cohort:{place.id}_people"
         cohorts[cohort_id] = KernelCohort(
@@ -298,6 +311,8 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
                 # silently open the sea all year.
                 season="sailing_open" if r.get("seasonal") else ""),),
             risk=int(r["risk"]),
+            course=_course(r.get("path", ())),
+            ends=(r["a"], r["b"]),
         )
 
     registry = Registry(regions=regions, polities=polities,
@@ -587,12 +602,6 @@ def load_scenario(name: str, seed: int) -> World:
     # the opening state, because the last epidemic was two generations ago and
     # the people who survived it are the ones in the predecessor archive.
     places = parse_places(cfg)
-    routes = tuple(
-        Route(a=r["a"], b=r["b"], legs=int(r["legs"]), mode=r["mode"],
-              seasonal=bool(r["seasonal"]), risk=int(r["risk"]),
-              course=_course(r.get("path", ())))
-        for r in cfg.get("routes", [])
-    )
     # The ground, and the holdings standing on it. Scenery on the same terms as
     # the coordinates above: authored in `content/`, carried through Belief,
     # read by nobody but the tablet that draws it. Degrees are authored as
@@ -832,7 +841,7 @@ def load_scenario(name: str, seed: int) -> World:
         date=date,
         court=court,
         kernel=kernel,
-        places=places, routes=routes, terrain=terrain, sites=sites,
+        terrain=terrain, sites=sites,
         correspondents=correspondents, season=seasons,
         relations=relations, oaths=oaths, foreign_courts=foreign_courts,
         plague=plague_state,

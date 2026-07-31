@@ -186,6 +186,17 @@ class Settlement:
     # False during M13.1: its intents come from the player and the legacy
     # adapter, not from a policy.
     autonomous: bool = True
+    # Where it stands on the authored tablet, and what the tablet says about it
+    # (Task 2 C5). No rule reads any of it: distance is counted in courier legs.
+    # It lives here because `World.places` is derived from the registry now.
+    col: int = 0
+    row: int = 0
+    power: str = ""
+    rank: str = "town"
+    glyph: str = ""
+    role: str = ""
+    harbour: bool = False
+    population: int = 0        # authored opening size
 
 
 @dataclasses.dataclass(frozen=True)
@@ -209,6 +220,19 @@ class Site:
     # scramble for furrows that nobody in the period was having. What the two
     # do compete for is hands, and that contest is the allocator's.
     holder: EntityId = ""
+    # Where the mark stands on the tablet (Task 2 C5). As on `Settlement`:
+    # drawing, not rule.
+    col: int = 0
+    row: int = 0
+    glyph: str = ""
+    role: str = ""             # the line the tablet writes about it
+    harbour: bool = False      # its Alu reaches the sea through this mark
+    population: int = 0
+    # Whether a courier, a correspondent or the sickness can reach this mark by
+    # name. True for the palace centres the scenario authors as `[[places]]`
+    # rows -- Ma'hadu, Gib'ala -- and false for the ground authored as
+    # `[[sites]]`, which is drawn and named and addressed by nobody.
+    addressable: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -234,6 +258,13 @@ class Route:
     capacity: int = 0            # units of cargo per fortnight; 0 = unmodelled
     toll_jurisdictions: tuple[EntityId, ...] = ()
     risk: int = 0                # scaled 1000
+    # The ground the route crosses, as (col, row) turns on the map. Empty means
+    # the tablet falls back to a straight line.
+    course: tuple[tuple[int, int], ...] = ()
+    # The marks the route was authored between, which a leg cannot say: a leg
+    # names the settlement a courier arrives at, and a route to Ma'hadu arrives
+    # at Ugarit. Couriers walk these.
+    ends: tuple[EntityId, EntityId] = ()
 
     @property
     def origin(self) -> EntityId:

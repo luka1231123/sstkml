@@ -123,6 +123,19 @@ def _kernel_land(kernel: Kernel) -> int:
         and kernel.registry.sites[site].function == "estate")
 
 
+def _stored(field: str):
+    """How much of a fact the court keeps of its own, which may be none.
+
+    A name that resolves to a property rather than a field is a view over the
+    kernel (Task 2 C5): the court can still read it, and reading is not holding.
+    """
+    def count(world: World) -> int:
+        if field in {f.name for f in dataclasses.fields(world)}:
+            return len(getattr(world, field))
+        return 0
+    return count
+
+
 # Each row: the fact, how to count it on each side, and what Phase C deletes.
 # Counting rather than comparing, deliberately: the two figures are allowed to
 # differ during the migration, and a row is a finding because both are non-empty,
@@ -136,9 +149,9 @@ ROWS: tuple[tuple[str, object, object, str], ...] = (
      "Court.corvee_days / corvee_sources / at_harvest"),
     ("land under the seat", _court_land, _kernel_land,
      "Court.estates"),
-    ("places", lambda w: len(w.places),
+    ("places", _stored("places"),
      lambda k: len(k.registry.settlements), "World.places"),
-    ("routes", lambda w: len(w.routes),
+    ("routes", _stored("routes"),
      lambda k: len(k.registry.routes), "World.routes"),
     ("foreign court standing",
      lambda w: len(w.foreign_courts),
