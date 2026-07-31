@@ -108,6 +108,12 @@ has been since C2, and the mirror is deleted with its readers in C5.
       redistributive arrangement, which is what a palace deciding who eats
       first is. `allowance` is deliberately not capped at the fortnight's
       ration: a store that hands over more is paying down a debt.
+- [ ] `SP.PLACEMENTS` still names `settlement:mahadu`, which the live map does
+      not have -- the third stale id out of the retired
+      `content/kernel/world.toml`, after `seat_people.SEAT` and the audit's copy
+      of it. `seat.enrol` stands the garrison at the seat rather than nowhere,
+      and `kernel.faults` is what caught it. Content decides whether the map
+      gets a port or the table loses the row.
 - [ ] The seat's other 80,000. Its own households are `pooled` and still eat
       nothing here, so `world._consume` keeps a seat exemption. Not people --
       land: the palace owns every lot standing there, so feeding them would be

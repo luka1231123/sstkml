@@ -63,16 +63,33 @@ def test_the_court_and_the_kernel_cannot_disagree_about_the_heads():
         assert group.size == cohort.people
 
 
-def test_the_garrison_abroad_is_fed_by_the_crown_not_by_its_neighbours():
-    """Prebendal, and the distinction is the whole of why the word exists."""
+def test_nobody_is_placed_at_a_settlement_the_map_does_not_have():
+    """`PLACEMENTS` still names `settlement:mahadu`; the live map has no port.
+
+    The same stale id the `SEAT` constant was, from an authored world the
+    scenario stopped building from. A cohort standing at a settlement that does
+    not exist is not an error anything raises -- it is simply never found by
+    anything -- so the garrison stands with the rest of the crown's people and
+    `kernel.faults` stays quiet, which is what says it.
+    """
     world = _world()
-    garrison = world.kernel.registry.cohorts["cohort:mahadu_garrison"]
-    assert garrison.settlement != SP.SEAT
+    for cohort in world.kernel.registry.cohorts.values():
+        assert cohort.settlement in world.kernel.registry.settlements
+    assert (world.kernel.registry.cohorts["cohort:mahadu_garrison"].settlement
+            == SP.SEAT)
+
+
+def test_a_body_kept_by_a_house_elsewhere_reaches_that_houses_store():
+    """What `prebendal` is for, held against the day the map has a Ma'hadu."""
+    world = _world()
+    crown = world.kernel.controller(SP.SEAT)
+    garrison = dataclasses.replace(
+        world.kernel.registry.cohorts["cohort:mahadu_garrison"],
+        settlement=SP.SEAT, tenure="prebendal", origin=crown)
     assert world.kernel.tenure_of(garrison) == "prebendal"
-    assert garrison.origin == world.kernel.controller(SP.SEAT)
-    reach = {lot.location for lot
+    reach = {lot.owner for lot
              in K._local_food(world.kernel, world.kernel.book, garrison)}
-    assert SP.SEAT in reach, "the crown's granary is out of the garrison's reach"
+    assert reach == {crown}, "a prebendary ate something that was not its house's"
 
 
 def test_cutting_a_ration_reaches_the_grain():

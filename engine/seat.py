@@ -105,12 +105,23 @@ def enrol(world: World) -> World:
             continue
         cohort, _ = SP.as_cohort(group)
         cohort = dataclasses.replace(cohort, shortfall=max(0, group.arrears))
-        if entry.settlement != SP.SEAT:
-            # The garrison at Ma'hadu lives there and is fed from here, which
-            # is not the same claim as redistributive: that one says "whoever
-            # controls the place I stand in", and the place it stands in is not
-            # the one that owes it dinner. `prebendal` is the word for a body
-            # kept by the house it serves, and the crown is the house.
+        if entry.settlement not in kernel.registry.settlements:
+            # The map has no such place. `PLACEMENTS` names `settlement:mahadu`
+            # and the scenario the live world is built from has one settlement
+            # of the crown's, the seat -- the same stale id as the `SEAT`
+            # constant was, from the retired `content/kernel/world.toml`.
+            #
+            # So the garrison stands with the rest of the crown's people rather
+            # than at a port that does not exist. It is the crown that feeds it
+            # either way, which is the fact the ledger is about; where it sleeps
+            # becomes a real question when the map has a Ma'hadu, and `prebendal`
+            # plus `world._within_reach` is what will answer it then.
+            cohort = dataclasses.replace(cohort, settlement=SP.SEAT)
+        elif entry.settlement != SP.SEAT:
+            # Lives there, fed from here. Not redistributive -- that word says
+            # "whoever controls the place I stand in", and the place it stands
+            # in is not the one that owes it dinner. `prebendal` is a body kept
+            # by the house it serves, and the crown is the house.
             cohort = dataclasses.replace(
                 cohort, tenure="prebendal", origin=crown)
         cohorts[cohort.id] = cohort
