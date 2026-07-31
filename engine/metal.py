@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.state import Court, MetalState, World
 
 
@@ -50,7 +51,7 @@ def step(world: World) -> tuple[World, list]:
         return world, []
 
     rules = world.land_rules
-    stores = dict(court.stores)
+    stores = seat.held(world)
     events: list = []
 
     # A workshop crew deep in arrears works less: the bronze chain is not
@@ -168,5 +169,11 @@ def step(world: World) -> tuple[World, list]:
             formation, replacement_rate=rate, ready=ready))
 
     court = dataclasses.replace(
-        court, stores=stores, metals=metals, formations=tuple(formations))
-    return dataclasses.replace(world, court=court), events
+        court, metals=metals, formations=tuple(formations))
+    world = dataclasses.replace(world, court=court)
+    # One settle for a step that spends three ways -- copper and tin into the
+    # fire, bronze out to the formations -- so the sink is the general one.
+    # `melted` would be exact for two of the three and wrong for the third, and
+    # spec 2.2 counts both as consumed either way.
+    return seat.put(world, stores, reason_down="expended",
+                    reason_up="produced"), events

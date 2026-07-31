@@ -49,11 +49,19 @@ Closes: 47 unmapped places.
 
 ## C2 — goods
 
-- [ ] `Court.stores` -> `Book` lots at `settlement:seat`.
-- [ ] `metal.py`, `revenue.py`, `works.py`, `institution.py`, `letter_terms.py`
-      read book.
+- [x] `Court.stores` -> `Book` lots at `settlement:seat`.
+- [x] `metal.py`, `revenue.py`, `works.py`, `institution.py`, `letter_terms.py`
+      read book. Also `land.py`, `plague.py`, `relations.py`, `reduce.py` and
+      the `systems.py` block in `tick`: a writer left on the flat mapping would
+      have put the two records out of step inside the turn, which is worse than
+      either being wrong on its own. `engine/seat.py` is the doorway; the
+      court's mapping is written as a mirror until C5 moves its readers.
 - [ ] `git mv engine/systems.py` spoilage into legacy; `Book` spoilage stand.
-- [ ] `store_history` become projection only.
+      Blocked on C4. The Book spoils at a flat authored rate; the court's rate
+      moves with the state of the granary (6.18), and the institution does not
+      cross until then. For now `farm.keep` skips the seat's lots, so the seat
+      spoils once, in the place that knows about the roof.
+- [x] `store_history` become projection only.
 
 ## C3 — people and labour
 

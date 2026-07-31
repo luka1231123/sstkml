@@ -495,9 +495,17 @@ def keep(kernel):
     """
     events: list = []
     book = kernel.book.at_phase(kernel.date.absolute, "production")
+    # The seat is the court's, the same way its mouths are (`world._consume`).
+    # `systems.spoilage` already loses the seat's stock at a rate the state of
+    # the granary moves (6.18), which nothing here knows, so spoiling those lots
+    # as well would take the same grain twice and lose the granary with it. The
+    # rule goes when the granary institution crosses.
+    seat = getattr(kernel.seat_goods, "seat", "")
     for lot_id in sorted(book.lots):
         lot = book.lots.get(lot_id)
         if lot is None:
+            continue
+        if seat and lot.location == seat:
             continue
         rate = kernel.spoilage.get(lot.good, 0)
         if rate <= 0:

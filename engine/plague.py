@@ -14,6 +14,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.core import stream
 from engine.state import Place, World
 
@@ -125,13 +126,13 @@ def expiate(world: World, oath_id: str, offering: int = 0) -> tuple[World, list]
     offering = max(0, offering)
     plague = world.plague
     court = world.court
-    stores = dict(court.stores)
+    stores = seat.held(world)
     if offering:
         stores["grain"] = max(0, stores.get("grain", 0) - offering)
-    court = dataclasses.replace(court, stores=stores)
     plague = dataclasses.replace(
         plague, expiated=plague.expiated + (oath_id,))
     world = dataclasses.replace(world, court=court, plague=plague)
+    world = seat.put(world, stores, reason_down="expended")
     return world, [A.OathExpiated(oath_id, offering)]
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.core import stream
 from engine.state import Scheduled, World, replace_court
 
@@ -80,7 +81,7 @@ def collect_harbour(world: World) -> tuple[World, list]:
         * world.revenue_rules.get("clearance_units_per_1000", 100)
         // 1_000_000
     )
-    stores = dict(court.stores)
+    stores = seat.held(world)
     cargo = dict(world.harbour_cargo)
     events = []
     total_taken = 0
@@ -106,10 +107,13 @@ def collect_harbour(world: World) -> tuple[World, list]:
     if not events:
         events.append(A.HarbourDueTaken(
             world.revenue_good, 0, court.harbour_due_rate, 0))
-    court = dataclasses.replace(
-        court, stores=stores, last_harbour_due=total_taken)
-    return dataclasses.replace(
-        world, court=court, harbour_cargo=cargo), events
+    court = dataclasses.replace(court, last_harbour_due=total_taken)
+    world = dataclasses.replace(world, court=court, harbour_cargo=cargo)
+    # The due is levied off a cargo already in the Book, so what enters the
+    # granary here is a move and not a source. `settle` cannot say that yet --
+    # it mints -- so the reason is the honest one for a figure the flat
+    # arithmetic produced.
+    return seat.put(world, stores), events
 
 
 def pressure(world: World) -> tuple[World, list]:

@@ -32,6 +32,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.state import World
 
 # How fast the fabric goes, per fortnight, by kind. Mudbrick and timber in a wet
@@ -243,7 +244,7 @@ def step(world: World) -> tuple[World, list]:
     events: list = []
     institutions = {}
     history = dict(court.institution_history)
-    stores = dict(court.stores)
+    stores = seat.held(world)
     for key in sorted(court.institutions):
         inst = court.institutions[key]
         upkeep_met = _consume_upkeep(stores, inst)
@@ -266,7 +267,8 @@ def step(world: World) -> tuple[World, list]:
         # quietly going, and that line is the tell -- not any number on it.
         said = reported_condition(court, inst, world.seed, world.date.absolute)
         history[key] = (history.get(key, ()) + (said,))[-24:]
-    return dataclasses.replace(
+    world = dataclasses.replace(
         world, court=dataclasses.replace(
-            court, stores=stores, institutions=institutions,
-            institution_history=history)), events
+            court, institutions=institutions,
+            institution_history=history))
+    return seat.put(world, stores, reason_down="expended"), events

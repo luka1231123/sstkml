@@ -259,6 +259,63 @@ def reconcile(book: W.Book, view: SeatGoods,
     return tuple(found)
 
 
+def settle(book: W.Book, view: SeatGoods, stores: Mapping[GoodId, int], *,
+           reason_down: str = "consumed", reason_up: str = "authored",
+           authority: EntityId = "") -> tuple[W.Book, SeatGoods]:
+    """Make the Book say what a system decided, good by good.
+
+    The counterpart of `in_hand`. A court system reads the seat's figures out of
+    the Book, works on a flat mapping the way it always did, and hands the
+    result back here; what changed becomes lots leaving or entering the world.
+    That is what lets the systems migrate one at a time without the two records
+    parting company mid-turn, which `reconcile` could report but not prevent.
+
+    A drop draws down the seat's oldest lots first, so the grain that has been
+    in the granary longest is the grain that gets eaten. A rise mints one lot,
+    and `reason_up` is the caller's business: a system that knows the goods were
+    smelted should say so, and `authored` is only the honest answer where the
+    old flat arithmetic conjured a figure nothing in the world produced.
+
+    Reserved quantities are not touched. A system that tries to spend past them
+    raises rather than quietly spending a contract's grain, because the flat
+    mapping had no way to say a store was spoken for and the whole point of the
+    lots is that this one now can.
+    """
+    if reason_up not in W.SOURCES:
+        raise W.LedgerError(f"{reason_up!r} does not bring goods into the world")
+    held = in_hand(book, view)
+    taken = _taken(book, view.seat)
+    next_ordinal = max(taken) + 1 if taken else 0
+    for good in sorted(set(held) | set(stores)):
+        want = int(stores.get(good, 0))
+        if want < 0:
+            raise W.LedgerError(f"{good}: a store of {want} is not a store")
+        delta = want - held.get(good, 0)
+        if delta < 0:
+            owed = -delta
+            for lot in lots(book, view, good):
+                if owed <= 0:
+                    break
+                spend = min(owed, lot.free)
+                if spend <= 0:
+                    continue
+                book = book.consume(lot.id, spend, reason_down,
+                                    authority=authority)
+                owed -= spend
+            if owed:
+                raise W.LedgerError(
+                    f"{good}: {owed} short of what the seat can spend")
+        elif delta > 0:
+            lot_id = mint(view.seat, book.turn, "lot", next_ordinal)
+            next_ordinal += 1
+            book = book.create(
+                lot_id, good, delta, owner=view.owner, holder=view.holder,
+                location=view.seat, reason=reason_up, authority=authority,
+                marks=(mark(good, book.turn),))
+    declared = tuple(sorted(set(view.declared) | set(stores)))
+    return book, dataclasses.replace(view, declared=declared)
+
+
 # --- provenance ---------------------------------------------------------------
 
 # The provenance marks that name another lot, and the prefix each uses. Reading

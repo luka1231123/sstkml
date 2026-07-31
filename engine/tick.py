@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from engine import systems
+from engine import seat, systems
 from engine.state import World
 
 
@@ -132,11 +132,16 @@ def advance(world: World) -> tuple[World, list]:
     # A8 spoilage (stock sitting through the fortnight), then rites take their
     # cut, then rations pay from the remainder. Grain enters only at threshing.
     court, e = systems.spoilage(court); events += e
+    # Spoilage crosses on its own, because it is the one sink here that is not
+    # somebody eating: spec 2.2 counts spoiled apart from consumed, and a
+    # single crossing for the whole block would file rot as a meal.
+    world = seat.record(world, court, reason_down="spoiled")
+    court = world.court
     court, e = systems.do_rites(court, world.date.fortnight); events += e
     court, e = systems.pay_rations(court); events += e
     # A9 unrest
     court, e = systems.recompute_unrest(court); events += e
-    world = dataclasses.replace(world, court=court)
+    world = seat.record(world, court, reason_down="consumed")
     # High land dues are an additional pressure, not part of ration arrears,
     # and flight is permanent even if the next order lowers the rate.
     world, e = revenue.pressure(world); events += e
@@ -180,10 +185,18 @@ _HISTORY = 24                      # one full year, one column per fortnight
 
 
 def _record_stores(world: World) -> World:
+    """A year of readings, off the Book (Task 2 C2).
+
+    A projection and nothing else: the sparkline the player reads is a picture
+    of the seat's lots at the close of each fortnight, not a second record that
+    could disagree with them.
+    """
+    from engine import seat
+    stores = seat.held(world)
     history = dict(world.court.store_history)
-    for good in sorted(world.court.stores):
+    for good in sorted(stores):
         series = history.get(good, ())
-        history[good] = (series + (world.court.stores.get(good, 0),))[-_HISTORY:]
+        history[good] = (series + (stores.get(good, 0),))[-_HISTORY:]
     return dataclasses.replace(
         world, court=dataclasses.replace(world.court, store_history=history))
 

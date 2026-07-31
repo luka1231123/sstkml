@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 
 from engine import actions as A
+from engine import seat
 from engine.core import in_range
 from engine.state import Institution, Project, World
 
@@ -164,7 +165,7 @@ def step(world: World) -> tuple[World, list]:
     rules = _rules(world)
     rate = rules.get("days_per_fortnight", 400)
     per_1000 = cost_per_1000(world)
-    stores = dict(court.stores)
+    stores = seat.held(world)
     events: list = []
     projects = dict(court.projects)
     works_days = court.works_days
@@ -195,9 +196,10 @@ def step(world: World) -> tuple[World, list]:
         events.append(A.WorkProgressed(project.id, days, project.days_done,
                                        project.days_needed))
 
-    world = dataclasses.replace(
+    world = seat.put(dataclasses.replace(
         world, court=dataclasses.replace(
-            court, stores=stores, projects=projects, works_days=works_days))
+            court, projects=projects, works_days=works_days)),
+        stores, reason_down="expended")
 
     # Completion last, so a project that finished this fortnight has already
     # paid for the fortnight that finished it.

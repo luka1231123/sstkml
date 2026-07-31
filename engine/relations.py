@@ -5,6 +5,7 @@ import dataclasses
 from collections.abc import Mapping
 
 from engine import actions as A
+from engine import seat
 from engine.core import canonical_json, lerp_table, stream
 from engine.state import GiftRecord, Relation, Scheduled, World
 
@@ -59,7 +60,7 @@ def send_gift(world: World, action: A.SendGift) -> tuple[World, list]:
     unit_value = world.gift_values.get(action.good)
     if unit_value is None:
         raise ValueError(f"{action.good} is not a gift good")
-    stores = dict(world.court.stores)
+    stores = seat.held(world)
     if stores.get(action.good, 0) < action.quantity:
         raise ValueError(f"not enough {action.good} for that gift")
 
@@ -74,10 +75,11 @@ def send_gift(world: World, action: A.SendGift) -> tuple[World, list]:
         action.quantity, value, world.date.absolute)
     stores[action.good] -= action.quantity
     court = dataclasses.replace(
-        world.court, stores=stores,
+        world.court,
         treasury_gifts_sent=world.court.treasury_gifts_sent + (record,))
     world = dataclasses.replace(
         world, court=court, gift_seq=world.gift_seq + 1)
+    world = seat.put(world, stores, reason_down="expended")
     world = schedule(world, arrival, A.GiftArrived(gift_id))
     return world, [A.GiftSent(
         gift_id, action.recipient, action.good, action.quantity, value, arrival)]
