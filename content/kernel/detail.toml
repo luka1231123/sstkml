@@ -68,7 +68,7 @@ settlement = "settlement:alashiya"
 region = "region:alashiya"
 function = "food"
 capacity = 5600
-extent = 6600000
+extent = 6204000
 
 [[sites]]
 id = "site:alashiya_318_88"
@@ -140,7 +140,7 @@ settlement = "settlement:apasa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 12257142
+extent = 11766857
 
 [[sites]]
 id = "site:apasa_158_50"
@@ -236,7 +236,7 @@ settlement = "settlement:athens"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 9138461
+extent = 8315999
 
 [[sites]]
 id = "site:athens_72_46"
@@ -380,7 +380,7 @@ settlement = "settlement:dur_katlimmu"
 region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
-extent = 10800000
+extent = 10799999
 
 [[sites]]
 id = "site:dur_katlimmu_498_80"
@@ -572,7 +572,7 @@ settlement = "settlement:hattusa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 82971428
+extent = 79652571
 
 [[sites]]
 id = "site:hattusa_340_6"
@@ -604,7 +604,7 @@ settlement = "settlement:iolcos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 7615384
+extent = 6929999
 
 [[sites]]
 id = "site:iolcos_48_28"
@@ -628,7 +628,7 @@ settlement = "settlement:kanesh"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 25457142
+extent = 24438857
 
 [[sites]]
 id = "site:kanesh_370_32"
@@ -700,7 +700,7 @@ settlement = "settlement:knossos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 16246153
+extent = 14783999
 
 [[sites]]
 id = "site:knossos_116_84"
@@ -740,7 +740,7 @@ settlement = "settlement:kydonia"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 5584615
+extent = 5081999
 
 [[sites]]
 id = "site:kydonia_78_86"
@@ -844,7 +844,7 @@ settlement = "settlement:millawanda"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 4569230
+extent = 4157999
 
 [[sites]]
 id = "site:millawanda_158_48"
@@ -868,7 +868,7 @@ settlement = "settlement:mira"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 8485714
+extent = 8146285
 
 [[sites]]
 id = "site:mira_212_46"
@@ -900,7 +900,7 @@ settlement = "settlement:mycenae"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 44169230
+extent = 40194000
 
 [[sites]]
 id = "site:mycenae_46_46"
@@ -1020,7 +1020,7 @@ settlement = "settlement:pylos"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 18784615
+extent = 17094000
 
 [[sites]]
 id = "site:pylos_24_58"
@@ -1204,7 +1204,7 @@ settlement = "settlement:tarhuntassa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 18857142
+extent = 18102857
 
 [[sites]]
 id = "site:tarhuntassa_322_70"
@@ -1268,7 +1268,7 @@ settlement = "settlement:tarsa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 9428571
+extent = 9051428
 
 [[sites]]
 id = "site:tarsa_352_60"
@@ -1292,7 +1292,7 @@ settlement = "settlement:thebes_gr"
 region = "region:aegean"
 function = "food"
 capacity = 4550
-extent = 11169230
+extent = 10163999
 
 [[sites]]
 id = "site:thebes_gr_58_36"
@@ -1436,7 +1436,7 @@ settlement = "settlement:wilusa"
 region = "region:anatolia"
 function = "food"
 capacity = 4900
-extent = 16971428
+extent = 16292571
 
 [[sites]]
 id = "site:wilusa_134_14"
@@ -2637,7 +2637,7 @@ quantity = 6000000
 settlement = "settlement:alashiya"
 site = "site:alashiya_318_84"
 good = "standing_grain"
-quantity = 36960000
+quantity = 34742400
 
 [[stores]]
 settlement = "settlement:alashiya"
@@ -2648,6 +2648,12 @@ quantity = 6000
 settlement = "settlement:alashiya"
 good = "grain"
 quantity = 12800000
+
+[[stores]]
+settlement = "settlement:alashiya"
+owner = "org:alashiya_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:amurru"
@@ -2661,15 +2667,27 @@ good = "grain"
 quantity = 10000000
 
 [[stores]]
+settlement = "settlement:amurru"
+owner = "org:amurru_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:apasa"
 site = "site:apasa_158_42"
 good = "standing_grain"
-quantity = 60059995
+quantity = 57657599
 
 [[stores]]
 settlement = "settlement:apasa"
 good = "grain"
 quantity = 18200000
+
+[[stores]]
+settlement = "settlement:apasa"
+owner = "org:apasa_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:ashkelon"
@@ -2702,7 +2720,7 @@ quantity = 55000000
 settlement = "settlement:athens"
 site = "site:athens_60_44"
 good = "standing_grain"
-quantity = 41579997
+quantity = 37837795
 
 [[stores]]
 settlement = "settlement:athens"
@@ -2713,6 +2731,12 @@ quantity = 300
 settlement = "settlement:athens"
 good = "grain"
 quantity = 11700000
+
+[[stores]]
+settlement = "settlement:athens"
+owner = "org:athens_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:babylon"
@@ -2747,6 +2771,12 @@ good = "grain"
 quantity = 16000000
 
 [[stores]]
+settlement = "settlement:byblos"
+owner = "org:byblos_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:carchemish"
 site = "site:carchemish_422_60"
 good = "standing_grain"
@@ -2766,7 +2796,7 @@ quantity = 12000000
 settlement = "settlement:dur_katlimmu"
 site = "site:dur_katlimmu_494_84"
 good = "standing_grain"
-quantity = 83160000
+quantity = 83159992
 
 [[stores]]
 settlement = "settlement:dur_katlimmu"
@@ -2794,6 +2824,12 @@ quantity = 429660000
 settlement = "settlement:egypt"
 good = "grain"
 quantity = 297600000
+
+[[stores]]
+settlement = "settlement:egypt"
+owner = "org:egypt_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:emar"
@@ -2828,6 +2864,12 @@ good = "grain"
 quantity = 12600000
 
 [[stores]]
+settlement = "settlement:gezer"
+owner = "org:gezer_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:halab"
 site = "site:halab_400_74"
 good = "standing_grain"
@@ -2842,7 +2884,7 @@ quantity = 24000000
 settlement = "settlement:hattusa"
 site = "site:hattusa_338_8"
 good = "standing_grain"
-quantity = 406559997
+quantity = 390297597
 
 [[stores]]
 settlement = "settlement:hattusa"
@@ -2863,12 +2905,18 @@ quantity = 12000000
 settlement = "settlement:iolcos"
 site = "site:iolcos_44_22"
 good = "standing_grain"
-quantity = 34649997
+quantity = 31531495
 
 [[stores]]
 settlement = "settlement:iolcos"
 good = "grain"
 quantity = 9750000
+
+[[stores]]
+settlement = "settlement:iolcos"
+owner = "org:iolcos_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:jerusalem"
@@ -2884,7 +2932,7 @@ quantity = 10000000
 settlement = "settlement:kanesh"
 site = "site:kanesh_366_36"
 good = "standing_grain"
-quantity = 124739995
+quantity = 119750399
 
 [[stores]]
 settlement = "settlement:kanesh"
@@ -2911,7 +2959,7 @@ quantity = 121600000
 settlement = "settlement:knossos"
 site = "site:knossos_100_88"
 good = "standing_grain"
-quantity = 73919996
+quantity = 67267195
 
 [[stores]]
 settlement = "settlement:knossos"
@@ -2919,15 +2967,27 @@ good = "grain"
 quantity = 20800000
 
 [[stores]]
+settlement = "settlement:knossos"
+owner = "org:knossos_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:kydonia"
 site = "site:kydonia_68_82"
 good = "standing_grain"
-quantity = 25409998
+quantity = 23123095
 
 [[stores]]
 settlement = "settlement:kydonia"
 good = "grain"
 quantity = 7150000
+
+[[stores]]
+settlement = "settlement:kydonia"
+owner = "org:kydonia_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:lachish"
@@ -2939,6 +2999,12 @@ quantity = 23099995
 settlement = "settlement:lachish"
 good = "grain"
 quantity = 9000000
+
+[[stores]]
+settlement = "settlement:lachish"
+owner = "org:lachish_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:megiddo"
@@ -2966,7 +3032,7 @@ quantity = 192000000
 settlement = "settlement:millawanda"
 site = "site:millawanda_154_50"
 good = "standing_grain"
-quantity = 20789996
+quantity = 18918895
 
 [[stores]]
 settlement = "settlement:millawanda"
@@ -2974,10 +3040,16 @@ good = "grain"
 quantity = 5850000
 
 [[stores]]
+settlement = "settlement:millawanda"
+owner = "org:millawanda_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:mira"
 site = "site:mira_208_40"
 good = "standing_grain"
-quantity = 41579998
+quantity = 39916796
 
 [[stores]]
 settlement = "settlement:mira"
@@ -2998,12 +3070,18 @@ quantity = 6000000
 settlement = "settlement:mycenae"
 site = "site:mycenae_42_44"
 good = "standing_grain"
-quantity = 200969996
+quantity = 182882700
 
 [[stores]]
 settlement = "settlement:mycenae"
 good = "grain"
 quantity = 56550000
+
+[[stores]]
+settlement = "settlement:mycenae"
+owner = "org:mycenae_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:nagar"
@@ -3046,12 +3124,18 @@ quantity = 9100000
 settlement = "settlement:pylos"
 site = "site:pylos_18_54"
 good = "standing_grain"
-quantity = 85469998
+quantity = 77777700
 
 [[stores]]
 settlement = "settlement:pylos"
 good = "grain"
 quantity = 24050000
+
+[[stores]]
+settlement = "settlement:pylos"
+owner = "org:pylos_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:sau"
@@ -3065,6 +3149,12 @@ good = "grain"
 quantity = 57600000
 
 [[stores]]
+settlement = "settlement:sau"
+owner = "org:sau_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:seat"
 site = "site:seat_372_76"
 good = "standing_grain"
@@ -3074,6 +3164,12 @@ quantity = 36960000
 settlement = "settlement:seat"
 good = "grain"
 quantity = 16000000
+
+[[stores]]
+settlement = "settlement:seat"
+owner = "org:seat_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:shechem"
@@ -3100,7 +3196,7 @@ quantity = 11000000
 settlement = "settlement:tarhuntassa"
 site = "site:tarhuntassa_316_72"
 good = "standing_grain"
-quantity = 92399995
+quantity = 88703999
 
 [[stores]]
 settlement = "settlement:tarhuntassa"
@@ -3113,10 +3209,16 @@ good = "grain"
 quantity = 28000000
 
 [[stores]]
+settlement = "settlement:tarhuntassa"
+owner = "org:tarhuntassa_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:tarsa"
 site = "site:tarsa_344_60"
 good = "standing_grain"
-quantity = 46199997
+quantity = 44351997
 
 [[stores]]
 settlement = "settlement:tarsa"
@@ -3124,10 +3226,16 @@ good = "grain"
 quantity = 14000000
 
 [[stores]]
+settlement = "settlement:tarsa"
+owner = "org:tarsa_merchants"
+good = "copper"
+quantity = 3000
+
+[[stores]]
 settlement = "settlement:thebes_gr"
 site = "site:thebes_gr_54_42"
 good = "standing_grain"
-quantity = 50819996
+quantity = 46246195
 
 [[stores]]
 settlement = "settlement:thebes_gr"
@@ -3144,6 +3252,12 @@ quantity = 36960000
 settlement = "settlement:tjaru"
 good = "grain"
 quantity = 25600000
+
+[[stores]]
+settlement = "settlement:tjaru"
+owner = "org:tjaru_merchants"
+good = "copper"
+quantity = 3000
 
 [[stores]]
 settlement = "settlement:tyre"
@@ -3186,7 +3300,7 @@ quantity = 182400000
 settlement = "settlement:wilusa"
 site = "site:wilusa_130_20"
 good = "standing_grain"
-quantity = 83159997
+quantity = 79833597
 
 [[stores]]
 settlement = "settlement:wilusa"
@@ -3197,6 +3311,12 @@ quantity = 150
 settlement = "settlement:wilusa"
 good = "grain"
 quantity = 25200000
+
+[[stores]]
+settlement = "settlement:wilusa"
+owner = "org:wilusa_merchants"
+good = "copper"
+quantity = 3000
 
 [[orgs]]
 id = "org:abdju_palace"
@@ -3223,6 +3343,14 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:alashiya_merchants"
+name = "the merchants of Alashiya"
+settlement = "settlement:alashiya"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:amurru_council"
 name = "the council of Sumur"
 settlement = "settlement:amurru"
@@ -3231,12 +3359,28 @@ policy = "subsistence"
 authority = 300
 
 [[orgs]]
+id = "org:amurru_merchants"
+name = "the merchants of Sumur"
+settlement = "settlement:amurru"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:apasa_palace"
 name = "the palace of Apasa"
 settlement = "settlement:apasa"
 kind = "palace"
 policy = "subsistence"
 authority = 600
+
+[[orgs]]
+id = "org:apasa_merchants"
+name = "the merchants of Apasa"
+settlement = "settlement:apasa"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:ashkelon_council"
@@ -3263,6 +3407,14 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:athens_merchants"
+name = "the merchants of Athens"
+settlement = "settlement:athens"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:babylon_palace"
 name = "the palace of Babylon"
 settlement = "settlement:babylon"
@@ -3277,6 +3429,14 @@ settlement = "settlement:byblos"
 kind = "palace"
 policy = "subsistence"
 authority = 600
+
+[[orgs]]
+id = "org:byblos_merchants"
+name = "the merchants of Gubla"
+settlement = "settlement:byblos"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:carchemish_palace"
@@ -3319,6 +3479,14 @@ policy = "subsistence"
 authority = 900
 
 [[orgs]]
+id = "org:egypt_merchants"
+name = "the merchants of Pi-Ramesses"
+settlement = "settlement:egypt"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:emar_council"
 name = "the council of Emar"
 settlement = "settlement:emar"
@@ -3341,6 +3509,14 @@ settlement = "settlement:gezer"
 kind = "council"
 policy = "subsistence"
 authority = 300
+
+[[orgs]]
+id = "org:gezer_merchants"
+name = "the merchants of Gezer"
+settlement = "settlement:gezer"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:halab_palace"
@@ -3373,6 +3549,14 @@ settlement = "settlement:iolcos"
 kind = "palace"
 policy = "subsistence"
 authority = 600
+
+[[orgs]]
+id = "org:iolcos_merchants"
+name = "the merchants of Iolcos"
+settlement = "settlement:iolcos"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:jerusalem_council"
@@ -3415,6 +3599,14 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:knossos_merchants"
+name = "the merchants of Knossos"
+settlement = "settlement:knossos"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:kydonia_council"
 name = "the council of Kydonia"
 settlement = "settlement:kydonia"
@@ -3423,12 +3615,28 @@ policy = "subsistence"
 authority = 300
 
 [[orgs]]
+id = "org:kydonia_merchants"
+name = "the merchants of Kydonia"
+settlement = "settlement:kydonia"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:lachish_council"
 name = "the council of Lachish"
 settlement = "settlement:lachish"
 kind = "council"
 policy = "subsistence"
 authority = 300
+
+[[orgs]]
+id = "org:lachish_merchants"
+name = "the merchants of Lachish"
+settlement = "settlement:lachish"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:megiddo_council"
@@ -3455,6 +3663,14 @@ policy = "subsistence"
 authority = 300
 
 [[orgs]]
+id = "org:millawanda_merchants"
+name = "the merchants of Millawanda"
+settlement = "settlement:millawanda"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:mira_council"
 name = "the council of Mira"
 settlement = "settlement:mira"
@@ -3477,6 +3693,14 @@ settlement = "settlement:mycenae"
 kind = "palace"
 policy = "subsistence"
 authority = 600
+
+[[orgs]]
+id = "org:mycenae_merchants"
+name = "the merchants of Mycenae"
+settlement = "settlement:mycenae"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:nagar_council"
@@ -3527,6 +3751,14 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:pylos_merchants"
+name = "the merchants of Pylos"
+settlement = "settlement:pylos"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:sau_palace"
 name = "the palace of Sau"
 settlement = "settlement:sau"
@@ -3535,12 +3767,28 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:sau_merchants"
+name = "the merchants of Sau"
+settlement = "settlement:sau"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:seat_palace"
 name = "the palace of Ugarit"
 settlement = "settlement:seat"
 kind = "palace"
 policy = "subsistence"
 authority = 700
+
+[[orgs]]
+id = "org:seat_merchants"
+name = "the merchants of Ugarit"
+settlement = "settlement:seat"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:shechem_council"
@@ -3575,12 +3823,28 @@ policy = "subsistence"
 authority = 600
 
 [[orgs]]
+id = "org:tarhuntassa_merchants"
+name = "the merchants of Tarhuntassa"
+settlement = "settlement:tarhuntassa"
+kind = "merchant"
+policy = "trade"
+authority = 200
+
+[[orgs]]
 id = "org:tarsa_council"
 name = "the council of Tarsa"
 settlement = "settlement:tarsa"
 kind = "council"
 policy = "subsistence"
 authority = 300
+
+[[orgs]]
+id = "org:tarsa_merchants"
+name = "the merchants of Tarsa"
+settlement = "settlement:tarsa"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:thebes_gr_palace"
@@ -3597,6 +3861,14 @@ settlement = "settlement:tjaru"
 kind = "council"
 policy = "subsistence"
 authority = 300
+
+[[orgs]]
+id = "org:tjaru_merchants"
+name = "the merchants of Tjaru"
+settlement = "settlement:tjaru"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[orgs]]
 id = "org:tyre_council"
@@ -3637,6 +3909,14 @@ settlement = "settlement:wilusa"
 kind = "palace"
 policy = "subsistence"
 authority = 600
+
+[[orgs]]
+id = "org:wilusa_merchants"
+name = "the merchants of Wilusa"
+settlement = "settlement:wilusa"
+kind = "merchant"
+policy = "trade"
+authority = 200
 
 [[obligations]]
 id = "settlement:abdju/0/obligation/0"

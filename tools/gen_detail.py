@@ -64,6 +64,34 @@ RETURN_PER_1000 = 7000
 EXTENT_PER_HEAD = 66
 GRAIN_PER_HEAD = 200
 
+# How much ground a household can actually get onto, as a share of what the
+# division above says it wants. The correction has a limit and the limit is
+# the ground itself: working more of it only answers poor land where there is
+# more of it to work. On Cyprus there is a coast and then a mountain, in the
+# Aegean a plain the size of a valley floor and then rock, and on the plateau
+# distance does the same job -- ground a day's walk past the last house feeds
+# nobody, whatever the survey says is arable.
+#
+# So these three cannot farm their way level, and that is the whole point of
+# them. They eat oil, wine, copper and other people's grain, and in a bad year
+# they have nothing to fall back on but what they can buy. The Aegean is the
+# thinnest of the three, which is why it goes first.
+#
+# The numbers are close to one and the margin they leave is thin on purpose,
+# because the model has no slow decline in it. A settlement either covers its
+# ration or it does not, and one that does not loses people, loses the hands
+# that work the ground, and comes apart inside a few years. Between a ceiling
+# of 0.90 and 0.91 the Aegean goes from gone to standing; there is no setting
+# that makes it dwindle picturesquely. So these are set one notch above the
+# cliff: the Aegean holds level and never builds a reserve while the Delta
+# doubles, which is the difference that matters and is as near the edge as the
+# rules can be made to sit.
+ARABLE_CEILING = {
+    "aegean": 0.91,
+    "alashiya": 0.94,
+    "anatolia": 0.96,
+}
+
 # Play does not begin at the beginning of a story. It opens in the growing
 # season, so the predecessor's crop is already standing on the ground: the
 # whole extent sown, at what that ground returns.
@@ -114,6 +142,26 @@ ORG_AUTHORITY = {"imperial": 900, "royal": 600, "seat": 700, "town": 300}
 # nothing at all, which is worse than a palace behaving like a council.
 ORG_POLICY = {rank: "subsistence" for rank in ORG_KIND}
 
+# The merchant houses, at the ports. `carry.trade` was written and never run:
+# every org the generator minted decided by `subsistence`, and a subsistence
+# council can only buy what is already standing in its own harbour. Nothing put
+# it there, so no qa of grain had ever crossed between two settlements. The
+# Delta filled and the islands emptied and there was no mechanism by which the
+# one could answer the other.
+#
+# A house sits where a sea route touches, which is what being a port consists
+# of. It is not the controlling org: it decides for itself, holds its own
+# purse, and its authority is low because a merchant commands nobody's labour.
+#
+# The purse is sized off the line it works, not off the town: a house buys at
+# most LINE_CARGO in a fortnight, at roughly BASE_PRICE the thousand, so a few
+# thousand shekels of copper is several voyages of working capital and an
+# empty strongbox is a house that has to sell before it can buy again. Which
+# is the interesting failure and the reason not to size this generously.
+MERCHANT_KIND = "merchant"
+MERCHANT_AUTHORITY = 200
+MERCHANT_COPPER = 3000
+
 # Grain owed to the overlord each harvest, per head. A place that answers
 # to no one owes nothing.
 # Ma'hadu rendered 1800 qa for 560 people, which is where this comes from.
@@ -133,6 +181,10 @@ def build():
         raw = tomllib.load(fh)
     reg = mint_from_scenario(raw)
     places = {p["id"]: p for p in raw["places"] if p.get("kind") == "alu"}
+    # A port is a place a sea route reaches. Taken off the routes rather than
+    # authored again, so a map that gains a crossing gains the house with it.
+    ports = {end for route in raw.get("routes", []) if route.get("mode") == "sea"
+             for end in (route["a"], route["b"]) if end in places}
 
     sites, cohorts, stores, orgs, obligations = [], [], [], [], []
 
@@ -159,7 +211,8 @@ def build():
         if food:
             cap = int(RETURN_PER_1000 * yld)
             for i, site in enumerate(food):
-                extent = int(pop * EXTENT_PER_HEAD / yld) if i == 0 else 0
+                per_head = EXTENT_PER_HEAD / yld * ARABLE_CEILING.get(region, 1.0)
+                extent = int(pop * per_head) if i == 0 else 0
                 sites.append({
                     "id": site.id, "settlement": sid, "region": f"region:{region}",
                     "function": "food", "capacity": cap, "extent": extent,
@@ -218,6 +271,21 @@ def build():
             "settlement": sid, "kind": ORG_KIND[rank],
             "policy": ORG_POLICY[rank], "authority": ORG_AUTHORITY[rank],
         })
+
+        # The house at the quay, and the copper it works with. Its own org, so
+        # it decides by its own policy and its purse is not the palace's.
+        if slug in ports:
+            where = place.get("name") or slug
+            orgs.append({
+                "id": f"org:{slug}_merchants",
+                "name": f"the merchants of {where}",
+                "settlement": sid, "kind": MERCHANT_KIND,
+                "policy": "trade", "authority": MERCHANT_AUTHORITY,
+            })
+            stores.append({
+                "settlement": sid, "owner": f"org:{slug}_merchants",
+                "good": "copper", "quantity": MERCHANT_COPPER,
+            })
 
         if power != FREE and f"polity:{power}" in reg.polities:
             obligations.append({
