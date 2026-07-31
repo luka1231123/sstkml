@@ -48,7 +48,11 @@ GroupId = str
 PlaceId = str
 
 # The settlement the legacy court is the seat of. Named once, as in the audit.
-SEAT = "settlement:ugarit"
+# It was "settlement:ugarit" until Task 2 C3, which is the id in
+# `content/kernel/world.toml` -- an authored world the live scenario stopped
+# building from. Nothing failed, because a placement at a settlement that does
+# not exist simply never matches anything.
+SEAT = "settlement:seat"
 
 # Person-days a head can give in a fortnight. One figure for every function,
 # and that is a claim rather than a shortcut: what differs between a smith and a
@@ -303,6 +307,12 @@ def as_cohort(group: DependentGroup,
         ration_per_head=max(0, group.entitlement),
         hunger=hunger,
         grievance=grievance_of(group.loyalty),
+        # A dependent group is the definition of a redistributive body: it owns
+        # no grain, it is owed a ration, and `arrears` is the record of the
+        # crown failing to pay one. Said on the cohort rather than left to the
+        # polity, because the countryside these people sit in feeds itself and
+        # they do not.
+        tenure="redistributive",
     )
     residue = Residue(
         group=group.id, cohort=entry.cohort, name=group.name,

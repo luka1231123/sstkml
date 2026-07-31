@@ -36,9 +36,21 @@ from load import kernel_settlement, load_scenario  # noqa: E402
 
 SEED = 8814402919
 
-# The settlement the legacy court is the seat of. Named once, because the whole
-# audit is about which of the two records for this place is the authority.
-SEAT = "settlement:ugarit"
+# The settlement the legacy court is the seat of. Asked of the world rather than
+# written down here, and the reason is a bug this line used to have: it said
+# "settlement:ugarit", which is the id in `content/kernel/world.toml`, an older
+# authored world that the live scenario no longer builds from. The scenario's
+# seat is `settlement:seat`. Every kernel-side count below therefore returned
+# zero, and an audit row is only a finding when both sides are non-empty -- so
+# goods, people, labour and land, the four rows Phase C is actually about,
+# reported nothing at all and looked like progress.
+FALLBACK_SEAT = "settlement:seat"
+
+
+def seat_of(kernel: Kernel) -> str:
+    """Which settlement is the court's. The kernel already knows (Task 2 C2)."""
+    goods = getattr(kernel, "seat_goods", None)
+    return getattr(goods, "seat", "") or FALLBACK_SEAT
 
 
 @dataclasses.dataclass(frozen=True)
@@ -65,7 +77,7 @@ def _court_goods(world: World) -> int:
 
 
 def _kernel_goods(kernel: Kernel) -> int:
-    return sum(lot.quantity for lot in kernel.book.at(SEAT))
+    return sum(lot.quantity for lot in kernel.book.at(seat_of(kernel)))
 
 
 def _court_people(world: World) -> int:
@@ -75,7 +87,7 @@ def _court_people(world: World) -> int:
 
 
 def _kernel_people(kernel: Kernel) -> int:
-    return kernel.people(SEAT)
+    return kernel.people(seat_of(kernel))
 
 
 def _court_labour(world: World) -> int:
@@ -94,7 +106,7 @@ def _court_labour(world: World) -> int:
 
 
 def _kernel_labour(kernel: Kernel) -> int:
-    return kernel.labour(SEAT)
+    return kernel.labour(seat_of(kernel))
 
 
 def _court_land(world: World) -> int:
@@ -103,10 +115,11 @@ def _court_land(world: World) -> int:
 
 
 def _kernel_land(kernel: Kernel) -> int:
+    seat = seat_of(kernel)
     return sum(
         kernel.registry.sites[site].extent
         for site in sorted(kernel.registry.sites)
-        if kernel.registry.sites[site].settlement == SEAT
+        if kernel.registry.sites[site].settlement == seat
         and kernel.registry.sites[site].function == "estate")
 
 

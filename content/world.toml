@@ -264,6 +264,57 @@ rows = [
     "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::,,,,,≈,,,,,,:::::::::::::::::::::::::::::::::::::::::::::~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~,,,.........................................................................................................................................................................................................:::......::::::......:::.",
 ]
 
+# How each polity's people come by their food (engine/entity.py, TENURES).
+#
+# Not a difficulty setting. It decides which granary a household may open, and
+# so whether "a full palace store beside a hungry village" is a state this world
+# can reach at all. Before this table existed every settlement pooled its stock
+# and fed everyone standing in it, which is Egypt's arrangement imposed on the
+# entire Bronze Age -- and the one arrangement that makes a famine impossible to
+# localise.
+#
+# Each line is a claim about a society and is meant to be arguable:
+#
+#   egypt        The state took the harvest into royal and temple granaries and
+#                issued rations and seed back out. Households held no reserve of
+#                their own, which is why an Egyptian famine is a failure of
+#                administration and is recorded as one.
+#   assyria      Same shape, less complete: the Middle Assyrian palace ran its
+#                dependants on rations, and the countryside on top of that.
+#                Recorded as redistributive because the part this model touches
+#                -- who feeds the towns -- is the palace.
+#   karduniash   Kassite Babylonia, temple and palace households on prebends,
+#                but the villages held their own land. Subsistence.
+#   hatti        The Hittite countryside fed itself and rendered; the capital
+#                was fed by that render and, by the end, by Egyptian grain
+#                ships. Subsistence, which is exactly why Hattusa is fragile
+#                when the render stops.
+#   ahhiyawa     Mycenaean palaces rationed the specialists they employed and
+#                did not feed the countryside. Subsistence, with the palace
+#                cohorts marked redistributive individually where a scenario
+#                authors them.
+#
+# Everything unlisted -- the Levantine and Cypriot city-states, which is most of
+# this map -- takes the default. A village holding its own crop and rendering a
+# due is what the Ugarit and Alalakh land texts describe.
+# The default is `pooled`, and that is a stated blocker rather than a view about
+# the Levant. Running the whole map on `subsistence` was measured over ten years
+# and costs 57% of the world's people against 16% on `pooled`, with grain piling
+# up in stores nobody starving may open. The share of the crop the households
+# keep barely moves it -- at 100% the collapse is identical -- so it is not the
+# render rate. It is that subsistence removes the insurance pooling was silently
+# providing, and the two things that replaced it in life are both unbuilt here:
+# a household cannot petition for relief (spec 6.3, M13.5) and cannot buy grain,
+# because the market is between organizations. Until one of them exists, flipping
+# this default would be shipping a famine caused by a missing mechanism and
+# calling it history.
+[tenure]
+default = "pooled"
+
+[tenure.polities]
+"polity:egypt" = "redistributive"
+"polity:assyria" = "redistributive"
+
 [[regions]]
 id = "north_levant"
 name = "North Levant"

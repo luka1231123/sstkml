@@ -106,6 +106,20 @@ class Kernel:
                 return org_id
         return ""
 
+    def tenure_of(self, cohort: Cohort) -> str:
+        """How this cohort comes by its food. Its own answer, else its polity's.
+
+        Two levels rather than one because the common case is a whole country
+        arranged one way -- one authored word for Egypt covers every cohort in
+        it -- and the exception is a single household inside it that is not.
+        """
+        if cohort.tenure:
+            return cohort.tenure
+        settlement = self.registry.settlements.get(cohort.settlement)
+        polity = self.registry.polities.get(
+            settlement.polity) if settlement else None
+        return polity.tenure if polity else "pooled"
+
     def cohorts_of(self, settlement: EntityId) -> tuple[Cohort, ...]:
         return tuple(self.registry.cohorts[c] for c in sorted(self.registry.cohorts)
                      if self.registry.cohorts[c].settlement == settlement)
@@ -475,39 +489,64 @@ def _farm_steps(intents: tuple[Intent, ...],
         T.Step("production", "threshing",
                lambda k: F.thresh(k, intents, allocation)),
         T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
+        T.Step("production", "the share", F.share_out),
         T.Step("production", "the stack", F.keep),
     )
 
 
+def _food_owners(kernel: Kernel, cohort: Cohort) -> set[EntityId]:
+    """Whose grain this cohort may eat. The whole of what tenure decides.
+
+    A settlement is not one granary with a queue at it. Who may open which door
+    is the arrangement a society is, and these four are the ones the Late Bronze
+    Age actually ran (`entity.TENURES`).
+    """
+    settlement = cohort.settlement
+    controller = kernel.controller(settlement)
+    tenure = kernel.tenure_of(cohort)
+    if tenure == "subsistence":
+        # Its own harvest and nothing else. The palace store down the road is
+        # not theirs, and that is the point rather than an omission.
+        return {cohort.id}
+    if tenure == "redistributive":
+        # The state granary, and only it. They own no food to fall back on, so
+        # a palace that cannot deliver is a famine with somebody to blame.
+        return {controller}
+    if tenure == "prebendal":
+        # Fed by the house they serve, wherever they happen to live.
+        return {cohort.origin or controller}
+    return {settlement, controller}
+
+
 def _local_food(kernel: Kernel, book: W.Book,
-                settlement: EntityId) -> tuple[W.GoodsLot, ...]:
-    """What the households of a place may eat, in the order they will eat it.
+                cohort: Cohort) -> tuple[W.GoodsLot, ...]:
+    """What a body of people may eat, in the order they will eat it.
 
     Grain first, then the seed corn. Reaching the second is a real decision with
     a real price -- it is next year's harvest going into this fortnight's
     bread -- and households have always made it rather than starve.
 
-    Ownership bounds it, and bounds it tightly: the common stores of the place
-    and the stores of the body that governs it, and nothing else standing in the
-    same town.
+    Ownership bounds it, and bounds it tightly: `_food_owners` says whose, and
+    nothing else standing in the same town is reachable.
 
-    Two exclusions, for the same reason. Grain in Ma'hadu that belongs to the
-    crown because it was rendered as tribute is not Ma'hadu's to eat; taking it
-    would be a seizure, which is a political act with consequences. And the
-    temple's granary is not the town's either. A temple that feeds the hungry in
-    a bad year is doing something -- relief, patronage, a claim on those it
-    fed -- and spec 6.3 has it as a choice a household makes and an institution
-    grants. Letting it happen silently every fortnight would delete the choice
-    and, worse, would hide the case this world most wants to be able to show:
-    a full temple store beside a hungry town.
+    Two exclusions hold under every tenure, for the same reason. Grain in
+    Ma'hadu that belongs to the crown because it was rendered as tribute is not
+    Ma'hadu's to eat; taking it would be a seizure, which is a political act
+    with consequences. And the temple's granary is not the town's either. A
+    temple that feeds the hungry in a bad year is doing something -- relief,
+    patronage, a claim on those it fed -- and spec 6.3 has it as a choice a
+    household makes and an institution grants. Letting it happen silently every
+    fortnight would delete the choice and, worse, would hide the case this world
+    most wants to be able to show: a full temple store beside a hungry town.
 
     So the temple's grain accumulates here and nothing spends it. That is not
     an oversight, it is an unbuilt mechanism sitting in plain view, and M13.5's
-    petitions are what build it.
+    petitions are what build it. Subsistence tenure makes the same case out of
+    the palace rather than the temple, and wants the same mechanism.
     """
-    mine = {settlement, kernel.controller(settlement)}
+    mine = _food_owners(kernel, cohort)
     return tuple(lot for good in (GRAIN, F.SEED)
-                 for lot in book.at(settlement)
+                 for lot in book.at(cohort.settlement)
                  if lot.good == good and lot.owner in mine)
 
 
@@ -525,7 +564,7 @@ def _consume(kernel: Kernel) -> tuple[Kernel, list]:
             want = cohort.ration()
             got = 0
             ate_seed = 0
-            for lot in _local_food(kernel, book, settlement):
+            for lot in _local_food(kernel, book, cohort):
                 if want - got <= 0:
                     break
                 current = book.lots.get(lot.id)

@@ -22,9 +22,11 @@ from engine.entity import Registry
 from engine.entity import Route as KernelRoute
 from engine.entity import Settlement as KernelSettlement
 from engine.entity import Site as KernelSite
+from engine.entity import TENURES
 from engine.entity import check as check_registry
 from engine.entity import mint as mint_id
 from engine.entity import parse as parse_id
+from engine.kernel import farm
 from engine.kernel import seat_goods
 from engine.kernel.world import Kernel
 
@@ -188,6 +190,21 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     alus = {p.id: p for p in places.values() if p.kind == "alu"}
     place_region = {p["id"]: p.get("region", "") for p in cfg.get("places", [])}
 
+    # How each polity's people come by their food (`entity.TENURES`). Authored
+    # rather than derived: nothing about a place on a map says whether the crop
+    # goes to a state granary or stays in the village, and guessing it from
+    # anything else would be inventing a society.
+    tenure_cfg = cfg.get("tenure", {})
+    tenure_default = tenure_cfg.get("default", "pooled")
+    tenure_by_polity = dict(tenure_cfg.get("polities", {}))
+    for name in sorted({tenure_default, *tenure_by_polity.values()}):
+        if name not in TENURES:
+            raise ValueError(f"unknown tenure {name!r}; expected one of "
+                             + ", ".join(TENURES))
+
+    def tenure_for(pid: str) -> str:
+        return tenure_by_polity.get(pid, tenure_default)
+
     polities: dict[str, KernelPolity] = {}
     settlement_polity: dict[str, str] = {}
     overlord_controls: dict[str, list[str]] = {o: [] for o in OVERLORDS}
@@ -198,7 +215,9 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
             overlord_controls[place.power].append(settlement_id)
         else:
             pid = f"polity:{place.id}"
-            polities[pid] = KernelPolity(id=pid, name=place.name, seat=settlement_id)
+            polities[pid] = KernelPolity(id=pid, name=place.name,
+                                         seat=settlement_id,
+                                         tenure=tenure_for(pid))
             settlement_polity[place.id] = pid
     for overlord in OVERLORDS:
         controlled = tuple(sorted(overlord_controls[overlord]))
@@ -208,7 +227,8 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
             seat = f"settlement:{overlord}"
         pid = f"polity:{overlord}"
         polities[pid] = KernelPolity(
-            id=pid, name=overlord, seat=seat, controls=controlled)
+            id=pid, name=overlord, seat=seat, controls=controlled,
+            tenure=tenure_for(pid))
 
     reg_sites: dict[str, KernelSite] = {}
     settlement_sites: dict[str, list[str]] = {alu: [] for alu in alus}
@@ -825,6 +845,13 @@ def load_scenario(name: str, seed: int) -> World:
         seed=seed, date=date, registry=kernel_registry, book=book,
         obligations=obligations, seasons=seasons, seat_goods=seat_view,
         region_climate=region_climate, spoilage=load_spoilage())
+
+    # The opening division. A settlement's authored granary is one heap, and
+    # under subsistence tenure the households' part of it is theirs already --
+    # the world does not begin the fortnight before its first harvest. Without
+    # this every village in a subsistence country would own nothing until the
+    # threshing floor came round and would starve on the calendar.
+    kernel, _ = farm.divide(kernel)
 
     return World(
         seed=seed, scenario=cfg["scenario"],

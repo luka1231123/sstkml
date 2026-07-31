@@ -134,7 +134,19 @@ def code_for(seasons, fortnight: int) -> int:
 
 # Ordinal blocks, so that two steps minting lots at the same parent on the same
 # turn cannot collide. 0-199 is left to the settlement phase's levy ordinals.
-BLOCKS = {"sow": 200, "reap": 400, "thresh": 600, "fodder": 800, "seed": 1000}
+BLOCKS = {"sow": 200, "reap": 400, "thresh": 600, "fodder": 800, "seed": 1000,
+          "share": 1200}
+
+# What a household keeps of the crop it worked, where the land is held that way
+# (`entity.TENURES`, "subsistence"). The remainder stays with the council and is
+# the due, the seed already having been set aside before this runs.
+#
+# Two thirds is the low end of what the Late Bronze Age tax estimates leave a
+# village -- the Alalakh and Ugarit ration texts imply a heavy but not
+# confiscatory render -- and the low end is the right end to author. A share
+# this size is what makes a village's own store, not the palace's, the thing
+# that decides whether it eats.
+HOUSEHOLD_SHARE_PER_1000 = 850
 
 
 # --- the calendar -------------------------------------------------------------
@@ -246,6 +258,28 @@ def _settlement_of(kernel, actor: EntityId) -> EntityId:
     return org.settlement if org else ""
 
 
+def _sowable(kernel, book, actor: EntityId, settlement: EntityId):
+    """The seed this actor can put in the ground, whoever's house it sits in.
+
+    A council's own seed, and -- where the households hold their land that way
+    -- theirs as well. It is their seed and their plots; the council decides the
+    sowing and the work is done together, which is what a village sowing season
+    was. Leaving the households' seed out would strand two thirds of the world's
+    seed corn in the houses that grew it while the fields went unsown.
+
+    Eating it is still their decision and not the council's: `_consume` reaches
+    a household's seed only after its grain is gone, and this does not touch
+    that. What is sown here is what is left by the time the sowing comes round.
+    """
+    lots = list(_lots(book, actor, SEED, settlement))
+    if actor != kernel.controller(settlement):
+        return tuple(lots)
+    for cohort in kernel.cohorts_of(settlement):
+        if kernel.tenure_of(cohort) == "subsistence":
+            lots.extend(_lots(book, cohort.id, SEED, settlement))
+    return tuple(lots)
+
+
 # --- the four moments ---------------------------------------------------------
 
 def sow(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
@@ -282,15 +316,15 @@ def sow(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
             left[site_id] = max(0, site.extent - under_crop(
                 dataclasses.replace(kernel, book=book), site_id))
 
-        seed = min(held(book, actor, SEED, settlement),
+        sowable = _sowable(kernel, book, actor, settlement)
+        seed = min(sum(lot.free for lot in sowable),
                    got * SOW_PER_DAY,
                    left[site_id])
         if seed <= 0:
             continue
 
-        book, sown, from_lots = _draw(
-            book, _lots(book, actor, SEED, settlement), seed, "sown",
-            authority=actor)
+        book, sown, from_lots = _draw(book, sowable, seed, "sown",
+                                      authority=actor)
         if sown <= 0:
             continue
         left[site_id] -= sown
@@ -476,6 +510,88 @@ def store_seed(kernel, intents: tuple[Intent, ...]):
                            owner=actor, holder=actor, location=settlement,
                            reason="produced", from_lots=from_lots)
         events.append(("set_aside", actor, taken))
+    return dataclasses.replace(kernel, book=book), events
+
+
+def share_out(kernel):
+    """The households take their own crop, where the land is held that way.
+
+    Runs on the last fortnight of threshing, once a year, and only where a
+    cohort's tenure is `subsistence`. Everything else -- a palace economy, a
+    temple's prebendaries, a settlement whose arrangement nobody has authored
+    yet -- passes through untouched.
+
+    The arithmetic runs the opposite way round from the history, and it is worth
+    saying so. A Levantine village did not surrender its harvest and receive
+    two thirds back; it kept its harvest and rendered a due. What is modelled
+    here is the same division arrived at from the other end, because the council
+    is the actor that holds the land, decides the sowing, and sets the seed
+    aside, and taking the crop off it at threshing would mean rebuilding all
+    three. The share is taken after the seed, which is the ordering that
+    matters: a village eats its own grain, and next year's sowing is not on the
+    table either way.
+
+    What this buys is the state the pooled store could not represent. A village
+    with a bad year now goes hungry beside a council granary it may not open,
+    and whether the council opens it is a decision somebody makes (spec 6.3)
+    rather than an accident of the arithmetic.
+    """
+    if not closing(kernel.seasons, kernel.date.fortnight, "threshing"):
+        return kernel, []
+    return divide(kernel, kernel.book.at_phase(kernel.date.absolute,
+                                               "production"))
+
+
+def divide(kernel, book=None):
+    """The division itself, without the calendar.
+
+    Separate from `share_out` because the loader needs it too. A world opens
+    with its granaries already full, and those stocks were authored as one heap
+    per settlement; if the first division waited for the first threshing, every
+    household in a subsistence country would own nothing for a year and starve
+    on a technicality rather than on a harvest.
+    """
+    events: list = []
+    book = kernel.book if book is None else book
+    turn = kernel.date.absolute
+    index = 0
+    for settlement in kernel.autonomous():
+        holders = [c for c in kernel.cohorts_of(settlement)
+                   if kernel.tenure_of(c) == "subsistence" and c.people > 0]
+        if not holders:
+            continue
+        council = kernel.controller(settlement)
+        people = sum(c.people for c in holders)
+
+        # Grain and seed both. The seed matters more than it looks: seed corn
+        # is the last food in the house, and `_consume` eats it rather than let
+        # anyone starve. A household holding grain but no seed of its own would
+        # have had that decision taken away from it -- it would starve at the
+        # point the grain ran out, with next year's sowing safe in a granary it
+        # may not open, which is a rule no village ever lived under.
+        for good in (GRAIN, SEED):
+            stock = sum(lot.free for lot in _lots(book, council, good,
+                                                  settlement))
+            share = stock * HOUSEHOLD_SHARE_PER_1000 // 1000
+            if share <= 0:
+                continue
+            # By heads, and the remainder stays with the council rather than
+            # going to whoever sorts first. A rounding crumb is not a policy.
+            for cohort in holders:
+                due = share * cohort.people // people
+                if due <= 0:
+                    continue
+                book, taken, from_lots = _draw(
+                    book, _lots(book, council, good, settlement), due,
+                    "expended", authority=council)
+                if taken <= 0:
+                    continue
+                book = book.create(
+                    _mint(settlement, turn, "share", index), good, taken,
+                    owner=cohort.id, holder=cohort.id, location=settlement,
+                    reason="produced", from_lots=from_lots)
+                index += 1
+                events.append(("shared_out", cohort.id, settlement, good, taken))
     return dataclasses.replace(kernel, book=book), events
 
 
