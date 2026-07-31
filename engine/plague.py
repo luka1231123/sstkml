@@ -265,8 +265,19 @@ def _kill_dependents(world: World, deaths: int) -> tuple[World, list]:
         events.append(A.DependentsDied(
             group.id, group.place, share, "plague"))
         remaining -= share
-    return (
-        dataclasses.replace(
-            world, court=dataclasses.replace(court, dependents=dependents)),
-        events,
-    )
+    # The heads come off the cohort as well, and that is not bookkeeping: since
+    # Task 2 C3 the cohort is the authority and `Court.dependents` is written
+    # back from it every turn. Killing only the court's copy would have the
+    # mirror hand the dead their places back on the same turn, and the audit
+    # would see a burial nothing accounted for -- which is exactly how this was
+    # found.
+    from engine import seat as seat_door
+
+    world = dataclasses.replace(
+        world, court=dataclasses.replace(court, dependents=dependents))
+    for group_id, group in sorted(dependents.items()):
+        was = court.dependents[group_id]
+        if group.size >= was.size:
+            continue
+        world = seat_door.bury(world, group_id, was.size - group.size)
+    return world, events

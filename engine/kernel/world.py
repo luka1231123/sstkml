@@ -545,9 +545,25 @@ def _local_food(kernel: Kernel, book: W.Book,
     the palace rather than the temple, and wants the same mechanism.
     """
     mine = _food_owners(kernel, cohort)
-    return tuple(lot for good in (GRAIN, F.SEED)
+    return tuple(lot for good in _foods(kernel, cohort)
                  for lot in _within_reach(kernel, book, cohort)
                  if lot.good == good and lot.owner in mine)
+
+
+def _foods(kernel: Kernel, cohort: Cohort) -> tuple[str, ...]:
+    """Grain, and the seed corn where reaching for it is theirs to decide.
+
+    A household eats its own seed rather than starve, and no one asks it. A body
+    on somebody's ration roll does not decide what is in the ration -- the store's
+    holder does, and issuing next year's sowing as this fortnight's bread is a
+    decision with a name. At the seat it already has one: `actions.EatSeed`, which
+    the player gives and the log records. Letting the roll reach the seed on its
+    own would spend the crown's sowing every hungry fortnight and delete the
+    order, which is the same argument as the temple's granary above.
+    """
+    if kernel.tenure_of(cohort) in ("redistributive", "prebendal"):
+        return (GRAIN,)
+    return (GRAIN, F.SEED)
 
 
 def _within_reach(kernel: Kernel, book: W.Book,

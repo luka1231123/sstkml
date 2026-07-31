@@ -90,15 +90,18 @@ def enrol(world: World) -> World:
 
     After this the 1,010 heads on the crown's payroll are cohorts standing at
     the seat like anybody else's people, marked `redistributive` because that is
-    what a body owed a ration and owning no grain is. The seat's other 80,000
-    are untouched and still eat nothing here; their fields are the court's until
-    C4, and `kernel.world._mouths` says why at length.
+    what a body owed a ration and owning no grain is. They come out of the
+    seat's own cohorts rather than on top of them (`_make_room`): the crown's
+    people already lived in that town, and naming them is not the same as
+    arriving. What is left of the 80,000 still eats nothing here; their fields
+    are the court's until C4, and `kernel.world._mouths` says why at length.
     """
     kernel = getattr(world, "kernel", None)
     if kernel is None:
         return world
     cohorts = dict(kernel.registry.cohorts)
     crown = kernel.controller(SP.SEAT)
+    moved: dict[str, int] = {}
     for entry in SP.PLACEMENTS:
         group = world.court.dependents.get(entry.group)
         if group is None:
@@ -125,9 +128,45 @@ def enrol(world: World) -> World:
             cohort = dataclasses.replace(
                 cohort, tenure="prebendal", origin=crown)
         cohorts[cohort.id] = cohort
+        moved[cohort.settlement] = moved.get(cohort.settlement, 0) + cohort.people
+    cohorts = _make_room(kernel, cohorts, moved)
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
         world, kernel=dataclasses.replace(kernel, registry=registry))
+
+
+def _make_room(kernel, cohorts: dict, moved: dict[str, int]) -> dict:
+    """Take the payroll's heads out of the town it was already living in.
+
+    The scenario authors a settlement's whole population and the generator
+    splits it into craft, field labour and palace. The crown's 1,010 are not a
+    thousand people who have just arrived -- they are a thousand of the eighty
+    thousand, named. Adding them without subtracting them counts them twice,
+    which is spec 2.2 for people and is what `test_registry_mint` asks.
+
+    Which of the three loses them is by weight, so the split stays in
+    proportion, and `_apportion` does it exactly rather than by rounding each
+    share on its own: floors first, then the remainder one head at a time in
+    sorted order, so a replay puts the same person in the same place.
+    """
+    payroll = {entry.cohort for entry in SP.PLACEMENTS}
+    for settlement, heads in sorted(moved.items()):
+        hosts = [c for c in cohorts.values()
+                 if c.settlement == settlement and c.id not in payroll
+                 and c.people > 0]
+        if not hosts or heads <= 0:
+            continue
+        weights = tuple((c.id, c.people) for c in hosts)
+        caps = {c.id: c.people for c in hosts}
+        for cohort_id, take in SP._apportion(heads, weights, caps).items():
+            if take <= 0:
+                continue
+            host = cohorts[cohort_id]
+            people = host.people - take
+            cohorts[cohort_id] = dataclasses.replace(
+                host, people=people,
+                households=min(host.households, people))
+    return cohorts
 
 
 def feed(world: World) -> World:
@@ -235,6 +274,28 @@ def _amend(world: World, cohort_id: str, **fields) -> World:
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
         world, kernel=dataclasses.replace(kernel, registry=registry))
+
+
+def bury(world: World, group: str, dead: int) -> World:
+    """Take the dead off the payroll's cohort. The court's copy is the caller's.
+
+    For anything that kills people at the seat outside the ration roll -- the
+    plague is the one -- because the cohort is where a head count lives now and
+    the mirror would otherwise write the group's size straight back.
+    """
+    kernel = getattr(world, "kernel", None)
+    if kernel is None or dead <= 0:
+        return world
+    try:
+        entry = SP.placement(group)
+    except SP.Unmapped:
+        return world
+    cohort = kernel.registry.cohorts.get(entry.cohort)
+    if cohort is None:
+        return world
+    people = max(0, cohort.people - dead)
+    return _amend(world, cohort.id, people=people,
+                  households=min(cohort.households, people))
 
 
 def allow(world: World, group: str, qa: int) -> World:
