@@ -761,6 +761,9 @@ def _world_graph(world) -> dict:
                 "mode": route.mode,
                 "seasonal": route.seasonal,
                 "legs": route.legs,
+                # Scenery on the same terms as the terrain: the course is the
+                # inherited map of where the road runs, not a live report.
+                "course": [list(turn) for turn in route.course],
                 "source": source,
                 "as_of_turn": 0,
                 "age_turns": max(0, now),
@@ -790,7 +793,8 @@ def _world_graph(world) -> dict:
         },
         "sites": [
             {"kind": site.kind, "alu": site.alu, "role": site.role,
-             "capacity": site.capacity, "col": site.col, "row": site.row}
+             "capacity": site.capacity, "name": site.name,
+             "col": site.col, "row": site.row}
             for site in world.sites
         ],
     }

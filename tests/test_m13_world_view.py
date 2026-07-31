@@ -61,11 +61,11 @@ def _route(a: str, b: str, mode: str = "land", age: int = 0,
     }
 
 
-def _site(kind: str, alu: str, col: int, row: int) -> dict:
+def _site(kind: str, alu: str, col: int, row: int, name: str = "") -> dict:
     role = "palace_centre" if kind == "palace" else "capacity"
     capacity = "" if kind == "palace" else ("food" if kind == "grain" else kind)
     return {"kind": kind, "alu": alu, "role": role, "capacity": capacity,
-            "col": col, "row": row}
+            "name": name, "col": col, "row": row}
 
 
 def _belief(places: list[dict], routes: list[dict],
@@ -448,14 +448,17 @@ def test_each_layer_draws_its_own_question_and_leaves_the_others_alone() -> None
     assert "─" in drawn["roads"]
 
 
-def test_the_hinterland_is_counted_beside_the_map_and_never_named() -> None:
+def test_the_hinterland_names_its_palaces_and_counts_its_ground() -> None:
+    """A palace centre is somewhere; ground is a quantity, not a place."""
     places = [_place("home", "Home", col=1, row=1)]
-    sites = [_site("palace", "home", 3, 3), _site("palace", "home", 4, 2),
+    sites = [_site("palace", "home", 3, 3, name="Nerik"),
+             _site("palace", "home", 4, 2, name="Sapinuwa"),
              _site("grain", "home", 5, 4), _site("copper", "home", 9, 1)]
     text = plain_text(
         worldmap.compose(_belief(places, [], sites=sites), 104, 30))
-    assert "2 palace centres" in text
+    assert "Nerik" in text and "Sapinuwa" in text
     assert "copper" in text
+    assert "1 grain estates" not in text
 
 
 def test_two_places_in_one_cell_are_both_drawn() -> None:

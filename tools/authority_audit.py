@@ -33,7 +33,6 @@ sys.path.insert(0, str(ROOT))
 from engine.kernel.world import Kernel          # noqa: E402
 from engine.state import World                  # noqa: E402
 from load import load_scenario                  # noqa: E402
-from load_kernel import load_kernel             # noqa: E402
 
 SEED = 8814402919
 
@@ -153,22 +152,20 @@ def findings(world: World, kernel: Kernel) -> list[Finding]:
 
 
 def unmapped(world: World, kernel: Kernel) -> list[Finding]:
-    """Court entities with no kernel counterpart under the current id grammar.
+    """Court places with no kernel counterpart, checked against idmap."""
+    import tomllib
+    idmap_path = ROOT / "content" / "kernel" / "idmap.toml"
+    idmap = tomllib.loads(idmap_path.read_text()) if idmap_path.exists() else {}
 
-    Kernel ids carry a kind prefix and the court's do not, so this cannot be a
-    string comparison; it asks whether a kernel settlement exists whose id ends
-    in the court's own name. Crude on purpose -- the authored map that replaces
-    this guess is C2's deliverable, and until it exists an honest "nobody has
-    said" is better than a derived answer that looks authoritative.
-    """
+    mapped = set(idmap.get("places", {}))
     names = {
         settlement.split(":")[-1]
         for settlement in kernel.registry.settlements
     }
     missing = sorted(
         place for place in world.places
-        if place.replace("_", "") not in {name.replace("_", "")
-                                          for name in names})
+        if place not in mapped
+        and place.replace("_", "") not in {n.replace("_", "") for n in names})
     if not missing:
         return []
     return [Finding(
@@ -176,7 +173,7 @@ def unmapped(world: World, kernel: Kernel) -> list[Finding]:
         f"{len(missing)}: " + ", ".join(missing[:8])
         + ("..." if len(missing) > 8 else ""),
         f"{len(names)} settlements authored",
-        "content/kernel/*.toml must author them, or the id map must say why not",
+        "add to content/kernel/idmap.toml [places] section",
     )]
 
 
@@ -187,8 +184,9 @@ def run(seed: int = SEED) -> dict:
     from engine.kernel.world import advance as advance_kernel
     from engine.tick import advance as advance_court
 
-    world, _ = advance_court(load_scenario("ugarit", seed))
-    kernel, _ = advance_kernel(load_kernel("world", seed))
+    scenario = load_scenario("ugarit", seed)
+    world, _ = advance_court(scenario)
+    kernel, _ = advance_kernel(scenario.kernel)
     duplicates = findings(world, kernel)
     gaps = unmapped(world, kernel)
     return {

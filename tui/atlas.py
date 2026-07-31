@@ -78,9 +78,8 @@ POWER_TONE = {
     "karduniash": "sand",
 }
 
-# The hinterland, which has no names: a holding, an estate, a source of metal.
-# One glyph per kind of thing rather than per commodity -- the tablet beside
-# the map says which metal, and the map says only that there is one.
+# One glyph per kind of holding, not per commodity. Metal type and palace
+# names are given in the side tablet, not on the map.
 SITE_GLYPH = {
     "palace": "x",
     "grain": "%",

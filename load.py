@@ -6,10 +6,26 @@ from a seeded stream so it is identical every run.
 """
 from __future__ import annotations
 
+import dataclasses
 import tomllib
 from pathlib import Path
 
+from engine import obligation as O
+from engine import ownership as W
 from engine.core import Date, in_range, stream
+from engine.entity import Cohort as KernelCohort
+from engine.entity import Leg as KernelLeg
+from engine.entity import Organization as KernelOrganization
+from engine.entity import Polity as KernelPolity
+from engine.entity import Region as KernelRegion
+from engine.entity import Registry
+from engine.entity import Route as KernelRoute
+from engine.entity import Settlement as KernelSettlement
+from engine.entity import Site as KernelSite
+from engine.entity import check as check_registry
+from engine.entity import mint as mint_id
+from engine.entity import parse as parse_id
+from engine.kernel.world import Kernel
 from engine.land import climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
                           Document, Estate, ForeignCourt, Formation,
@@ -17,6 +33,396 @@ from engine.state import (Clause, Correspondent, Court, DependentGroup,
                           HouseMember, Institution, MetalState, Oath, Petition,
                           Place, PlagueState, Relation, Rite, Route, Site,
                           Terrain, Workshop, World)
+
+# The five overlords a place's `power` may name. "free" is not among them: a
+# free place is its own polity, not headless.
+OVERLORDS = ("egypt", "hatti", "ahhiyawa", "assyria", "karduniash")
+
+# Every site.function a scenario may author: the palace itself, or one of the
+# capacities a holding can be classified as (spec 8.3). Closed so a typo in a
+# scenario's capacity string fails to load rather than minting a site that
+# nothing in the allocator recognizes.
+SITE_FUNCTIONS = frozenset({
+    "palace_centre", "food", "copper", "tin", "gold", "silver",
+    "cedar", "horses", "lapis",
+})
+
+
+def parse_places(cfg: dict) -> dict:
+    """The scenario's map marks, checked (spec 8.3).
+
+    Everyone starts susceptible (spec 6.12): there is no acquired immunity in
+    the opening state, because the last epidemic was two generations ago and
+    the people who survived it are the ones in the predecessor archive.
+    """
+    places = {}
+    for p in cfg.get("places", []):
+        pop = int(p.get("population", 0))
+        # A column and a row into the authored terrain, plus what the place is
+        # to the map: whose empire, what rank, which letter, and the one line
+        # the tablet writes about it. None of it is read by a rule.
+        kind = str(p.get("kind", "alu"))
+        if kind not in ("alu", "palace_centre"):
+            raise ValueError(f"{p['id']}: unknown place kind {kind!r}")
+        places[p["id"]] = Place(id=p["id"], name=p["name"],
+                                col=int(p.get("col", 0)),
+                                row=int(p.get("row", 0)),
+                                power=str(p.get("power", "")),
+                                rank=str(p.get("rank", "town")),
+                                glyph=str(p.get("glyph", "")),
+                                role=str(p.get("role", "")),
+                                kind=kind,
+                                alu=str(p.get("alu", "")),
+                                harbour=bool(p.get("harbour", False)),
+                                population=pop, susceptible=pop)
+    # Every mark answers to one Alu, and the answer is authored (spec 8.3).
+    # Resolved here rather than at the tablet because a mark with no owner, or
+    # an owner that is itself a holding, is a scenario fault and not a drawing
+    # one: it is how a decorative site becomes a settlement nobody meant.
+    alu_ids = {i for i, place in places.items() if place.kind == "alu"}
+    for place in places.values():
+        if place.kind != "palace_centre":
+            if place.alu:
+                raise ValueError(f"{place.id}: an Alu cannot belong to {place.alu}")
+            continue
+        if place.alu not in alu_ids:
+            raise ValueError(f"{place.id}: palace centre of unknown Alu "
+                             f"{place.alu!r}")
+    return places
+
+
+def _course(flat) -> tuple[tuple[int, int], ...]:
+    """A route's `path = [col, row, col, row, ...]`, in pairs.
+
+    Authored flat because a hundred nested pairs make the file unreadable, and
+    an odd count is an authoring slip worth refusing rather than truncating.
+    """
+    numbers = [int(n) for n in flat]
+    if len(numbers) % 2:
+        raise ValueError(f"route path has {len(numbers)} numbers, "
+                         "which is not a whole number of turns")
+    return tuple(zip(numbers[::2], numbers[1::2]))
+
+
+def parse_sites(cfg: dict, places: dict) -> tuple:
+    """The holdings standing on the ground, each answering to one Alu."""
+    alu_ids = {i for i, place in places.items() if place.kind == "alu"}
+    sites = []
+    for s in cfg.get("sites", []):
+        role = str(s.get("role", ""))
+        alu = str(s.get("alu", ""))
+        if role not in ("palace_centre", "capacity"):
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             f"unknown role {role!r}")
+        if alu not in alu_ids:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             f"unknown Alu {alu!r}")
+        capacity = str(s.get("capacity", ""))
+        if role == "capacity" and not capacity:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             "a capacity must say what of")
+        name = str(s.get("name", ""))
+        if role == "palace_centre" and not name:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             "a palace centre must be named")
+        if role == "capacity" and name:
+            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
+                             "a capacity is ground, not a place; it takes no name")
+        sites.append(Site(kind=str(s.get("kind", "")), alu=alu, role=role,
+                          capacity=capacity, name=name,
+                          col=int(s.get("col", 0)),
+                          row=int(s.get("row", 0))))
+    return tuple(sites)
+
+
+def mint_from_scenario(cfg: dict) -> Registry:
+    """The registry a scenario file implies, without the detail file.
+
+    `tools/gen_detail.py` writes that detail file, so it cannot go through
+    `load_scenario`, which reads it.
+    """
+    places = parse_places(cfg)
+    return mint_registry(places, parse_sites(cfg, places), cfg)
+
+
+def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
+    """The kernel Registry implied by a scenario's places and sites.
+
+    Pure derivation from already-parsed content: no file access, no World
+    field. Exercised and validated here so a scenario that cannot mint a sound
+    registry fails to load, well before anything wires it into play.
+    """
+    regions = {
+        f"region:{r['id']}": KernelRegion(id=f"region:{r['id']}", name=r["name"])
+        for r in cfg.get("regions", [])
+    }
+
+    alus = {p.id: p for p in places.values() if p.kind == "alu"}
+    place_region = {p["id"]: p.get("region", "") for p in cfg.get("places", [])}
+
+    polities: dict[str, KernelPolity] = {}
+    settlement_polity: dict[str, str] = {}
+    overlord_controls: dict[str, list[str]] = {o: [] for o in OVERLORDS}
+    for place in alus.values():
+        settlement_id = f"settlement:{place.id}"
+        if place.power in OVERLORDS:
+            settlement_polity[place.id] = f"polity:{place.power}"
+            overlord_controls[place.power].append(settlement_id)
+        else:
+            pid = f"polity:{place.id}"
+            polities[pid] = KernelPolity(id=pid, name=place.name, seat=settlement_id)
+            settlement_polity[place.id] = pid
+    for overlord in OVERLORDS:
+        controlled = tuple(sorted(overlord_controls[overlord]))
+        seat = ""
+        overlord_place = alus.get(overlord)
+        if overlord_place is not None and overlord_place.power == overlord:
+            seat = f"settlement:{overlord}"
+        pid = f"polity:{overlord}"
+        polities[pid] = KernelPolity(
+            id=pid, name=overlord, seat=seat, controls=controlled)
+
+    reg_sites: dict[str, KernelSite] = {}
+    settlement_sites: dict[str, list[str]] = {alu: [] for alu in alus}
+    for s in sites:
+        site_id = f"site:{s.alu}_{s.col}_{s.row}"
+        settlement_id = f"settlement:{s.alu}"
+        if s.role == "palace_centre":
+            function = "palace_centre"
+            reg_sites[site_id] = KernelSite(
+                id=site_id, name=s.name, settlement=settlement_id,
+                function=function)
+            settlement_sites[s.alu].append(site_id)
+        else:
+            function = s.capacity
+            reg_sites[site_id] = KernelSite(
+                id=site_id, name="", settlement=settlement_id,
+                function=function)
+        if function not in SITE_FUNCTIONS:
+            raise ValueError(f"{site_id}: unknown site function {function!r}")
+
+    settlements = {}
+    cohorts = {}
+    for place in alus.values():
+        settlement_id = f"settlement:{place.id}"
+        settlements[settlement_id] = KernelSettlement(
+            id=settlement_id, name=place.name,
+            region=f"region:{place_region[place.id]}",
+            polity=settlement_polity[place.id],
+            sites=tuple(sorted(settlement_sites[place.id])),
+            autonomous=place.id != cfg.get("seat", ""),
+        )
+        cohort_id = f"cohort:{place.id}_people"
+        cohorts[cohort_id] = KernelCohort(
+            id=cohort_id, settlement=settlement_id, kind="field_labour",
+            households=max(1, place.population // 5), people=place.population,
+        )
+
+    def route_settlement(place_id: str) -> str:
+        # A route endpoint may name a holding (a harbour, say) rather than the
+        # Alu itself; every mark answers to one Alu (spec 8.3), and that Alu is
+        # the settlement a courier actually arrives at.
+        place = places.get(place_id)
+        alu_id = place_id if place is None or place.kind == "alu" else place.alu
+        return f"settlement:{alu_id}"
+
+    routes = {}
+    for r in cfg.get("routes", []):
+        route_id = f"route:{r['a']}_{r['b']}"
+        routes[route_id] = KernelRoute(
+            id=route_id, name=f"{r['a']}-{r['b']}",
+            legs=(KernelLeg(
+                origin=route_settlement(r["a"]), destination=route_settlement(r["b"]),
+                mode=r["mode"], fortnights=int(r["legs"]),
+                # A seasonal leg is shut outside the sailing window; the season
+                # itself is the scenario's, so a run that renames it here would
+                # silently open the sea all year.
+                season="sailing_open" if r.get("seasonal") else ""),),
+            risk=int(r["risk"]),
+        )
+
+    registry = Registry(regions=regions, polities=polities,
+                        settlements=settlements, sites=reg_sites,
+                        routes=routes, cohorts=cohorts)
+    faults = check_registry(registry)
+    if faults:
+        raise ValueError("; ".join(faults))
+    return registry
+
+def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict, list]:
+    """Fold `content/kernel/detail.toml` onto a minted registry.
+
+    The scenario map says what exists and where; it cannot say how much ground
+    a mark is, how a settlement's people divide, what is in the granary on day
+    one, or what is owed to whom. That is this file, written by
+    `tools/gen_detail.py`, and every row of it must name an entity the scenario
+    already made -- a row that names anything else is a load error rather than
+    a quietly ignored line.
+
+    Returns (registry, book, obligations, seasons, region_climate, drought_curve).
+    Seasons, climate, and drought curve are authored here as shared-world
+    parameters, not campaign-specific.
+    """
+    cfg = tomllib.loads((CONTENT / "kernel" / "detail.toml").read_text())
+
+    def known(where: str, field: str, value: str, table) -> None:
+        if value not in table:
+            raise ValueError(f"detail.toml: {where}: {field} names {value!r}, "
+                             "which the scenario did not make")
+
+    sites = dict(registry.sites)
+    for row in cfg.get("sites", []):
+        known("sites", "id", row["id"], sites)
+        known(row["id"], "region", row["region"], registry.regions)
+        if row["settlement"] != sites[row["id"]].settlement:
+            raise ValueError(f"detail.toml: {row['id']} is not a site of "
+                             f"{row['settlement']}")
+        sites[row["id"]] = dataclasses.replace(
+            sites[row["id"]], region=row["region"],
+            capacity=int(row["capacity"]), extent=int(row["extent"]))
+
+    # Authored cohorts replace the one cohort per Alu that minting made, and
+    # must account for the same people: a split that loses a hundred heads on
+    # the way through is a content bug that would otherwise show up as an
+    # unexplained famine ten years in.
+    detailed = {row["settlement"] for row in cfg.get("cohorts", [])}
+    cohorts = {cid: c for cid, c in registry.cohorts.items()
+               if c.settlement not in detailed}
+    minted_people: dict[str, int] = {}
+    for cohort in registry.cohorts.values():
+        minted_people[cohort.settlement] = (
+            minted_people.get(cohort.settlement, 0) + cohort.people)
+    split_people: dict[str, int] = {}
+    for row in cfg.get("cohorts", []):
+        known("cohorts", "settlement", row["settlement"], registry.settlements)
+        if row["id"] in cohorts:
+            raise ValueError(f"detail.toml: two cohorts called {row['id']!r}")
+        cohorts[row["id"]] = KernelCohort(
+            id=row["id"], settlement=row["settlement"], kind=row["kind"],
+            households=int(row["households"]), people=int(row["people"]))
+        split_people[row["settlement"]] = (
+            split_people.get(row["settlement"], 0) + int(row["people"]))
+    for settlement, people in sorted(split_people.items()):
+        if people != minted_people.get(settlement, 0):
+            raise ValueError(
+                f"detail.toml: {settlement} is split into {people} people, "
+                f"but the scenario authors {minted_people.get(settlement, 0)}")
+
+    orgs = {}
+    for row in cfg.get("orgs", []):
+        known("orgs", "settlement", row["settlement"], registry.settlements)
+        orgs[row["id"]] = KernelOrganization(
+            id=row["id"], name=row["name"], settlement=row["settlement"],
+            kind=row["kind"], policy=row.get("policy", "subsistence"),
+            authority=int(row.get("authority", 0)))
+    for site in sites.values():
+        if site.holder and site.holder not in orgs:
+            raise ValueError(f"detail.toml: {site.id} is held by "
+                             f"{site.holder!r}, which is not an organization")
+
+    settlements = {
+        sid: dataclasses.replace(
+            settlement,
+            cohorts=tuple(sorted(c for c in cohorts
+                                 if cohorts[c].settlement == sid)),
+            orgs=tuple(sorted(o for o in orgs if orgs[o].settlement == sid)))
+        for sid, settlement in registry.settlements.items()}
+
+    registry = dataclasses.replace(
+        registry, sites=sites, cohorts=cohorts, orgs=orgs,
+        settlements=settlements)
+    faults = check_registry(registry)
+    if faults:
+        raise ValueError("detail.toml: " + "; ".join(faults))
+
+    # Opening stores, as lots. Ordinals come from the sorted (owner, good)
+    # pairs at each location, so adding a good in one place cannot renumber
+    # another's.
+    holdings: dict[str, dict[tuple[str, str], int]] = {}
+    for row in cfg.get("stores", []):
+        settlement = row["settlement"]
+        known("stores", "settlement", settlement, registry.settlements)
+        owner = row.get("owner") or _controller(orgs, settlement) or settlement
+        if owner not in orgs and owner not in registry.settlements:
+            raise ValueError(f"detail.toml: {settlement}: stores owned by "
+                             f"{owner!r}, which does not exist")
+        location = row.get("site", settlement)
+        if location not in sites and location not in registry.settlements:
+            raise ValueError(f"detail.toml: {settlement}: stores at "
+                             f"{location!r}, which does not exist")
+        if int(row["quantity"]) <= 0:
+            raise ValueError(f"detail.toml: {settlement}: the {row['good']} "
+                             "store must be positive")
+        key = (owner, row["good"])
+        if key in holdings.get(location, {}):
+            raise ValueError(f"detail.toml: {location}: {owner} has two "
+                             f"opening stores of {row['good']}")
+        holdings.setdefault(location, {})[key] = int(row["quantity"])
+
+    book = W.Book(turn=0, phase="authored")
+    for location in sorted(holdings):
+        for i, (owner, good) in enumerate(sorted(holdings[location])):
+            book = book.create(
+                mint_id(location, 0, "lot", i), good,
+                holdings[location][(owner, good)], owner=owner, holder=owner,
+                location=location, reason="authored")
+
+    obligations = []
+    for row in cfg.get("obligations", []):
+        parse_id(row["id"])
+        obligations.append(O.Obligation(
+            id=row["id"], party=row["party"], beneficiary=row["beneficiary"],
+            clause=row["clause"], good=row.get("good", ""),
+            quantity=int(row.get("quantity", 0)), rate=int(row.get("rate", 0)),
+            authority=row.get("authority", ""),
+            consequence=row.get("consequence", ""),
+            due=O.Due(kind=row.get("due_kind", "never"),
+                      span=row.get("due_span", ""),
+                      every=int(row.get("due_every", 0)),
+                      start=int(row.get("due_start", 0)),
+                      trigger=row.get("due_trigger", ""))))
+    obligation_faults = O.faults(tuple(obligations), exists=registry.exists)
+    if obligation_faults:
+        raise ValueError("detail.toml: " + "; ".join(obligation_faults))
+
+    seasons = {k: tuple(int(v) for v in vals)
+               for k, vals in cfg.get("season", {}).items()}
+    climate_raw = cfg.get("climate", {})
+    region_climate = {f"region:{name}": tuple(int(v) for v in series)
+                      for name, series in climate_raw.get("series", {}).items()}
+    for region_id in sorted(region_climate):
+        if region_id not in registry.regions:
+            raise ValueError(f"climate series for {region_id}, which is not a region")
+    drought_curve = tuple(
+        (int(p[0]), int(p[1])) for p in climate_raw.get("drought_curve", []))
+
+    return registry, book, tuple(obligations), seasons, region_climate, drought_curve
+
+
+def _controller(orgs: dict, settlement: str) -> str:
+    for org_id in sorted(orgs):
+        org = orgs[org_id]
+        if org.settlement == settlement and org.kind in ("council", "palace"):
+            return org_id
+    return ""
+
+
+def load_spoilage() -> dict[str, int]:
+    """Per-good spoilage per fortnight, scaled 1000, from the authored table.
+
+    A good with no rate authored does not spoil, which is the table's own
+    convention and is why this reads rather than defaults.
+    """
+    goods = tomllib.loads((CONTENT / "goods.toml").read_text())
+    rates = {}
+    for good, row in goods.items():
+        rate = row.get("spoilage_per_1000", 0) if isinstance(row, dict) else 0
+        if rate < 0:
+            raise ValueError(f"goods.toml: {good}: a spoilage rate is not negative")
+        if rate:
+            rates[good] = rate
+    return rates
+
 
 CONTENT = Path(__file__).parent / "content"
 
@@ -54,7 +460,9 @@ def _requires(d: dict) -> tuple[tuple[str, int], ...]:
 
 
 def load_scenario(name: str, seed: int) -> World:
-    cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
+    world_cfg = tomllib.loads((CONTENT / "world.toml").read_text())
+    scenario_cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
+    cfg = {**world_cfg, **scenario_cfg}  # scenario wins on key overlap
     relation_cfg = tomllib.loads((CONTENT / "relations.toml").read_text())
     names = cfg["names"]
 
@@ -83,42 +491,11 @@ def load_scenario(name: str, seed: int) -> World:
     # Everyone starts susceptible (spec 6.12). There is no acquired immunity in
     # the opening state, because the last epidemic was two generations ago and
     # the people who survived it are the ones in the predecessor archive.
-    places = {}
-    for p in cfg.get("places", []):
-        pop = int(p.get("population", 0))
-        # A column and a row into the authored terrain, plus what the place is
-        # to the map: whose empire, what rank, which letter, and the one line
-        # the tablet writes about it. None of it is read by a rule.
-        kind = str(p.get("kind", "alu"))
-        if kind not in ("alu", "palace_centre"):
-            raise ValueError(f"{p['id']}: unknown place kind {kind!r}")
-        places[p["id"]] = Place(id=p["id"], name=p["name"],
-                                col=int(p.get("col", 0)),
-                                row=int(p.get("row", 0)),
-                                power=str(p.get("power", "")),
-                                rank=str(p.get("rank", "town")),
-                                glyph=str(p.get("glyph", "")),
-                                role=str(p.get("role", "")),
-                                kind=kind,
-                                alu=str(p.get("alu", "")),
-                                harbour=bool(p.get("harbour", False)),
-                                population=pop, susceptible=pop)
-    # Every mark answers to one Alu, and the answer is authored (spec 8.3).
-    # Resolved here rather than at the tablet because a mark with no owner, or
-    # an owner that is itself a holding, is a scenario fault and not a drawing
-    # one: it is how a decorative site becomes a settlement nobody meant.
-    alu_ids = {i for i, place in places.items() if place.kind == "alu"}
-    for place in places.values():
-        if place.kind != "palace_centre":
-            if place.alu:
-                raise ValueError(f"{place.id}: an Alu cannot belong to {place.alu}")
-            continue
-        if place.alu not in alu_ids:
-            raise ValueError(f"{place.id}: palace centre of unknown Alu "
-                             f"{place.alu!r}")
+    places = parse_places(cfg)
     routes = tuple(
         Route(a=r["a"], b=r["b"], legs=int(r["legs"]), mode=r["mode"],
-              seasonal=bool(r["seasonal"]), risk=int(r["risk"]))
+              seasonal=bool(r["seasonal"]), risk=int(r["risk"]),
+              course=_course(r.get("path", ())))
         for r in cfg.get("routes", [])
     )
     # The ground, and the holdings standing on it. Scenery on the same terms as
@@ -133,24 +510,9 @@ def load_scenario(name: str, seed: int) -> World:
         step_lon=round(float(ground.get("step_lon", 0)) * 100),
         step_lat=round(float(ground.get("step_lat", 0)) * 100),
         legend=str(ground.get("legend", "")))
-    sites = []
-    for s in cfg.get("sites", []):
-        role = str(s.get("role", ""))
-        alu = str(s.get("alu", ""))
-        if role not in ("palace_centre", "capacity"):
-            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
-                             f"unknown role {role!r}")
-        if alu not in alu_ids:
-            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
-                             f"unknown Alu {alu!r}")
-        capacity = str(s.get("capacity", ""))
-        if role == "capacity" and not capacity:
-            raise ValueError(f"site at {s.get('col')},{s.get('row')}: "
-                             "a capacity must say what of")
-        sites.append(Site(kind=str(s.get("kind", "")), alu=alu, role=role,
-                          capacity=capacity, col=int(s.get("col", 0)),
-                          row=int(s.get("row", 0))))
-    sites = tuple(sites)
+    sites = parse_sites(cfg, places)
+    registry = mint_registry(places, sites, cfg)
+    kernel_registry, book, obligations, seasons, region_climate, drought_curve = load_detail(registry)
     correspondents = tuple(
         Correspondent(
             actor=c["actor"], place=c["place"], cadence=int(c["cadence"]),
@@ -217,8 +579,6 @@ def load_scenario(name: str, seed: int) -> World:
         )
         for o in cfg.get("oaths", [])
     )
-    season = {k: tuple(v) for k, v in cfg.get("season", {}).items()}
-
     land_cfg = tomllib.loads((CONTENT / "land.toml").read_text())
 
     # Estates open the game with a crop already in the ground: the first harvest
@@ -230,7 +590,7 @@ def load_scenario(name: str, seed: int) -> World:
     # -- otherwise the player's first harvest under-reports by the length of the
     # gap, and `last_harvest` (his one hard datum) misleads him all year two.
     banked = int(cfg.get("opening_growing_turns", 0))
-    growing_span = tuple(cfg.get("season", {}).get("growing", ()))
+    growing_span = tuple(seasons.get("growing", ()))
     growing = sum(1 for f in range(1, 25)
                   if growing_span and in_range(f, growing_span)) or 1
     estates = {}
@@ -381,12 +741,19 @@ def load_scenario(name: str, seed: int) -> World:
         for lot in cfg.get("harbour_cargo", [])
     }
 
+    date = Date(year=1, fortnight=0, absolute=0)   # turn 1 begins with an advance
+    kernel = Kernel(
+        seed=seed, date=date, registry=kernel_registry, book=book,
+        obligations=obligations, seasons=seasons,
+        region_climate=region_climate, spoilage=load_spoilage())
+
     return World(
         seed=seed, scenario=cfg["scenario"],
-        date=Date(year=1, fortnight=0, absolute=0),   # turn 1 begins with an advance
+        date=date,
         court=court,
+        kernel=kernel,
         places=places, routes=routes, terrain=terrain, sites=sites,
-        correspondents=correspondents, season=season,
+        correspondents=correspondents, season=seasons,
         relations=relations, oaths=oaths, foreign_courts=foreign_courts,
         plague=plague_state,
         documents=load_predecessor_archive(cfg["scenario"]),
@@ -399,10 +766,7 @@ def load_scenario(name: str, seed: int) -> World:
         god_ranks={k: int(v) for k, v in relation_cfg["gods"]["rank"].items()},
         protocol_rules={
             k: int(v) for k, v in relation_cfg["protocol"].items()},
-        climate=climate_series(
-            seed, CLIMATE_YEARS * 24,
-            tuple((int(point[0]), int(point[1]))
-                  for point in cfg.get("climate", {}).get("drought_curve", []))),
+        climate=climate_series(seed, CLIMATE_YEARS * 24, drought_curve),
         land_tables={
             name: tuple((int(x), int(y)) for x, y in points)
             for name, points in land_cfg["tables"].items()},

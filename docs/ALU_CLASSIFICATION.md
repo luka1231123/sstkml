@@ -1,43 +1,31 @@
 # Alu classification — design pass for Alpha 0.7 Task 1
 
-- Status: implemented; see §12 for what the build changed about the design
+- Status: implemented; §12 hold what build changed about design
 - Revision: 2026-07-30
 - Covers: `BASE_GAME_SPEC_DRAFT.md` §2.4, §8.2, §8.3, Task 1
 - Input data: `content/scenarios/ugarit.toml` (37 places, 146 site marks, 56 routes)
 
-Task 1 asks for one documented classification and one owning Alu for every map
-mark, a map that renders from that classification, and no decorative site
-silently treated as an autonomous settlement. This document is that
-classification. It changes authored data, three small render tables, and the
-loader; it does not move any authority between `World` and `Kernel` — that is
-Task 2.
+Task 1 want: one documented classification + one owning Alu per map mark, map render from classification, no decorative site silently treated as autonomous settlement. This doc = that classification. Change authored data, three small render tables, loader. Move no authority between `World` and `Kernel` — that Task 2.
 
 ---
 
 ## 1. Vocabulary
 
-Three verdicts, and every mark on the map takes exactly one.
+Three verdicts. Every mark take exactly one.
 
-**Alu** — a major city or regional centre with its hinterland. Has a king
-(§8.2), a Seat, cohorts, and its own decisions. Full settlement-level entity.
+**Alu** — major city or regional centre with hinterland. Has king (§8.2), Seat, cohorts, own decisions. Full settlement-level entity.
 
-**Dependent palace centre** — a located, owned subordinate centre. No king, no
-autonomous simulation (§8.3). It is a real object because rules need one: it
-can be raided, garrisoned, stripped, or lost without the Seat falling, and it
-is where corvée detachments and stores sit outside the walls.
+**Dependent palace centre** — located, owned subordinate centre. No king, no autonomous simulation (§8.3). Real object because rules need one: raid, garrison, strip, lose it without Seat falling. Where corvée detachments and stores sit outside walls.
 
-**Capacity** — not an object. Folds into the owning Alu's numbers: food and
-extent for grain ground, production for a metal or timber or horse source. The
-mark stays on the map as detail; it names no settlement and runs no simulation.
+**Capacity** — not object. Fold into owning Alu numbers: food + extent for grain ground, production for metal/timber/horse source. Mark stay on map as detail. Names no settlement, runs no simulation.
 
-Alu are the only entities that gain population, decisions, or a king.
+Alu only entities that gain population, decisions, king.
 
 ---
 
 ## 2. Data shape
 
-Classification is carried in the authored scenario, one explicit field per
-mark, resolved through authored ids and never inferred from a string.
+Classification carried in authored scenario. One explicit field per mark, resolved through authored ids, never inferred from string.
 
 ### 2.1 `[[places]]`
 
@@ -48,15 +36,11 @@ kind = "alu"            # "alu" | "palace_centre"
 alu  = ""               # owning Alu id; required when kind = "palace_centre"
 ```
 
-An `alu` place keeps `rank` (`seat`/`imperial`/`royal`/`town`) — that is the
-map bracket and the standing line, and it stays authored. A `palace_centre`
-place takes `rank = "centre"`, keeps its name, glyph, and coordinates, and
-carries `population = 0` because its people are folded into its owner (§6).
+`alu` place keep `rank` (`seat`/`imperial`/`royal`/`town`) — that map bracket + standing line, stay authored. `palace_centre` place take `rank = "centre"`, keep name, glyph, coordinates, carry `population = 0` because people folded into owner (§6).
 
 ### 2.2 `[[sites]]`
 
-`hub` is renamed to `alu` — §2.4 of the spec names `hub` as legacy vocabulary,
-and the rename is three call sites plus tests. Two new keys:
+`hub` renamed to `alu` — spec §2.4 name `hub` legacy vocabulary. Rename = three call sites plus tests. Two new keys:
 
 ```toml
 role     = "capacity"   # "palace_centre" | "capacity"
@@ -67,40 +51,35 @@ capacity = "food"       # only when role = "capacity": food|copper|tin|silver|go
 
 | File | Change |
 |---|---|
-| `load.py:86-121` | read `kind`/`alu` on places, `role`/`capacity`/`alu` on sites; reject a `palace_centre` whose `alu` is unknown, and any site whose `alu` is unknown |
+| `load.py:86-121` | read `kind`/`alu` on places, `role`/`capacity`/`alu` on sites; reject `palace_centre` whose `alu` unknown, and any site whose `alu` unknown |
 | `engine/state.py:398` `Place` | add `kind: str = "alu"`, `alu: PlaceId = ""` |
 | `engine/state.py:523` `Site` | rename `hub` → `alu`; add `role: str`, `capacity: str = ""` |
-| `belief/project.py:734-791` | project the new fields; sites emit `alu`/`role`/`capacity` |
+| `belief/project.py:734-791` | project new fields; sites emit `alu`/`role`/`capacity` |
 | `tui/atlas.py:59` `BRACKET` | add `"centre": ("", "")` |
-| `tui/worldmap.py:54` `RANK_WORD` | add `"centre"`; the standing line reads "a palace centre of {owner name}" |
-| `tui/worldmap.py:723-726` | hinterland count reads `site["alu"]`, and counts palace centres and capacities apart |
+| `tui/worldmap.py:54` `RANK_WORD` | add `"centre"`; standing line read "a palace centre of {owner name}" |
+| `tui/worldmap.py:723-726` | hinterland count read `site["alu"]`, count palace centres and capacities apart |
 
-Validation is the point of the loader change: after Task 1 it is impossible to
-author a mark with no classification or an owner that does not exist. That is
-the mechanical half of "no decorative site is silently treated as an autonomous
-settlement".
+Validation = point of loader change: after Task 1, impossible to author mark with no classification or owner that not exist. That mechanical half of "no decorative site silently treated as autonomous settlement".
 
 ---
 
 ## 3. Table A — the 37 existing places
 
-32 stay Alu. 5 are demoted to dependent palace centres. Nothing is deleted, no
-coordinate moves.
+32 stay Alu. 5 demoted to dependent palace centres. Nothing deleted, no coordinate moves.
 
 ### 3.1 Demoted to dependent palace centre
 
 | Place | Pop | Owning Alu | Why |
 |---|---|---|---|
-| `ma_hadu` (Ma'hadu) | 2500 | `seat` (Ugarit) | Ugarit's own harbour, 4 km from the Seat. §8.3 makes the harbour a capacity of the Alu, not a second settlement. Also the kernel conflict in §9. |
-| `gibala` (Gib'ala) | 1200 | `seat` (Ugarit) | Border town inside the kingdom of Ugarit, no king of its own. |
-| `gla` (Gla) | 2000 | `thebes_gr` (Thebes) | Boeotian fortress of the Theban polity, no dynasty. |
-| `tiryns` (Tiryns) | 5000 | `mycenae` (Mycenae) | Argolid citadel subordinate to Mycenae. The largest demotion, and the one most open to revision — see §11. |
-| `ura` (Ura) | 3000 | `tarhuntassa` (Tarhuntassa) | The Hittite grain landing in Cilicia. Its merchants are famous; its politics are Hittite. |
+| `ma_hadu` (Ma'hadu) | 2500 | `seat` (Ugarit) | Ugarit own harbour, 4 km from Seat. §8.3 make harbour capacity of Alu, not second settlement. Also kernel conflict in §9. |
+| `gibala` (Gib'ala) | 1200 | `seat` (Ugarit) | Border town inside kingdom of Ugarit, no own king. |
+| `gla` (Gla) | 2000 | `thebes_gr` (Thebes) | Boeotian fortress of Theban polity, no dynasty. |
+| `tiryns` (Tiryns) | 5000 | `mycenae` (Mycenae) | Argolid citadel subordinate to Mycenae. Largest demotion, most open to revision — see §11. |
+| `ura` (Ura) | 3000 | `tarhuntassa` (Tarhuntassa) | Hittite grain landing in Cilicia. Merchants famous; politics Hittite. |
 
 ### 3.2 The 32 Alu
 
-Every remaining place is an Alu, with its authored king (Task 4 gives that king
-a record). Listed with the classification-relevant fields only.
+Every remaining place = Alu, with authored king (Task 4 give that king record). Listed with classification-relevant fields only.
 
 | Alu | Rank | Power | Pop |
 |---|---|---|---|
@@ -137,27 +116,19 @@ a record). Listed with the classification-relevant fields only.
 | `emar` Emar | town | hatti | 3000 |
 | `millawanda` Millawanda | town | ahhiyawa | 3000 |
 
-The Canaanite towns (Gaza, Ashkelon, Lachish, Megiddo, Tyre, Sidon) stay Alu
-despite Egyptian garrisons: each has its own king in the correspondence, which
-is exactly the §8.2 model — a king under an overlord, not a place without one.
+Canaanite towns (Gaza, Ashkelon, Lachish, Megiddo, Tyre, Sidon) stay Alu despite Egyptian garrisons: each has own king in correspondence — exactly §8.2 model, king under overlord, not place without one.
 
 ---
 
 ## 4. Table B — the 146 site marks
 
-The authored marks are formulaic, not per-city: a place gets 2 palace + 3 grain
-if it is large, 1 palace + 2 grain if it is a town, plus a resource mark where
-the region has one. So classification is by rule, not case by case.
+Authored marks formulaic, not per-city: place get 2 palace + 3 grain if large, 1 palace + 2 grain if town, plus resource mark where region has one. So classification by rule, not case by case.
 
-**Rule 1** — every `palace` mark is a **dependent palace centre** of its Alu.
-51 marks. Unnamed, as authored; the map already draws them without names. The
-Seat itself is the place mark, never a site mark.
+**Rule 1** — every `palace` mark = **dependent palace centre** of its Alu. 51 marks, all named. Seat itself = place mark, never site mark.
 
-**Rule 2** — every `grain` mark is a **capacity** (`capacity = "food"`) of its
-Alu: hinterland extent and food-producing ground. 83 marks. Not a farm object,
-not a village.
+**Rule 2** — every `grain` mark = **capacity** (`capacity = "food"`) of its Alu: hinterland extent + food-producing ground. 83 marks. Not farm object, not village.
 
-**Rule 3** — every resource mark is a **capacity** named by its good. 12 marks:
+**Rule 3** — every resource mark = **capacity** named by its good. 12 marks:
 
 | Good | Owning Alu |
 |---|---|
@@ -169,11 +140,9 @@ not a village.
 | gold | `waset` |
 | lapis | `babylon` |
 
-**Rule 4** — the 15 marks that hung off the five demoted places re-point to the
-owning Alu. Ugarit gains Ma'hadu's and Gib'ala's 6 marks, Thebes gains Gla's 3,
-Mycenae gains Tiryns's 3, Tarhuntassa gains Ura's 3.
+**Rule 4** — 15 marks that hung off five demoted places re-point to owning Alu. Ugarit gain Ma'hadu + Gib'ala 6 marks, Thebes gain Gla 3, Mycenae gain Tiryns 3, Tarhuntassa gain Ura 3.
 
-After re-pointing, the existing 146 marks distribute as:
+After re-point, existing 146 marks distribute as:
 
 | Alu | palace | grain | other |
 |---|---|---|---|
@@ -193,18 +162,13 @@ After re-pointing, the existing 146 marks distribute as:
 
 Total 146, every mark owned, nothing promoted.
 
-**Additionally**, `ma_hadu` becomes Ugarit's **harbour** capacity as well as a
-palace centre — Ugarit is a coastal Alu (§8.3) and Ma'hadu is where that is
-true. Same for `ura` and Tarhuntassa.
+**Additionally**, `ma_hadu` become Ugarit **harbour** capacity as well as palace centre — Ugarit coastal Alu (§8.3), Ma'hadu where that true. Same for `ura` and Tarhuntassa.
 
 ---
 
 ## 5. Table C — new Alu
 
-The map is thin east of the Euphrates, in central Anatolia, and up the Nile.
-Ten additions, all inside the authored terrain grid (300 × 119 cells; col =
-`(lon − 21.00) / 0.08`, row = `(41.00 − lat) / 0.135`), all on non-sea ground,
-none within 4 cells of an existing mark. Total after Task 1: **42 Alu**.
+Map thin east of Euphrates, central Anatolia, up the Nile. Ten additions, all inside authored terrain grid (300 × 119 cells; col = `(lon − 21.00) / 0.08`, row = `(41.00 − lat) / 0.135`), all non-sea ground, none within 4 cells of existing mark. Total after Task 1: **42 Alu**.
 
 ### 5.1 Mesopotamia (4)
 
@@ -215,7 +179,7 @@ none within 4 cells of an existing mark. Total after Task 1: **42 Alu**.
 | `dur_katlimmu` | Dur-Katlimmu | 247,40 | 35.65N 40.75E | town | assyria | 3000 | D |
 | `nuzi` | Nuzi | 291,42 | 35.38N 44.30E | town | assyria | 2500 | n |
 
-Roles, in the voice of the existing entries:
+Roles, in voice of existing entries:
 
 - `nineveh` — "Ishtar's own city, and where the northern road turns west"
 - `dur_kurigalzu` — "the Kassite king's new foundation, and hungry as new
@@ -223,9 +187,7 @@ Roles, in the voice of the existing entries:
 - `dur_katlimmu` — "the Assyrian hand on the Habur, counting the western road"
 - `nuzi` — "eastern ground, and tablets full of other men's debts"
 
-`sippar` is deliberately **not** an Alu: it becomes a named dependent palace
-centre of Babylon (33.06N 44.24E → col 290, row 59), which is what the category
-is for.
+`sippar` deliberately **not** Alu: become named dependent palace centre of Babylon (33.06N 44.24E → col 290, row 59) — what category for.
 
 ### 5.2 Anatolia (2)
 
@@ -237,8 +199,7 @@ is for.
 - `tarsa` — "the Cilician gate, where Hatti's grain comes ashore"
 - `kanesh` — "old Nesa, whose tongue the kings still write in"
 
-Kanesh carries a `silver` capacity — the third silver source on the map, and
-the only one in the Anatolian interior.
+Kanesh carry `silver` capacity — third silver source on map, only one in Anatolian interior.
 
 ### 5.3 Egypt (4)
 
@@ -254,17 +215,13 @@ the only one in the Anatolian interior.
 - `sau` — "Neith's city in the western Delta, with the Libyan wind at its back"
 - `tjaru` — "the fortress gate of the Ways of Horus, where Asia begins"
 
-Glyph letters repeat across the map already (`M` ×5, `A` ×5 as authored), so
-the new letters are chosen for legibility, not uniqueness.
+Glyph letters repeat across map already (`M` ×5, `A` ×5 as authored), so new letters chosen for legibility, not uniqueness.
 
 ---
 
 ### 5.4 Site marks for the new Alu
 
-41 new marks, authored on the same formula the existing map uses: royal rank
-takes 2 palace centres and 3 food capacities, town rank takes 1 and 2. Every
-coordinate is non-sea ground, 2–4 cells from its Alu, at least 2 cells from any
-other mark. `sippar` is a named palace centre of Babylon, not a site mark.
+41 new marks, authored on same formula existing map uses: royal rank take 2 palace centres + 3 food capacities, town rank take 1 and 2. Every coordinate non-sea ground, 2–4 cells from its Alu, at least 2 cells from any other mark. `sippar` = named palace centre of Babylon, not site mark.
 
 | Alu | Dependent palace centres | Food capacities | Other |
 |---|---|---|---|
@@ -279,23 +236,22 @@ other mark. `sippar` is a named palace centre of Babylon, not a site mark.
 | `sau` | (122,72) (124,74) | (122,76) (120,74) (124,72) | — |
 | `tjaru` | (142,73) | (144,75) (142,77) | — |
 
-Sippar's own cell (290,59) is taken out of Dur-Kurigalzu's food capacities,
-which move to (292,59); no two marks in the world then share a cell.
+Sippar own cell (290,59) taken out of Dur-Kurigalzu food capacities, which move to (292,59); no two marks in world then share cell.
 
 Map totals after Task 1:
 
 - **48 place records** — 42 Alu, plus 6 named dependent palace centres
   (Ma'hadu, Gib'ala, Gla, Tiryns, Ura, Sippar).
-- **187 site marks** — 66 unnamed dependent palace centres (51 authored + 15
+- **187 site marks** — 66 named dependent palace centres (51 authored + 15
   new), 121 capacities (108 food, 13 resource).
 
-Every one of the 235 marks has a verdict and an owning Alu.
+Every one of 235 marks has verdict + owning Alu.
 
 ---
 
 ## 6. Population
 
-Demotion folds people into the owner. No population is invented or lost.
+Demotion fold people into owner. No population invented or lost.
 
 | Alu | Was | Folds in | Becomes |
 |---|---|---|---|
@@ -306,48 +262,30 @@ Demotion folds people into the owner. No population is invented or lost.
 
 Demoted places take `population = 0`.
 
-**This moves plague numbers.** `Place.susceptible` is seeded from `population`
-(`load.py:88-99`, `state.py:425-429`), so folding changes the SIR compartments
-of four places and removes four separate compartments. Two consequences to pin
-in tests: the region's total susceptible population is unchanged, and an
-epidemic seeded at Ugarit now runs over 11700 rather than 8000. Cohorts become
-the authoritative population in Task 6; until then `population` remains the
-seed and this is the honest arithmetic for it.
+**This move plague numbers.** `Place.susceptible` seeded from `population` (`load.py:88-99`, `state.py:425-429`), so folding change SIR compartments of four places, remove four separate compartments. Two consequences to pin in tests: region total susceptible population unchanged, and epidemic seeded at Ugarit now run over 11700 not 8000. Cohorts become authoritative population in Task 6; until then `population` stay seed and this honest arithmetic for it.
 
 ---
 
 ## 7. Power vocabulary
 
-`power` is the overlord label the map draws (`atlas.POWER_TONE`,
-`worldmap.POWER_WORD`), and `free` currently reads "under no overlord". That is
-right for Alashiya and Apasa, and wrong for four Assyrian and Kassite cities.
-Two values added:
+`power` = overlord label map draw (`atlas.POWER_TONE`, `worldmap.POWER_WORD`), and `free` currently read "under no overlord". Right for Alashiya and Apasa, wrong for four Assyrian and Kassite cities. Two values added:
 
 | Value | Word | Tone | Places |
 |---|---|---|---|
 | `assyria` | "under Assyria" | `wine` | `assur`, `nineveh`, `dur_katlimmu`, `nuzi` |
 | `karduniash` | "under Babylon" | `sand` | `babylon`, `dur_kurigalzu` |
 
-`assur` and `babylon` move off `free`, following the existing convention where
-a capital carries its own power (`hattusa` is `hatti`, `egypt` is `egypt`).
+`assur` and `babylon` move off `free`, following existing convention where capital carry own power (`hattusa` is `hatti`, `egypt` is `egypt`).
 
-Both tones already exist in `content/palette.toml`, and no colour is added: the
-four authored powers hold `gold`, `flame`, `lapis`, and `verdigris`, and `wine`
-is used by no map table at all. `sand` is also the dry-ground tone, which is
-drawn faint behind the marks, so a lettered mark in brackets still reads apart
-from it.
+Both tones already exist in `content/palette.toml`, no colour added: four authored powers hold `gold`, `flame`, `lapis`, `verdigris`, and `wine` used by no map table at all. `sand` also dry-ground tone, drawn faint behind marks, so lettered mark in brackets still read apart from it.
 
-This is a map label only. Overlordship as an obligation between two kings is
-Task 4, and this document deliberately does not encode `power` as ownership.
+Map label only. Overlordship as obligation between two kings = Task 4. This doc deliberately not encode `power` as ownership.
 
 ---
 
 ## 8. Routes for the new Alu
 
-Nothing unreachable. Legs and risk follow the conventions the authored table
-already obeys — `risk = 40 + km/3` by land, `40 + km/6` by sea and river; about
-98 km per land leg, about 170 km per sea or river leg — with a 1.25 detour
-factor on straight-line land distance.
+Nothing unreachable. Legs + risk follow conventions authored table already obey — `risk = 40 + km/3` by land, `40 + km/6` by sea and river; about 98 km per land leg, about 170 km per sea or river leg — with 1.25 detour factor on straight-line land distance.
 
 ```toml
 # Assyria and Karduniash
@@ -378,10 +316,7 @@ khemenu–abdju            legs=1 river risk=75    # 210 km
 abdju–waset              legs=1 river risk=55    # 90 km
 ```
 
-`ma_hadu–seat` (4 km) survives as a route to a palace centre — the loader must
-accept a route endpoint that is not an Alu, or the leg is dropped and Ugarit
-loses its harbour connection. Existing `egypt–gaza` stays alongside the new
-Ways of Horus pair; a caravan may take either.
+`ma_hadu–seat` (4 km) survive as route to palace centre — loader must accept route endpoint that not Alu, else leg dropped and Ugarit lose harbour connection. Existing `egypt–gaza` stay alongside new Ways of Horus pair; caravan may take either.
 
 New route count: 22, giving 78 total.
 
@@ -389,31 +324,20 @@ New route count: 22, giving 78 total.
 
 ## 9. Kernel reconciliation
 
-The kernel's four settlements map onto the Alu model like this:
+Kernel four settlements map onto Alu model like this:
 
 | Kernel entity | Verdict |
 |---|---|
 | `settlement:ugarit` | Alu `seat` |
 | `settlement:mahadu` | dependent palace centre + harbour capacity of `seat` |
-| `settlement:ari` | hinterland capacity of `seat` (a village, no palace) |
+| `settlement:ari` | hinterland capacity of `seat` (village, no palace) |
 | `settlement:alashiya_port` | harbour capacity of Alu `alashiya` |
 
-**This contradicts the M13.1 exit gate.** `content/kernel/world.toml:129` gives
-Ma'hadu `autonomous` (default true), and the gate is that Ma'hadu and the
-Alashiyan port go on producing, consuming, and deciding when Ugarit is idle or
-removed. §8.3 forbids autonomous simulation for a dependent palace centre.
-Ten test files reference `mahadu`.
+**This contradict M13.1 exit gate.** `content/kernel/world.toml:129` give Ma'hadu `autonomous` (default true), and gate = Ma'hadu + Alashiyan port go on producing, consuming, deciding when Ugarit idle or removed. §8.3 forbid autonomous simulation for dependent palace centre. Ten test files reference `mahadu`.
 
-Per §9 of the spec the contradiction is resolved before code is added.
-Resolution: **autonomy moves from the settlement to the Alu.** Ma'hadu, Ari,
-and the Alashiyan port stop being autonomous deciders; Alashiya, Alalakh,
-Amurru, and Carchemish — real Alu with real kings — become them. The gate's
-intent (the world does not stop when the player stops) is preserved and
-strengthened: it is then demonstrated by other kings' cities rather than by
-Ugarit's own port deciding against Ugarit.
+Per spec §9, contradiction resolved before code added. Resolution: **autonomy move from settlement to Alu.** Ma'hadu, Ari, Alashiyan port stop being autonomous deciders; Alashiya, Alalakh, Amurru, Carchemish — real Alu with real kings — become them. Gate intent (world not stop when player stop) preserved and strengthened: then demonstrated by other kings' cities rather than Ugarit own port deciding against Ugarit.
 
-That kernel edit is Task 2's work. Task 1 owns only the classification it
-implies, recorded here.
+That kernel edit = Task 2 work. Task 1 own only classification it implies, recorded here.
 
 ---
 
@@ -421,78 +345,58 @@ implies, recorded here.
 
 | Completion criterion | Delivered by |
 |---|---|
-| every map mark has one documented classification | §3 (places), §4 (marks), §5 (new places), enforced by the loader in §2.3 |
+| every map mark has one documented classification | §3 (places), §4 (marks), §5 (new places), enforced by loader in §2.3 |
 | and one owning Alu | `alu` on every `palace_centre` place and every site |
 | the map renders from that classification | `BRACKET`/`RANK_WORD`/hinterland-count changes in §2.3; palace centres and capacities draw and read apart |
-| no decorative site silently treated as an autonomous settlement | no mark is promoted; the loader rejects an unclassified or unowned mark; §9 removes the two kernel settlements that were the real instance of this |
+| no decorative site silently treated as an autonomous settlement | no mark promoted; loader reject unclassified or unowned mark; §9 remove two kernel settlements that were real instance of this |
 
-Tests, causal rather than smoke, in `tests/test_alu_classification.py`:
+Tests, causal not smoke, in `tests/test_alu_classification.py`:
 
 1. `test_every_mark_has_a_classification_and_an_owning_alu` — 42 Alu, 6 palace
-   centres, 187 marks, every `alu` reference resolving to a place with
+   centres, 187 marks, every `alu` reference resolve to place with
    `kind = "alu"`.
-2. `test_an_unowned_or_unclassified_mark_is_a_load_error` — the fault the
-   classification exists to prevent, driven through the real loader on an
-   edited copy of the scenario.
+2. `test_an_unowned_or_unclassified_mark_is_a_load_error` — fault classification
+   exist to prevent, driven through real loader on edited copy of scenario.
 3. `test_demoted_towns_keep_their_people_and_are_counted_once` — palace centres
-   hold nobody, the four owners hold exactly the folded sums, and the living
-   population equals the authored population with nothing double-counted.
+   hold nobody, four owners hold exactly folded sums, living population equal
+   authored population with nothing double-counted.
 4. `test_ugarit_still_reaches_the_sea_through_its_own_harbour` — Ma'hadu is
-   `seat`'s harbour, and a route may still end at a palace centre.
-5. `test_the_authored_import_sickens_the_alu_that_holds_the_harbour` — the
-   tablet still says Ma'hadu, the sickness begins at Ugarit, and it runs on
-   11700 people.
-6. `test_every_alu_is_reachable_from_the_seat` — no Alu a courier cannot reach.
-7. `test_the_tablet_draws_holdings_as_holdings` — no `hub` survives in Belief,
-   `seat` counts 4 palace centres and 7 grain estates, its named centres are
-   listed, and a selected palace centre says whose it is instead of claiming a
-   rank.
+   `seat` harbour, route may still end at palace centre.
+5. `test_the_authored_import_sickens_the_alu_that_holds_the_harbour` — tablet
+   still say Ma'hadu, sickness begin at Ugarit, run on 11700 people.
+6. `test_every_alu_is_reachable_from_the_seat` — no Alu courier cannot reach.
+7. `test_the_tablet_draws_holdings_as_holdings` — no `hub` survive in Belief,
+   `seat` count 4 palace centres and 7 grain estates, named centres listed,
+   selected palace centre say whose it is instead of claiming rank.
 
 ---
 
 ## 11. As built
 
-Four things the implementation settled that the design left open or wrong.
+Four things implementation settled that design left open or wrong.
 
-**The authored plague import.** `[plague] import_place = "ma_hadu"` seeded a
-compartment on a place that no longer has one, so the disease simply never
-began. The scenario still names Ma'hadu — travellers do land at the harbour —
-and `load.py` resolves the seeding to the Alu that holds it. A palace centre
-never carries SIR compartments; the people the travellers land among are
-Ugarit's. `tests/test_m13_material_causality.py` pinned Ma'hadu as a second
-infectable settlement one leg from the seat, and now uses Alalakh (`mukish`),
-which is an Alu, one land leg away, and open all year.
+**Authored plague import.** `[plague] import_place = "ma_hadu"` seeded compartment on place that no longer has one, so disease never began. Scenario still name Ma'hadu — travellers do land at harbour — and `load.py` resolve seeding to Alu that hold it. Palace centre never carry SIR compartments; people travellers land among are Ugarit's. `tests/test_m13_material_causality.py` pinned Ma'hadu as second infectable settlement one leg from seat, now use Alalakh (`mukish`) — Alu, one land leg away, open all year.
 
-**`Place.harbour`.** A boolean on the palace-centre record, because Task 1 has
-to be able to answer "is this Alu coastal" without inventing the harbour system
-that §8.3 gives to Task 5. Ma'hadu and Ura carry it.
+**`Place.harbour`.** Boolean on palace-centre record, because Task 1 must answer "is this Alu coastal" without inventing harbour system §8.3 give to Task 5. Ma'hadu and Ura carry it.
 
-**The standing line does not mention the harbour.** "a palace centre of Ugarit,
-and its harbour" runs past the panel width and is cut mid-word; the authored
-`role` line already says what Ma'hadu is. The line reads "a palace centre of
-Ugarit" and stops.
+**Standing line not mention harbour.** "a palace centre of Ugarit, and its harbour" run past panel width, cut mid-word; authored `role` line already say what Ma'hadu is. Line read "a palace centre of Ugarit" and stop.
 
-**`SITE_WORD["palace"]`** changed from "small palaces" to "palace centres", so
-the map's words and the data's words are the same word.
+**`SITE_WORD["palace"]`** changed from "small palaces" to "palace centres", so map words and data words same word.
 
-The authority audit's missing-mapping finding moved from 36 legacy places to 47
-— the new Alu are real places with no kernel settlement behind them. That number
-is Task 2's to drive to zero, and it is now honest about the whole map rather
-than about part of it.
+Authority audit missing-mapping finding moved from 36 legacy places to 47 — new Alu are real places with no kernel settlement behind them. That number Task 2 to drive to zero, now honest about whole map rather than part.
 
 ---
 
 ## 12. Open, and deliberately not decided here
 
-- **Tiryns.** Demoted to a palace centre of Mycenae. It is the one demotion
-  with a live argument for its own wanax, and if it becomes an Alu again the
-  count moves to 43 with no other change.
-- **Naming the 51 palace centres.** They are unnamed, as authored. Where
-  history supplies a name (Sippar under Babylon, Ma'hadu under Ugarit) it is
-  used; the rest can be named later without touching this classification.
-- **`power` as a taxonomy.** Two values added for honesty on the map. The real
-  model of overlordship is king-to-king in Task 4, and `power` should die there.
+- **Tiryns.** Demoted to palace centre of Mycenae. One demotion with live
+  argument for own wanax; if it become Alu again, count move to 43 with no
+  other change.
+- **Naming the 66 palace centres.** All named now. Where history supply name
+  (Sippar under Babylon, Ma'hadu under Ugarit) it used; rest take plausible
+  Bronze Age toponym for that Alu territory.
+- **`power` as taxonomy.** Two values added for honesty on map. Real model of
+  overlordship king-to-king in Task 4, and `power` should die there.
 - **Kernel `Site.function` vocabulary.** `estate`/`harbour`/`mine` versus this
-  document's `capacity` names. They must be reconciled when the kernel becomes
-  the one authority; §4's `capacity` values are chosen to map onto them
-  one-to-one.
+  doc `capacity` names. Must reconcile when kernel become one authority; §4
+  `capacity` values chosen to map onto them one-to-one.

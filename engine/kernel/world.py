@@ -55,6 +55,11 @@ from engine.kernel.intent import Intent, Snapshot, open_turn
 
 GRAIN = F.GRAIN
 
+# The site functions that are ground a settlement can sow. Two names for one
+# thing: the scenario map calls a grain mark a "food" capacity, the retired
+# hand-authored world called it an "estate", and the crop does not care.
+FIELD = frozenset({"estate", "food"})
+
 
 @dataclasses.dataclass(frozen=True)
 class Kernel:
@@ -69,6 +74,13 @@ class Kernel:
     seasons: Mapping[str, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
     climate: tuple[int, ...] = ()     # by absolute turn; 100 is an ordinary year
+    # The same series, per region, where content authors one. A world that
+    # spans the Nile and the Aegean has no single weather: the flood peaks in
+    # the fortnights the Levant is driest, and a drought that emptied both
+    # would be a scripted event rather than a climate. A region absent here
+    # falls back to `climate` above.
+    region_climate: Mapping[EntityId, tuple[int, ...]] = dataclasses.field(
+        default_factory=dict)
     # Per good, per fortnight, scaled 1000. Authored in content/goods.toml and
     # carried here rather than looked up, because engine/ does not read files.
     # A good absent from this mapping does not spoil.
@@ -84,7 +96,7 @@ class Kernel:
         """The organization that decides for a settlement, or "" if none does."""
         for org_id in sorted(self.registry.orgs):
             org = self.registry.orgs[org_id]
-            if org.settlement == settlement and org.kind == "council":
+            if org.settlement == settlement and org.kind in ("council", "palace"):
                 return org_id
         return ""
 
@@ -112,7 +124,7 @@ class Kernel:
         """
         estates = [i for i in sorted(self.registry.sites)
                    if self.registry.sites[i].settlement == settlement
-                   and self.registry.sites[i].function == "estate"]
+                   and self.registry.sites[i].function in FIELD]
         if actor:
             for site_id in estates:
                 if self.registry.sites[site_id].holder == actor:
@@ -141,10 +153,15 @@ class Kernel:
             s for s in sorted(self.registry.settlements)
             if self.registry.settlements[s].autonomous and self.controller(s))
 
-    def climate_at(self, absolute: int) -> int:
-        if not self.climate:
+    def climate_at(self, absolute: int, region: EntityId = "") -> int:
+        series = self.region_climate.get(region) or self.climate
+        if not series:
             return 100
-        return self.climate[absolute % len(self.climate)]
+        return series[absolute % len(series)]
+
+    def region_of(self, settlement: EntityId) -> EntityId:
+        found = self.registry.settlements.get(settlement)
+        return found.region if found else ""
 
 
 # --- policy (spec 10.11) ------------------------------------------------------

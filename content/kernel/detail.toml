@@ -1,0 +1,4263 @@
+# Written by tools/gen_detail.py. Do not edit by hand; edit the
+# rates at the top of that file and run it again.
+
+[season]
+growing = [23, 7]
+harvest = [8, 11]
+low_water = [14, 18]
+sailing_open = [7, 21]
+sowing = [19, 22]
+threshing = [12, 13]
+
+[climate]
+drought_curve = [[0, 104], [1, 100], [2, 97], [3, 99], [4, 92], [5, 88], [6, 91], [7, 82], [8, 78], [9, 74], [12, 68]]
+
+[climate.series]
+aegean = [85, 84, 80, 84, 84, 87, 88, 90, 94, 98, 104, 108, 108, 110, 105, 96, 95, 96, 95, 95, 98, 105, 103, 95, 90, 90, 87, 85, 93, 95, 99, 98, 106, 106, 108, 111, 114, 112, 110, 108, 105, 104, 103, 101, 102, 111, 112, 97, 87, 83, 82, 78, 80, 83, 87, 89, 91, 101, 104, 104, 108, 102, 96, 95, 95, 94, 90, 96, 99, 100, 100, 89, 90, 89, 85, 85, 87, 88, 91, 95, 99, 107, 110, 107, 109, 107, 105, 104, 99, 99, 98, 101, 102, 107, 107, 93]
+alashiya = [92, 89, 89, 90, 87, 90, 99, 100, 100, 106, 111, 110, 116, 111, 105, 102, 103, 101, 97, 100, 102, 109, 111, 95, 89, 85, 80, 80, 86, 88, 90, 89, 97, 101, 103, 103, 106, 103, 102, 101, 94, 93, 93, 93, 99, 98, 105, 90, 91, 91, 88, 83, 84, 91, 94, 98, 98, 103, 104, 111, 114, 107, 106, 99, 101, 96, 97, 101, 103, 105, 111, 94, 83, 82, 79, 77, 79, 81, 89, 86, 94, 99, 96, 98, 104, 100, 98, 94, 91, 92, 89, 90, 95, 94, 96, 88]
+anatolia = [90, 91, 89, 85, 88, 93, 95, 100, 103, 103, 110, 109, 117, 112, 106, 105, 100, 98, 101, 101, 105, 110, 111, 97, 86, 86, 85, 79, 81, 88, 86, 94, 96, 99, 104, 102, 108, 108, 97, 95, 98, 94, 89, 93, 100, 97, 106, 93, 87, 86, 85, 85, 85, 90, 94, 94, 98, 104, 108, 109, 110, 106, 102, 97, 95, 94, 95, 95, 99, 105, 106, 96, 96, 95, 89, 89, 92, 98, 98, 102, 104, 110, 113, 116, 119, 114, 109, 109, 102, 106, 101, 105, 109, 112, 111, 102]
+lower_mesopotamia = [88, 85, 85, 78, 83, 88, 87, 88, 92, 97, 104, 106, 106, 108, 102, 96, 94, 96, 89, 93, 97, 103, 101, 92, 95, 90, 89, 88, 91, 89, 93, 99, 103, 108, 112, 114, 113, 114, 110, 105, 104, 97, 102, 101, 103, 104, 109, 100, 81, 82, 76, 76, 80, 78, 87, 84, 92, 96, 99, 98, 98, 96, 96, 90, 93, 90, 86, 89, 95, 92, 98, 86, 99, 97, 96, 93, 91, 99, 99, 102, 109, 112, 115, 118, 122, 116, 110, 111, 110, 107, 103, 104, 111, 115, 116, 102]
+nile = [88, 87, 90, 90, 89, 91, 87, 89, 93, 95, 99, 95, 90, 95, 122, 125, 125, 118, 100, 95, 93, 92, 88, 92, 87, 82, 87, 87, 91, 83, 89, 88, 93, 94, 93, 91, 91, 89, 118, 123, 118, 117, 94, 92, 91, 91, 87, 83, 95, 88, 92, 93, 96, 89, 93, 97, 99, 98, 100, 100, 93, 99, 121, 133, 126, 122, 105, 96, 94, 97, 94, 92, 91, 88, 89, 90, 91, 87, 92, 91, 92, 94, 98, 94, 88, 95, 121, 126, 126, 116, 101, 97, 92, 91, 90, 86]
+north_levant = [88, 89, 89, 88, 90, 87, 92, 93, 100, 107, 107, 110, 114, 110, 108, 100, 97, 98, 94, 102, 102, 105, 109, 98, 90, 82, 85, 82, 83, 89, 93, 91, 98, 98, 103, 104, 106, 104, 104, 100, 94, 95, 96, 94, 99, 104, 102, 93, 70, 73, 69, 68, 71, 70, 73, 75, 82, 81, 89, 88, 89, 85, 84, 85, 81, 80, 75, 77, 84, 86, 89, 75, 89, 92, 87, 89, 91, 93, 95, 99, 105, 108, 107, 111, 113, 113, 107, 107, 103, 100, 100, 104, 101, 107, 108, 99]
+south_levant = [91, 89, 81, 80, 82, 87, 94, 92, 100, 105, 107, 111, 109, 107, 104, 98, 99, 93, 96, 99, 98, 103, 108, 93, 93, 90, 89, 86, 86, 91, 93, 97, 99, 101, 110, 107, 111, 110, 104, 102, 100, 99, 95, 100, 100, 103, 106, 92, 68, 68, 65, 64, 69, 71, 72, 76, 80, 82, 81, 86, 90, 86, 84, 81, 81, 75, 79, 78, 79, 81, 87, 74, 88, 91, 86, 87, 89, 90, 95, 97, 98, 104, 106, 110, 113, 111, 108, 105, 99, 100, 97, 99, 101, 106, 110, 96]
+upper_mesopotamia = [91, 87, 88, 84, 90, 92, 96, 98, 102, 105, 104, 113, 112, 113, 103, 104, 97, 96, 94, 98, 102, 108, 106, 95, 82, 76, 78, 74, 75, 83, 82, 86, 89, 92, 99, 102, 101, 97, 98, 95, 87, 86, 88, 90, 92, 92, 95, 82, 98, 89, 88, 92, 89, 92, 101, 99, 104, 108, 110, 116, 120, 118, 108, 105, 107, 101, 102, 103, 104, 109, 113, 98, 84, 83, 79, 80, 82, 88, 89, 92, 92, 100, 104, 106, 105, 102, 99, 96, 98, 92, 92, 96, 96, 98, 103, 90]
+
+[[sites]]
+id = "site:abdju_270_216"
+settlement = "settlement:abdju"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 12000000
+
+[[sites]]
+id = "site:abdju_278_216"
+settlement = "settlement:abdju"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:abdju_282_220"
+settlement = "settlement:abdju"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:abdju_274_216"
+settlement = "settlement:abdju"
+region = "region:nile"
+function = "palace_centre"
+capacity = 7500
+extent = 37500
+
+[[sites]]
+id = "site:abdju_278_220"
+settlement = "settlement:abdju"
+region = "region:nile"
+function = "palace_centre"
+capacity = 7500
+extent = 37500
+
+[[sites]]
+id = "site:alashiya_318_84"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "food"
+capacity = 5600
+extent = 6400000
+
+[[sites]]
+id = "site:alashiya_318_88"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "food"
+capacity = 5600
+extent = 0
+
+[[sites]]
+id = "site:alashiya_312_86"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "palace_centre"
+capacity = 4000
+extent = 20000
+
+[[sites]]
+id = "site:alashiya_326_82"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "palace_centre"
+capacity = 4000
+extent = 20000
+
+[[sites]]
+id = "site:alashiya_314_86"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "copper"
+capacity = 6000
+extent = 0
+
+[[sites]]
+id = "site:alashiya_326_88"
+settlement = "settlement:alashiya"
+region = "region:alashiya"
+function = "copper"
+capacity = 6000
+extent = 0
+
+[[sites]]
+id = "site:amurru_374_90"
+settlement = "settlement:amurru"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 4000000
+
+[[sites]]
+id = "site:amurru_378_92"
+settlement = "settlement:amurru"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:amurru_374_88"
+settlement = "settlement:amurru"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:apasa_158_42"
+settlement = "settlement:apasa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 10400000
+
+[[sites]]
+id = "site:apasa_158_50"
+settlement = "settlement:apasa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:apasa_158_40"
+settlement = "settlement:apasa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 13000
+extent = 65000
+
+[[sites]]
+id = "site:ashkelon_340_142"
+settlement = "settlement:ashkelon"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 4000000
+
+[[sites]]
+id = "site:ashkelon_344_136"
+settlement = "settlement:ashkelon"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
+id = "site:ashkelon_350_138"
+settlement = "settlement:ashkelon"
+region = "region:south_levant"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:assur_552_80"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 20000000
+
+[[sites]]
+id = "site:assur_556_78"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:assur_556_86"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:assur_546_82"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 12500
+extent = 62500
+
+[[sites]]
+id = "site:assur_556_76"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 12500
+extent = 62500
+
+[[sites]]
+id = "site:assur_552_84"
+settlement = "settlement:assur"
+region = "region:upper_mesopotamia"
+function = "tin"
+capacity = 800
+extent = 0
+
+[[sites]]
+id = "site:athens_60_44"
+settlement = "settlement:athens"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 7200000
+
+[[sites]]
+id = "site:athens_72_46"
+settlement = "settlement:athens"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:athens_68_38"
+settlement = "settlement:athens"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 9000
+extent = 45000
+
+[[sites]]
+id = "site:athens_64_42"
+settlement = "settlement:athens"
+region = "region:aegean"
+function = "silver"
+capacity = 600
+extent = 0
+
+[[sites]]
+id = "site:babylon_582_124"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 38400000
+
+[[sites]]
+id = "site:babylon_586_122"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
+id = "site:babylon_586_130"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
+id = "site:babylon_586_120"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 48000
+extent = 240000
+
+[[sites]]
+id = "site:babylon_590_124"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "lapis"
+capacity = 200
+extent = 0
+
+[[sites]]
+id = "site:byblos_370_98"
+settlement = "settlement:byblos"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 6400000
+
+[[sites]]
+id = "site:byblos_372_98"
+settlement = "settlement:byblos"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:byblos_378_102"
+settlement = "settlement:byblos"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 8000
+extent = 40000
+
+[[sites]]
+id = "site:byblos_368_106"
+settlement = "settlement:byblos"
+region = "region:north_levant"
+function = "cedar"
+capacity = 5000
+extent = 0
+
+[[sites]]
+id = "site:carchemish_422_60"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 19200000
+
+[[sites]]
+id = "site:carchemish_426_58"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:carchemish_426_66"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:carchemish_416_62"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 12000
+extent = 60000
+
+[[sites]]
+id = "site:carchemish_426_56"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 12000
+extent = 60000
+
+[[sites]]
+id = "site:dur_katlimmu_494_84"
+settlement = "settlement:dur_katlimmu"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 14400000
+
+[[sites]]
+id = "site:dur_katlimmu_498_80"
+settlement = "settlement:dur_katlimmu"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:dur_katlimmu_494_76"
+settlement = "settlement:dur_katlimmu"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 18000
+extent = 90000
+
+[[sites]]
+id = "site:dur_kurigalzu_576_114"
+settlement = "settlement:dur_kurigalzu"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 9600000
+
+[[sites]]
+id = "site:dur_kurigalzu_584_110"
+settlement = "settlement:dur_kurigalzu"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
+id = "site:dur_kurigalzu_584_118"
+settlement = "settlement:dur_kurigalzu"
+region = "region:lower_mesopotamia"
+function = "food"
+capacity = 10500
+extent = 0
+
+[[sites]]
+id = "site:dur_kurigalzu_580_110"
+settlement = "settlement:dur_kurigalzu"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 12000
+extent = 60000
+
+[[sites]]
+id = "site:egypt_266_150"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 74400000
+
+[[sites]]
+id = "site:egypt_270_148"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:egypt_270_156"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:egypt_270_158"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "palace_centre"
+capacity = 46500
+extent = 232500
+
+[[sites]]
+id = "site:egypt_280_152"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "palace_centre"
+capacity = 46500
+extent = 232500
+
+[[sites]]
+id = "site:emar_426_70"
+settlement = "settlement:emar"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 4800000
+
+[[sites]]
+id = "site:emar_430_72"
+settlement = "settlement:emar"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:emar_416_74"
+settlement = "settlement:emar"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 6000
+extent = 30000
+
+[[sites]]
+id = "site:emar_426_78"
+settlement = "settlement:emar"
+region = "region:upper_mesopotamia"
+function = "tin"
+capacity = 800
+extent = 0
+
+[[sites]]
+id = "site:gaza_334_142"
+settlement = "settlement:gaza"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 4800000
+
+[[sites]]
+id = "site:gaza_342_138"
+settlement = "settlement:gaza"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
+id = "site:gaza_348_140"
+settlement = "settlement:gaza"
+region = "region:south_levant"
+function = "palace_centre"
+capacity = 6000
+extent = 30000
+
+[[sites]]
+id = "site:halab_400_74"
+settlement = "settlement:halab"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 9600000
+
+[[sites]]
+id = "site:halab_402_76"
+settlement = "settlement:halab"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:halab_404_76"
+settlement = "settlement:halab"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:halab_394_72"
+settlement = "settlement:halab"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 6000
+extent = 30000
+
+[[sites]]
+id = "site:halab_404_66"
+settlement = "settlement:halab"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 6000
+extent = 30000
+
+[[sites]]
+id = "site:hattusa_338_8"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 70400000
+
+[[sites]]
+id = "site:hattusa_340_6"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:hattusa_342_8"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:hattusa_340_10"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "horses"
+capacity = 300
+extent = 0
+
+[[sites]]
+id = "site:iolcos_44_22"
+settlement = "settlement:iolcos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 6000000
+
+[[sites]]
+id = "site:iolcos_48_28"
+settlement = "settlement:iolcos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:iolcos_38_24"
+settlement = "settlement:iolcos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7500
+extent = 37500
+
+[[sites]]
+id = "site:kanesh_366_36"
+settlement = "settlement:kanesh"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 21600000
+
+[[sites]]
+id = "site:kanesh_370_32"
+settlement = "settlement:kanesh"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:kanesh_366_28"
+settlement = "settlement:kanesh"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 27000
+extent = 135000
+
+[[sites]]
+id = "site:kanesh_362_32"
+settlement = "settlement:kanesh"
+region = "region:anatolia"
+function = "silver"
+capacity = 600
+extent = 0
+
+[[sites]]
+id = "site:khemenu_244_200"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 30400000
+
+[[sites]]
+id = "site:khemenu_248_192"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:khemenu_248_200"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:khemenu_244_192"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "palace_centre"
+capacity = 19000
+extent = 95000
+
+[[sites]]
+id = "site:khemenu_248_196"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "palace_centre"
+capacity = 19000
+extent = 95000
+
+[[sites]]
+id = "site:knossos_100_88"
+settlement = "settlement:knossos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 12800000
+
+[[sites]]
+id = "site:knossos_116_84"
+settlement = "settlement:knossos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:knossos_98_88"
+settlement = "settlement:knossos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:knossos_114_84"
+settlement = "settlement:knossos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 8000
+extent = 40000
+
+[[sites]]
+id = "site:knossos_94_84"
+settlement = "settlement:knossos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 8000
+extent = 40000
+
+[[sites]]
+id = "site:kydonia_68_82"
+settlement = "settlement:kydonia"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 4400000
+
+[[sites]]
+id = "site:kydonia_78_86"
+settlement = "settlement:kydonia"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:kydonia_66_82"
+settlement = "settlement:kydonia"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 5500
+extent = 27500
+
+[[sites]]
+id = "site:lachish_342_142"
+settlement = "settlement:lachish"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 4000000
+
+[[sites]]
+id = "site:lachish_346_136"
+settlement = "settlement:lachish"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
+id = "site:lachish_346_134"
+settlement = "settlement:lachish"
+region = "region:south_levant"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:megiddo_350_122"
+settlement = "settlement:megiddo"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 4000000
+
+[[sites]]
+id = "site:megiddo_354_120"
+settlement = "settlement:megiddo"
+region = "region:south_levant"
+function = "food"
+capacity = 6300
+extent = 0
+
+[[sites]]
+id = "site:megiddo_354_118"
+settlement = "settlement:megiddo"
+region = "region:south_levant"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:memphis_252_164"
+settlement = "settlement:memphis"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 48000000
+
+[[sites]]
+id = "site:memphis_256_162"
+settlement = "settlement:memphis"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:memphis_256_170"
+settlement = "settlement:memphis"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:memphis_252_170"
+settlement = "settlement:memphis"
+region = "region:nile"
+function = "palace_centre"
+capacity = 60000
+extent = 300000
+
+[[sites]]
+id = "site:millawanda_154_50"
+settlement = "settlement:millawanda"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 3600000
+
+[[sites]]
+id = "site:millawanda_158_48"
+settlement = "settlement:millawanda"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:millawanda_158_58"
+settlement = "settlement:millawanda"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 4500
+extent = 22500
+
+[[sites]]
+id = "site:mira_208_40"
+settlement = "settlement:mira"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 7200000
+
+[[sites]]
+id = "site:mira_212_46"
+settlement = "settlement:mira"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:mira_212_36"
+settlement = "settlement:mira"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 9000
+extent = 45000
+
+[[sites]]
+id = "site:mira_212_38"
+settlement = "settlement:mira"
+region = "region:anatolia"
+function = "silver"
+capacity = 600
+extent = 0
+
+[[sites]]
+id = "site:mycenae_42_44"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 34800000
+
+[[sites]]
+id = "site:mycenae_46_46"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:mycenae_48_46"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:mycenae_50_46"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:mycenae_50_52"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:mycenae_36_50"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 21750
+extent = 108750
+
+[[sites]]
+id = "site:mycenae_44_54"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 21750
+extent = 108750
+
+[[sites]]
+id = "site:nineveh_550_68"
+settlement = "settlement:nineveh"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 16000000
+
+[[sites]]
+id = "site:nineveh_554_72"
+settlement = "settlement:nineveh"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:nineveh_558_64"
+settlement = "settlement:nineveh"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:nineveh_554_64"
+settlement = "settlement:nineveh"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 10000
+extent = 50000
+
+[[sites]]
+id = "site:nineveh_558_68"
+settlement = "settlement:nineveh"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 10000
+extent = 50000
+
+[[sites]]
+id = "site:nuzi_582_88"
+settlement = "settlement:nuzi"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 4000000
+
+[[sites]]
+id = "site:nuzi_586_84"
+settlement = "settlement:nuzi"
+region = "region:upper_mesopotamia"
+function = "food"
+capacity = 7700
+extent = 0
+
+[[sites]]
+id = "site:nuzi_582_80"
+settlement = "settlement:nuzi"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:pylos_18_54"
+settlement = "settlement:pylos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 14800000
+
+[[sites]]
+id = "site:pylos_24_58"
+settlement = "settlement:pylos"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:pylos_16_52"
+settlement = "settlement:pylos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 9250
+extent = 46250
+
+[[sites]]
+id = "site:pylos_26_58"
+settlement = "settlement:pylos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 9250
+extent = 46250
+
+[[sites]]
+id = "site:sau_240_148"
+settlement = "settlement:sau"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 14400000
+
+[[sites]]
+id = "site:sau_244_152"
+settlement = "settlement:sau"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:sau_248_144"
+settlement = "settlement:sau"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:sau_244_144"
+settlement = "settlement:sau"
+region = "region:nile"
+function = "palace_centre"
+capacity = 9000
+extent = 45000
+
+[[sites]]
+id = "site:sau_248_148"
+settlement = "settlement:sau"
+region = "region:nile"
+function = "palace_centre"
+capacity = 9000
+extent = 45000
+
+[[sites]]
+id = "site:seat_372_76"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 6400000
+
+[[sites]]
+id = "site:seat_374_80"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_374_82"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_374_86"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_376_80"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_376_82"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_376_84"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:seat_374_78"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 2000
+extent = 10000
+
+[[sites]]
+id = "site:seat_376_76"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 2000
+extent = 10000
+
+[[sites]]
+id = "site:seat_380_80"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 2000
+extent = 10000
+
+[[sites]]
+id = "site:seat_382_80"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 2000
+extent = 10000
+
+[[sites]]
+id = "site:sidon_364_112"
+settlement = "settlement:sidon"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 4000000
+
+[[sites]]
+id = "site:sidon_368_110"
+settlement = "settlement:sidon"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:sidon_364_106"
+settlement = "settlement:sidon"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:tarhuntassa_316_72"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 16000000
+
+[[sites]]
+id = "site:tarhuntassa_322_70"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:tarhuntassa_330_66"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:tarhuntassa_334_64"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:tarhuntassa_314_68"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 6666
+extent = 33333
+
+[[sites]]
+id = "site:tarhuntassa_316_68"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 6666
+extent = 33333
+
+[[sites]]
+id = "site:tarhuntassa_328_64"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 6666
+extent = 33333
+
+[[sites]]
+id = "site:tarhuntassa_324_64"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "cedar"
+capacity = 5000
+extent = 0
+
+[[sites]]
+id = "site:tarsa_344_60"
+settlement = "settlement:tarsa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 8000000
+
+[[sites]]
+id = "site:tarsa_352_60"
+settlement = "settlement:tarsa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:tarsa_348_56"
+settlement = "settlement:tarsa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 10000
+extent = 50000
+
+[[sites]]
+id = "site:thebes_gr_54_42"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 8800000
+
+[[sites]]
+id = "site:thebes_gr_58_36"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:thebes_gr_58_44"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:thebes_gr_62_38"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "food"
+capacity = 4550
+extent = 0
+
+[[sites]]
+id = "site:thebes_gr_44_38"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 5500
+extent = 27500
+
+[[sites]]
+id = "site:thebes_gr_68_40"
+settlement = "settlement:thebes_gr"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 5500
+extent = 27500
+
+[[sites]]
+id = "site:tjaru_284_154"
+settlement = "settlement:tjaru"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 6400000
+
+[[sites]]
+id = "site:tjaru_288_150"
+settlement = "settlement:tjaru"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:tjaru_284_146"
+settlement = "settlement:tjaru"
+region = "region:nile"
+function = "palace_centre"
+capacity = 8000
+extent = 40000
+
+[[sites]]
+id = "site:tyre_360_116"
+settlement = "settlement:tyre"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 4800000
+
+[[sites]]
+id = "site:tyre_364_114"
+settlement = "settlement:tyre"
+region = "region:north_levant"
+function = "food"
+capacity = 7000
+extent = 0
+
+[[sites]]
+id = "site:tyre_356_120"
+settlement = "settlement:tyre"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 6000
+extent = 30000
+
+[[sites]]
+id = "site:waset_288_228"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 45600000
+
+[[sites]]
+id = "site:waset_292_222"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:waset_292_230"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "food"
+capacity = 11200
+extent = 0
+
+[[sites]]
+id = "site:waset_288_222"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "palace_centre"
+capacity = 28500
+extent = 142500
+
+[[sites]]
+id = "site:waset_292_232"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "palace_centre"
+capacity = 28500
+extent = 142500
+
+[[sites]]
+id = "site:waset_296_224"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "gold"
+capacity = 400
+extent = 0
+
+[[sites]]
+id = "site:wilusa_130_20"
+settlement = "settlement:wilusa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 14400000
+
+[[sites]]
+id = "site:wilusa_134_14"
+settlement = "settlement:wilusa"
+region = "region:anatolia"
+function = "food"
+capacity = 4900
+extent = 0
+
+[[sites]]
+id = "site:wilusa_130_22"
+settlement = "settlement:wilusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 18000
+extent = 90000
+
+[[sites]]
+id = "site:wilusa_134_18"
+settlement = "settlement:wilusa"
+region = "region:anatolia"
+function = "horses"
+capacity = 300
+extent = 0
+
+[[cohorts]]
+id = "cohort:abdju_field_labour"
+settlement = "settlement:abdju"
+kind = "field_labour"
+households = 21000
+people = 105000
+
+[[cohorts]]
+id = "cohort:abdju_craft"
+settlement = "settlement:abdju"
+kind = "craft"
+households = 6000
+people = 30000
+
+[[cohorts]]
+id = "cohort:abdju_palace"
+settlement = "settlement:abdju"
+kind = "palace"
+households = 3000
+people = 15000
+
+[[cohorts]]
+id = "cohort:akko_field_labour"
+settlement = "settlement:akko"
+kind = "field_labour"
+households = 5100
+people = 25500
+
+[[cohorts]]
+id = "cohort:akko_craft"
+settlement = "settlement:akko"
+kind = "craft"
+households = 720
+people = 3600
+
+[[cohorts]]
+id = "cohort:akko_palace"
+settlement = "settlement:akko"
+kind = "palace"
+households = 180
+people = 900
+
+[[cohorts]]
+id = "cohort:alashiya_field_labour"
+settlement = "settlement:alashiya"
+kind = "field_labour"
+households = 11200
+people = 56000
+
+[[cohorts]]
+id = "cohort:alashiya_craft"
+settlement = "settlement:alashiya"
+kind = "craft"
+households = 3200
+people = 16000
+
+[[cohorts]]
+id = "cohort:alashiya_palace"
+settlement = "settlement:alashiya"
+kind = "palace"
+households = 1600
+people = 8000
+
+[[cohorts]]
+id = "cohort:amurru_field_labour"
+settlement = "settlement:amurru"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:amurru_craft"
+settlement = "settlement:amurru"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:amurru_palace"
+settlement = "settlement:amurru"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:apasa_field_labour"
+settlement = "settlement:apasa"
+kind = "field_labour"
+households = 18200
+people = 91000
+
+[[cohorts]]
+id = "cohort:apasa_craft"
+settlement = "settlement:apasa"
+kind = "craft"
+households = 5200
+people = 26000
+
+[[cohorts]]
+id = "cohort:apasa_palace"
+settlement = "settlement:apasa"
+kind = "palace"
+households = 2600
+people = 13000
+
+[[cohorts]]
+id = "cohort:ashkelon_field_labour"
+settlement = "settlement:ashkelon"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:ashkelon_craft"
+settlement = "settlement:ashkelon"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:ashkelon_palace"
+settlement = "settlement:ashkelon"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:assur_field_labour"
+settlement = "settlement:assur"
+kind = "field_labour"
+households = 30000
+people = 150000
+
+[[cohorts]]
+id = "cohort:assur_craft"
+settlement = "settlement:assur"
+kind = "craft"
+households = 12500
+people = 62500
+
+[[cohorts]]
+id = "cohort:assur_palace"
+settlement = "settlement:assur"
+kind = "palace"
+households = 7500
+people = 37500
+
+[[cohorts]]
+id = "cohort:athens_field_labour"
+settlement = "settlement:athens"
+kind = "field_labour"
+households = 12600
+people = 63000
+
+[[cohorts]]
+id = "cohort:athens_craft"
+settlement = "settlement:athens"
+kind = "craft"
+households = 3600
+people = 18000
+
+[[cohorts]]
+id = "cohort:athens_palace"
+settlement = "settlement:athens"
+kind = "palace"
+households = 1800
+people = 9000
+
+[[cohorts]]
+id = "cohort:babylon_field_labour"
+settlement = "settlement:babylon"
+kind = "field_labour"
+households = 57600
+people = 288000
+
+[[cohorts]]
+id = "cohort:babylon_craft"
+settlement = "settlement:babylon"
+kind = "craft"
+households = 24000
+people = 120000
+
+[[cohorts]]
+id = "cohort:babylon_palace"
+settlement = "settlement:babylon"
+kind = "palace"
+households = 14400
+people = 72000
+
+[[cohorts]]
+id = "cohort:byblos_field_labour"
+settlement = "settlement:byblos"
+kind = "field_labour"
+households = 11200
+people = 56000
+
+[[cohorts]]
+id = "cohort:byblos_craft"
+settlement = "settlement:byblos"
+kind = "craft"
+households = 3200
+people = 16000
+
+[[cohorts]]
+id = "cohort:byblos_palace"
+settlement = "settlement:byblos"
+kind = "palace"
+households = 1600
+people = 8000
+
+[[cohorts]]
+id = "cohort:carchemish_field_labour"
+settlement = "settlement:carchemish"
+kind = "field_labour"
+households = 33600
+people = 168000
+
+[[cohorts]]
+id = "cohort:carchemish_craft"
+settlement = "settlement:carchemish"
+kind = "craft"
+households = 9600
+people = 48000
+
+[[cohorts]]
+id = "cohort:carchemish_palace"
+settlement = "settlement:carchemish"
+kind = "palace"
+households = 4800
+people = 24000
+
+[[cohorts]]
+id = "cohort:damascus_field_labour"
+settlement = "settlement:damascus"
+kind = "field_labour"
+households = 8400
+people = 42000
+
+[[cohorts]]
+id = "cohort:damascus_craft"
+settlement = "settlement:damascus"
+kind = "craft"
+households = 2400
+people = 12000
+
+[[cohorts]]
+id = "cohort:damascus_palace"
+settlement = "settlement:damascus"
+kind = "palace"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:dur_katlimmu_field_labour"
+settlement = "settlement:dur_katlimmu"
+kind = "field_labour"
+households = 30600
+people = 153000
+
+[[cohorts]]
+id = "cohort:dur_katlimmu_craft"
+settlement = "settlement:dur_katlimmu"
+kind = "craft"
+households = 4320
+people = 21600
+
+[[cohorts]]
+id = "cohort:dur_katlimmu_palace"
+settlement = "settlement:dur_katlimmu"
+kind = "palace"
+households = 1080
+people = 5400
+
+[[cohorts]]
+id = "cohort:dur_kurigalzu_field_labour"
+settlement = "settlement:dur_kurigalzu"
+kind = "field_labour"
+households = 16800
+people = 84000
+
+[[cohorts]]
+id = "cohort:dur_kurigalzu_craft"
+settlement = "settlement:dur_kurigalzu"
+kind = "craft"
+households = 4800
+people = 24000
+
+[[cohorts]]
+id = "cohort:dur_kurigalzu_palace"
+settlement = "settlement:dur_kurigalzu"
+kind = "palace"
+households = 2400
+people = 12000
+
+[[cohorts]]
+id = "cohort:egypt_field_labour"
+settlement = "settlement:egypt"
+kind = "field_labour"
+households = 111600
+people = 558000
+
+[[cohorts]]
+id = "cohort:egypt_craft"
+settlement = "settlement:egypt"
+kind = "craft"
+households = 46500
+people = 232500
+
+[[cohorts]]
+id = "cohort:egypt_palace"
+settlement = "settlement:egypt"
+kind = "palace"
+households = 27900
+people = 139500
+
+[[cohorts]]
+id = "cohort:emar_field_labour"
+settlement = "settlement:emar"
+kind = "field_labour"
+households = 10200
+people = 51000
+
+[[cohorts]]
+id = "cohort:emar_craft"
+settlement = "settlement:emar"
+kind = "craft"
+households = 1440
+people = 7200
+
+[[cohorts]]
+id = "cohort:emar_palace"
+settlement = "settlement:emar"
+kind = "palace"
+households = 360
+people = 1800
+
+[[cohorts]]
+id = "cohort:gaza_field_labour"
+settlement = "settlement:gaza"
+kind = "field_labour"
+households = 10200
+people = 51000
+
+[[cohorts]]
+id = "cohort:gaza_craft"
+settlement = "settlement:gaza"
+kind = "craft"
+households = 1440
+people = 7200
+
+[[cohorts]]
+id = "cohort:gaza_palace"
+settlement = "settlement:gaza"
+kind = "palace"
+households = 360
+people = 1800
+
+[[cohorts]]
+id = "cohort:gezer_field_labour"
+settlement = "settlement:gezer"
+kind = "field_labour"
+households = 11900
+people = 59500
+
+[[cohorts]]
+id = "cohort:gezer_craft"
+settlement = "settlement:gezer"
+kind = "craft"
+households = 1680
+people = 8400
+
+[[cohorts]]
+id = "cohort:gezer_palace"
+settlement = "settlement:gezer"
+kind = "palace"
+households = 420
+people = 2100
+
+[[cohorts]]
+id = "cohort:halab_field_labour"
+settlement = "settlement:halab"
+kind = "field_labour"
+households = 16800
+people = 84000
+
+[[cohorts]]
+id = "cohort:halab_craft"
+settlement = "settlement:halab"
+kind = "craft"
+households = 4800
+people = 24000
+
+[[cohorts]]
+id = "cohort:halab_palace"
+settlement = "settlement:halab"
+kind = "palace"
+households = 2400
+people = 12000
+
+[[cohorts]]
+id = "cohort:hattusa_field_labour"
+settlement = "settlement:hattusa"
+kind = "field_labour"
+households = 105600
+people = 528000
+
+[[cohorts]]
+id = "cohort:hattusa_craft"
+settlement = "settlement:hattusa"
+kind = "craft"
+households = 44000
+people = 220000
+
+[[cohorts]]
+id = "cohort:hattusa_palace"
+settlement = "settlement:hattusa"
+kind = "palace"
+households = 26400
+people = 132000
+
+[[cohorts]]
+id = "cohort:hazor_field_labour"
+settlement = "settlement:hazor"
+kind = "field_labour"
+households = 8400
+people = 42000
+
+[[cohorts]]
+id = "cohort:hazor_craft"
+settlement = "settlement:hazor"
+kind = "craft"
+households = 2400
+people = 12000
+
+[[cohorts]]
+id = "cohort:hazor_palace"
+settlement = "settlement:hazor"
+kind = "palace"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:iolcos_field_labour"
+settlement = "settlement:iolcos"
+kind = "field_labour"
+households = 10500
+people = 52500
+
+[[cohorts]]
+id = "cohort:iolcos_craft"
+settlement = "settlement:iolcos"
+kind = "craft"
+households = 3000
+people = 15000
+
+[[cohorts]]
+id = "cohort:iolcos_palace"
+settlement = "settlement:iolcos"
+kind = "palace"
+households = 1500
+people = 7500
+
+[[cohorts]]
+id = "cohort:jerusalem_field_labour"
+settlement = "settlement:jerusalem"
+kind = "field_labour"
+households = 6800
+people = 34000
+
+[[cohorts]]
+id = "cohort:jerusalem_craft"
+settlement = "settlement:jerusalem"
+kind = "craft"
+households = 960
+people = 4800
+
+[[cohorts]]
+id = "cohort:jerusalem_palace"
+settlement = "settlement:jerusalem"
+kind = "palace"
+households = 240
+people = 1200
+
+[[cohorts]]
+id = "cohort:kadesh_field_labour"
+settlement = "settlement:kadesh"
+kind = "field_labour"
+households = 7000
+people = 35000
+
+[[cohorts]]
+id = "cohort:kadesh_craft"
+settlement = "settlement:kadesh"
+kind = "craft"
+households = 2000
+people = 10000
+
+[[cohorts]]
+id = "cohort:kadesh_palace"
+settlement = "settlement:kadesh"
+kind = "palace"
+households = 1000
+people = 5000
+
+[[cohorts]]
+id = "cohort:kanesh_field_labour"
+settlement = "settlement:kanesh"
+kind = "field_labour"
+households = 45900
+people = 229500
+
+[[cohorts]]
+id = "cohort:kanesh_craft"
+settlement = "settlement:kanesh"
+kind = "craft"
+households = 6480
+people = 32400
+
+[[cohorts]]
+id = "cohort:kanesh_palace"
+settlement = "settlement:kanesh"
+kind = "palace"
+households = 1620
+people = 8100
+
+[[cohorts]]
+id = "cohort:khemenu_field_labour"
+settlement = "settlement:khemenu"
+kind = "field_labour"
+households = 53200
+people = 266000
+
+[[cohorts]]
+id = "cohort:khemenu_craft"
+settlement = "settlement:khemenu"
+kind = "craft"
+households = 15200
+people = 76000
+
+[[cohorts]]
+id = "cohort:khemenu_palace"
+settlement = "settlement:khemenu"
+kind = "palace"
+households = 7600
+people = 38000
+
+[[cohorts]]
+id = "cohort:knossos_field_labour"
+settlement = "settlement:knossos"
+kind = "field_labour"
+households = 22400
+people = 112000
+
+[[cohorts]]
+id = "cohort:knossos_craft"
+settlement = "settlement:knossos"
+kind = "craft"
+households = 6400
+people = 32000
+
+[[cohorts]]
+id = "cohort:knossos_palace"
+settlement = "settlement:knossos"
+kind = "palace"
+households = 3200
+people = 16000
+
+[[cohorts]]
+id = "cohort:kydonia_field_labour"
+settlement = "settlement:kydonia"
+kind = "field_labour"
+households = 9350
+people = 46750
+
+[[cohorts]]
+id = "cohort:kydonia_craft"
+settlement = "settlement:kydonia"
+kind = "craft"
+households = 1320
+people = 6600
+
+[[cohorts]]
+id = "cohort:kydonia_palace"
+settlement = "settlement:kydonia"
+kind = "palace"
+households = 330
+people = 1650
+
+[[cohorts]]
+id = "cohort:lachish_field_labour"
+settlement = "settlement:lachish"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:lachish_craft"
+settlement = "settlement:lachish"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:lachish_palace"
+settlement = "settlement:lachish"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:megiddo_field_labour"
+settlement = "settlement:megiddo"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:megiddo_craft"
+settlement = "settlement:megiddo"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:megiddo_palace"
+settlement = "settlement:megiddo"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:memphis_field_labour"
+settlement = "settlement:memphis"
+kind = "field_labour"
+households = 84000
+people = 420000
+
+[[cohorts]]
+id = "cohort:memphis_craft"
+settlement = "settlement:memphis"
+kind = "craft"
+households = 24000
+people = 120000
+
+[[cohorts]]
+id = "cohort:memphis_palace"
+settlement = "settlement:memphis"
+kind = "palace"
+households = 12000
+people = 60000
+
+[[cohorts]]
+id = "cohort:millawanda_field_labour"
+settlement = "settlement:millawanda"
+kind = "field_labour"
+households = 7650
+people = 38250
+
+[[cohorts]]
+id = "cohort:millawanda_craft"
+settlement = "settlement:millawanda"
+kind = "craft"
+households = 1080
+people = 5400
+
+[[cohorts]]
+id = "cohort:millawanda_palace"
+settlement = "settlement:millawanda"
+kind = "palace"
+households = 270
+people = 1350
+
+[[cohorts]]
+id = "cohort:mira_field_labour"
+settlement = "settlement:mira"
+kind = "field_labour"
+households = 15300
+people = 76500
+
+[[cohorts]]
+id = "cohort:mira_craft"
+settlement = "settlement:mira"
+kind = "craft"
+households = 2160
+people = 10800
+
+[[cohorts]]
+id = "cohort:mira_palace"
+settlement = "settlement:mira"
+kind = "palace"
+households = 540
+people = 2700
+
+[[cohorts]]
+id = "cohort:mukish_field_labour"
+settlement = "settlement:mukish"
+kind = "field_labour"
+households = 4200
+people = 21000
+
+[[cohorts]]
+id = "cohort:mukish_craft"
+settlement = "settlement:mukish"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:mukish_palace"
+settlement = "settlement:mukish"
+kind = "palace"
+households = 600
+people = 3000
+
+[[cohorts]]
+id = "cohort:mycenae_field_labour"
+settlement = "settlement:mycenae"
+kind = "field_labour"
+households = 60900
+people = 304500
+
+[[cohorts]]
+id = "cohort:mycenae_craft"
+settlement = "settlement:mycenae"
+kind = "craft"
+households = 17400
+people = 87000
+
+[[cohorts]]
+id = "cohort:mycenae_palace"
+settlement = "settlement:mycenae"
+kind = "palace"
+households = 8700
+people = 43500
+
+[[cohorts]]
+id = "cohort:nagar_field_labour"
+settlement = "settlement:nagar"
+kind = "field_labour"
+households = 20400
+people = 102000
+
+[[cohorts]]
+id = "cohort:nagar_craft"
+settlement = "settlement:nagar"
+kind = "craft"
+households = 2880
+people = 14400
+
+[[cohorts]]
+id = "cohort:nagar_palace"
+settlement = "settlement:nagar"
+kind = "palace"
+households = 720
+people = 3600
+
+[[cohorts]]
+id = "cohort:nineveh_field_labour"
+settlement = "settlement:nineveh"
+kind = "field_labour"
+households = 28000
+people = 140000
+
+[[cohorts]]
+id = "cohort:nineveh_craft"
+settlement = "settlement:nineveh"
+kind = "craft"
+households = 8000
+people = 40000
+
+[[cohorts]]
+id = "cohort:nineveh_palace"
+settlement = "settlement:nineveh"
+kind = "palace"
+households = 4000
+people = 20000
+
+[[cohorts]]
+id = "cohort:nippur_field_labour"
+settlement = "settlement:nippur"
+kind = "field_labour"
+households = 29400
+people = 147000
+
+[[cohorts]]
+id = "cohort:nippur_craft"
+settlement = "settlement:nippur"
+kind = "craft"
+households = 8400
+people = 42000
+
+[[cohorts]]
+id = "cohort:nippur_palace"
+settlement = "settlement:nippur"
+kind = "palace"
+households = 4200
+people = 21000
+
+[[cohorts]]
+id = "cohort:nuzi_field_labour"
+settlement = "settlement:nuzi"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:nuzi_craft"
+settlement = "settlement:nuzi"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:nuzi_palace"
+settlement = "settlement:nuzi"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:orchomenos_field_labour"
+settlement = "settlement:orchomenos"
+kind = "field_labour"
+households = 11900
+people = 59500
+
+[[cohorts]]
+id = "cohort:orchomenos_craft"
+settlement = "settlement:orchomenos"
+kind = "craft"
+households = 1680
+people = 8400
+
+[[cohorts]]
+id = "cohort:orchomenos_palace"
+settlement = "settlement:orchomenos"
+kind = "palace"
+households = 420
+people = 2100
+
+[[cohorts]]
+id = "cohort:pylos_field_labour"
+settlement = "settlement:pylos"
+kind = "field_labour"
+households = 25900
+people = 129500
+
+[[cohorts]]
+id = "cohort:pylos_craft"
+settlement = "settlement:pylos"
+kind = "craft"
+households = 7400
+people = 37000
+
+[[cohorts]]
+id = "cohort:pylos_palace"
+settlement = "settlement:pylos"
+kind = "palace"
+households = 3700
+people = 18500
+
+[[cohorts]]
+id = "cohort:sau_field_labour"
+settlement = "settlement:sau"
+kind = "field_labour"
+households = 25200
+people = 126000
+
+[[cohorts]]
+id = "cohort:sau_craft"
+settlement = "settlement:sau"
+kind = "craft"
+households = 7200
+people = 36000
+
+[[cohorts]]
+id = "cohort:sau_palace"
+settlement = "settlement:sau"
+kind = "palace"
+households = 3600
+people = 18000
+
+[[cohorts]]
+id = "cohort:seat_field_labour"
+settlement = "settlement:seat"
+kind = "field_labour"
+households = 10400
+people = 52000
+
+[[cohorts]]
+id = "cohort:seat_craft"
+settlement = "settlement:seat"
+kind = "craft"
+households = 3680
+people = 18400
+
+[[cohorts]]
+id = "cohort:seat_palace"
+settlement = "settlement:seat"
+kind = "palace"
+households = 1920
+people = 9600
+
+[[cohorts]]
+id = "cohort:shechem_field_labour"
+settlement = "settlement:shechem"
+kind = "field_labour"
+households = 6800
+people = 34000
+
+[[cohorts]]
+id = "cohort:shechem_craft"
+settlement = "settlement:shechem"
+kind = "craft"
+households = 960
+people = 4800
+
+[[cohorts]]
+id = "cohort:shechem_palace"
+settlement = "settlement:shechem"
+kind = "palace"
+households = 240
+people = 1200
+
+[[cohorts]]
+id = "cohort:sidon_field_labour"
+settlement = "settlement:sidon"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:sidon_craft"
+settlement = "settlement:sidon"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:sidon_palace"
+settlement = "settlement:sidon"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:tabetu_field_labour"
+settlement = "settlement:tabetu"
+kind = "field_labour"
+households = 8500
+people = 42500
+
+[[cohorts]]
+id = "cohort:tabetu_craft"
+settlement = "settlement:tabetu"
+kind = "craft"
+households = 1200
+people = 6000
+
+[[cohorts]]
+id = "cohort:tabetu_palace"
+settlement = "settlement:tabetu"
+kind = "palace"
+households = 300
+people = 1500
+
+[[cohorts]]
+id = "cohort:tarhuntassa_field_labour"
+settlement = "settlement:tarhuntassa"
+kind = "field_labour"
+households = 28000
+people = 140000
+
+[[cohorts]]
+id = "cohort:tarhuntassa_craft"
+settlement = "settlement:tarhuntassa"
+kind = "craft"
+households = 8000
+people = 40000
+
+[[cohorts]]
+id = "cohort:tarhuntassa_palace"
+settlement = "settlement:tarhuntassa"
+kind = "palace"
+households = 4000
+people = 20000
+
+[[cohorts]]
+id = "cohort:tarsa_field_labour"
+settlement = "settlement:tarsa"
+kind = "field_labour"
+households = 17000
+people = 85000
+
+[[cohorts]]
+id = "cohort:tarsa_craft"
+settlement = "settlement:tarsa"
+kind = "craft"
+households = 2400
+people = 12000
+
+[[cohorts]]
+id = "cohort:tarsa_palace"
+settlement = "settlement:tarsa"
+kind = "palace"
+households = 600
+people = 3000
+
+[[cohorts]]
+id = "cohort:thebes_gr_field_labour"
+settlement = "settlement:thebes_gr"
+kind = "field_labour"
+households = 15400
+people = 77000
+
+[[cohorts]]
+id = "cohort:thebes_gr_craft"
+settlement = "settlement:thebes_gr"
+kind = "craft"
+households = 4400
+people = 22000
+
+[[cohorts]]
+id = "cohort:thebes_gr_palace"
+settlement = "settlement:thebes_gr"
+kind = "palace"
+households = 2200
+people = 11000
+
+[[cohorts]]
+id = "cohort:tjaru_field_labour"
+settlement = "settlement:tjaru"
+kind = "field_labour"
+households = 13600
+people = 68000
+
+[[cohorts]]
+id = "cohort:tjaru_craft"
+settlement = "settlement:tjaru"
+kind = "craft"
+households = 1920
+people = 9600
+
+[[cohorts]]
+id = "cohort:tjaru_palace"
+settlement = "settlement:tjaru"
+kind = "palace"
+households = 480
+people = 2400
+
+[[cohorts]]
+id = "cohort:tyre_field_labour"
+settlement = "settlement:tyre"
+kind = "field_labour"
+households = 10200
+people = 51000
+
+[[cohorts]]
+id = "cohort:tyre_craft"
+settlement = "settlement:tyre"
+kind = "craft"
+households = 1440
+people = 7200
+
+[[cohorts]]
+id = "cohort:tyre_palace"
+settlement = "settlement:tyre"
+kind = "palace"
+households = 360
+people = 1800
+
+[[cohorts]]
+id = "cohort:ur_field_labour"
+settlement = "settlement:ur"
+kind = "field_labour"
+households = 28000
+people = 140000
+
+[[cohorts]]
+id = "cohort:ur_craft"
+settlement = "settlement:ur"
+kind = "craft"
+households = 8000
+people = 40000
+
+[[cohorts]]
+id = "cohort:ur_palace"
+settlement = "settlement:ur"
+kind = "palace"
+households = 4000
+people = 20000
+
+[[cohorts]]
+id = "cohort:uruk_field_labour"
+settlement = "settlement:uruk"
+kind = "field_labour"
+households = 36400
+people = 182000
+
+[[cohorts]]
+id = "cohort:uruk_craft"
+settlement = "settlement:uruk"
+kind = "craft"
+households = 10400
+people = 52000
+
+[[cohorts]]
+id = "cohort:uruk_palace"
+settlement = "settlement:uruk"
+kind = "palace"
+households = 5200
+people = 26000
+
+[[cohorts]]
+id = "cohort:waset_field_labour"
+settlement = "settlement:waset"
+kind = "field_labour"
+households = 79800
+people = 399000
+
+[[cohorts]]
+id = "cohort:waset_craft"
+settlement = "settlement:waset"
+kind = "craft"
+households = 22800
+people = 114000
+
+[[cohorts]]
+id = "cohort:waset_palace"
+settlement = "settlement:waset"
+kind = "palace"
+households = 11400
+people = 57000
+
+[[cohorts]]
+id = "cohort:wilusa_field_labour"
+settlement = "settlement:wilusa"
+kind = "field_labour"
+households = 25200
+people = 126000
+
+[[cohorts]]
+id = "cohort:wilusa_craft"
+settlement = "settlement:wilusa"
+kind = "craft"
+households = 7200
+people = 36000
+
+[[cohorts]]
+id = "cohort:wilusa_palace"
+settlement = "settlement:wilusa"
+kind = "palace"
+households = 3600
+people = 18000
+
+[[stores]]
+settlement = "settlement:abdju"
+site = "site:abdju_270_216"
+good = "standing_grain"
+quantity = 134400000
+
+[[stores]]
+settlement = "settlement:abdju"
+good = "grain"
+quantity = 48000000
+
+[[stores]]
+settlement = "settlement:akko"
+good = "grain"
+quantity = 6000000
+
+[[stores]]
+settlement = "settlement:alashiya"
+site = "site:alashiya_318_84"
+good = "standing_grain"
+quantity = 35840000
+
+[[stores]]
+settlement = "settlement:alashiya"
+good = "copper"
+quantity = 6000
+
+[[stores]]
+settlement = "settlement:alashiya"
+good = "grain"
+quantity = 12800000
+
+[[stores]]
+settlement = "settlement:amurru"
+site = "site:amurru_374_90"
+good = "standing_grain"
+quantity = 28000000
+
+[[stores]]
+settlement = "settlement:amurru"
+good = "grain"
+quantity = 10000000
+
+[[stores]]
+settlement = "settlement:apasa"
+site = "site:apasa_158_42"
+good = "standing_grain"
+quantity = 50960000
+
+[[stores]]
+settlement = "settlement:apasa"
+good = "grain"
+quantity = 18200000
+
+[[stores]]
+settlement = "settlement:ashkelon"
+site = "site:ashkelon_340_142"
+good = "standing_grain"
+quantity = 25200000
+
+[[stores]]
+settlement = "settlement:ashkelon"
+good = "grain"
+quantity = 9000000
+
+[[stores]]
+settlement = "settlement:assur"
+site = "site:assur_552_80"
+good = "standing_grain"
+quantity = 154000000
+
+[[stores]]
+settlement = "settlement:assur"
+good = "tin"
+quantity = 400
+
+[[stores]]
+settlement = "settlement:assur"
+good = "grain"
+quantity = 55000000
+
+[[stores]]
+settlement = "settlement:athens"
+site = "site:athens_60_44"
+good = "standing_grain"
+quantity = 32760000
+
+[[stores]]
+settlement = "settlement:athens"
+good = "silver"
+quantity = 300
+
+[[stores]]
+settlement = "settlement:athens"
+good = "grain"
+quantity = 11700000
+
+[[stores]]
+settlement = "settlement:babylon"
+site = "site:babylon_582_124"
+good = "standing_grain"
+quantity = 403200000
+
+[[stores]]
+settlement = "settlement:babylon"
+good = "lapis"
+quantity = 100
+
+[[stores]]
+settlement = "settlement:babylon"
+good = "grain"
+quantity = 144000000
+
+[[stores]]
+settlement = "settlement:byblos"
+site = "site:byblos_370_98"
+good = "standing_grain"
+quantity = 44800000
+
+[[stores]]
+settlement = "settlement:byblos"
+good = "cedar"
+quantity = 2500
+
+[[stores]]
+settlement = "settlement:byblos"
+good = "grain"
+quantity = 16000000
+
+[[stores]]
+settlement = "settlement:carchemish"
+site = "site:carchemish_422_60"
+good = "standing_grain"
+quantity = 134400000
+
+[[stores]]
+settlement = "settlement:carchemish"
+good = "grain"
+quantity = 48000000
+
+[[stores]]
+settlement = "settlement:damascus"
+good = "grain"
+quantity = 12000000
+
+[[stores]]
+settlement = "settlement:dur_katlimmu"
+site = "site:dur_katlimmu_494_84"
+good = "standing_grain"
+quantity = 110880000
+
+[[stores]]
+settlement = "settlement:dur_katlimmu"
+good = "grain"
+quantity = 39600000
+
+[[stores]]
+settlement = "settlement:dur_kurigalzu"
+site = "site:dur_kurigalzu_576_114"
+good = "standing_grain"
+quantity = 100800000
+
+[[stores]]
+settlement = "settlement:dur_kurigalzu"
+good = "grain"
+quantity = 36000000
+
+[[stores]]
+settlement = "settlement:egypt"
+site = "site:egypt_266_150"
+good = "standing_grain"
+quantity = 833280000
+
+[[stores]]
+settlement = "settlement:egypt"
+good = "grain"
+quantity = 297600000
+
+[[stores]]
+settlement = "settlement:emar"
+site = "site:emar_426_70"
+good = "standing_grain"
+quantity = 36960000
+
+[[stores]]
+settlement = "settlement:emar"
+good = "tin"
+quantity = 400
+
+[[stores]]
+settlement = "settlement:emar"
+good = "grain"
+quantity = 13200000
+
+[[stores]]
+settlement = "settlement:gaza"
+site = "site:gaza_334_142"
+good = "standing_grain"
+quantity = 30240000
+
+[[stores]]
+settlement = "settlement:gaza"
+good = "grain"
+quantity = 10800000
+
+[[stores]]
+settlement = "settlement:gezer"
+good = "grain"
+quantity = 12600000
+
+[[stores]]
+settlement = "settlement:halab"
+site = "site:halab_400_74"
+good = "standing_grain"
+quantity = 67200000
+
+[[stores]]
+settlement = "settlement:halab"
+good = "grain"
+quantity = 24000000
+
+[[stores]]
+settlement = "settlement:hattusa"
+site = "site:hattusa_338_8"
+good = "standing_grain"
+quantity = 344960000
+
+[[stores]]
+settlement = "settlement:hattusa"
+good = "horses"
+quantity = 150
+
+[[stores]]
+settlement = "settlement:hattusa"
+good = "grain"
+quantity = 123199999
+
+[[stores]]
+settlement = "settlement:hazor"
+good = "grain"
+quantity = 12000000
+
+[[stores]]
+settlement = "settlement:iolcos"
+site = "site:iolcos_44_22"
+good = "standing_grain"
+quantity = 27300000
+
+[[stores]]
+settlement = "settlement:iolcos"
+good = "grain"
+quantity = 9750000
+
+[[stores]]
+settlement = "settlement:jerusalem"
+good = "grain"
+quantity = 7200000
+
+[[stores]]
+settlement = "settlement:kadesh"
+good = "grain"
+quantity = 10000000
+
+[[stores]]
+settlement = "settlement:kanesh"
+site = "site:kanesh_366_36"
+good = "standing_grain"
+quantity = 105840000
+
+[[stores]]
+settlement = "settlement:kanesh"
+good = "silver"
+quantity = 300
+
+[[stores]]
+settlement = "settlement:kanesh"
+good = "grain"
+quantity = 37800000
+
+[[stores]]
+settlement = "settlement:khemenu"
+site = "site:khemenu_244_200"
+good = "standing_grain"
+quantity = 340480000
+
+[[stores]]
+settlement = "settlement:khemenu"
+good = "grain"
+quantity = 121600000
+
+[[stores]]
+settlement = "settlement:knossos"
+site = "site:knossos_100_88"
+good = "standing_grain"
+quantity = 58240000
+
+[[stores]]
+settlement = "settlement:knossos"
+good = "grain"
+quantity = 20800000
+
+[[stores]]
+settlement = "settlement:kydonia"
+site = "site:kydonia_68_82"
+good = "standing_grain"
+quantity = 20020000
+
+[[stores]]
+settlement = "settlement:kydonia"
+good = "grain"
+quantity = 7150000
+
+[[stores]]
+settlement = "settlement:lachish"
+site = "site:lachish_342_142"
+good = "standing_grain"
+quantity = 25200000
+
+[[stores]]
+settlement = "settlement:lachish"
+good = "grain"
+quantity = 9000000
+
+[[stores]]
+settlement = "settlement:megiddo"
+site = "site:megiddo_350_122"
+good = "standing_grain"
+quantity = 25200000
+
+[[stores]]
+settlement = "settlement:megiddo"
+good = "grain"
+quantity = 9000000
+
+[[stores]]
+settlement = "settlement:memphis"
+site = "site:memphis_252_164"
+good = "standing_grain"
+quantity = 537600000
+
+[[stores]]
+settlement = "settlement:memphis"
+good = "grain"
+quantity = 192000000
+
+[[stores]]
+settlement = "settlement:millawanda"
+site = "site:millawanda_154_50"
+good = "standing_grain"
+quantity = 16380000
+
+[[stores]]
+settlement = "settlement:millawanda"
+good = "grain"
+quantity = 5850000
+
+[[stores]]
+settlement = "settlement:mira"
+site = "site:mira_208_40"
+good = "standing_grain"
+quantity = 35280000
+
+[[stores]]
+settlement = "settlement:mira"
+good = "silver"
+quantity = 300
+
+[[stores]]
+settlement = "settlement:mira"
+good = "grain"
+quantity = 12600000
+
+[[stores]]
+settlement = "settlement:mukish"
+good = "grain"
+quantity = 6000000
+
+[[stores]]
+settlement = "settlement:mycenae"
+site = "site:mycenae_42_44"
+good = "standing_grain"
+quantity = 158340000
+
+[[stores]]
+settlement = "settlement:mycenae"
+good = "grain"
+quantity = 56550000
+
+[[stores]]
+settlement = "settlement:nagar"
+good = "grain"
+quantity = 26400000
+
+[[stores]]
+settlement = "settlement:nineveh"
+site = "site:nineveh_550_68"
+good = "standing_grain"
+quantity = 123200000
+
+[[stores]]
+settlement = "settlement:nineveh"
+good = "grain"
+quantity = 44000000
+
+[[stores]]
+settlement = "settlement:nippur"
+good = "grain"
+quantity = 63000000
+
+[[stores]]
+settlement = "settlement:nuzi"
+site = "site:nuzi_582_88"
+good = "standing_grain"
+quantity = 30800000
+
+[[stores]]
+settlement = "settlement:nuzi"
+good = "grain"
+quantity = 11000000
+
+[[stores]]
+settlement = "settlement:orchomenos"
+good = "grain"
+quantity = 9100000
+
+[[stores]]
+settlement = "settlement:pylos"
+site = "site:pylos_18_54"
+good = "standing_grain"
+quantity = 67340000
+
+[[stores]]
+settlement = "settlement:pylos"
+good = "grain"
+quantity = 24050000
+
+[[stores]]
+settlement = "settlement:sau"
+site = "site:sau_240_148"
+good = "standing_grain"
+quantity = 161280000
+
+[[stores]]
+settlement = "settlement:sau"
+good = "grain"
+quantity = 57600000
+
+[[stores]]
+settlement = "settlement:seat"
+site = "site:seat_372_76"
+good = "standing_grain"
+quantity = 44800000
+
+[[stores]]
+settlement = "settlement:seat"
+good = "grain"
+quantity = 16000000
+
+[[stores]]
+settlement = "settlement:shechem"
+good = "grain"
+quantity = 7200000
+
+[[stores]]
+settlement = "settlement:sidon"
+site = "site:sidon_364_112"
+good = "standing_grain"
+quantity = 28000000
+
+[[stores]]
+settlement = "settlement:sidon"
+good = "grain"
+quantity = 10000000
+
+[[stores]]
+settlement = "settlement:tabetu"
+good = "grain"
+quantity = 11000000
+
+[[stores]]
+settlement = "settlement:tarhuntassa"
+site = "site:tarhuntassa_316_72"
+good = "standing_grain"
+quantity = 78400000
+
+[[stores]]
+settlement = "settlement:tarhuntassa"
+good = "cedar"
+quantity = 2500
+
+[[stores]]
+settlement = "settlement:tarhuntassa"
+good = "grain"
+quantity = 28000000
+
+[[stores]]
+settlement = "settlement:tarsa"
+site = "site:tarsa_344_60"
+good = "standing_grain"
+quantity = 39200000
+
+[[stores]]
+settlement = "settlement:tarsa"
+good = "grain"
+quantity = 14000000
+
+[[stores]]
+settlement = "settlement:thebes_gr"
+site = "site:thebes_gr_54_42"
+good = "standing_grain"
+quantity = 40040000
+
+[[stores]]
+settlement = "settlement:thebes_gr"
+good = "grain"
+quantity = 14300000
+
+[[stores]]
+settlement = "settlement:tjaru"
+site = "site:tjaru_284_154"
+good = "standing_grain"
+quantity = 71680000
+
+[[stores]]
+settlement = "settlement:tjaru"
+good = "grain"
+quantity = 25600000
+
+[[stores]]
+settlement = "settlement:tyre"
+site = "site:tyre_360_116"
+good = "standing_grain"
+quantity = 33600000
+
+[[stores]]
+settlement = "settlement:tyre"
+good = "grain"
+quantity = 12000000
+
+[[stores]]
+settlement = "settlement:ur"
+good = "grain"
+quantity = 60000000
+
+[[stores]]
+settlement = "settlement:uruk"
+good = "grain"
+quantity = 78000000
+
+[[stores]]
+settlement = "settlement:waset"
+site = "site:waset_288_228"
+good = "standing_grain"
+quantity = 510720000
+
+[[stores]]
+settlement = "settlement:waset"
+good = "gold"
+quantity = 200
+
+[[stores]]
+settlement = "settlement:waset"
+good = "grain"
+quantity = 182400000
+
+[[stores]]
+settlement = "settlement:wilusa"
+site = "site:wilusa_130_20"
+good = "standing_grain"
+quantity = 70560000
+
+[[stores]]
+settlement = "settlement:wilusa"
+good = "horses"
+quantity = 150
+
+[[stores]]
+settlement = "settlement:wilusa"
+good = "grain"
+quantity = 25200000
+
+[[orgs]]
+id = "org:abdju_palace"
+name = "the palace of Abdju"
+settlement = "settlement:abdju"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:akko_council"
+name = "the council of Akko"
+settlement = "settlement:akko"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:alashiya_palace"
+name = "the palace of Alashiya"
+settlement = "settlement:alashiya"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:amurru_council"
+name = "the council of Sumur"
+settlement = "settlement:amurru"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:apasa_palace"
+name = "the palace of Apasa"
+settlement = "settlement:apasa"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:ashkelon_council"
+name = "the council of Ashkelon"
+settlement = "settlement:ashkelon"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:assur_palace"
+name = "the palace of Assur"
+settlement = "settlement:assur"
+kind = "palace"
+policy = "subsistence"
+authority = 900
+
+[[orgs]]
+id = "org:athens_palace"
+name = "the palace of Athens"
+settlement = "settlement:athens"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:babylon_palace"
+name = "the palace of Babylon"
+settlement = "settlement:babylon"
+kind = "palace"
+policy = "subsistence"
+authority = 900
+
+[[orgs]]
+id = "org:byblos_palace"
+name = "the palace of Gubla"
+settlement = "settlement:byblos"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:carchemish_palace"
+name = "the palace of Carchemish"
+settlement = "settlement:carchemish"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:damascus_palace"
+name = "the palace of Damascus"
+settlement = "settlement:damascus"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:dur_katlimmu_council"
+name = "the council of Dur-Katlimmu"
+settlement = "settlement:dur_katlimmu"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:dur_kurigalzu_palace"
+name = "the palace of Dur-Kurigalzu"
+settlement = "settlement:dur_kurigalzu"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:egypt_palace"
+name = "the palace of Pi-Ramesses"
+settlement = "settlement:egypt"
+kind = "palace"
+policy = "subsistence"
+authority = 900
+
+[[orgs]]
+id = "org:emar_council"
+name = "the council of Emar"
+settlement = "settlement:emar"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:gaza_council"
+name = "the council of Gaza"
+settlement = "settlement:gaza"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:gezer_council"
+name = "the council of Gezer"
+settlement = "settlement:gezer"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:halab_palace"
+name = "the palace of Halab"
+settlement = "settlement:halab"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:hattusa_palace"
+name = "the palace of Hattusa"
+settlement = "settlement:hattusa"
+kind = "palace"
+policy = "subsistence"
+authority = 900
+
+[[orgs]]
+id = "org:hazor_palace"
+name = "the palace of Hazor"
+settlement = "settlement:hazor"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:iolcos_palace"
+name = "the palace of Iolcos"
+settlement = "settlement:iolcos"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:jerusalem_council"
+name = "the council of Jerusalem"
+settlement = "settlement:jerusalem"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:kadesh_palace"
+name = "the palace of Kadesh"
+settlement = "settlement:kadesh"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:kanesh_council"
+name = "the council of Kanesh"
+settlement = "settlement:kanesh"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:khemenu_palace"
+name = "the palace of Khemenu"
+settlement = "settlement:khemenu"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:knossos_palace"
+name = "the palace of Knossos"
+settlement = "settlement:knossos"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:kydonia_council"
+name = "the council of Kydonia"
+settlement = "settlement:kydonia"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:lachish_council"
+name = "the council of Lachish"
+settlement = "settlement:lachish"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:megiddo_council"
+name = "the council of Megiddo"
+settlement = "settlement:megiddo"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:memphis_palace"
+name = "the palace of Memphis"
+settlement = "settlement:memphis"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:millawanda_council"
+name = "the council of Millawanda"
+settlement = "settlement:millawanda"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:mira_council"
+name = "the council of Mira"
+settlement = "settlement:mira"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:mukish_palace"
+name = "the palace of Alalakh"
+settlement = "settlement:mukish"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:mycenae_palace"
+name = "the palace of Mycenae"
+settlement = "settlement:mycenae"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:nagar_council"
+name = "the council of Nagar"
+settlement = "settlement:nagar"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:nineveh_palace"
+name = "the palace of Ninua"
+settlement = "settlement:nineveh"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:nippur_palace"
+name = "the palace of Nippur"
+settlement = "settlement:nippur"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:nuzi_council"
+name = "the council of Nuzi"
+settlement = "settlement:nuzi"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:orchomenos_council"
+name = "the council of Orchomenos"
+settlement = "settlement:orchomenos"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:pylos_palace"
+name = "the palace of Pylos"
+settlement = "settlement:pylos"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:sau_palace"
+name = "the palace of Sau"
+settlement = "settlement:sau"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:seat_palace"
+name = "the palace of Ugarit"
+settlement = "settlement:seat"
+kind = "palace"
+policy = "subsistence"
+authority = 700
+
+[[orgs]]
+id = "org:shechem_council"
+name = "the council of Shechem"
+settlement = "settlement:shechem"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:sidon_council"
+name = "the council of Sidon"
+settlement = "settlement:sidon"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:tabetu_council"
+name = "the council of Tabetu"
+settlement = "settlement:tabetu"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:tarhuntassa_palace"
+name = "the palace of Tarhuntassa"
+settlement = "settlement:tarhuntassa"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:tarsa_council"
+name = "the council of Tarsa"
+settlement = "settlement:tarsa"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:thebes_gr_palace"
+name = "the palace of Thebes"
+settlement = "settlement:thebes_gr"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:tjaru_council"
+name = "the council of Tjaru"
+settlement = "settlement:tjaru"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:tyre_council"
+name = "the council of Tyre"
+settlement = "settlement:tyre"
+kind = "council"
+policy = "subsistence"
+authority = 300
+
+[[orgs]]
+id = "org:ur_palace"
+name = "the palace of Ur"
+settlement = "settlement:ur"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:uruk_palace"
+name = "the palace of Uruk"
+settlement = "settlement:uruk"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:waset_palace"
+name = "the palace of Waset"
+settlement = "settlement:waset"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[orgs]]
+id = "org:wilusa_palace"
+name = "the palace of Wilusa"
+settlement = "settlement:wilusa"
+kind = "palace"
+policy = "subsistence"
+authority = 600
+
+[[obligations]]
+id = "settlement:abdju/0/obligation/0"
+party = "settlement:abdju"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 720000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:akko/0/obligation/0"
+party = "settlement:akko"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 90000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:amurru/0/obligation/0"
+party = "settlement:amurru"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 150000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:ashkelon/0/obligation/0"
+party = "settlement:ashkelon"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 135000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:assur/0/obligation/0"
+party = "settlement:assur"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 825000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:athens/0/obligation/0"
+party = "settlement:athens"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 175500
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:babylon/0/obligation/0"
+party = "settlement:babylon"
+beneficiary = "polity:karduniash"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 2160000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:karduniash"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:byblos/0/obligation/0"
+party = "settlement:byblos"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 240000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:carchemish/0/obligation/0"
+party = "settlement:carchemish"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 720000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:dur_katlimmu/0/obligation/0"
+party = "settlement:dur_katlimmu"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 594000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:dur_kurigalzu/0/obligation/0"
+party = "settlement:dur_kurigalzu"
+beneficiary = "polity:karduniash"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 540000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:karduniash"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:egypt/0/obligation/0"
+party = "settlement:egypt"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 4464000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:emar/0/obligation/0"
+party = "settlement:emar"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 198000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:gaza/0/obligation/0"
+party = "settlement:gaza"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 162000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:gezer/0/obligation/0"
+party = "settlement:gezer"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 189000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:halab/0/obligation/0"
+party = "settlement:halab"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 360000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:hattusa/0/obligation/0"
+party = "settlement:hattusa"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 1847999
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:hazor/0/obligation/0"
+party = "settlement:hazor"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 180000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:iolcos/0/obligation/0"
+party = "settlement:iolcos"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 146250
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:jerusalem/0/obligation/0"
+party = "settlement:jerusalem"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 108000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:kadesh/0/obligation/0"
+party = "settlement:kadesh"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 150000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:kanesh/0/obligation/0"
+party = "settlement:kanesh"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 567000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:khemenu/0/obligation/0"
+party = "settlement:khemenu"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 1824000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:knossos/0/obligation/0"
+party = "settlement:knossos"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 312000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:kydonia/0/obligation/0"
+party = "settlement:kydonia"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 107250
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:lachish/0/obligation/0"
+party = "settlement:lachish"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 135000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:megiddo/0/obligation/0"
+party = "settlement:megiddo"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 135000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:memphis/0/obligation/0"
+party = "settlement:memphis"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 2880000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:millawanda/0/obligation/0"
+party = "settlement:millawanda"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 87750
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:mira/0/obligation/0"
+party = "settlement:mira"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 189000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:mukish/0/obligation/0"
+party = "settlement:mukish"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 90000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:mycenae/0/obligation/0"
+party = "settlement:mycenae"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 848250
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:nagar/0/obligation/0"
+party = "settlement:nagar"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 396000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:nineveh/0/obligation/0"
+party = "settlement:nineveh"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 660000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:nippur/0/obligation/0"
+party = "settlement:nippur"
+beneficiary = "polity:karduniash"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 945000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:karduniash"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:nuzi/0/obligation/0"
+party = "settlement:nuzi"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 165000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:orchomenos/0/obligation/0"
+party = "settlement:orchomenos"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 136500
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:pylos/0/obligation/0"
+party = "settlement:pylos"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 360750
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:sau/0/obligation/0"
+party = "settlement:sau"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 864000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:seat/0/obligation/0"
+party = "settlement:seat"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 240000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:shechem/0/obligation/0"
+party = "settlement:shechem"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 108000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:sidon/0/obligation/0"
+party = "settlement:sidon"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 150000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:tabetu/0/obligation/0"
+party = "settlement:tabetu"
+beneficiary = "polity:assyria"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 165000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:assyria"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:tarhuntassa/0/obligation/0"
+party = "settlement:tarhuntassa"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 420000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:tarsa/0/obligation/0"
+party = "settlement:tarsa"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 210000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:thebes_gr/0/obligation/0"
+party = "settlement:thebes_gr"
+beneficiary = "polity:ahhiyawa"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 214500
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:ahhiyawa"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:tjaru/0/obligation/0"
+party = "settlement:tjaru"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 384000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:tyre/0/obligation/0"
+party = "settlement:tyre"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 180000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:ur/0/obligation/0"
+party = "settlement:ur"
+beneficiary = "polity:karduniash"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 900000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:karduniash"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:uruk/0/obligation/0"
+party = "settlement:uruk"
+beneficiary = "polity:karduniash"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 1170000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:karduniash"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:waset/0/obligation/0"
+party = "settlement:waset"
+beneficiary = "polity:egypt"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 2736000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:egypt"
+consequence = "the overlord would send for the elders"
+
+[[obligations]]
+id = "settlement:wilusa/0/obligation/0"
+party = "settlement:wilusa"
+beneficiary = "polity:hatti"
+clause = "fixed_quantity"
+good = "grain"
+quantity = 378000
+due_kind = "season"
+due_span = "harvest"
+authority = "polity:hatti"
+consequence = "the overlord would send for the elders"

@@ -319,14 +319,19 @@ def tend(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
 
     book = kernel.book.at_phase(kernel.date.absolute, "production")
     days = granted(intents, allocation)
-    climate = kernel.climate_at(kernel.date.absolute)
-    weather = max(0, 100 - climate) * DROUGHT_PER_1000
 
     for actor in _farmers(kernel):
         lots = _lots(book, actor, STANDING)
         standing = sum(lot.quantity for lot in lots)
         if standing <= 0:
             continue
+
+        # The weather is the region's, not the world's. Two settlements in the
+        # same fortnight can have different years, and that difference is what
+        # makes a crossing worth making.
+        region = kernel.region_of(_settlement_of(kernel, actor))
+        climate = kernel.climate_at(kernel.date.absolute, region)
+        weather = max(0, 100 - climate) * DROUGHT_PER_1000
 
         wanted = days_for(standing, TEND_PER_DAY)
         got = min(days.get((actor, "tend"), 0), wanted)

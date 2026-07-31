@@ -1,12 +1,8 @@
 # One authority per fact — design pass for Alpha 0.7 Task 2
 
-Status: design only. No code changes belong to this document.
+Status: design only. No code changes in this document.
 
-Supersedes the plan in `docs/PHASE_C_AUTHORITY.md` where the two differ; that
-file's table of duplicated facts still stands and is restated here with the Alu
-model applied. Task 1's classification (`docs/ALU_CLASSIFICATION.md`) is the
-input: the scenario now says what every place and every mark on the map is, so
-the kernel can be built from it instead of being authored a second time.
+Supersedes `docs/PHASE_C_AUTHORITY.md` where they differ; that file's duplicated-facts table restated here with Alu model applied. Task 1's classification (`docs/ALU_CLASSIFICATION.md`) is input: scenario now says what every place and mark is, so kernel built from it, not authored twice.
 
 ---
 
@@ -27,26 +23,15 @@ the kernel can be built from it instead of being authored a second time.
 | the date | turn 2 | turn 2 |
 | court places with no kernel settlement | 47 | — |
 
-One fact the audit does not report and that decides the shape of this task:
-**nothing in the game loads the kernel.** `load_kernel` is imported by
-`tools/authority_audit.py`, `tools/kernel_inspect.py`, and tests. `session.py`,
-`play_cli.py`, and `play_gui.py` never touch it. So there is no live divergence
-to reconcile — there is a second world that has never been played, and the work
-is to make it the only one and then run the game on it.
+Audit misses one fact that decides task shape: **nothing in game loads kernel.** `load_kernel` imported by `tools/authority_audit.py`, `tools/kernel_inspect.py`, tests. `session.py`, `play_cli.py`, `play_gui.py` never touch it. No live divergence to reconcile — second world never played. Work: make it the only one, then run game on it.
 
-That is why the migration below moves the court onto the kernel rather than
-merging two running states. There is no save to convert: a save is a seed, a
-scenario, and an action log (`session.py`), and replaying it through the new
-loader produces the new state. Saves made before the change fail the
-`state_hash_at_save` check and are dropped, which is correct — there is no
-released version to be compatible with.
+So migration moves court onto kernel, not merges two running states. No save to convert: save is seed, scenario, action log (`session.py`); replay through new loader produces new state. Pre-change saves fail `state_hash_at_save` check and drop — correct, no released version to stay compatible with.
 
 ---
 
 ## 2. Final owner of every fact
 
-`World` keeps a `kernel: Kernel` field. `Kernel` owns the world; `Court` keeps
-only what is about the king's household and his correspondence.
+`World` keeps `kernel: Kernel` field. `Kernel` owns world; `Court` keeps only king's household and correspondence.
 
 | Fact | Owner after Task 2 | Deleted |
 |---|---|---|
@@ -69,20 +54,17 @@ only what is about the king's household and his correspondence.
 | Oaths, omens, justice, relations | court-side | — |
 | Court's own belief | `belief/project.py` | — |
 
-Rules the audit cannot check:
+Rules audit cannot check:
 
-1. A deleted court field may not return as a cache. Read-through is allowed
-   only through `belief/project.py`, which may precompute.
+1. Deleted court field may not return as cache. Read-through only through `belief/project.py`, which may precompute.
 2. Ugarit stays `autonomous = false` until player orders drive it (Task 3).
-3. No court→kernel identifier is inferred at a call site. One authored map,
-   loaded once, checked at load. See §4.
+3. No court→kernel identifier inferred at call site. One authored map, loaded once, checked at load. See §4.
 
 ---
 
 ## 3. One authored world
 
-Delete the duplicate geography in `content/kernel/world.toml`. The scenario is
-the authored world; the kernel registry is built from it at load.
+Delete duplicate geography in `content/kernel/world.toml`. Scenario is authored world; kernel registry built from it at load.
 
 | Registry table | Built from |
 |---|---|
@@ -94,21 +76,13 @@ the authored world; the kernel registry is built from it at load.
 | `Cohort` | `Place.population`, split by authored shares |
 | `Organization` | one palace per Alu; temples and merchant houses where authored |
 
-`content/kernel/world.toml` keeps only what the scenario cannot express and
-becomes `content/kernel/detail.toml`: seasons, the climate series, per-site
-`capacity` and `extent`, cohort composition for the settlements that have it
-authored, opening stores, obligations. Every row in it names an entity the
-scenario already created; a row naming anything else is a load error.
+`content/kernel/world.toml` keeps only what scenario cannot express, becomes `content/kernel/detail.toml`: seasons, climate series, per-site `capacity` and `extent`, cohort composition where authored, opening stores, obligations. Every row names entity scenario already created; row naming anything else is load error.
 
-Palace centres do not become settlements. A palace centre is a `Site` of its
-Alu with `function = "palace"`; `Place.harbour` becomes a `Site` with
-`function = "harbour"`. This is what keeps the settlement count at 42 rather
-than 48 and is the same rule Task 1 already enforces on the court side.
+Palace centres do not become settlements. Palace centre is `Site` of its Alu with `function = "palace"`; `Place.harbour` becomes `Site` with `function = "harbour"`. Keeps settlement count at 42, not 48 — same rule Task 1 enforces court-side.
 
 ### 3.1 Site function vocabulary
 
-Task 1 left this open. Closed here: the kernel's `Site.function` is the
-authority, and the scenario's `capacity` values map onto it one-to-one.
+Task 1 left open. Closed here: kernel's `Site.function` is authority; scenario's `capacity` values map onto it one-to-one.
 
 | Scenario `kind` / `capacity` | `Site.function` |
 |---|---|
@@ -120,26 +94,20 @@ authority, and the scenario's `capacity` values map onto it one-to-one.
 | `palace` (role `palace_centre`) | `palace` |
 | harbour mark | `harbour` |
 
-`forest` and `quarry` are new function names. `function` is a free string in
-`engine/entity.py`, so this is content, not a spec change — but the loader must
-reject a function outside the closed list, or the vocabulary drifts.
+`forest` and `quarry` are new function names. `function` is free string in `engine/entity.py`, so content, not spec change — but loader must reject function outside closed list, or vocabulary drifts.
 
 ### 3.2 Cohorts for 42 Alu
 
 Each Alu gets at least one cohort, minted from `Place.population`:
 
-- `cohort:{alu}_fields`, `kind = "field_labour"` — the default, taking the whole
-  authored population where nothing else is said.
-- Where `detail.toml` authors a split (Ugarit, Ma'hadu's old cohorts, Alashiya,
-  Ari), that split is used instead and must sum to `Place.population`.
+- `cohort:{alu}_fields`, `kind = "field_labour"` — default, takes whole authored population where nothing else said.
+- Where `detail.toml` authors a split (Ugarit, Ma'hadu's old cohorts, Alashiya, Ari), that split used instead and must sum to `Place.population`.
 
-The sum rule is the same conservation check Task 1 already has for demoted
-towns, and it gets a test: total cohort people equals total authored population.
+Sum rule is same conservation check Task 1 has for demoted towns; gets a test: total cohort people equals total authored population.
 
 ### 3.3 Autonomy
 
-Autonomy moves from settlement to Alu, as `docs/ALU_CLASSIFICATION.md` §9
-resolved:
+Autonomy moves from settlement to Alu, per `docs/ALU_CLASSIFICATION.md` §9:
 
 | Settlement | Before | After |
 |---|---|---|
@@ -149,26 +117,15 @@ resolved:
 | `settlement:alashiya_port` | autonomous | gone — the harbour of `settlement:alashiya` |
 | the other 41 Alu | absent | autonomous |
 
-The M13.1 exit gate — the world goes on when Ugarit is idle — is met by other
-kings' cities instead of by Ugarit's own port. Its tests move to Alalakh,
-Amurru, Carchemish, and Alashiya. The gate's assertion does not weaken: with
-Ugarit removed the remaining settlements must still produce, consume, decide,
-and change.
+M13.1 exit gate — world goes on when Ugarit idle — met by other kings' cities, not Ugarit's own port. Tests move to Alalakh, Amurru, Carchemish, Alashiya. Gate assertion does not weaken: with Ugarit removed, remaining settlements must still produce, consume, decide, change.
 
-`Kernel.controller()` looks for `kind == "council"`. Every Alu has a king, so
-the controlling organization is `kind = "palace"`. Widen `controller()` to
-`("palace", "council")`, palace first, and keep the existing councils where the
-authored place has no king (there are none left after the demotions, but the
-kind stays legal).
+`Kernel.controller()` looks for `kind == "council"`. Every Alu has king, so controlling organization is `kind = "palace"`. Widen `controller()` to `("palace", "council")`, palace first, keep existing councils where authored place has no king (none left after demotions, but kind stays legal).
 
 ---
 
 ## 4. The identifier map
 
-Court ids are bare strings, kernel ids are `kind:name`. Task 1 made the
-scenario the single place both are authored, so most of the map is one rule
-applied at one site in the loader — which is authorship, not inference, because
-the loader mints both ids from the same row:
+Court ids are bare strings, kernel ids are `kind:name`. Task 1 made scenario the single place both authored, so most of map is one rule applied at one site in loader — authorship, not inference, because loader mints both ids from same row:
 
 | Court entity | Kernel id |
 |---|---|
@@ -177,32 +134,25 @@ the loader mints both ids from the same row:
 | authored site mark | `site:{alu}_{capacity}_{n}` |
 | `Route(a, b)` | `route:{a}_{b}` |
 
-What is *not* derivable, and needs an authored `content/kernel/idmap.toml`:
+Not derivable, needs authored `content/kernel/idmap.toml`:
 
 | Section | Entries | Why not derivable |
 |---|---|---|
-| `[places]` | `mahadu = "site:ma_hadu_harbour"`, `ari`, `alashiya_port` | the existing kernel names differ from the scenario's (`mahadu` vs `ma_hadu`), and two of the three stop being settlements |
-| `[actors]` | 14 correspondents → `org:` ids | `hatti_king` → `org:hattusa_palace`; the name of the actor is not the name of the place |
-| `[estates]` | 3 court estates → `site:` ids | court estate ids are their own vocabulary |
-| `[institutions]` | court institutions → `org:` or `site:` | a harbour is a site, a temple is an org; the split is a judgement |
+| `[places]` | `mahadu = "site:ma_hadu_harbour"`, `ari`, `alashiya_port` | existing kernel names differ from scenario's (`mahadu` vs `ma_hadu`), and two of three stop being settlements |
+| `[actors]` | 14 correspondents → `org:` ids | `hatti_king` → `org:hattusa_palace`; actor name is not place name |
+| `[estates]` | 3 court estates → `site:` ids | court estate ids are own vocabulary |
+| `[institutions]` | court institutions → `org:` or `site:` | harbour is site, temple is org; split is judgement |
 | `[groups]` | `DependentGroup` → `cohort:` ids | function names do not match cohort kinds |
 
-The loader raises on any court entity of these kinds with no entry, and on any
-entry naming an entity the registry does not have. `unmapped()` in the audit
-stops guessing by string match and reads the map instead.
+Loader raises on any court entity of these kinds with no entry, and on any entry naming entity registry lacks. `unmapped()` in audit stops guessing by string match, reads map instead.
 
-One case the map has to handle: `ura_merchant` is a correspondent at `ura`,
-which Task 1 demoted to a palace centre of Tarhuntassa. Correspondent places
-resolve through the owning Alu, the same way the plague import does today.
+One case map must handle: `ura_merchant` is correspondent at `ura`, which Task 1 demoted to palace centre of Tarhuntassa. Correspondent places resolve through owning Alu, same way plague import does today.
 
 ---
 
 ## 5. The turn
 
-`engine/tick.py` becomes an assembly of `engine.kernel.turn.Step`s and stops
-being a second turn pipeline. Court systems keep their code; they are declared
-into the phase they occupy and run through `T.run`, which already refuses a
-step out of order.
+`engine/tick.py` becomes assembly of `engine.kernel.turn.Step`s, stops being second turn pipeline. Court systems keep code; declared into phase they occupy, run through `T.run`, which already refuses step out of order.
 
 | Phase | Steps |
 |---|---|
@@ -224,24 +174,16 @@ step out of order.
 | 16 player | `reduce.apply`, driven by the game loop |
 | 17 close | `faults()`, `state_hash` |
 
-Two orderings change and both are deliberate:
+Two orderings change, both deliberate:
 
-- Plague moves from before the house step to phase 11 with it. Ordering within
-  a phase is the implementer's, so plague still runs first inside it and the
-  "the dead are not fed" property is preserved — rations are now in phase 7 and
-  therefore *before* mortality. That inverts today's rule. Resolve by moving
-  mortality's grain effect: a person who dies in phase 11 was fed in phase 7 and
-  the ration is spent, which is the more defensible reading anyway.
-- `foreign_belief` and `correspondence_policy` become kernel observation and
-  kernel policy for the same actors, so they collapse into phases 3 and 4 as
-  those actors' councils. Until they do (step C6 below) they run in 12.
+- Plague moves from before house step to phase 11 with it. Ordering within phase is implementer's, so plague still runs first inside it and "dead are not fed" property preserved — rations now in phase 7, therefore *before* mortality. Inverts today's rule. Resolve by moving mortality's grain effect: person who dies in phase 11 was fed in phase 7 and ration is spent — more defensible reading anyway.
+- `foreign_belief` and `correspondence_policy` become kernel observation and kernel policy for same actors, so collapse into phases 3 and 4 as those actors' councils. Until then (step C6 below) they run in 12.
 
 ---
 
 ## 6. Migration order
 
-Each step ends green: full test run, `tools/authority_audit.py` with one fewer
-finding, and no new field that caches a deleted one.
+Each step ends green: full test run, `tools/authority_audit.py` with one fewer finding, no new field caching a deleted one.
 
 | Step | Does | Closes |
 |---|---|---|
@@ -254,40 +196,27 @@ finding, and no new field that caches a deleted one.
 | C7 | one date and one seed | the date |
 | C8 | `tick.py` as an assembly of kernel steps; `advance_court` deleted | the competing tick |
 
-C5 is the largest and is where the rooms change: `belief/project.py` is the only
-path from state to screen, so every room follows from that one file being
-repointed. C8 is the completion criterion the spec names; it cannot be done
-before C1–C7 because a step declared into a phase still needs its state to be in
-one place.
+C5 is largest, is where rooms change: `belief/project.py` is only path from state to screen, so every room follows from that one file being repointed. C8 is completion criterion spec names; cannot be done before C1–C7 because step declared into phase still needs its state in one place.
 
 ---
 
 ## 7. What has to be true at the end
 
-- `tools/authority_audit.py` reports no findings, without a row being narrowed
-  or deleted to achieve it.
-- `load_kernel` is gone as a separate entry point; `load_scenario` returns a
-  `World` whose `kernel` is the world.
-- No room reads a writable copy of a kernel fact. Grep for `court.stores`,
-  `court.dependents`, `court.estates`, `world.places`, `world.routes` in `tui/`
-  and `belief/` returns nothing.
-- `engine/tick.py` contains no phase ordering of its own; every step is declared
-  with its phase and run through `T.run`.
-- Removing `settlement:ugarit` from the registry leaves a world that still
-  advances 96 turns without a fault.
-- Total cohort people equals total authored `Place.population`; total lots at
-  the seat equal the authored opening stores.
-- A save written before the change is refused with a clear message rather than
-  replayed into a divergent hash.
+- `tools/authority_audit.py` reports no findings, without narrowing or deleting a row to achieve it.
+- `load_kernel` gone as separate entry point; `load_scenario` returns `World` whose `kernel` is the world.
+- No room reads writable copy of kernel fact. Grep for `court.stores`, `court.dependents`, `court.estates`, `world.places`, `world.routes` in `tui/` and `belief/` returns nothing.
+- `engine/tick.py` contains no phase ordering of its own; every step declared with its phase, run through `T.run`.
+- Removing `settlement:ugarit` from registry leaves world that still advances 96 turns without fault.
+- Total cohort people equals total authored `Place.population`; total lots at seat equal authored opening stores.
+- Save written before change is refused with clear message, not replayed into divergent hash.
 
-## 8. Open
+## 8. Decided since
 
-- **Regions.** 42 Alu need regions and none are authored. Provisional list:
-  north Levant, south Levant, Nile, Anatolia, Aegean, upper Mesopotamia, lower
-  Mesopotamia, Alashiya. Climate is per region and the series is currently one
-  global array; C1 either authors eight series or accepts one until Task 4.
-- **Polities vs `power`.** Task 1 left `power` as a taxonomy that should die
-  when king-to-king overlordship arrives in Task 4. C1 mints polities from it;
-  that mapping is temporary and should be marked so in the loader.
-- **`Court.house`, oaths, omens, justice.** Court-side and untouched here. They
-  reference places by court id and will need the id map at C5.
+- **Archiving.** Replaced court modules move by `git mv` into `engine/legacy/`, unedited, drop out of turn. Nothing commented out in place.
+- **Regions and climate.** Eight regions — north Levant, south Levant, Nile, Anatolia, Aegean, upper Mesopotamia, lower Mesopotamia, Alashiya — each with own 96-entry climate series. Nile series is flood, not rainfall.
+- **Palace names.** All 66 unnamed palace marks get name (C0). Stay sites, not settlements: named on map and in hinterland panel, not addressable by courier, plague, or correspondent.
+
+## 9. Open
+
+- **Polities vs `power`.** Task 1 left `power` as taxonomy that should die when king-to-king overlordship arrives in Task 4. C1 mints polities from it; mapping temporary, should be marked so in loader.
+- **`Court.house`, oaths, omens, justice.** Court-side, untouched here. Reference places by court id, will need id map at C5.

@@ -1,0 +1,17 @@
+# Entity ID map: court -> kernel.
+#
+# Court entity IDs (World.places, World.court.estates, etc.) that do not share
+# a kernel counterpart's suffix. Every court place not listed here is matched
+# by suffix; every entry here names a valid kernel entity.
+
+[places]
+# Ma'hadu is the port quarter of Ugarit (seat), not a separate settlement.
+ma_hadu = "settlement:seat"
+# Gib'ala is a dependency of Amurru.
+gibala = "settlement:amurru"
+# Gla, Sippar, Tiryns, Ura are minor palace-centres in the world geography.
+# They exist as places but are not autonomous kernel settlements.
+gla = ""
+sippar = ""
+tiryns = ""
+ura = ""

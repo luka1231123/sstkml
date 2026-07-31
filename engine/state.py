@@ -13,6 +13,7 @@ from engine.core import Date
 
 if TYPE_CHECKING:
     from engine.actions import LetterTerm
+    from engine.kernel.world import Kernel
     from engine.obligation import (
         GoodsReservation,
         LetterObligation,
@@ -501,6 +502,11 @@ class Route:
     mode: str          # "sea" | "land" | "river"
     seasonal: bool     # sea legs shut outside the sailing window
     risk: int          # 0..1000 base interception/loss weight
+    # The ground the route actually crosses, as (col, row) turns on the map.
+    # A road is not a straight line: it follows the valley and goes round the
+    # mountain, and `tools/route_geography.py` is what decides where. Empty
+    # means nobody has laid it yet, and the tablet falls back to a straight one.
+    course: tuple[tuple[int, int], ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -531,9 +537,8 @@ class Terrain:
 class Site:
     """One holding in an Alu's hinterland: a small palace, an estate, a mine.
 
-    It has no name on purpose. This is what the hinterland of a great house
-    looks like from the capital -- a count of holdings, each of a kind, each
-    answering to one Alu -- and not a second list of towns to write letters to.
+    A palace centre has a name; a capacity does not. Both belong to one Alu
+    and are not towns; a palace centre is not addressable by courier.
 
     `role` is the classification and it is authored, never guessed: a palace
     centre is a place that can be raided, garrisoned, or lost on its own, and a
@@ -544,6 +549,7 @@ class Site:
     alu: PlaceId         # whose hinterland it lies in
     role: str = "capacity"   # "palace_centre" | "capacity"
     capacity: str = ""       # "food" | "copper" | ...; empty on a palace centre
+    name: str = ""           # authored on a palace centre; empty on a capacity
     col: int = 0
     row: int = 0
 
@@ -769,6 +775,8 @@ class World:
     scenario: str
     date: Date
     court: Court
+    # The autonomous world (Task 2). Always present; not yet wired into play.
+    kernel: "Kernel"
     # Anything that "arrives later" is a Scheduled (spec 3.3). Sorted, stable.
     schedule: tuple["Scheduled", ...] = ()
     # Mail (spec 6.6). Places/routes/correspondents authored; the rest is live.

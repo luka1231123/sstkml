@@ -33,7 +33,9 @@ from tui.grid import INDEX, InteractiveScreen, Surface
 C = INDEX
 
 MODE_GLYPH = {"land": "·", "sea": "~", "river": "≈"}
-MODE_TONE = {"land": "sand", "sea": "lapis", "river": "sky"}
+# A lane was drawn in lapis over a sea drawn in lapis, which is why nobody
+# could see one. Each mode is now a step off the ground it crosses.
+MODE_TONE = {"land": "sand", "sea": "sky", "river": "verdigris"}
 CERTAIN_WORDS = frozenset({"charted", "confirmed", "known", "certain"})
 
 ESTEEM_TONE = {
@@ -61,11 +63,17 @@ RANK_WORD = {
     "centre": "a palace centre",
 }
 
-# How often a route lays down a glyph. A road is solid, a sea lane is a dashed
-# track, a lane the season has shut is a few dots -- so the three read apart in
-# a monochrome terminal, where the mode colours are not there to help.
-STRIDE = {"land": 1, "river": 1, "sea": 2, "unknown": 2}
+# How often a route lays down a glyph. Roads and lanes are both solid, because
+# a lane drawn every other cell disappears into the sea it crosses; a lane the
+# season has shut is a few dots. A sea lane is told from a road by its glyph
+# instead, which is the same line broken -- so the two read apart in a
+# monochrome terminal, where the mode colours are not there to help.
+STRIDE = {"land": 1, "river": 1, "sea": 1, "unknown": 1}
 CLOSED_STRIDE = 3
+
+# The broken twin of each road glyph. There are no broken diagonals to be had,
+# so a diagonal lane is told apart by its colour and by the company it keeps.
+SEA_GLYPH = {"─": "╌", "│": "╎"}
 
 # What a place is, beyond its own mark, on the layers that ask. The rank
 # brackets in `atlas` say what a place IS; these say what it is TO YOU, and
@@ -92,16 +100,16 @@ LAYER_NAME = {
 }
 LAYER_LEGEND = {
     "land": "{ } seat  [ ] imperial  ( ) royal  ~ sea  ^ upland  , sown",
-    "roads": "─ road  ≈ river  Nf fortnights by courier  · shut this season",
+    "roads": "─ road  ╌ sea lane  ≈ river  Nf fortnights  · shut this season",
     "trade": "╌ sea lane  Nf fortnights  * metal  Y cedar  n horses",
     "farms": ", sown ground  % a grain estate  : desert",
-    "holds": "x a small palace, counted and not named",
+    "holds": "x a small palace",
     "courts": "◇ a court that writes to you  · silence from there",
     "sickness": "✗ the road is shut by your order  ○ nothing reported",
 }
 LAYER_UNDER = {
     "land": "the ground itself; the tabs above put things on it",
-    "roads": "the roads and the rivers, in fortnights of courier time",
+    "roads": "every way there is, in fortnights of courier time",
     "trade": "what crosses the sea, and where the metal comes from",
     "farms": "the sown ground, and the estates that work it",
     "holds": "the small palaces: your hinterland, and everyone else's",
@@ -109,11 +117,14 @@ LAYER_UNDER = {
     "sickness": "the roads you have shut, and the ones you have not",
 }
 
-# Which routes are the subject of which layer. A road is on Roads, a sea lane
-# is on Trade, and neither is drawn anywhere else: roads over the ground layer
-# were the wash of lines this window was split up to stop.
+# Which routes are the subject of which layer. Roads carries every way there
+# is, because "how do I reach Alashiya" is one question and the answer is a
+# ship: a layer that showed the roads and hid the lanes answered it wrong.
+# Trade keeps the lanes alone, beside what crosses them. Neither is drawn
+# anywhere else: routes over the ground layer were the wash of lines this
+# window was split up to stop.
 LAYER_MODES = {
-    "roads": ("land", "river", "unknown"),
+    "roads": ("land", "river", "sea", "unknown"),
     "trade": ("sea",),
 }
 
@@ -183,6 +194,20 @@ def places_in_order(b: dict) -> list[dict]:
         _spoken(place.get("name") or place.get("id", "")).lower(),
         str(place.get("id", "")),
     ))
+
+
+def _drawn_places(places: list[dict], layer: str) -> list[dict]:
+    """The places a layer puts a mark on the ground for.
+
+    A dependent palace centre is not a kingdom: it has no king, no road of its
+    own and nothing to trade with, so it has no business on Land, Roads or
+    Trade, where every other mark is somebody who can answer a letter. Holds is
+    the layer that is about the hinterland, and there it belongs.
+    """
+    if layer == "holds":
+        return list(places)
+    return [place for place in places
+            if str(place.get("kind", "alu")) == "alu"]
 
 
 def routes_of(b: dict, place: str = "") -> list[dict]:
@@ -388,17 +413,17 @@ def _draw_ground(surface: Surface, rows: list[str], view: atlas.View,
 
 def _draw_sites(surface: Surface, b: dict, view: atlas.View,
                 x: int, y: int, layer: str,
-                used: set[tuple[int, int]]) -> int:
-    """The hinterland: holdings, estates and sources, none of them named.
+                used: set[tuple[int, int]]
+                ) -> list[tuple[tuple[int, int], str]]:
+    """Draw holdings, estates and sources. Drawn only on their own layer.
 
-    They are drawn only on the layer that asks about them, and they are never
-    clickable -- there is no order in this game that names one, and a hit
-    region on a thing you cannot act on is a lie about the shape of the game.
+    Returns the cell and name of each palace centre drawn, for the caller to
+    label. Sites are not clickable: no order in this game targets one.
     """
     kinds = LAYER_SITES.get(layer, ())
     if not kinds:
-        return 0
-    drawn = 0
+        return []
+    named = []
     for site in atlas.sites_of(b):
         kind = str(site.get("kind", ""))
         if kind not in kinds:
@@ -413,7 +438,42 @@ def _draw_sites(surface: Surface, b: dict, view: atlas.View,
                     atlas.SITE_GLYPH.get(kind, "x"),
                     C[atlas.site_tone(kind)], C["ink"])
         used.add(cell)
-        drawn += 1
+        name = str(site.get("name", ""))
+        if name and str(site.get("role", "")) == "palace_centre":
+            named.append((cell, _spoken(name)))
+    return named
+
+
+def _course_cells(route: dict, start: tuple[int, int], end: tuple[int, int],
+                  view: atlas.View, mode: str = "land"
+                  ) -> list[tuple[tuple[int, int], str]]:
+    """Every window cell the road passes through, with the glyph it takes.
+
+    The authored course is a handful of turns on the grid; the road is the
+    straight runs between them. The glyph is chosen once per run, from the
+    bearing of the whole run rather than from the two cells either side of it:
+    a Bresenham step alternates between level and diagonal, and reading the
+    slope off each step in turn is what made a straight road look like gravel.
+
+    A route with no course drawn -- an older save, or a scenario nobody has laid
+    on the ground -- falls back to the straight line the map always drew.
+    """
+    turns = [turn for turn in route.get("course", ())
+             if isinstance(turn, (list, tuple)) and len(turn) == 2]
+    runs = ([(start, end)] if len(turns) < 2 else
+            [(view.cell(int(a[0]), int(a[1])), view.cell(int(z[0]), int(z[1])))
+             for a, z in zip(turns, turns[1:])])
+    dashed = mode in ("sea", "unknown")
+    drawn: list[tuple[tuple[int, int], str]] = []
+    for first, second in runs:
+        if first == second:
+            continue
+        glyph = atlas.slope_glyph(first, second)
+        if dashed:
+            glyph = SEA_GLYPH.get(glyph, glyph)
+        cells = atlas.line(first, second)
+        drawn.extend((cell, glyph) for cell in (cells if not drawn
+                                                else cells[1:]))
     return drawn
 
 
@@ -435,6 +495,10 @@ def _draw_routes(surface: Surface, b: dict, view: atlas.View, x: int, y: int,
         if spot is not None:
             ends[str(place.get("id", ""))] = view.cell(*spot)
 
+    # The selected place's own roads go down last, over the top of everyone
+    # else's: the road he is asking about is the one that must stay legible
+    # where it crosses three others.
+    drawn: list[tuple[bool, str, str, str, bool, dict]] = []
     for route in routes_of(b):
         a, z = str(route.get("a", "")), str(route.get("b", ""))
         if a not in ends or z not in ends:
@@ -451,34 +515,49 @@ def _draw_routes(surface: Surface, b: dict, view: atlas.View, x: int, y: int,
         # the route tablet, which lists all of them and says which are closed.
         if closed and not incident:
             continue
-        glyph = "·" if closed else atlas.slope_glyph(ends[a], ends[z])
-        stride = CLOSED_STRIDE if closed else STRIDE.get(mode, 2)
+        drawn.append((incident, a, z, mode, closed, route))
+
+    # One cell holds one road. Where two run together the second is silently
+    # the first's neighbour rather than a second glyph fighting for the cell,
+    # which is what turned a junction into a knot.
+    paved: set[tuple[int, int]] = set()
+    for incident, a, z, mode, closed, route in sorted(drawn,
+                                                      key=lambda i: i[0]):
+        stride = CLOSED_STRIDE if closed else STRIDE.get(mode, 1)
         tone = ("faint" if closed
                 else "bone" if incident
                 else MODE_TONE.get(mode, "clay"))
-        road = atlas.line(ends[a], ends[z])
-        for step, cell in enumerate(road):
+        road = _course_cells(route, ends[a], ends[z], view, mode)
+        for step, (cell, glyph) in enumerate(road):
             if cell in marks or not view.inside(cell):
                 continue      # a city is not a milestone on its own road
             surface.link(x + cell[0], y + cell[1], 1, 1,
                          f"world:route:{a}:{z}")
-            if step % stride:
+            # There is no broken diagonal in the box-drawing set, so a diagonal
+            # lane is broken by leaving cells out instead. A road is never.
+            gapped = stride * 2 if mode == "sea" and glyph in "╱╲" else stride
+            if step % gapped or (cell in paved and not incident):
                 continue
-            surface.put(x + cell[0], y + cell[1], glyph, C[tone], C["ink"])
+            surface.put(x + cell[0], y + cell[1], "·" if closed else glyph,
+                        C[tone], C["ink"])
+            paved.add(cell)
             used.add(cell)
 
+        # Only the selected place's own roads are numbered. Every road numbered
+        # is fifty numbers over the ground, and the answer to "how far is this
+        # one" is unreadable among them.
         legs = _number(route.get("legs"), 0)
-        if not legs or len(road) < 5:
+        if not incident or not legs or len(road) < 5:
             continue
         label = f"{legs}f"
-        middle = road[len(road) // 2]
-        spot = (middle[0] - 1, middle[1])
+        middle = road[len(road) // 2][0]
+        spot = (middle[0] - 1, middle[1] - 1)
         if any((spot[0] + step, spot[1]) in marks or
+               (spot[0] + step, spot[1]) in paved or
                not view.inside((spot[0] + step, spot[1]))
                for step in range(len(label))):
             continue
-        surface.text(x + spot[0], y + spot[1], label,
-                     C["bone"] if incident else C["dim"], C["ink"])
+        surface.text(x + spot[0], y + spot[1], label, C["bone"], C["ink"])
         for step in range(len(label)):
             used.add((spot[0] + step, spot[1]))
 
@@ -494,7 +573,7 @@ def _draw_map(surface: Surface, b: dict, x: int, y: int,
     name, which is the same order a scribe would have drawn it in.
     """
     layer = _layer_of(layer)
-    places = places_in_order(b)
+    places = _drawn_places(places_in_order(b), layer)
     rows = atlas.ground_rows(b)
     if not rows:
         surface.text(x, y, "this tablet has no ground drawn on it.",
@@ -515,7 +594,7 @@ def _draw_map(surface: Surface, b: dict, x: int, y: int,
     at, marks = _lay_marks(places, b, courts, selected, layer, view,
                            width, height)
 
-    _draw_sites(surface, b, view, x, y, layer, used | marks)
+    holdings = _draw_sites(surface, b, view, x, y, layer, used | marks)
     _draw_routes(surface, b, view, x, y, layer, selected, marks, used)
 
     for place in places:
@@ -561,6 +640,18 @@ def _draw_map(surface: Surface, b: dict, x: int, y: int,
         for step in range(len(name)):
             used.add((lx + step, ly))
         surface.link(x + lx, y + ly, len(name), 1, f"world:place:{place_id}")
+
+    # Palace centres last, so place names get first claim on the space.
+    # No link -- nothing to click.
+    for cell, name in sorted(holdings, key=lambda item: item[1].lower()):
+        name = name[:14]
+        spot = _label_spot(cell, len(name), width, height, used)
+        if spot is None:
+            continue
+        lx, ly = spot
+        surface.text(x + lx, y + ly, name, C["ash"], C["ink"])
+        for step in range(len(name)):
+            used.add((lx + step, ly))
     return at, view
 
 
@@ -728,40 +819,37 @@ def _wrap(text: str, room: int, lines: int = 2) -> list[str]:
 
 
 def _hinterland(b: dict, place: str, room: int) -> list[tuple[str, str]]:
-    """What lies behind an Alu, counted by kind. Never named.
+    """Return the Alu's hinterland: palace centres by name, capacities by kind.
 
-    Holdings and capacities are counted apart, in that order, because they are
-    different answers to different questions: a palace centre is somewhere a
-    detachment can be sent and somewhere an enemy can take, and a capacity is
-    ground and production that belongs to the Alu and is nowhere in particular.
+    Listed separately because they differ: a palace centre is a place
+    (can be sent to, can be taken), a capacity is production with no location.
     """
-    centres, capacities = 0, {}
+    centres, capacities = [], {}
     for site in atlas.sites_of(b):
         if str(site.get("alu", "")) != place:
             continue
-        if str(site.get("role", "")) == "palace_centre":
-            centres += 1
-            continue
         kind = str(site.get("kind", ""))
         capacities[kind] = capacities.get(kind, 0) + 1
+        if str(site.get("role", "")) == "palace_centre":
+            centres.append(_spoken(str(site.get("name", ""))))
     parts = []
-    if centres:
-        parts.append(f"{centres} {atlas.SITE_WORD['palace']}"
-                     if centres > 1 else "one palace centre")
     for kind, count in sorted(capacities.items()):
         word = atlas.SITE_WORD.get(kind, kind)
-        parts.append(f"{count} {word}" if count > 1 or kind == "grain" else word)
-    named = [_spoken(item.get("name") or item.get("id"))
-             for item in places_in_order(b)
-             if str(item.get("kind", "")) == "palace_centre"
-             and str(item.get("alu", "")) == place]
+        if count == 1 and word.endswith("s"):
+            word = word[:-1]
+        parts.append(f"{count} {word}" if count > 1 or kind in ("grain", "palace") else word)
+    named = sorted(centres) + [
+        _spoken(item.get("name") or item.get("id"))
+        for item in places_in_order(b)
+        if str(item.get("kind", "")) == "palace_centre"
+        and str(item.get("alu", "")) == place]
     if not parts and not named:
         return []
     lines = [(line, "dim") for line in
              _wrap("hinterland: " + " · ".join(parts), room, 2)] if parts else []
     if named:
         lines += [(line, "dim") for line in
-                  _wrap("its own: " + " · ".join(sorted(named)), room, 2)]
+                  _wrap("its own: " + " · ".join(named), room, 2)]
     return lines
 
 
@@ -781,8 +869,7 @@ def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
     power = str(entry.get("power", ""))
     standing = RANK_WORD.get(rank, "a town")
     if str(entry.get("kind", "")) == "palace_centre":
-        # Whose it is, not what empire answers for it: a palace centre has no
-        # king of its own, and the useful fact is the Alu that holds it.
+        # A palace centre has no empire of its own; show the Alu that holds it.
         owner = next((item for item in places_in_order(b)
                       if str(item.get("id", "")) == str(entry.get("alu", ""))), {})
         held_by = _spoken(owner.get("name") or entry.get("alu", ""))
@@ -932,7 +1019,10 @@ def compose(b: dict, width: int = 90, height: int = 30,
     style.notice(surface, 2, 1, width - 4, notice)
 
     graph = b.get("world_graph") or {}
-    places = places_in_order(b)
+    # The same list the layer draws, so the "elsewhere on the map" line counts
+    # the marks that are missing from the window rather than the ones the layer
+    # was never going to draw, and the arrow keys never walk to an empty cell.
+    places = _drawn_places(places_in_order(b), _layer_of(layer))
     place_ids = [str(place.get("id", "")) for place in places]
     seat_id = str(b.get("seat", ""))
     if selected_place not in place_ids:
