@@ -162,7 +162,11 @@ class GridWindow:
         # would read them as a game verb.
         for sequence, handler in getattr(app, "desktop_bindings", {}).items():
             try:
-                self.root.bind(sequence, handler)
+                def routed(event, desktop_handler=handler):
+                    result = desktop_handler(event)
+                    return (self.on_key(event)
+                            if result != "break" and self.on_key else result)
+                self.root.bind(sequence, routed)
             except Exception:
                 continue
 
