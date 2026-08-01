@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import art, style
+from tui import art, style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
+VIEWS = ("rites", "divination", "oaths")
 
 # question -> (key, what the king is asking about, what it costs him)
 QUESTIONS = (
@@ -99,13 +100,16 @@ def _room(surface: Surface, width: int, controls_top: int,
 def compose(b: dict, readings: list[str], chosen: str = "harvest",
             offering: tuple[str, int] | None = None,
             width: int = 78, height: int = 32,
-            subject: str = "", notice: str = "") -> InteractiveScreen:
+            subject: str = "", notice: str = "",
+            view: str = "divination") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
-    style.panel(surface, 0, 0, width, height, title="THE ALTAR", drop=False)
+    style.panel(surface, 0, 0, width, height, title="THE SHRINE", drop=False)
 
     # --- what may be asked ---------------------------------------------------
     foot = height - 10
     _room(surface, width, foot, readings)
+    workbench.tabs(surface, 2, 2, width,
+                   tuple((name, name.title()) for name in VIEWS), view)
     style.bar(surface, 2, foot, width - 4, " WHAT YOU WOULD KNOW",
               fg=C["bone"], bg=C["faint"])
     people = [

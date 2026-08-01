@@ -140,8 +140,7 @@ def faults() -> list[str]:
     built = {target for _k, _l, target in hall.DOORS if target in hall.BUILT}
     import play_gui
     openable = ({k for k, _t, _h in play_gui.TABLETS.values()}
-                | {k for k, _t, _h in play_gui.LEDGERS.values()
-                   if k != "stores"}
+                | {k for k, _t, _h in play_gui.LEDGERS.values()}
                 | {k for k, _t, _h in play_gui.ROOMS.values()})
     for target in sorted(built - openable):
         found.append(f"unreachable room: hall advertises '{target}'")

@@ -88,15 +88,14 @@ SHUT_MARK = "✗"
 # where the sickness is come out as one wash of marks in which nothing can be
 # found -- so each is a tab, the ground is the one you land on, and every other
 # layer draws the ground faintly underneath itself to say where you are.
-LAYERS = ("land", "roads", "trade", "farms", "holds", "courts", "sickness")
+LAYERS = ("land", "roads", "trade", "courts", "sickness", "holds")
 LAYER_NAME = {
-    "land": "LAND",
-    "roads": "ROADS",
-    "trade": "TRADE",
-    "farms": "FARMS",
-    "holds": "HOLDS",
-    "courts": "COURTS",
-    "sickness": "PLAGUE",
+    "land": "PLACES",
+    "roads": "ROUTES",
+    "trade": "JOURNEYS",
+    "courts": "NEWS",
+    "sickness": "DISEASE",
+    "holds": "DISPLACEMENT",
 }
 LAYER_LEGEND = {
     "land": "{ } seat  [ ] imperial  ( ) royal  ~ sea  ^ upland  , sown",

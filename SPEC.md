@@ -466,7 +466,7 @@ ships in 0.7.
 - grain, labour, trade in more than one good, transport, obligation, disease,
   politics, household, succession, and limited conflict interacting through
   the shared foundations;
-- the eight rooms of §3.3 owning their verbs, with no working action lost.
+- the nine rooms of §3.3 owning their verbs, with no working action lost.
 
 **Decision — obligations, and what 0.7 needs.** Four kinds, all letter-facing
 and all with a due date, a debtor, a creditor, and a stated remedy on failure:

@@ -31,7 +31,7 @@ from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_campaign                  # noqa: E402
-from tui import desktop, inbox, ledgers, orders, palace, works
+from tui import desktop, inbox, ledgers, orders, palace, trade, works
 from tui import (altar, archive, alu, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
@@ -62,7 +62,7 @@ SCREENS = {
     "muster": ("THE CORVÉE", lambda b: ledgers.muster(b, **_ledger("muster"))),
     "oaths": ("THE OATHS", lambda b: ledgers.oaths(b, **_ledger("oaths"))),
     "land": ("THE LAND", lambda b: ledgers.land(b, **_ledger("land"))),
-    "palace": ("THE PALACE", lambda b: palace.compose(
+    "palace": ("THE COURT", lambda b: palace.compose(
         b, view="court", hours=8,
         width=desktop.default_size("palace")[0],
         height=desktop.default_size("palace")[1])),
@@ -76,11 +76,12 @@ SCREENS = {
         height=desktop.default_size("palace")[1])),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
     "alu": ("THE ALU", lambda b: alu.compose(b, None, 96, 36)),
+    "trade": ("TRADE", lambda b: trade.compose(b, 78, 28)),
     "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 104, 32)),
     "counsel": ("COUNSEL", lambda b: counsel.compose(
         b, _talk(b), 6, "", False, *desktop.default_size("counsel"))),
-    "altar": ("THE ALTAR", lambda b: altar.compose(
+    "altar": ("THE SHRINE", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
         "harvest", ("oil", 20), 78, 32)),
     "archive": ("THE SCRIBES' ROOM — RECORDS", lambda b: archive.compose(

@@ -24,31 +24,31 @@ C = INDEX
 # Retained as a compatibility surface for the CLI and old saved actions.  The
 # graphical desk no longer asks the player to choose one of these postures.
 INTENTS = ("reassure", "refuse", "promise", "warn", "excuse", "request")
-BLOCKS = ("address", "recognition", "matter", "seal")
-FOCI = ("address", "recognition", "matter", "terms", "seal")
+BLOCKS = ("address", "marker", "prostration", "wellbeing", "recognition",
+          "matter", "terms", "precedent", "warning", "seal")
+FOCI = BLOCKS
 
 # Every piece a tablet can be built from, in the order they stand on the clay.
 # Which of them a given recipient may receive comes from that profile's `blocks`
 # list in `content/formulae.toml`, and each is a convention documented in
 # `content/corpus/historical.toml`. `matter` is the player's own words and is
 # never optional; the rest can be added, edited and taken off.
-BLOCK_ORDER = (
-    "address", "prostration", "wellbeing", "recognition", "quotation",
-    "matter", "instruction", "oath", "seal",
-)
+BLOCK_ORDER = ("address", "marker", "prostration", "wellbeing", "recognition",
+               "matter", "terms", "precedent", "warning", "seal")
 BLOCK_LABELS = {
     "address": "ADDRESS",
-    "prostration": "PROSTRATION",
-    "wellbeing": "WISH FOR HIS HOUSE",
+    "marker": "MESSAGE MARKER",
+    "prostration": "PROSTRATION / GREETING",
+    "wellbeing": "WELL-BEING",
     "recognition": "RECOGNITION",
-    "quotation": "THEIR OWN WORDS",
     "matter": "MATTER · YOUR WORDS",
-    "instruction": "INSTRUCTION",
-    "oath": "OATH",
+    "terms": "TERMS",
+    "precedent": "PRECEDENT",
+    "warning": "WARNING",
     "seal": "SEAL",
 }
 # Blocks the desk puts on a new tablet before the player touches it.
-OPENING_BLOCKS = ("address", "recognition", "matter", "seal")
+OPENING_BLOCKS = ("address", "marker", "recognition", "matter", "terms", "seal")
 TERM_KINDS = (
     "gift", "request_good", "promise_good", "service",
     "marriage_proposal",
@@ -103,6 +103,7 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
         f"By {' and '.join(gods)}, what I have written I shall perform."
         if gods else "By the gods, what I have written I shall perform.")
     return {
+        "marker": (BlockChoice("ROYAL WORD", "Message of Ammurapi, king of Ugarit."),),
         "prostration": (
             BlockChoice("SEVEN AND SEVEN",
                         rule.get("prostration")
@@ -120,14 +121,14 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
                 " sons and your horses. It is well with me."),
             BlockChoice("NONE", ""),
         ),
-        "quotation": (
+        "precedent": (
             BlockChoice(
                 "QUOTE AND ANSWER",
                 f"{rule.get('quotation_form', 'As to what you wrote me,'
                                                ' saying:')} \"…\""),
             BlockChoice("NONE", ""),
         ),
-        "instruction": (
+        "warning": (
             BlockChoice(
                 "WRITE BACK",
                 "Write to me when it is done, and write the count of the days"
@@ -137,10 +138,7 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
                 "Send your answer with the same courier."),
             BlockChoice("NONE", ""),
         ),
-        "oath": (
-            BlockChoice("BY THE GODS", oath_line),
-            BlockChoice("NONE", ""),
-        ),
+        "terms": (BlockChoice("ATTACHED TERMS", ""),),
         "address": (
             BlockChoice("COURT FORM", proper),
             BlockChoice(
@@ -176,7 +174,12 @@ def default_blocks() -> dict[str, int]:
 def permitted_blocks(recipient: str) -> tuple[str, ...]:
     """Which pieces this recipient's register allows, in tablet order."""
     rule = formula(load_formulae(), profile_for(recipient))
-    allowed = set(rule.get("blocks", OPENING_BLOCKS)) | {"matter", "seal"}
+    allowed = set(rule.get("blocks", OPENING_BLOCKS))
+    if "quotation" in allowed:
+        allowed.add("precedent")
+    if "instruction" in allowed:
+        allowed.add("warning")
+    allowed |= {"marker", "matter", "terms", "seal"}
     # Recognition is not a rank convention; it is the desk's own courtesy and
     # is offered everywhere the register does not forbid a greeting.
     if not rule.get("wellbeing_forbidden"):
@@ -201,9 +204,12 @@ def opening_order(recipient: str) -> tuple[str, ...]:
 def normalise_order(order, recipient: str) -> tuple[str, ...]:
     """Keep a saved block order legal: permitted pieces, tablet order, matter."""
     allowed = permitted_blocks(recipient)
-    kept = [name for name in (order or ()) if name in allowed]
-    if "matter" not in kept:
-        kept.append("matter")
+    aliases = {"quotation": "precedent", "instruction": "warning"}
+    kept = [aliases.get(name, name) for name in (order or ())]
+    kept = [name for name in kept if name in allowed]
+    for required in ("address", "marker", "matter", "terms", "seal"):
+        if required not in kept:
+            kept.append(required)
     return tuple(name for name in BLOCK_ORDER if name in kept)
 
 
@@ -391,8 +397,7 @@ def _draw_bound(surface: Surface, x: int, y: int, width: int, rows: int,
     """
     surface.fill(x + 1, y, max(0, width - 2), max(1, rows + 1),
                  " ", C["clay"], C["ink"])
-    heading = ("BOUND BY THIS TABLET" if bound
-               else "BOUND BY THIS TABLET · nothing yet")
+    heading = "FINAL REVIEW" if bound else "FINAL REVIEW · NO ORDER PARSED"
     surface.text(x + 2, y, _short(heading, width - 4), C["bone"], C["ink"])
     for offset, line in enumerate(bound[:rows]):
         surface.text(x + 4, y + 1 + offset, _short(f"· {line}", width - 6),
@@ -634,12 +639,16 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     for name in below:
         if name == "seal":
             continue
+        if name == "terms":
+            y = _draw_terms(surface, right, y, right_width, terms,
+                            term_builder, block_focus == name, term_focus)
+            continue
         y = _draw_block(
             surface, right, y, right_width, BLOCK_LABELS.get(name, name),
             picked.get(name, BlockChoice("", "")),
             block_focus == name, 1, f"block:{name}")
     y = _draw_bound(surface, right, y, right_width,
-                    min(3, max(1, len(bound))), bound)
+                    min(5, max(1, len(bound))), bound)
 
     seal_choice = picked["seal"]
     if seal_data:

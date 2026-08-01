@@ -28,6 +28,8 @@ STEPS = {"roll": 50, "stores": 50, "corvee": 5, "dredge": 5,
          "land_due": 25, "expiate": 10}
 
 TASKS = ("garrison", "watch", "harvest", "campaign")
+MUSTER_VIEWS = (("formations", "Formations"), ("cohorts", "Cohorts"),
+                ("detachments", "Detachments"), ("draft", "Draft order"))
 
 # Which store rows are a ledger the king can have counted. `inspect_ledger`
 # takes `granary` or `seed` and nothing else, so the control is offered on
@@ -342,7 +344,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
 def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
            scroll: int = 0, task: str = "garrison", place: str = "",
            amount: int = 0, notice: str = "",
-           hours: int = 0) -> InteractiveScreen:
+           hours: int = 0, view: str = "formations") -> InteractiveScreen:
     troops = b.get("troops", {})
     land = b.get("land") or {}
     formations = list(troops.get("formations", []))
@@ -388,6 +390,19 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
             (due, "blood" if summons["overdue"] else "dim"),
             (_spoken(summons["oath_id"]), "dim"),
         ), mark="!" if summons["overdue"] else ""))
+
+    if view in {"cohorts", "detachments"}:
+        cohorts = [c for c in b.get("cohorts", ())
+                   if (bool(c.get("parent") or c.get("task"))) == (view == "detachments")]
+        rows = [Row(c["id"], ((c.get("name", c["id"]), "clay"),
+                              (str(c.get("size", 0)), "dim"),
+                              (_spoken(c.get("task", "at home")), "sand"),
+                              (_spoken(c.get("place", "")), "dim")))
+                for c in cohorts]
+    elif view == "draft":
+        rows = [Row("draft", (("levy heads from cohort", "gold"),
+                              ("exact", "flame"), ("typed", "clay"),
+                              ("[c]", "dim")))]
 
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
@@ -462,6 +477,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
                                  + (f" at {_spoken(place)}" if place else ""),
                            enabled=formation is not None and bool(place),
                            why="choose a formation and a place"), hours),
+        Control("release_cohort", "r", label="release exact detachment"),
         Control("place_person", key_for("place_person"), label="give it a commander",
                 enabled=formation is not None),
         Control("dismiss_person", key_for("dismiss_person"), label="take the command away",
@@ -473,7 +489,8 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
         (24, -5, 10, 14),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="no hands or formations are recorded.",
-        note="↑↓ choose   [ ] set days   [c] call up   [t] task   [l] place   [esc] close")
+        note="Tab view   [c] write exact levy   [r] release   [a] assign   [esc] close",
+        views=MUSTER_VIEWS, view=view)
 
 
 # --- the oaths ----------------------------------------------------------------

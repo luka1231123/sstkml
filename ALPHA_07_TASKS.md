@@ -591,13 +591,14 @@ destination, and expected delay where those facts apply.
 | Window | Owns | Principal verbs |
 | --- | --- | --- |
 | Hall | urgent matters, passage of time | inspect, open, end fortnight |
-| Alu | cohorts, food, labour, stores, hinterland, walls, works, dependent centres | allocate, ration, levy corvée, release, build, repair, accept, settle, redirect, refuse |
+| Alu | cohorts, institutions, sites, walls, works, dependent centres | inspect, build, repair, accept, settle, redirect, refuse |
 | Trade | Exchange, merchants, cargo, caravans, commercial routes | finance, authorize, request, offer, tax, exempt, requisition, escort, close |
+| Storehouse | stores, labour roll, land, reserves, dues | inspect, allocate, ration, prioritize, tax |
 | World | Alu, roads, sea legs, moving parties, displacement, known danger | inspect, compare, follow, open correspondence |
 | Scribes | letters, reports, promises, obligations, archives | read, file, delegate, reply, demand, offer, promise, dispatch |
-| Palace | king, court, officials, succession, justice | appoint, dismiss, judge, pardon, name heir |
-| Muster | formations, levies, garrisons, escorts, defence | levy, assign, reinforce, escort, recall |
-| Altar | temple support, rites, divination, oaths | offer, consult, swear, expiate |
+| Court | king, court, officials, succession, justice | appoint, dismiss, judge, pardon, name heir |
+| Muster | formations, cohorts, detachments, garrisons, escorts, defence | levy exact cohorts, release, assign, reinforce, escort, recall |
+| Shrine | temple support, rites, divination, oaths | offer, consult, swear, expiate |
 
 Counsel, Orders, and Help remain supporting utilities. An action has one owning
 window even when another window links to it. World displays trade movement;

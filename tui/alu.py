@@ -28,10 +28,54 @@ first. The player reads the shapes and decides (D19).
 """
 from __future__ import annotations
 
-from tui import art, collection, document, style
+from tui import art, collection, document, style, workbench
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
+VIEWS = ("overview", "cohorts", "institutions", "sites", "works")
+
+
+def _plain(b: dict, view: str, width: int, height: int, notice: str) -> Screen:
+    surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
+    style.panel(surface, 0, 0, width, height, title="THE ALU", drop=False)
+    workbench.tabs(surface, 2, 2, width,
+                   tuple((name, name.title()) for name in VIEWS), view)
+    rows = []
+    if view == "overview":
+        rows = [("people", sum(c.get("size", 0) for c in b.get("cohorts", ()))),
+                ("cohorts", len(b.get("cohorts", ()))),
+                ("awaiting reception", sum(c.get("status") in {"displaced", "petitioning"}
+                                           for c in b.get("cohorts", ()))),
+                ("institutions", len(b.get("institutions", ()))),
+                ("works", len(b.get("projects", ())))]
+    elif view == "cohorts":
+        rows = [(c.get("name", c["id"]), f"{c.get('size', 0):,} · {c.get('place', '')}")
+                for c in b.get("cohorts", ())]
+    elif view == "sites":
+        rows = [(i["name"], f"{i.get('place', '')} · {i.get('kind', '')}")
+                for i in b.get("institutions", ())]
+    else:
+        rows = [(p.get("what", p.get("id", "work")),
+                 f"{p.get('days_done', 0):,}/{p.get('days_needed', 0):,} days")
+                for p in b.get("projects", ())]
+    for y, (name, value) in enumerate(rows[:max(0, height - 8)], 5):
+        surface.text(3, y, str(name)[:max(8, width // 2 - 4)], C["clay"], C["ink"])
+        surface.text(width // 2, y, str(value)[:max(0, width // 2 - 3)], C["dim"], C["ink"])
+        source = (b.get("cohorts", ()) if view == "cohorts" else
+                  b.get("institutions", ()) if view == "sites" else ())
+        item = next((item for item in source if item.get("name", item.get("id")) == name), None)
+        if item:
+            surface.link(2, y, width - 4, 1, f"alu:open:{item['id']}")
+    style.notice(surface, 3, height - 3, width - 6, notice)
+    actions = [style.FooterAction("Tab", "next view")]
+    if view in {"overview", "cohorts"}:
+        actions += [style.FooterAction("a", "accept"),
+                    style.FooterAction("z", "settle"),
+                    style.FooterAction("d", "redirect"),
+                    style.FooterAction("f", "refuse")]
+    actions.append(style.FooterAction("Esc", "close"))
+    style.footer(surface, actions)
+    return surface.interactive()
 
 # What each kind stops doing when it stops. Stated plainly and without warning:
 # the player should be able to learn the machine by reading it once.
@@ -228,10 +272,15 @@ def table_room(height: int) -> int:
 
 def compose(b: dict, history: dict[str, list[int]] | None = None,
             width: int = 96, height: int = 36,
-            notice: str = "", scroll: int = 0) -> Screen:
+            notice: str = "", scroll: int = 0,
+            view: str = "overview") -> Screen:
+    if view != "institutions":
+        return _plain(b, view, width, height, notice)
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALU",
                 note="[esc] close", drop=False)
+    workbench.tabs(surface, 2, 2, width,
+                   tuple((name, name.title()) for name in VIEWS), view)
 
     institutions = b.get("institutions") or []
     history = history or {}

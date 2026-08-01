@@ -140,6 +140,9 @@ class DispatchLetter:
     seal: str
     courier_id: str
     path: tuple[str, ...]
+    orders: tuple[str, ...] = ()
+    tone: str = "plain"
+    unparsed: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         required = {

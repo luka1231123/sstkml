@@ -2,7 +2,7 @@
 
 Information-constrained rulership sim. Fragile Late Bronze Age world.
 
-People, households, institutions, goods, labour, obligations, journeys, disease, foreign courts — all simulated deterministically. Player hold Ugarit together through fallible people and delayed, interested information. No omniscient strategy layer.
+People, households, institutions, goods, labour, obligations, journeys, disease, and foreign courts are simulated deterministically. The player holds the Seat through fallible people and delayed, interested information. No omniscient strategy layer.
 
 [`SPEC.md`](SPEC.md) = sole current product and release authority (Alpha 0.7). Superseded specs and plans live in [`docs/archive`](docs/archive/README.md) — history, not active requirements.
 
@@ -14,17 +14,17 @@ People, households, institutions, goods, labour, obligations, journeys, disease,
 - agriculture, institutions, trade, cargo, news, disease, justice, household, ritual, military service, construction foundations;
 - required grounded local-model language for scribes, advisers, tablets;
 - multi-window character-cell Palace Desktop;
-- Hall, Court, Scribes' Room, Storehouse, City, Muster, World, Shrine foundations;
-- four-part writing desk: Address, Recognition, player-written Matter, Seal;
+- Hall, Scribes, Alu, Trade, Storehouse, Muster, Court, Shrine, and World;
+- corpus-derived writing blocks and a parsed order/tone review before sealing;
 - versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
 
-Court and kernel not yet one authority: six facts still held twice. Remaining scope lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-alpha-07).
+The shared world contains 55 simulated Alu; authored court content currently makes only `seat` playable. Remaining scope lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-alpha-07).
 
 ## Run
 
 ```sh
 ./run.sh                  # windowed game
-./run.sh --cli ugarit     # terminal game
+./run.sh --cli seat       # terminal game
 ./run.sh --check          # interpreter, Tk, display, Ollama, and model
 ./run.sh --screens all    # render every screen as text
 ./run.sh --probe          # live Tk probe
@@ -32,7 +32,7 @@ Court and kernel not yet one authority: six facts still held twice. Remaining sc
 
 `run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
-Hall print current controls. `Space` end fortnight, `Ctrl-S` save, `Ctrl-O` ask before reload, `?` open grounded Help, `Q` quit.
+Hall prints current controls. `Space`, then `Enter`, ends the fortnight; `Ctrl-S` saves, `Ctrl-O` asks before reload, `?` opens grounded Help, and `Q` quits.
 
 ## Required local language model
 

@@ -87,7 +87,7 @@ WINDOWS: dict[str, WindowSpec] = {
         # The World is intentionally exempt from the compact desktop pass.
         _spec("world", "The Known World", "workbench", (104, 32), (68, 22)),
         _spec("trade", "Trade", "workbench", (72, 24), (66, 22)),
-        _spec("palace", "The Palace", "workbench", (74, 25), (68, 24)),
+        _spec("palace", "The Court", "workbench", (74, 25), (68, 24)),
         _spec("works", "Works", "ledger", (66, 23), (62, 21)),
         _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
         _spec("roll", "The Roll", "ledger", (66, 23), (62, 21)),
@@ -101,13 +101,14 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("stores", "The Storehouse", "workbench", (78, 25), (76, 24)),
         # The Shrine keeps enough vertical room for its medium altar vignette
         # above the fixed ritual controls, even at the minimum geometry.
-        _spec("altar", "The Altar", "document", (54, 24), (52, 22)),
+        _spec("altar", "The Shrine", "document", (54, 24), (52, 22)),
         _spec("counsel", "Counsel", "document", (52, 18), (50, 17)),
         _spec("fortnight", "The Fortnight", "document", (54, 18), (50, 17)),
         _spec("help", "Help", "utility"),
         _spec("palette", "Command", "palette"),
         _spec("switcher", "Windows", "utility", (42, 17), (40, 15)),
         _spec("institution:", "Institution", "document", (50, 19), (46, 18)),
+        _spec("focus:", "Record", "document", (58, 22), (46, 18)),
         _spec("letter:", "Tablet", "document", (50, 20), (46, 18)),
         _spec("archive:", "Tablet", "document", (50, 20), (46, 18)),
     )

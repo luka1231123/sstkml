@@ -605,8 +605,8 @@ def _relations_detail(b: dict, chosen: str, amount: int,
     lines.append(("", "clay"))
     lines.append(("Gifts and marriage proposals are written at the Desk.",
                   "gold"))
-    lines.append((f"harbour due {revenue.get('harbour_rate', 0)}/1000"
-                  "   [<] [>]", "sand"))
+    lines.append((f"harbour due {revenue.get('harbour_rate', 0)}/1000 · Trade",
+                  "sand"))
     return lines
 
 
@@ -621,9 +621,6 @@ def _relations_controls(b: dict, chosen: str, hours: int, amount: int,
             "dispatch_letter", "m", label="propose marriage by letter",
             enabled=bool(chosen), why="choose a court",
             command="letter-marriage"),
-        workbench.Control(
-            "set_harbour_due", registry.BY_ID["set_harbour_due"].mnemonic,
-            label="harbour due · [<] [>]", command="due"),
     ]
 
 
