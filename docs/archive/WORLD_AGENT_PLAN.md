@@ -1,8 +1,8 @@
 # World continuation — agent execution plan
 
-Status: executable; subordinate to root `SPEC.md`.  
-Baseline: 692 tests passing.  
-Retire file when done.
+Status: **Done and dusted.** The correspondence chain below is built. Kept as a
+record of how it was staged. Adds no requirement to `SPEC.md`.  
+Baseline at the time of writing: 692 tests passing.
 
 ## 1. Goal
 

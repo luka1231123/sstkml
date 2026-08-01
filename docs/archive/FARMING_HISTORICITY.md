@@ -1,6 +1,7 @@
 # The farming model is not how the collapse happened
 
-Status: note, not a plan. Nothing here is scheduled. Written down so the next
+Status: standing note, not a plan. Nothing here is scheduled and nothing here
+is a requirement of `SPEC.md`. Written down so the next
 person to open `tools/gen_detail.py` does not mistake the current numbers for a
 considered position on Late Bronze Age agriculture. They are not; they are a
 balance pass that stopped a generator bug from emptying half the map.

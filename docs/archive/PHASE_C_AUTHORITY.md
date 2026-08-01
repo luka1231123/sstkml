@@ -1,8 +1,8 @@
 # Phase C — one authority per fact
 
-Status: executable; subordinate to root `SPEC.md` (§6.2) and
-`docs/WORLD_AGENT_PLAN.md` §7. Retire when `tools/authority_audit.py` reports
-no findings.
+Status: **Done and dusted.** Superseded by `docs/ONE_AUTHORITY_DESIGN.md`,
+which restates this table with the Alu model applied. Kept for its deletion
+targets. Adds no requirement to `SPEC.md`.
 
 Phase C end state `content/kernel/world.toml` already name in own comment: "the legacy court still owns Ugarit". Today two systems each hold authoritative answer to same question. No test say which one true. This file name the one authority and one deletion target per duplicated fact — migration become list, not judgement call.
 

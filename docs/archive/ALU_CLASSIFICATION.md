@@ -1,8 +1,10 @@
 # Alu classification — design pass for Alpha 0.7 Task 1
 
-- Status: implemented; §12 hold what build changed about design
+- Status: **Done and dusted.** Task 1 is implemented; this file is now the
+  record of the verdicts, not a plan. §12 holds what the build changed about
+  the design. Adds no requirement to `SPEC.md`.
 - Revision: 2026-07-30
-- Covers: `BASE_GAME_SPEC_DRAFT.md` §2.4, §8.2, §8.3, Task 1
+- Covers: `SPEC.md` §2.4, §8.2, §8.3, Task 1
 - Input data: `content/scenarios/ugarit.toml` (37 places, 146 site marks, 56 routes)
 
 Task 1 want: one documented classification + one owning Alu per map mark, map render from classification, no decorative site silently treated as autonomous settlement. This doc = that classification. Change authored data, three small render tables, loader. Move no authority between `World` and `Kernel` — that Task 2.
