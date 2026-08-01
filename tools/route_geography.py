@@ -495,7 +495,7 @@ def main():
         out.append({
             "a": a, "b": b, "legs": legs, "mode": mode,
             # A sea lane shuts outside the sailing window; a road does not.
-            "seasonal": mode != "land",
+            "seasonal": mode == "sea",
             "risk": risk,
             "path": [n for cell in kept for n in cell],
         })

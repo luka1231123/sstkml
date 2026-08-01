@@ -195,7 +195,7 @@ def main():
         leg_km = LAND_LEG if mode=="land" else SEA_LEG
         legs = max(1, round(km/leg_km))
         risk = int(40 + km // (3 if mode=="land" else 6))
-        seasonal = mode!="land"
+        seasonal = mode=="sea"
         route_toml += (f"[[routes]]\na = \"{a}\"\nb = \"{b}\"\n"
                        f"legs = {legs}\nmode = \"{mode}\"\n"
                        f"seasonal = {'true' if seasonal else 'false'}\nrisk = {risk}\n")
