@@ -24,7 +24,7 @@ VIEWS = ("rites", "divination", "oaths")
 # question -> (key, what the king is asking about, what it costs him)
 QUESTIONS = (
     ("h", "of the harvest", "harvest"),
-    ("d", "of a death in the house", "death"),
+    ("k", "of a death in the house", "death"),
     ("r", "of the road and the sea", "route"),
 )
 
@@ -104,6 +104,15 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             view: str = "divination") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE SHRINE", drop=False)
+    if view == "rites":
+        workbench.tabs(surface, 2, 2, width,
+                       tuple((name, name.title()) for name in VIEWS), view)
+        surface.text(3, 5, "RITES", C["gold"], C["ink"])
+        surface.text(3, 7, "no rite awaits a royal decision", C["ash"], C["ink"])
+        style.footer(surface, (style.FooterAction("Tab", "view"),
+                               style.FooterAction("Esc", "close")),
+                     y=height - 2, x=2, width=width - 4)
+        return surface.interactive()
 
     # --- what may be asked ---------------------------------------------------
     foot = height - 10
@@ -155,7 +164,13 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             "a larger offering does not buy a truer answer. "
             "it buys a readier one."[:width - 6],
             C["ash"], C["ink"])
-    style.bar(surface, 2, height - 2, width - 4,
-              " [enter] ask   ·   2 hours + offering   ·   [o] the oaths",
-              fg=C["clay"], bg=C["lapis"])
+    active = next((o for o in reversed(b.get("house", {}).get("omens", ()))
+                   if o.get("published") and not o.get("defied")), None)
+    actions = ([style.FooterAction("s", "suppress · 2h", command="do:suppress_omen"),
+                style.FooterAction("d", "defy", command="do:defy_omen")]
+               if active else
+               [style.FooterAction("Enter", "ask · 2h + offering", command="altar:ask")])
+    actions += [style.FooterAction("Tab", "view"),
+                style.FooterAction("Esc", "close")]
+    style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()

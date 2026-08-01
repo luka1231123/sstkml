@@ -430,8 +430,9 @@ def compose(b: dict, width: int = 100, height: int = 32,
     move_label = "read clay" if not rack_focused else "choose tablet"
     style.footer(surface, [
         style.FooterAction(
-            "tab", "focus rack" if not rack_focused else "focus tablet",
+            "space", "focus rack" if not rack_focused else "focus tablet",
             command="focus:toggle"),
+        style.FooterAction("tab", "next view", command="view:next"),
         style.FooterAction("↑", move_label, command="nav:up"),
         style.FooterAction("↓", move_label, command="nav:down"),
         style.FooterAction("enter", "break seal", enabled=can_read),

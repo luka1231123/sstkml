@@ -252,6 +252,7 @@ class Game:
         self.archive_generation = 0
         self.archive_typing = False
         self.archive_open_ref = ""
+        self.archive_pick = ""
         self.archive_documents: dict[str, dict] = {}
         self.archive_document_scroll: dict[str, int] = {}
         # The pile's display order, held steady across the fortnight so the
@@ -761,7 +762,7 @@ class Game:
                     self.archive_summary, self.archive_typing,
                     width, height, notice=notice,
                     scroll=self.scroll_of("archive_scroll"),
-                    embedded=True)
+                    embedded=True, selected=getattr(self, "archive_pick", ""))
             return inbox_page.compose(
                 b, width, height, self.stack_order, self.inbox_pick,
                 self.inbox_filter, self.inbox_scroll, self.hours,
@@ -782,11 +783,13 @@ class Game:
                 all_routes=getattr(self, "world_all_routes", False))
         if key == "trade":
             return trade_page.compose(b, width, height, notice=notice,
-                                      view=getattr(self, "trade_view", trade_page.VIEWS[0]))
+                                      view=getattr(self, "trade_view", trade_page.VIEWS[0]),
+                                      selected=getattr(self, "trade_pick", ""))
         if key == "alu":
             return alu.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("alu_scroll"),
-                                view=getattr(self, "alu_view", alu.VIEWS[0]))
+                                view=getattr(self, "alu_view", alu.VIEWS[0]),
+                                selected=getattr(self, "alu_pick", ""))
         if key == "works":
             return works_page.compose(
                 b, self.works_pick, width, height, notice=notice,
@@ -839,7 +842,9 @@ class Game:
                 return ledger_page.oaths(
                     b, selected=state["pick"], scroll=state["scroll"],
                     amount=state["amount"], notice=notice, hours=self.hours,
-                    width=width, height=height)
+                    width=width, height=height,
+                    views=tuple((name, name.title()) for name in altar.VIEWS),
+                    view="oaths")
             return altar.compose(b, self.altar_readings, self.altar_question,
                                  self.altar_offering, width, height,
                                  subject=self.altar_subject,
@@ -849,7 +854,8 @@ class Game:
             return archive.compose(b, self.archive_query, self.archive_hits,
                                    self.archive_summary, self.archive_typing,
                                    width, height, notice=notice,
-                                   scroll=self.scroll_of("archive_scroll"))
+                                   scroll=self.scroll_of("archive_scroll"),
+                                   selected=getattr(self, "archive_pick", ""))
         if key.startswith("archive:"):
             item = self.archive_documents.get(key)
             return None if item is None else archive.tablet(
@@ -893,10 +899,23 @@ class Game:
                 return "break" if handler() else None
             return wrapped
 
+        def guarded(handler):
+            def wrapped(_event=None):
+                active = self.active_window()
+                typing = ((active == "stack" and self.desk and self.desk.get("dictating"))
+                          or (active == "counsel" and self.counsel_typing)
+                          or (active in {"stack", "archive"} and self.archive_typing)
+                          or active == "palette")
+                if typing:
+                    return None
+                handler()
+                return "break"
+            return wrapped
+
         bindings = {
-            "<colon>": bind(self.open_palette),
-            "<grave>": bind(self.open_palette),
-            "<question>": bind(self.open_help),
+            "<colon>": guarded(self.open_palette),
+            "<grave>": guarded(self.open_palette),
+            "<question>": guarded(self.open_help),
             "<Return>": pending(self.confirm_pending),
             "<Escape>": pending(self.cancel_pending),
             "<Control-Tab>": bind(self.cycle_windows),
@@ -905,6 +924,8 @@ class Game:
         for modifier in ("Control", "Command"):
             bindings[f"<{modifier}-h>"] = bind(self.raise_hall)
             bindings[f"<{modifier}-g>"] = bind(self.open_switcher)
+            bindings[f"<{modifier}-s>"] = bind(self.save_current)
+            bindings[f"<{modifier}-o>"] = bind(self.request_load)
             bindings[f"<{modifier}-Shift-t>"] = bind(self.tile_windows)
             bindings[f"<{modifier}-Shift-c>"] = bind(self.cascade_windows)
             bindings[f"<{modifier}-plus>"] = bind(lambda: self.zoom(1))
@@ -914,7 +935,17 @@ class Game:
             bindings[f"<{modifier}-minus>"] = bind(lambda: self.zoom(-1))
             bindings[f"<{modifier}-Key-0>"] = bind(self.reset_zoom)
             bindings[f"<{modifier}-Tab>"] = bind(self.cycle_windows)
+            bindings[f"<{modifier}-Shift-Tab>"] = bind(lambda: self.cycle_windows(True))
         return bindings
+
+    def request_load(self) -> None:
+        if self.load_armed:
+            self.load_current()
+            return
+        self.load_armed = True
+        self.notify("Reload discards unsaved orders. Press Ctrl-O again to confirm.",
+                    registry.PREVIEW)
+        self.repaint()
 
     def zoom(self, step: int) -> None:
         size = self.app.set_font_size(self.prefs.font_size + step)
@@ -2039,6 +2070,14 @@ class Game:
             state["scroll"] = 0
             self.repaint()
             return
+        if event.keysym in {"Tab", "ISO_Left_Tab"}:
+            views = [key for key, _label in orders_page.VIEWS]
+            step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
+            state["view"] = views[(views.index(state["view"]) + step) % len(views)]
+            state["pick"] = ""
+            state["scroll"] = 0
+            self.repaint()
+            return
         if char.isdigit() and 1 <= int(char) <= len(orders_page.VIEWS):
             state["view"] = orders_page.VIEWS[int(char) - 1][0]
             state["pick"] = ""
@@ -2066,7 +2105,7 @@ class Game:
 
         chosen = self.chosen_order()
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
-        if char == "o" or wanted == "open":
+        if event.keysym == "Return" or char == "o" or wanted == "open":
             self.open_where_given(chosen)
             return
         if char == "u" or (wanted and wanted != "open"):
@@ -2456,10 +2495,11 @@ class Game:
         formation = next(
             (f for f in formations if f["id"] == state["pick"]), None)
         places = [place["id"] for place in affordances.places(b)]
-        if char == _key("levy_cohort") or wanted == "levy_cohort":
+        if view in {"cohorts", "draft"} and (
+                char == _key("levy_cohort") or wanted == "levy_cohort"):
             self.command_line = "levy "
             self.open_palette()
-        elif char == "r" or wanted == "release_cohort":
+        elif view == "detachments" and (char == "r" or wanted == "release_cohort"):
             self.command_line = "release "
             self.open_palette()
         elif char == "t":
@@ -2472,7 +2512,8 @@ class Game:
                 else -1
             state["place"] = places[(here + 1) % len(places)]
             self.repaint()
-        elif char == _key("assign_troops") or wanted == "assign_troops":
+        elif view == "formations" and (
+                char == _key("assign_troops") or wanted == "assign_troops"):
             if formation is None or not state["place"]:
                 self.notify(
                     "choose a formation, then a task and a place with [t]"
@@ -3099,7 +3140,17 @@ class Game:
         if event.keysym == "Escape":
             self.app.close("altar")
             return
+        if view == "rites":
+            return
         char = (event.char or "").lower()
+        omen = next((o for o in reversed(self.belief.get("house", {}).get("omens", ()))
+                     if o.get("published") and not o.get("defied")), None)
+        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        if omen and (char in {"s", "d"} or wanted in {"suppress_omen", "defy_omen"}):
+            suppress = char == "s" or wanted == "suppress_omen"
+            self.do((A.SuppressOmen if suppress else A.DefyOmen)(omen["id"]),
+                    window="altar")
+            return
         people = [
             person for person in self.belief.get(
                 "house", {}).get("members", [])
@@ -3136,10 +3187,7 @@ class Game:
                 self.altar_notice = ""
                 self.repaint()
                 return
-        if char == "o":
-            self.open_oaths()
-            return
-        if event.keysym == "Return":
+        if event.keysym == "Return" or command == "altar:ask":
             if self.hours < OMEN_COST:
                 self.altar_notice = (
                     f"The rite requires {OMEN_COST} hours; "
@@ -3277,6 +3325,7 @@ class Game:
             return
         if command.startswith("alu:open:"):
             ref = command.split(":", 2)[2]
+            self.alu_pick = ref
             item = next((item for item in self.belief.get("cohorts", ())
                          if item["id"] == ref), None)
             item = item or next((item for item in self.belief.get("institutions", ())
@@ -3304,11 +3353,56 @@ class Game:
             self.open_palette()
             return
         if view == "works":
-            self.open_works()
+            if event.keysym == "Return":
+                self.open_works()
+            return
+        if view in {"cohorts", "sites"} and (
+                event.keysym in {"Up", "Down"} or command == "alu:next"):
+            source = (self.belief.get("cohorts", ()) if view == "cohorts"
+                      else self.belief.get("institutions", ()))
+            ids = [item["id"] for item in source]
+            if ids:
+                here = ids.index(getattr(self, "alu_pick", "")) if getattr(self, "alu_pick", "") in ids else 0
+                self.alu_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+                self.repaint()
+            return
+        if view in {"cohorts", "sites"} and event.keysym == "Return":
+            ref = getattr(self, "alu_pick", "")
+            item = next((item for item in self.belief.get("cohorts", ())
+                         if item["id"] == ref), None)
+            item = item or next((item for item in self.belief.get("institutions", ())
+                                 if item["id"] == ref), None)
+            if item:
+                self.open_focus("cohort" if view == "cohorts" else "site", item)
             return
         if view != "institutions":
             return
         institutions = self.belief.get("institutions", [])
+
+        def open_institution(inst):
+            self.alu_pick = inst["id"]
+            if not inst["inspected"] and not self.do(
+                    A.InspectLedger(f"institution:{inst['id']}"), window="alu"):
+                return
+            key = f"institution:{inst['id']}"
+            window = self.app.window(
+                key, inst["name"], 68, 22,
+                on_key=lambda e, k=key, i=inst["id"]: self.on_institution_key(e, k, i),
+                on_close=lambda k=key: self.app.close(k))
+            self.repaint()
+            window.focus()
+
+        if (event.keysym in {"Up", "Down"} or command == "alu:next") and institutions:
+            ids = [item["id"] for item in institutions]
+            here = ids.index(getattr(self, "alu_pick", "")) if getattr(self, "alu_pick", "") in ids else 0
+            self.alu_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+            self.repaint()
+            return
+        if event.keysym == "Return" and institutions:
+            inst = next((item for item in institutions
+                         if item["id"] == getattr(self, "alu_pick", "")), institutions[0])
+            open_institution(inst)
+            return
         _width, height = self._size("alu")
         room = alu.table_room(height)
         if event.keysym in self.STEPS:
@@ -3324,21 +3418,7 @@ class Game:
             index = page.absolute(int(char))
             if index < 0:
                 return
-            inst = institutions[index]
-            if not inst["inspected"]:
-                if not self.do(
-                        A.InspectLedger(f"institution:{inst['id']}"),
-                        window="alu"):
-                    return
-            self.alu_notice = ""
-            key = f"institution:{inst['id']}"
-            window = self.app.window(
-                key, inst["name"], 68, 22,
-                on_key=lambda e, k=key, i=inst["id"]: self.on_institution_key(
-                    e, k, i),
-                on_close=lambda k=key: self.app.close(k))
-            self.repaint()
-            window.focus()
+            open_institution(institutions[index])
 
     def on_archive_key(self, event, embedded: bool = False) -> None:
         if embedded and self.archive_open_ref:
@@ -3368,6 +3448,7 @@ class Game:
         command = getattr(event, "command", "")
         if command.startswith("open:"):
             ref = command.split(":", 1)[1]
+            self.archive_pick = ref
             item = next(
                 (hit for hit in self.archive_hits
                  if str(hit.get("ref", "")) == ref),
@@ -3394,33 +3475,31 @@ class Game:
             self.repaint()
             return
         char = event.char or ""
-        if event.keysym in self.STEPS:
-            if embedded and event.keysym not in {"Up", "Down"}:
-                return
-            if self.scrolled("archive_scroll", len(self.archive_hits),
-                             archive.RESULT_ROOM, self.STEPS[event.keysym]):
-                self.repaint()
-            return
-        if char.isdigit() and char != "0":
-            page = collection.page(
-                len(self.archive_hits), archive.RESULT_ROOM,
-                self.scroll_of("archive_scroll"))
-            index = page.absolute(int(char))
-            if index >= 0:
-                item = self.archive_hits[index]
-                if embedded:
-                    self.archive_open_ref = str(item.get("ref", ""))
-                    self.archive_document_scroll["embedded"] = 0
-                    self.repaint()
-                else:
-                    self.open_archive_document(item)
+        if (event.keysym in self.STEPS or command == "archive:next") \
+                and self.archive_hits:
+            refs = [str(hit.get("ref", "")) for hit in self.archive_hits]
+            here = refs.index(self.archive_pick) if self.archive_pick in refs else 0
+            self.archive_pick = refs[collection.step(
+                len(refs), here, self.STEPS.get(event.keysym, 1))]
+            self.repaint()
             return
         if char == "/":
             self.archive_typing = True
             self.archive_query = ""
+            self.archive_pick = ""
             self.repaint()
         elif event.keysym == "Return":
-            self.search_archive(window="stack" if embedded else "archive")
+            item = next((hit for hit in self.archive_hits
+                         if str(hit.get("ref", "")) == self.archive_pick), None)
+            if item is not None:
+                if embedded:
+                    self.archive_open_ref = self.archive_pick
+                    self.archive_document_scroll["embedded"] = 0
+                    self.repaint()
+                else:
+                    self.open_archive_document(item)
+            else:
+                self.search_archive(window="stack" if embedded else "archive")
 
     # --- the palace: court, house and relations in one room (spec 16) --------
 
@@ -3749,8 +3828,14 @@ class Game:
                     if places else ""
             elif picked in places:
                 self.world_place_pick = picked
+        elif event.keysym in {"Up", "Down"} and not (getattr(event, "state", 0) & 1):
+            if places:
+                step = -1 if event.keysym == "Up" else 1
+                self.world_place_pick = places[(here + step) % len(places)]
+                self.world_focus = None
         elif command.startswith("world:pan:") or event.keysym in (
-                "Up", "Down", "Left", "Right"):
+                "Left", "Right") or (
+                getattr(event, "state", 0) & 1 and event.keysym in {"Up", "Down"}):
             # The arrows move the window over the map. They are the only way to
             # look at ground nobody has a court on, which on a map this size is
             # most of it.
@@ -3847,6 +3932,7 @@ class Game:
                       "routes": self.belief.get("trade", {}).get("routes", ())}.get(kind, ())
             index = int(number)
             if index < len(source):
+                self.trade_pick = str(source[index].get("id") or f"{kind}:{index}")
                 self.open_focus(kind.rstrip("s"), source[index])
             return
         if command.startswith("tab:"):
@@ -3858,20 +3944,37 @@ class Game:
             self.trade_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
-        if char in {"f", "r", "c"}:
+        source = {"exchange": self.belief.get("trade", {}).get("cargo", ()),
+                  "movements": self.belief.get("trade", {}).get("movements", ()),
+                  "routes": self.belief.get("trade", {}).get("routes", ())}.get(view, ())
+        ids = [str(item.get("id") or f"{view}:{index}")
+               for index, item in enumerate(source)]
+        if (event.keysym in {"Up", "Down"} or command == "trade:next") and ids:
+            here = ids.index(getattr(self, "trade_pick", "")) if getattr(self, "trade_pick", "") in ids else 0
+            self.trade_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+            self.repaint()
+            return
+        if event.keysym == "Return" and ids:
+            here = ids.index(getattr(self, "trade_pick", "")) if getattr(self, "trade_pick", "") in ids else 0
+            self.open_focus(view.rstrip("s"), source[here])
+            return
+        if view == "exchange" and char in {"f", "r"}:
             self.command_line = {"f": "finance ", "r": "requisition ",
-                                 "c": "quarantine "}[char]
+                                 }[char]
             self.open_palette()
-        elif char == "e":
+        elif view == "exchange" and char == "e":
             self.do(A.ExemptTrade(), window="trade")
-        elif char in {"<", ">"}:
+        elif view == "orders" and char in {"<", ">"}:
             rate = self.belief.get("revenue", {}).get("harbour_rate", 0)
             self.do(A.SetHarbourDue(max(0, min(1000, rate + (-25 if char == "<" else 25)))),
                     window="trade")
-        elif char == "g":
+        elif view == "movements" and char == "g":
             self.command_line = "assign "
             self.open_palette()
-        elif char in {"a", "o", "p"}:
+        elif view in {"movements", "routes"} and char == "c":
+            self.command_line = "quarantine "
+            self.open_palette()
+        elif view == "orders" and char in {"a", "o", "p"}:
             relation = next(iter(self.belief.get("relations", ())), None)
             if relation:
                 self.open_new_letter(relation["other"], relation["place"],
@@ -3933,6 +4036,7 @@ class Game:
             return
         hits = self.belief.get("archive_index", {}).get("hits", {}).get(query, [])
         self.archive_hits = hits
+        self.archive_pick = str(hits[0].get("ref", "")) if hits else ""
         self.archive_generation = self.__dict__.get(
             "archive_generation", 0) + 1
         generation = self.archive_generation
@@ -4013,6 +4117,10 @@ class Game:
 
         if command.startswith("view:"):
             chosen = command.split(":", 1)[1]
+            if chosen in {"next", "previous"}:
+                stations = [key for key, _label in inbox_page.VIEWS]
+                here = stations.index(self.inbox_filter) if self.inbox_filter in stations else 0
+                chosen = stations[(here + (1 if chosen == "next" else -1)) % len(stations)]
             if chosen in {"all", "archived", "outbox", "records"}:
                 choose_view(chosen)
             return
@@ -4030,13 +4138,10 @@ class Game:
         if not archive_typing and char in views:
             choose_view(views[char])
             return
-        if not archive_typing and event.keysym in {"Left", "Right"}:
+        if not archive_typing and event.keysym in {"Tab", "ISO_Left_Tab"}:
             stations = [key for key, _label in inbox_page.VIEWS]
-            try:
-                here = stations.index(self.inbox_filter)
-            except ValueError:
-                here = 0
-            step = -1 if event.keysym == "Left" else 1
+            here = stations.index(self.inbox_filter) if self.inbox_filter in stations else 0
+            step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
             choose_view(stations[(here + step) % len(stations)])
             return
         if self.inbox_filter == "records":
@@ -4109,12 +4214,6 @@ class Game:
                     A.DelegateLetter(letter_id, person_id), window="stack")
             return
 
-        if event.keysym in {"Tab", "ISO_Left_Tab"}:
-            stations = [key for key, _label in inbox_page.VIEWS]
-            here = stations.index(self.inbox_filter) if self.inbox_filter in stations else 0
-            step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
-            choose_view(stations[(here + step) % len(stations)])
-            return
         if event.keysym == "space":
             self.inbox_pane = (
                 "clay"
@@ -4250,14 +4349,7 @@ class Game:
         if control and event.keysym.lower() == "s":
             self.save_current()
         elif control and event.keysym.lower() == "o":
-            if not self.load_armed:
-                self.load_armed = True
-                self.session_notice = (
-                    "Reload discards unsaved orders from this fortnight. "
-                    "Press Ctrl-O again to confirm.")
-                self.repaint()
-            else:
-                self.load_current()
+            self.request_load()
         elif event.keysym == "space":
             self.pending_end_fortnight = True
             self.notify("End this fortnight — no hours. Enter confirms; Escape cancels.",

@@ -253,7 +253,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
                 slot.undo, "u", label=slot.undo_label), hours))
         if chosen.descriptor is not None:
             controls.append(workbench.Control(
-                "open", "o", label="open where it was given"))
+                "open", "Enter", label="open where it was given"))
     if not any(control.key == "u" for control in controls):
         controls.append(workbench.Control(
             "countermand", "u", label="countermand", enabled=False,
@@ -264,7 +264,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
         rows, chosen.id if chosen else "", detail, controls, hours,
         width, height, scroll, notice,
         empty=_empty(view), views=VIEWS, view=view,
-        note="the log is the record; nothing here rewrites the world")
+        note="Tab / Shift-Tab view   ↑↓ choose   Enter open")
 
 
 def _empty(view: str) -> str:

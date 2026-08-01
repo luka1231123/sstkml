@@ -720,7 +720,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
 
     if dictating:
         style.footer(surface, [
-            style.FooterAction("arrows", "move stylus"),
+            style.FooterAction("arrows", "move stylus", command="Right"),
             style.FooterAction("ctrl-z", "undo"),
             style.FooterAction("ctrl-y", "redo"),
         ], y=height - 3, x=2, width=width - 4)
@@ -758,7 +758,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
                 command="desk:edit"),
             advisor_action,
             style.FooterAction(
-                "s", "send · 2h" if compact else "seal & send · 2h",
+                "Enter", "review · 2h" if compact else "review & seal · 2h",
                 enabled=(
                     bool(matter.strip()) and not composing
                     and bool(seal_id(recipient, blocks))

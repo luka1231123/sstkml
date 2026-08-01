@@ -6,7 +6,8 @@ VIEWS = ("exchange", "movements", "routes", "orders")
 
 
 def compose(b: dict, width: int = 72, height: int = 24,
-            notice: str = "", view: str = "exchange") -> InteractiveScreen:
+            notice: str = "", view: str = "exchange",
+            selected: str = "") -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="TRADE", drop=False)
     workbench.tabs(surface, 2, 2, width,
@@ -32,16 +33,38 @@ def compose(b: dict, width: int = 72, height: int = 24,
     if not rows:
         surface.text(3, y, "none reported", C["ash"], C["ink"])
     for index, (name, value) in enumerate(rows[:max(0, height - 10)]):
+        source = {"exchange": trade.get("cargo", ()),
+                  "movements": trade.get("movements", ()),
+                  "routes": trade.get("routes", ())}.get(view, ())
+        ref = str(source[index].get("id") or f"{view}:{index}") if index < len(source) else ""
+        surface.text(2, y, ">" if ref == selected else " ", C["flame"], C["ink"])
         surface.text(3, y, str(name)[:max(8, width // 2 - 4)], C["clay"], C["ink"])
         surface.text(width // 2, y, str(value)[:max(0, width // 2 - 3)], C["sky"], C["ink"])
         if view in {"exchange", "movements", "routes"}:
             surface.link(2, y, width - 4, 1, f"trade:open:{view}:{index}")
         y += 1
-    style.notice(surface, 3, height - 3, width - 6, notice)
-    style.footer(surface, (
-        style.FooterAction("Tab", "view"), style.FooterAction("f", "finance"),
-        style.FooterAction("r", "requisition"), style.FooterAction("e", "exempt"),
-        style.FooterAction("<>", "tax"), style.FooterAction("g", "escort"),
-        style.FooterAction("c", "close"), style.FooterAction("a/o/p", "write"),
-        style.FooterAction("Esc", "close")))
+    style.notice(surface, 3, height - 4, width - 6, notice)
+    nav = [style.FooterAction("Tab", "view")]
+    if view in {"exchange", "movements", "routes"}:
+        nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
+                style.FooterAction("Enter", "open")]
+    style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
+    actions = []
+    if view == "exchange":
+        actions += [style.FooterAction("f", "finance"),
+                    style.FooterAction("r", "requisition"),
+                    style.FooterAction("e", "exempt")]
+    elif view == "movements":
+        actions += [style.FooterAction("g", "escort"),
+                    style.FooterAction("c", "close route")]
+    elif view == "routes":
+        actions.append(style.FooterAction("c", "close route"))
+    else:
+        actions += [style.FooterAction("<", "due−"),
+                    style.FooterAction(">", "due+"),
+                    style.FooterAction("a", "permit"),
+                    style.FooterAction("o", "offer"),
+                    style.FooterAction("p", "guard")]
+    actions.append(style.FooterAction("Esc", "close"))
+    style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()

@@ -235,8 +235,6 @@ def _workbench_gaps() -> list[str]:
             audit_land, days=5,
             group=groups[0]["id"] if groups else "",
             hours=8, width=84, height=28),
-        "muster": ledgers.muster(
-            belief, hours=8, width=84, height=28),
         "oaths": ledgers.oaths(
             audit_oaths, amount=50, hours=8, width=82, height=28),
     }
@@ -256,6 +254,18 @@ def _workbench_gaps() -> list[str]:
         if descriptor.id not in offered_stores:
             gaps.append(
                 f"stores does not offer {descriptor.id}, which the "
+                "registry says belongs to it")
+    offered_muster = {
+        hit.command.split(":", 1)[1]
+        for view, _label in ledgers.MUSTER_VIEWS
+        for hit in ledgers.muster(
+            belief, hours=8, width=84, height=28, view=view).hits
+        if hit.command.startswith("do:")
+    }
+    for descriptor in registry.in_context("muster"):
+        if descriptor.id not in offered_muster:
+            gaps.append(
+                f"muster does not offer {descriptor.id}, which the "
                 "registry says belongs to it")
     for context, screen in screens.items():
         offered = {hit.command.split(":", 1)[1] for hit in screen.hits

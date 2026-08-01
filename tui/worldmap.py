@@ -1132,9 +1132,8 @@ def compose(b: dict, width: int = 90, height: int = 30,
                      C["dim"] if enabled else C["ash"], C["ink"])
 
     actions = [
-        style.FooterAction("↑↓←→", "pan", bool(view), "world:pan:north"),
-        style.FooterAction("]", "next place", bool(places),
-                           "world:place:next"),
+        style.FooterAction("↑↓", "place", bool(places), "world:place:next"),
+        style.FooterAction("shift+arrows", "pan", bool(view), "world:pan:north"),
         style.FooterAction(
             "a", "roads here" if all_routes else "all roads", True,
             "world:routes:scope"),
@@ -1146,11 +1145,8 @@ def compose(b: dict, width: int = 90, height: int = 30,
         actions.append(style.FooterAction(
             "ctrl-d", "more", True, "world:routes:next"))
     actions.extend((
-        style.FooterAction("tab", "layer", True, "world:layer:next"),
-        style.FooterAction("p", "sickness", True, "world:sickness"),
-        style.FooterAction("+", "closer", wide > 1, "world:zoom:in"),
-        style.FooterAction("-", "wider", wide < atlas.MAX_WIDE,
-                           "world:zoom:out"),
+        style.FooterAction("tab", "view", True, "world:layer:next"),
+        style.FooterAction("enter", "open place", bool(places)),
         style.FooterAction("esc", "close"),
     ))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)

@@ -722,19 +722,12 @@ def compose(b: dict, view: str = "court", selected: str = "",
     band = scene_rows(height)
     queue = rows
 
-    title = "THE PALACE"
-    note = {
-        "court": "each figure on the floor is a matter in the audience",
-        "house": "the list is the house; only those at court stand here",
-        "relations": "the list is correspondence; only present envoys stand",
-        "post": "a hollow station is vacant; a filled station is held",
-    }[listing]
+    title = "THE COURT"
+    note = "↑↓ choose   Enter open   Tab view   [c] counsel"
     if choosing == "post":
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
-        title = f"THE PALACE — A POST FOR {named.upper()}"
+        title = f"THE COURT — A POST FOR {named.upper()}"
         note = "choose a post, or [esc] to think better of it"
-    else:
-        note = f"{note}   ·   [c] counsel"
 
     # Once testimony is heard, the room yields architecture before it yields
     # the words a verdict acts upon. Supported sizes fit ordinary cases in a

@@ -28,7 +28,7 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             summary: str = "", typing: bool = False,
             width: int = 84, height: int = 32,
             notice: str = "", scroll: int = 0,
-            embedded: bool = False) -> InteractiveScreen:
+            embedded: bool = False, selected: str = "") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     size = b.get("archive_index", {}).get("size", 0)
     style.panel(
@@ -37,7 +37,7 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             f"SCRIBES' ROOM — {size} RECORDS ON THE SHELVES"
             if embedded else
             f"THE TABLET HOUSE — {size} tablets are shelved here"),
-        note="[esc] return to the Hall" if embedded else "",
+        note="",
         focus=typing, drop=False)
     top = 2
     if embedded:
@@ -102,12 +102,11 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
         surface.text(3, y, "nothing in this house answers to that.",
                      C["ash"], C["ink"])
         y += 1
-    # Results scroll. A search that found forty tablets and offered nine was
-    # answering a different question than the one the hour was spent on.
-    # Nine at a time, because the nine digits are how a result is opened. The
-    # rest are a scroll away rather than absent.
+    # Results page without dropping anything the search found.
     room = max(1, min(RESULT_ROOM, (height - 6 - y) // 2))
-    visible = collection.page(len(hits), room, scroll)
+    selected_index = next((i for i, hit in enumerate(hits)
+                           if str(hit.get("ref", "")) == selected), -1)
+    visible = collection.page(len(hits), room, scroll, selected_index)
     for index, _absolute, hit in visible.rows(hits):
         if y >= height - 6:
             break
@@ -118,6 +117,8 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
         who = render.actor_name(sender, b.get("house"))
         if who == sender:
             who = sender.replace("_", " ")
+        surface.text(2, y, ">" if _absolute == selected_index else " ",
+                     C["flame"], C["ink"])
         surface.text(3, y, f"{index}."[:2], C["flame"], C["ink"])
         surface.text(6, y, who[: field - 5], C["clay"], C["ink"])
         dated = str(hit.get("dated_as")
@@ -135,13 +136,13 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
 
     style.footer(surface, [
         style.FooterAction("/", "new search"),
-        style.FooterAction("enter", "search — one hour"),
-        style.FooterAction("1-9", "open result", enabled=bool(hits)),
-        style.FooterAction("up/down", "scroll", enabled=visible.partial),
+        style.FooterAction("↑↓", "choose", enabled=bool(hits),
+                           command="archive:next"),
+        style.FooterAction("enter", "search · 1h" if typing or not hits else "open"),
         style.FooterAction("esc", "leave"),
     ], y=height - 2, x=2, width=width - 4)
     if visible.partial:
-        surface.text(3, height - 3, f"↑↓ results {visible.label()}"[:field],
+        surface.text(3, height - 3, f"results {visible.label()}"[:field],
                      C["dim"], C["ink"])
     style.notice(surface, 3, height - 4, field, notice)
     return surface.interactive()

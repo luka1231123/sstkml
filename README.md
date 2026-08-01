@@ -32,7 +32,7 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 
 `run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
-Hall prints current controls. `Space`, then `Enter`, ends the fortnight; `Ctrl-S` saves, `Ctrl-O` asks before reload, `?` opens grounded Help, and `Q` quits.
+Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter` opens or confirms, `Space` toggles, and `Escape` cancels or closes. In Hall, `Space`, then `Enter`, ends the fortnight. `Ctrl-H` raises Hall, `Ctrl-G` opens the switcher, `Ctrl-Tab` cycles windows, `Ctrl-S` saves, `Ctrl-O` asks before reload, `:` opens Command, and `?` opens grounded Help.
 
 ## Required local language model
 

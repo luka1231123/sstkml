@@ -35,7 +35,8 @@ C = INDEX
 VIEWS = ("overview", "cohorts", "institutions", "sites", "works")
 
 
-def _plain(b: dict, view: str, width: int, height: int, notice: str) -> Screen:
+def _plain(b: dict, view: str, width: int, height: int, notice: str,
+           selected: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALU", drop=False)
     workbench.tabs(surface, 2, 2, width,
@@ -65,16 +66,25 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str) -> Screen:
                   b.get("institutions", ()) if view == "sites" else ())
         item = next((item for item in source if item.get("name", item.get("id")) == name), None)
         if item:
+            surface.text(2, y, ">" if item["id"] == selected else " ",
+                         C["flame"], C["ink"])
             surface.link(2, y, width - 4, 1, f"alu:open:{item['id']}")
-    style.notice(surface, 3, height - 3, width - 6, notice)
-    actions = [style.FooterAction("Tab", "next view")]
+    style.notice(surface, 3, height - 4, width - 6, notice)
+    nav = [style.FooterAction("Tab", "view")]
+    if view in {"cohorts", "sites"}:
+        nav += [style.FooterAction("↑↓", "choose", command="alu:next"),
+                style.FooterAction("Enter", "open")]
+    if view == "works":
+        nav.append(style.FooterAction("Enter", "manage works"))
+    style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
+    actions = []
     if view in {"overview", "cohorts"}:
         actions += [style.FooterAction("a", "accept"),
                     style.FooterAction("z", "settle"),
                     style.FooterAction("d", "redirect"),
                     style.FooterAction("f", "refuse")]
     actions.append(style.FooterAction("Esc", "close"))
-    style.footer(surface, actions)
+    style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()
 
 # What each kind stops doing when it stops. Stated plainly and without warning:
@@ -273,9 +283,9 @@ def table_room(height: int) -> int:
 def compose(b: dict, history: dict[str, list[int]] | None = None,
             width: int = 96, height: int = 36,
             notice: str = "", scroll: int = 0,
-            view: str = "overview") -> Screen:
+            view: str = "overview", selected: str = "") -> Screen:
     if view != "institutions":
-        return _plain(b, view, width, height, notice)
+        return _plain(b, view, width, height, notice, selected)
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALU",
                 note="[esc] close", drop=False)
@@ -338,6 +348,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         # The row carries the same number as the building above it. The
         # skyline only has room for six; the table can show more, and every
         # row it shows must be openable by the key printed on it.
+        surface.text(0, y, ">" if inst["id"] == selected else " ", C["flame"], C["ink"])
         surface.text(1, y, str(number), C["flame"], C["ink"])
         if compact:
             surface.link(1, y, 20, 1, str(number))
@@ -407,18 +418,14 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
              f"last took {revenue.get('last_harbour_due', 0)} "
              f"{revenue.get('harbour_good', 'oil')}.")[: width - 6],
             C["ash"], C["ink"])
-    if compact:
-        if shown:
-            footer = (f" [1-{len(shown)}] go and look — one hour"
-                      "   [s] stores   [n] works   [o] orders   [esc] close")
-        else:
-            footer = (" no houses stand here   [s] stores"
-                      "   [n] works   [o] orders   [esc] close")
-    else:
-        footer = (" [1-9] go and look — one hour   [s] stores"
-                  "   [n] works   [o] orders   [esc] close")
-    style.bar(surface, 2, height - 2, width - 4, footer,
-              fg=C["clay"], bg=C["lapis"])
+    actions = [style.FooterAction("Tab", "view")]
+    if shown:
+        actions += [style.FooterAction("↑↓", "choose", command="alu:next"),
+                    style.FooterAction("Enter", "inspect · 1h")]
+    actions += [style.FooterAction("n", "works"),
+                style.FooterAction("o", "orders"),
+                style.FooterAction("Esc", "close")]
+    style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()
 
 
