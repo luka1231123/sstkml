@@ -1,25 +1,4 @@
-"""One allocation for the whole world (spec 6.1 phase 5, 10.10).
-
-Every intent that draws on something exclusive -- person-days, an asset's
-capacity, a route's tonnage -- is settled here, together, once. Nothing about
-the result may depend on the order the intents arrived in, which settlement
-happened to be first in a registry, or which key a dict chose to yield first.
-
-The rule, in full:
-
-    claimants sort by obligation priority, then authority rank, then entity id,
-    and are served greedily to their stated need.
-
-Greedy, not proportional. A crown that has called up two thousand person-days
-and has one thousand gets the thousand and the second claim goes short; it does
-not get five hundred while a rival gets five hundred. Splitting every claim
-would make scarcity painless and unreadable, and the thing the player must be
-able to see is who went without.
-
-Ties by entity id are arbitrary and admitted to be arbitrary. They are also
-stable, which is the property that matters: the same seed and the same actions
-produce the same grants, every time, on every machine.
-"""
+"""One allocation for the whole world (spec 6.1 phase 5, 10.10)."""
 from __future__ import annotations
 
 import dataclasses
@@ -72,12 +51,7 @@ class Allocation:
 
 
 def rank(intent: Intent, authority_rank) -> tuple:
-    """The sort key. Higher priority and authority first; ties by id, ascending.
-
-    Negated rather than reversed, so that the id tie-break stays ascending
-    while the two ranks descend -- one `sorted` call, and no branch that could
-    disagree with itself.
-    """
+    """The sort key."""
     return (-intent.priority, -authority_rank(intent), intent.actor, intent.id)
 
 
@@ -105,8 +79,7 @@ def allocate(intents: tuple[Intent, ...],
             intent=intent.id, actor=intent.actor, resource=intent.resource,
             asked=intent.quantity, granted=given, authority=intent.authority))
 
-    # Grants are reported in the order they were decided, which is the order
-    # the shortfall happened in and the order the inspector should show.
+    # Grants are reported in the order they were decided, which is the order the shortfall happened.
     return Allocation(grants=tuple(grants), remaining=left)
 
 

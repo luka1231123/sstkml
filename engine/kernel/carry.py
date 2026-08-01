@@ -1,56 +1,4 @@
-"""The crossing: quotes, contracts, loading, journeys, delivery, payment.
-
-Spec 6.6 and 6.7, and the whole of M13.2's reason for existing. The grain year
-in `engine.kernel.farm` ends with a settlement that cannot feed itself and
-cannot decide its way out, because the ground has an extent. This is the
-mechanism by which grain reaches it from somewhere that has some -- or does not.
-
-Four things had to be true before any of it was worth building, and the farm
-chain is what made them true: grain is physical, it is owned by somebody, the
-place that needs it is short of ground rather than short of effort, and the
-place that has it has a surplus it did not plan.
-
-The chain, in the order the phases run it:
-
-    market      a seller quotes, a buyer accepts, goods and payment change
-                owner -- both parties standing in the same place
-    movement    the buyer loads what it now owns, and a voyage departs
-    arrivals    two fortnights later it lands, or it does not
-    market      the cargo is now at the far place, and is sold there
-
-There is no cross-place bargaining, and that is deliberate rather than a
-shortcut. A merchant at Ma'hadu cannot agree a price with a council on Alashiya
-without a round trip to do it in, so it does what the period's merchants did: it
-buys on its own account, carries, and sells on arrival at whatever the price
-there turns out to be. The risk of the crossing is entirely its own, and the
-thing it is risking on is a price it last heard about four fortnights ago.
-
-That staleness is the point. News travels on the same ships as the cargo, so
-what a merchant believes about the far port is exactly as old as its last
-returning voyage -- and a ship that sinks carries no news home either.
-
-Two prices, one function. Everyone values grain by how many fortnights of eating
-the local store represents, so a place with a full granary sells cheap and a
-place with an empty one pays dearly. Nobody is reading anyone else's books: each
-actor prices what it can see, and the merchant's margin is the difference
-between two places it has to physically cross between.
-
-What is not built here, and is M13.3's:
-
-Forward delivery. Every bargain struck below is settled where it is struck, so
-no contract outlives its turn and none is carried in the world's state. When a
-contract can promise delivery next spring, it becomes state and this changes.
-
-Vessels. A route's `capacity` is the port's whole carrying trade per fortnight,
-not one hull; individual ships with condition, crew, and provisioning are the
-next milestone's. What is real here is that the sea shuts, the crossing takes
-time, capacity is finite and rationed by the same allocator as everything else,
-and a voyage can be lost outright.
-
-Credit. A buyer short of payment buys less. It cannot promise to pay later,
-because a debt that outlives the turn is the same state problem as a forward
-contract, and M13.3 builds both together.
-"""
+"""The crossing: quotes, contracts, loading, journeys, delivery, payment."""
 from __future__ import annotations
 
 import dataclasses
@@ -66,71 +14,34 @@ GRAIN = F.GRAIN
 COPPER = "copper"
 
 # --- price (spec 6.6) ---------------------------------------------------------
-#
-# Shekels of copper per thousand qa of grain, from one reading: how many
-# fortnights of eating the store in front of you represents. It is deterministic
-# and tunable and is not offered as an ancient formula.
-#
-# The shape is what matters. Price rises without bound as the store empties and
-# flattens once there is plenty, because the last qa before starvation is worth
-# everything and the ten-thousandth is worth what anyone will give. The floor
-# and ceiling are the admission that neither end is really unbounded: a glut does
-# not make grain free, and a famine price is capped by what the buyer has.
 
 BASE_PRICE = 60          # what a thousand qa fetches at an ordinary cover
 TARGET_COVER = 12        # fortnights of eating that counts as ordinary
 PRICE_FLOOR = 15
 PRICE_CEILING = 400
 
-# What a council keeps before it will sell anything at all, and it has to be a
-# year. Grain arrives once, in the harvest fortnights, and is eaten for the
-# twenty-four after them: a council reading its granary the morning after
-# threshing is looking at everything it will have until this time next year.
-# A smaller figure here does not make it a bolder trader, it makes it a council
-# that sells its winter in the autumn -- which the port duly did, at a good
-# price, and then starved with the money in the strongbox.
-#
-# This is a different reserve from `farm`'s seed, and larger. Seed is set aside
-# against next year; this is what the town lives on to reach it.
+# What a council keeps before it will sell anything at all, and it has to be a year.
 KEEP_FORTNIGHTS = 26
 
-# What a council will hold if it can buy: the cover it aims at, and therefore
-# the size of the deficit it goes shopping with. Above a year, because a place
-# that buys its food wants the next harvest's worth in hand before the sea
-# shuts, not on the day it runs out.
+# The cover a council aims at when buying, and so the size of its order.
 COVER_TARGET = 28
 
-# The margin a merchant wants on a thousand qa before it is worth crossing. Not
-# a cost that is charged anywhere -- the crossing's real costs are the loading
-# labour, the capacity, and the chance of losing the lot -- but the merchant's
-# own rule of thumb about when a voyage is worth making.
+# The margin a merchant wants on a thousand qa before it is worth crossing.
 CROSSING_MARGIN = 40
 
-# The most one house buys in one fortnight, whatever its purse says. A merchant
-# with a full strongbox standing in front of a granary is not thereby able to
-# buy the granary: it can only buy what it can move, and what it can move is one
-# season's worth of the line it works. Without this the house bids its entire
-# capital into a single bargain, which is how a hundred thousand qa changes
-# hands in an afternoon -- an artefact of there being no vessels yet, not a
-# thing about the period. M13.3's hulls replace this with the real bound.
+# The most one house buys in one fortnight, whatever its purse says.
 LINE_CARGO = 4000
 
-# Qa a person loads or discharges in a day. Small enough that a cargo is a real
-# call on the same person-days the harvest wants, which is the interesting case:
-# the sailing season and the harvest window overlap.
+# Qa a person loads or discharges in a day.
 LOAD_PER_DAY = 25
 
-# How much hold a unit of a good takes, relative to a qa of grain. Copper is
-# dense and grain is not: sixty shekels of copper stow like one qa of grain,
-# which is why a ship can bring back the price of the cargo it carried out.
+# How much hold a unit of a good takes, relative to a qa of grain.
 BULK = {COPPER: 60}
 
-# Ordinal blocks for lots minted here, clear of `farm`'s (200-1100) and the
-# settlement phase's (2000+).
+# Ordinal blocks for lots minted here, clear of `farm`'s (200-1100) and the settlement phase's.
 BLOCKS = {"sale": 3000, "pay": 3400, "land": 3800}
 
-# Where the fortnight's ordinary traffic numbers its journeys from, clear of the
-# cargo voyages leaving the same route on the same turn.
+# Where the fortnight's ordinary traffic numbers its journeys from, clear of the cargo voyages.
 DISPATCH = 100
 
 
@@ -160,16 +71,7 @@ def unbulk(good: str, hold: int) -> int:
 
 @dataclasses.dataclass(frozen=True)
 class Voyage:
-    """Cargo at sea: spec 5.6's Journey and Shipment, which here are one thing.
-
-    They are one thing because nothing in M13.2 travels without cargo or
-    alongside a different journey. When envoys and troops move in M13.4 they
-    will want the journey without the shipment, and this splits.
-
-    `news` is spec 5.6's "intended report path", captured at departure: the
-    readings the origin would have given anyone who asked, on the day the ship
-    left. It arrives with the ship or not at all.
-    """
+    """Cargo at sea: spec 5.6's Journey and Shipment, which here are one thing."""
     id: EntityId
     route: EntityId
     carrier: EntityId                    # who has the cargo while it is at sea
@@ -183,13 +85,7 @@ class Voyage:
 
 @dataclasses.dataclass(frozen=True)
 class Contract:
-    """One bargain struck (spec 5.5). Not world state; see the module docstring.
-
-    Every contract below is agreed, delivered, and paid inside the phase that
-    matched it, so it is a record of what happened rather than a promise that
-    outlives the turn. It rides in the turn log, which is what the inspector
-    reads.
-    """
+    """One bargain struck (spec 5.5)."""
     id: EntityId
     seller: EntityId
     buyer: EntityId
@@ -216,23 +112,12 @@ def sea_open(kernel, route) -> bool:
 
 
 def pool(origin: EntityId, destination: EntityId) -> EntityId:
-    """The exclusive pool a cargo draws on, named by where it is going.
-
-    By destination rather than by route id, because an actor decides to send
-    grain to Alashiya; which route carries it, and whether one exists, is the
-    world's answer and not part of the decision. This is also what lets the
-    trade policy name a pool without being handed the route table.
-    """
+    """The exclusive pool a cargo draws on, named by where it is going."""
     return f"{origin}>{destination}#cargo"
 
 
 def capacity(kernel) -> dict[EntityId, int]:
-    """Every crossing's tonnage this fortnight. Zero when the sea is shut.
-
-    Both directions of every route, because a sea crossing is not one-way and
-    authoring the return leg separately would be bookkeeping rather than
-    modelling. Two routes between the same pair add their capacity together.
-    """
+    """Every crossing's tonnage this fortnight."""
     pools: dict[EntityId, int] = {}
     for route_id in sorted(kernel.registry.routes):
         route = kernel.registry.routes[route_id]
@@ -260,11 +145,7 @@ def route_between(kernel, origin: EntityId, destination: EntityId):
 
 
 def reachable(kernel, settlement: EntityId) -> tuple[EntityId, ...]:
-    """Everywhere a route runs to from here, in season or not.
-
-    Out of season as well as in, because a merchant knows where the crossing
-    goes in the winter too. What it cannot do in the winter is sail it.
-    """
+    """Everywhere a route runs to from here, in season or not."""
     found: set[EntityId] = set()
     for route_id in sorted(kernel.registry.routes):
         route = kernel.registry.routes[route_id]
@@ -280,20 +161,7 @@ def reachable(kernel, settlement: EntityId) -> tuple[EntityId, ...]:
 # --- what a place looks like to anyone standing in it -------------------------
 
 def readings(kernel, settlement: EntityId) -> dict[str, int]:
-    """The market as a person in it would describe it. No books are opened.
-
-    Both figures are about the place rather than about whoever is looking, which
-    is what makes them the things that travel: what grain is going for here, and
-    whether there is any standing on the quay that is not already somebody's
-    stores. A carrier can repeat either to a stranger.
-
-    What is deliberately not here is how much anyone can spare or is short of.
-    Those are positions, not readings -- they depend on whose granary it is and
-    how many mouths that owner feeds -- and an actor works them out below from
-    what it counted of its own, which is the only place it could honestly get
-    them. Putting them here once meant a council read the whole town's grain,
-    the merchant's warehouse included, as cover it could sell down against.
-    """
+    """The market as a person in it would describe it."""
     need = sum(c.ration() for c in kernel.cohorts_of(settlement))
     stores = kernel.stores(settlement, GRAIN)
     mine = {settlement, kernel.controller(settlement)}
@@ -333,15 +201,7 @@ def _ship(actor: EntityId, turn: int, origin: EntityId, destination: EntityId,
 
 def sell_surplus(actor: EntityId, belief: B.Belief,
                  home: EntityId) -> tuple[Intent, ...]:
-    """Offer what you believe you can spare, at what you believe it is worth.
-
-    A council does not trade for gain; it sells the surplus of a good year
-    because copper keeps and grain does not. What it will not sell is the cover
-    it is living on: its own grain, against its own mouths, for the months it
-    has to get through. Both numbers are its own counting, so a council that
-    misjudged how many it feeds would offer the wrong quantity and nothing here
-    would correct it.
-    """
+    """Offer what you believe you can spare, at what you believe it is worth."""
     spare = (belief.value(home, "own_grain", 0)
              - belief.value(home, "need", 0) * KEEP_FORTNIGHTS)
     ask = belief.value(home, "price_grain", 0)
@@ -352,13 +212,7 @@ def sell_surplus(actor: EntityId, belief: B.Belief,
 
 def buy_shortfall(actor: EntityId, belief: B.Belief,
                   home: EntityId) -> tuple[Intent, ...]:
-    """Buy what is standing in your own harbour, if you are short and can pay.
-
-    Bounded three ways, and which one bites is the whole story of a bad year:
-    what the place is short of, what is actually for sale here, and what the
-    council has left to pay with. The third is the one that ends a settlement,
-    and it ends it while there is grain on the quay.
-    """
+    """Buy what is standing in your own harbour, if you are short and can pay."""
     deficit = (belief.value(home, "need", 0) * COVER_TARGET
                - belief.value(home, "own_grain", 0))
     offered = belief.value(home, "market_grain", 0)
@@ -376,37 +230,7 @@ def buy_shortfall(actor: EntityId, belief: B.Belief,
 
 
 def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
-    """A merchant house runs one line: buy at the cheapest end, sell at the dearest.
-
-    Everything below is a claim and nothing is a lookup. The price at its seat it
-    saw this morning. The price at each end it had from the last carrier in,
-    which left there before it left here -- so a house commits its whole purse
-    to a crossing on a number that is at best four fortnights old, and the
-    voyage is a bet that the number has not moved. In the fortnight a foreign
-    harvest comes in, it has moved a long way.
-
-    One buying place and one selling place, rather than a bid at every port it
-    knows. That is a real restriction and it is the right one: a house that
-    could work both ends of three markets at once would need a simultaneous view
-    of all of them, which is exactly what nobody in this world has. What it can
-    do is keep a factor at each end of one line and move money one way along it
-    while the goods go the other.
-
-    Goods and money both route through the seat, because the seat is the only
-    place the house has a route from -- Ma'hadu is a transshipment port and this
-    is what being one consists of. Grain comes down to the port and goes out;
-    copper comes in and goes up. Nothing crosses in one hop that has no crossing.
-
-    Grain always moves toward the dearest place the house knows of, one hop at a
-    time, and only while that place is dearer than where the grain is standing
-    by more than the crossing margin. Stating it as a single destination rather
-    than as a pairwise comparison at each quay is what keeps the line from
-    reversing itself: there is one maximum, so there is one direction, and the
-    margin is the dead band that stops a fortnight's small move from flipping it.
-    Grain that is not moving is grain that is for sale where it stands -- a
-    factor with stock and no onward leg sells it at the local price, which is
-    also how a cargo that arrived into a fallen market eventually clears.
-    """
+    """A merchant house runs one line: buy at the cheapest end, sell at the dearest."""
     seat = home(belief)
     if not seat:
         return ()
@@ -417,8 +241,7 @@ def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
     if len(prices) < 2:
         return ()
 
-    # Ties by id, and stable: sorting first means `max` and `min` take the
-    # lowest-id place among equals rather than whichever the mapping offered.
+    # Ties by id, and stable: sorting first means `max` and `min` take the lowest-id place among.
     order = sorted(prices)
     dearest = max(order, key=lambda p: prices[p])
     cheapest = min(order, key=lambda p: prices[p])
@@ -430,8 +253,7 @@ def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
         grain = belief.value(place, "own_grain", 0)
         copper = belief.value(place, "own_copper", 0)
 
-        # Buy where it is cheapest, with the money that is standing there, and
-        # with as much of it as a fortnight's carrying can lift.
+        # Buy where it is cheapest, with the money standing there.
         if worth_it and place == cheapest and copper > 0:
             want = min(copper * 1000 // prices[place], LINE_CARGO)
             if want > 0:
@@ -459,13 +281,7 @@ def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
 
 
 def home(belief: B.Belief) -> EntityId:
-    """Where this actor is, out of its own belief rather than out of a table.
-
-    An actor that holds claims about three ports has to be able to say which one
-    it is standing in, and a policy is handed nothing but its own name and its
-    own belief. So `home` is a claim like any other -- observed, dated, and
-    minted in phase 3 where every other observation is.
-    """
+    """Where this actor is, out of its own belief rather than out of a table."""
     for claim in reversed(belief.claims):
         if claim.attribute == "home" and claim.value == 1:
             return claim.subject
@@ -509,18 +325,7 @@ def _move(book, seller: EntityId, buyer: EntityId, good: str, place: EntityId,
 
 
 def market(kernel, intents: tuple[Intent, ...]):
-    """Phase 8. Quotes and acceptances meet, at one place, and goods change hands.
-
-    Matched greedily and in a fixed order: the cheapest ask first, the highest
-    bid first, ties by intent id. Nothing is prorated, for the same reason the
-    labour allocator does not prorate -- a buyer who was outbid should be
-    visibly short rather than quietly given a fraction.
-
-    The price paid is the seller's ask. A buyer whose ceiling is above it does
-    not get the difference back; what its ceiling bought was the right to be
-    served at all. Modelling the haggle between the two is a bargaining problem
-    and it is spec 6.6's, not this milestone's.
-    """
+    """Phase 8."""
     events: list = []
     contracts: list[Contract] = []
     book = kernel.book.at_phase(kernel.date.absolute, "market")
@@ -581,15 +386,7 @@ def market(kernel, intents: tuple[Intent, ...]):
 # --- phase 9: loading and departure -------------------------------------------
 
 def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
-    """Phase 9. What was granted hold, and can be carried, goes aboard and sails.
-
-    Three separate things have to be true and each of them refuses differently.
-    The sea must be open, or there is no route and nothing moves. Hold must have
-    been granted, and it was rationed against every other cargo by the same
-    allocator that rations the harvest's hands. And the goods must actually be
-    there -- a merchant that intended to buy and was outbid loads what it has,
-    which is nothing.
-    """
+    """Phase 9."""
     events: list = []
     book = kernel.book.at_phase(kernel.date.absolute, "movement")
     turn = kernel.date.absolute
@@ -616,8 +413,7 @@ def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
                 continue
             take = min(wanted - aboard, lot.free)
             if take < lot.quantity:
-                # Part of a lot sails and the rest stays on the quay: the two
-                # are in different places from here on and cannot be one lot.
+                # Part of a lot sails and the rest stays on the quay: the two are in different.
                 part = mint(origin, turn, "lot", BLOCKS["land"] + len(cargo))
                 book = book.split(lot.id, take, part)
                 lot_id = part
@@ -647,24 +443,7 @@ def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
 
 
 def _dispatch(kernel, events: list):
-    """The ordinary traffic, which carries word whether or not it carries cargo.
-
-    Nothing here is a courier system -- orders and envoys are M13.4's. This is
-    the plainer fact underneath one: a road that a village uses and a sea lane
-    that a port lives by have people going along them all the time, and what
-    those people know arrives when they do.
-
-    Modelled as a voyage with an empty hold, so it costs no capacity and gets
-    everything else for free: it takes the crossing's time, it is stopped by the
-    season, and it can be lost. That last is worth having. A settlement whose
-    news does not come is not told that its news did not come; it goes on acting
-    on the last thing it heard, and cannot tell the difference between quiet and
-    nothing to report.
-
-    The consequence with teeth is seasonal. When the sea shuts, Alashiya goes
-    dark for four fortnights, and every decision made about it in that time is
-    made on a picture of a port as it stood before the winter.
-    """
+    """The ordinary traffic, which carries word whether or not it carries cargo."""
     turn = kernel.date.absolute
     voyages = list(kernel.voyages)
     for route_id in sorted(kernel.registry.routes):
@@ -678,8 +457,7 @@ def _dispatch(kernel, events: list):
             if origin == destination:
                 continue
             voyages.append(Voyage(
-                # Ordinals from a block of their own, clear of the fortnight's
-                # cargo voyages at the same route on the same turn.
+                # Ordinals from a block of their own, clear of cargo voyages.
                 id=mint(route_id, turn, "journey", DISPATCH + ordinal),
                 route=route_id, carrier=origin, origin=origin,
                 destination=destination, departed=turn,
@@ -692,37 +470,10 @@ def _origin_of(resource: EntityId) -> EntityId:
     return resource.split(">", 1)[0] if ">" in resource else ""
 
 
-def loading_days(intents: tuple[Intent, ...],
-                 allocation: R.Allocation) -> dict[EntityId, int]:
-    """Person-days a fortnight's sailings would take, by actor. Read by nobody yet.
-
-    Kept as a reading rather than wired in: loading is a real call on the same
-    hands the harvest wants, but charging it against the labour pool needs the
-    cargo to be known in phase 5, and the cargo is not bought until phase 8.
-    Spec 6.1 will not have phase 8 run before phase 5, and it is right. The fix
-    is a standing order placed a fortnight ahead, which is M13.4's.
-    """
-    days: dict[EntityId, int] = {}
-    for intent in intents:
-        if intent.kind != "ship":
-            continue
-        got = allocation.granted(intent.id)
-        if got > 0:
-            days[intent.actor] = days.get(intent.actor, 0) + F.days_for(
-                unbulk(intent.task, got), LOAD_PER_DAY)
-    return days
-
-
 # --- phase 2: arrivals --------------------------------------------------------
 
 def arrivals(kernel):
-    """Phase 2. The ships due today land, and what they carry lands with them.
-
-    Both cargoes: the goods, and what the crew knows. A voyage that is lost
-    delivers neither, which is the honest form of the thing -- the far port does
-    not learn that the ship sank, it learns nothing at all, and goes on believing
-    whatever the last one told it.
-    """
+    """Phase 2."""
     events: list = []
     if not kernel.voyages:
         return kernel, events
@@ -742,9 +493,7 @@ def arrivals(kernel):
                 if lot is not None:
                     book = book.consume(lot_id, lot.quantity, "lost",
                                         authority=voyage.id)
-            # A cargo lost is an event with a hole in the ledger behind it. A
-            # courier lost is only an absence, and is logged as one: nobody at
-            # the far end knows a ship was even due.
+            # A cargo lost is an event with a hole in the ledger behind it.
             events.append((
                 "lost_at_sea" if voyage.cargo else "no_word",
                 voyage.id, voyage.route, voyage.destination))
@@ -768,12 +517,7 @@ def arrivals(kernel):
 
 
 def _tell(kernel, landed: tuple[Voyage, ...], events: list):
-    """What the crews say when they come ashore (spec 5.8, 6.1 phase 2).
-
-    A dated, sourced, second-hand claim with the carrier in its chain -- the
-    ordinary form of everything an actor knows about anywhere it is not. The
-    value is not distorted here; it is simply old, and it says how old.
-    """
+    """What the crews say when they come ashore (spec 5.8, 6.1 phase 2)."""
     if not landed:
         return kernel, events
     turn = kernel.date.absolute
@@ -798,14 +542,7 @@ def _tell(kernel, landed: tuple[Voyage, ...], events: list):
 # --- phase 10: the stores tidy up ---------------------------------------------
 
 def consolidate(kernel):
-    """Fold identical lots together. Bookkeeping, and it conserves.
-
-    Every sale splits a lot, so a port that trades every fortnight accumulates
-    lots faster than it accumulates grain, and nothing distinguishes them: same
-    good, same owner, same holder, same place. A store is a store. Reserved lots
-    and anything at sea are left alone, because those are distinguished by
-    something the fields do not show.
-    """
+    """Fold identical lots together."""
     book = kernel.book.at_phase(kernel.date.absolute, "settlement")
     groups: dict[tuple, list[EntityId]] = {}
     for lot_id in sorted(book.lots):

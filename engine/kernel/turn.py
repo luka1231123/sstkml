@@ -1,23 +1,10 @@
-"""The seventeen phases, in the one order they may run (spec 6.1, 10.10).
-
-The rule this module exists to hold: the fortnight is not a walk through the
-settlements, it is a walk through the phases, and every settlement crosses each
-phase together. A tick that finished Ugarit before starting Ma'hadu would let
-the first city spend labour, buy grain, and take route capacity that the second
-never had the chance to bid for -- and no amount of care inside the systems
-recovers the fairness that ordering threw away.
-
-So phases are declared, ordered, and checked. A phase may read the opening
-snapshot and the results of phases already run. It may not read a later phase's
-output; a phase that needs one is mis-ordered, and the fix is to move it.
-"""
+"""The seventeen phases, in the one order they may run (spec 6.1, 10.10)."""
 from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
 
-# Spec 6.1, verbatim in order. The implementation may split a phase further; it
-# may not reorder these without changing the specification and its tests.
+# Spec 6.1, verbatim in order.
 PHASES: tuple[str, ...] = (
     "calendar",       # 1  advance the date, derive seasonal and climate conditions
     "arrivals",       # 2  scheduled legs, births, deaths, deadlines, committed effects
@@ -77,14 +64,7 @@ class Trace:
 
 
 def run(state, steps: tuple[Step, ...]) -> tuple[object, list, Trace]:
-    """Run the steps as given, refusing any that would run out of turn.
-
-    Deliberately not sorted. Quietly reordering a mis-assembled turn would hide
-    the mistake in the one place it must be visible, and the caller would go on
-    believing its declared order is the order that ran. Within a single phase
-    the given order stands: that is the implementer's business, and 6.1 permits
-    splitting a phase further.
-    """
+    """Run the steps as given, refusing any that would run out of turn."""
     events: list = []
     entries: list[tuple[str, str, int]] = []
     reached = -1

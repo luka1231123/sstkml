@@ -8,7 +8,7 @@
 [[command]]
 id = "help"
 category = "interface"
-title = "Ask for help"
+title = "Help and questions"
 syntax = "[?] Help; type a question; [Enter] ask"
 answer = "Press ? in the Hall to open Help. Type any question about controls, orders, costs, or where to find something, then press Enter. Help costs no hours; Ctrl-U clears the question and Escape returns to the Hall."
 examples = ["How do I send troops on campaign?", "Where can I inspect the granary?"]

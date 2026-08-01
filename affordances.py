@@ -1,30 +1,19 @@
-"""What the player may legally name, read from Belief alone (UI/UX spec 10).
+"""Names the player may use, read from Belief alone (UI/UX spec 10).
 
-Every typed surface needs the same answer to the same question: given what the
-king believes right now, which formations, oaths, places, and posts can he
-actually refer to? The optional parser had that knowledge as private helpers,
-which meant the deterministic command palette either had to import from `ai/`
--- a package the game must run entirely without -- or grow a second copy that
-would drift from the first.
+Every function takes a Belief dict and returns ids or names already visible to
+the player. No engine, no World, so nothing here can widen what he knows.
 
-So it lives here instead: no model, no engine, no toolkit, and no World. Every
-function takes a Belief dictionary and returns ids or names that are already
-visible to the player. Nothing here can widen what he knows; a domain that is
-empty because he has not been told is empty here too, which is the point.
-
-`ai/parser.py` now reads these rather than its own, so the typed path and the
-palette resolve `chariotry` to the same formation or fail in the same way.
+Shared by the palette and `ai/parser.py` so both resolve a word the same way.
 """
 from __future__ import annotations
 
 import re
 
-# How the correspondence pile is numbered when spoken about.
+# How letters in the stack are numbered when spoken about.
 ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
          "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx")
 
-# Closed vocabularies. These are the engine's, not the player's, so they are
-# constants rather than projections.
+# Closed vocabularies. Fixed by the engine, so constants, not Belief reads.
 TROOP_TASKS = ("garrison", "watch", "harvest", "campaign")
 LEDGERS = ("granary", "seed")
 VERDICTS = ("for", "against", "split", "defer")
@@ -52,12 +41,9 @@ def resolve_letter(value: str, belief: dict) -> str | None:
 
 def resolve_named(value: str, rows: list[dict], id_key: str = "id",
                   name_key: str = "name") -> str | None:
-    """Resolve an exact ID or an unambiguous player-facing name.
+    """Resolve an exact id or an unambiguous player-facing name.
 
-    Returns None when two things match, never a guess: the specification's
-    fourth palette rule is that the game must not silently choose among
-    matches, because an order given to the wrong formation is worse than an
-    order refused.
+    Returns None when two rows match. Palette rule 4: never guess between them.
     """
     wanted = normal(value)
     exact: list[str] = []
@@ -81,7 +67,7 @@ def resolve_named(value: str, rows: list[dict], id_key: str = "id",
 
 def matches_for(value: str, rows: list[dict], id_key: str = "id",
                 name_key: str = "name") -> list[str]:
-    """Every id a partial word could mean. What completion offers."""
+    """Every id a partial word could mean. Feeds completion."""
     wanted = normal(value)
     found = []
     for row in rows:

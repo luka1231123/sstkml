@@ -1,14 +1,17 @@
 # SAY TO THE KING, MY LORD
 
-## Release 1.0 product specification
+## 0.7 alpha product specification
 
 - Status: authoritative
-- Revision: 2026-07-30
-- Scope: the first complete release
+- Revision: 2026-08-01
 
 This is the only current design specification. Code and tests describe
 implementation detail; archived documents describe how the design evolved.
 Neither may quietly expand the release beyond this document.
+
+The Alpha 0.7 task list lives in
+[`docs/ALPHA_07_TASKS.md`](docs/ALPHA_07_TASKS.md). It is subordinate to this
+file: it may sequence work, never add scope.
 
 The full pre-consolidation specifications are preserved under
 [`docs/archive/2026-07-30-pre-consolidation`](docs/archive/2026-07-30-pre-consolidation/README.md).
@@ -20,27 +23,31 @@ specifications. Those are historical implementation citations, not additional
 requirements. New work should cite this specification by named contract rather
 than revive the old milestone numbering.
 
+Questions this document had to answer are marked **Decision:**. A decision is
+a default that works, not a final word; change it here first, then in code.
+
 ---
 
 ## 1. The game
 
 **SAY TO THE KING, MY LORD** is an information-constrained rulership
-simulation set around Ugarit in the Late Bronze Age.
+simulation set around 1200 BC, at the end of the Late Bronze Age.
 
 The player is not an omniscient cursor over a map. The player is a ruler at a
-court. People, households, institutions, goods, labour, obligations, journeys,
-disease, and foreign courts continue to act whether or not the player opens a
-window. Knowledge reaches the court through dated, delayed, interested reports.
-
-The aim is the causal richness of a deep simulation game without copying the
-shape or identity of another game. The distinctive play is holding a social and
-material system together through people, tablets, rooms, seals, routes, and
-fallible interpretation.
+court. The distinctive play is holding a social and material system together
+through letters, officials, and institutions.
 
 The historical starting situation constrains the run. The historical outcome
-does not. Ugarit may survive, submit, transform, fragment, or be destroyed
-because of simulated causes and player choices, never because a script demands
-the familiar ending.
+does not. The world is on a course to destruction: shocks cascade, routes
+fail, and cities empty. The player uses the tools of a king to delay that
+failure, survive it, or be buried by it.
+
+**Decision — how long the world lasts.** No script and no doom counter. The
+seed sets the timing and severity of shocks; the ordinary rules turn those
+shocks into collapse. Balance targets an unaided world that fails somewhere
+between year 15 and year 30 across seeds. That is a tuning target checked by
+long headless runs, not a rule the engine enforces. A run that survives past
+30 years because the player played well is a correct outcome.
 
 ### The fortnight
 
@@ -83,37 +90,46 @@ opening + produced + imported + recovered
 
 ### 2.3 The outside world is autonomous
 
-Included settlements and organizations persist without player contact. They
-produce, consume, plan, trade, refuse, substitute, store, move, and react from
-their own circumstances. Removing Ugarit from a headless simulation must not
-freeze the rest of the network.
+Every settlement outside the player's seat farms, eats, trades, levies,
+suffers, and decides without the player. It does not wait to be observed and
+does not act only when addressed. The player's city is one settlement under
+the same rules, distinguished only by who gives its orders.
 
-### 2.4 The player sees Belief, never World
+Foreign courts act on their own beliefs and needs. They write first, refuse,
+delay, lie, and go silent.
 
-`World` is authoritative state. Every actor has dated, sourced, possibly
-conflicting beliefs. The player interface and language layer receive only the
-court's projected Belief.
+### 2.4 The player sees mostly Belief, not World
 
-Unknown, stale, disputed, and interested testimony remain visible as such. A
-clean interface may summarize a claim; it may not turn it into truth.
+World holds the truth. The player sees Belief: dated, sourced, incomplete,
+sometimes wrong. Every player-facing number carries the date and origin of the
+record it came from, and stale records stay stale until something arrives to
+correct them.
+
+No screen may read World directly. A quantity the court has not measured is
+shown as an estimate or a range, or not shown.
 
 ### 2.5 Orders act through people and institutions
 
-Anything at distance or requiring judgement has authority, an executor, an
-execution site, delay, and a report path. Interface parsing is exact; human
-execution may be late, partial, self-interested, or incompetent.
+An order names its subject, its authority, and the person or institution that
+will carry it out. Between the order and the outcome sit travel time,
+competence, competing duties, cost, and self-interest. Orders can be delayed,
+performed badly, performed partly, or refused.
+
+The player never mutates the world from a screen. Every change passes through
+a registered action with a stated cost and a stated refusal.
 
 ### 2.6 Determinism is structural
 
-The same version, content, seed, and confirmed action log produce the same
-world. Randomness is content-addressed and named. Replay never depends on
-iteration order, wall-clock time, network timing, or fresh model output.
+Same version, same world data, same seed, same confirmed action log produce
+the same run, byte for byte. Randomness is drawn from named streams, never
+from wall-clock time or iteration order. Accepted model text is stored, not
+regenerated.
 
 ### 2.7 The local model supplies language, not truth
 
 The supported lightweight local model is required in normal windowed play. It
-voices people, corrects player-written matter, interprets tablets, and
-summarizes permitted records.
+voices people, corrects player-written matter, interprets tablets, parses
+orders, and summarizes permitted records.
 
 It may not:
 
@@ -124,45 +140,24 @@ It may not:
 - mutate state;
 - be rerun during replay to recover accepted text.
 
-The engine keeps facts and outcomes authoritative. Accepted model language is
-validated and stored. Recovery text exists for service failure, not as a
-separate full-featured AI-off mode.
-
 The supported baseline is `qwen3:4b-instruct`.
 
 ### 2.8 Religion has human and institutional causality
 
-Gods are real to the people, not hidden switches in the physics:
+Gods do not act. Temples, priests, rites, omens, and oaths act, because people
+believe and because institutions hold grain, land, labour, and authority.
 
-- disease spreads materially;
-- weather and harvest arise from material systems;
-- rites and offerings consume resources and affect legitimacy, factions,
-  morale, obligations, and decisions;
-- divination is a fallible human interpretation, not access to a secret future.
-
-The game does not settle the player's theology.
-
-### 2.9 History constrains mechanisms, not outcomes
-
-Attested, reconstructed, and fictional content must not be presented as the
-same kind of claim. Historical uncertainty is kept where it matters. Modern
-market, bureaucratic, nationalist, and supernatural assumptions are not
-silently projected backward.
-
-### 2.10 There is one current path
-
-There is one world grammar, one Belief boundary, one order pipeline, one
-current room layout, and one release specification. Compatibility adapters are
-temporary and tested. Replaced implementations belong in Git, not beside the
-live path.
+A rite costs real goods and real days. An omen changes what people expect, and
+so what they will do. A broken oath is a political fact other courts can cite.
+No hidden divine favour modifier moves harvests or battles.
 
 ---
 
-## 3. Release 1.0 pillars
+## 3. Alpha 0.7 pillars
 
 ### 3.1 A living, inspectable simulation
 
-Release 1.0 includes interacting foundations for:
+0.7 includes interacting foundations for:
 
 - named people, households, kinship, office, health, and movement;
 - stores, lots, ownership, custody, consumption, and loss;
@@ -174,13 +169,13 @@ Release 1.0 includes interacting foundations for:
   transformation;
 - observation, claims, reports, letters, archives, and actor Belief.
 
-“Simulate everything” means important causes interact and can be explained. It
+"Simulate everything" means important causes interact and can be explained. It
 does not mean every imagined subsystem, commodity, profession, or named person
-must ship in 1.0.
+must ship in 0.7.
 
-Every strategic failure must be traceable through records: what was absent,
-where it should have come from, what competed for it, who knew, who decided,
-and what followed.
+The rule runs the other way: **when a system can be written short and still
+work, write it short.** A new entity type needs a rule that consumes it.
+Anything without one stays a number on something that already exists.
 
 ### 3.2 Correspondence is a principal game system
 
@@ -196,16 +191,79 @@ Incoming tablets show:
 - related people, places, obligations, and older tablets;
 - seal, copy, damage, translation, or provenance where relevant.
 
-The writing table places the source tablet beside the wet reply. The outgoing
-tablet has four visible pieces:
+#### 3.2.1 The blocks a letter is made of
 
-1. **Address** — rank and relationship.
-2. **Recognition** — what the king acknowledges receiving or hearing.
-3. **Matter** — one or two sentences written by the player.
-4. **Seal** — the authority and dispatch form.
+**Decision — the block list, from the actual corpus.** Late Bronze Age
+Akkadian letters, in the Amarna and Ugarit archives, are built from a small
+set of fixed parts in a fixed order: an address ("Say to the king, my lord"),
+a message marker (*umma* PN, "message of your servant PN"), a self-abasement
+or prostration formula for a superior ("I fall at the feet of my lord seven
+times and seven times"), a well-being formula (*lū šulmu*, "may there be
+well-being"), then the body, then a closing. The opening parts carry the
+relationship; the body carries the business. That is the game's model.
+
+The outgoing tablet is composed of these blocks:
+
+| Block | Required | Carries |
+| --- | --- | --- |
+| Address | yes | rank and claimed relationship: lord, servant, brother, father, son |
+| Message marker | yes | who sends, and by whose authority |
+| Prostration or greeting | by rank | deference, equality, or its pointed absence |
+| Well-being | no | courtesy; its absence is legible as coldness |
+| Recognition | no | what the king admits receiving or hearing |
+| Matter | yes | one or two sentences written by the player |
+| Terms | when material | structured quantities, goods, people, dates, destinations |
+| Precedent | no | a cited oath, kinship, past gift, or earlier tablet |
+| Warning | no | a stated consequence of refusal |
+| Seal | yes | authority and dispatch form |
+
+Address, marker, and greeting are chosen from the forms the sender's real
+standing permits. A vassal who addresses a great king as "brother" is making a
+claim, and the recipient reads it as one. Rank is never shown as a score.
+
+#### 3.2.2 What the model does with the matter
+
+**Decision — orders versus tone.** The model reads the player's Matter and
+returns two things:
+
+1. **Orders** — a list of structured commitments and requests: send X, promise
+   Y by date Z, demand, refuse, offer marriage, swear. These are the only part
+   with mechanical force.
+2. **Tone** — a confidence reading of the wording, on a small scale from
+   hedged through plain to emphatic.
+
+Everything not parsed into an order is prose. It changes how the reader sees
+the king; it moves nothing material by itself.
+
+**Decision — how tone is balanced.** One rule, no second score. Each promise
+recorded from a letter carries the tone it was made in. Tone sets what the
+recipient expects, and the expectation sets what the outcome is worth:
+
+- an emphatic promise raises the recipient's expectation; kept, it gains more
+  standing than a hedged one; broken, it costs more;
+- a hedged promise moves standing little in either direction;
+- emphatic language with nothing delivered is the worst case, and a court that
+  has been burnt discounts the next emphatic letter from that sender.
+
+So confidence is a wager on delivery, not a persuasion stat. The player can
+see the wager before sealing (§3.2.3). Numbers for it live in
+`content/`, not in code, so tuning does not need a release.
+
+#### 3.2.3 Nothing is sealed unseen
+
+Before dispatch the writing table shows a deterministic panel: every order the
+model parsed, in plain words, with quantities, dates, and destinations; the
+recorded tone; and the prose that will travel unparsed. The player may edit,
+remove, or cancel. Sealing without that confirmation is not possible.
+
+If the model is unavailable or its output fails validation, the panel shows
+the failure and the letter is not sent. It never guesses on the player's
+behalf.
+
+#### 3.2.4 The rest of the path
 
 The player chooses among meaningful letter blocks; there is no abstract
-“posture” menu and no exposed protocol score.
+"posture" menu and no exposed protocol score.
 
 Yabninu may correct the player's matter while preserving its meaning, numbers,
 names, conditions, uncertainty, negation, and commitments. The original words
@@ -242,14 +300,29 @@ There are eight primary rooms:
 4. **Storehouse** — stores, labour roll, land, reserves, dues, and exact
    accounts.
 5. **City** — institutions, sites, assets, damage, repair, and works.
-6. **Muster Yard** — formations, commanders, equipment, watches, escorts, and
-   service.
-7. **Known World** — places, routes, journeys, foreign courts, trade, news, and
-   disease layers.
-8. **Shrine** — rites, offerings, oaths, divination, priests, and precedent.
+6. **Muster Yard** — troops, and corvée: how many people, for how many days,
+   and what that costs elsewhere.
+7. **Known World** — places, routes, journeys, foreign courts, trade, news,
+   and disease layers.
+8. **Shrine** — rites and offerings, oaths and obligations.
+
+#### 3.3.1 The Hall
+
+The Hall is the room the player lands in and the room they end the fortnight
+from. Three columns:
+
+- **left** — the believed standing of what matters: grain, copper, tin, each
+  with its change since the last fortnight, each dated to the record it came
+  from;
+- **centre** — the doors, listed vertically, each with its access letter, its
+  ASCII mark, and the count of matters flagged in that room;
+- **right** — what is in motion: envoys and where they are believed to be, and
+  orders dispatched but not yet resolved.
+
+Counts are the only alert. A door with nothing behind it shows nothing.
 
 Counsel belongs to named people in Court. Oaths belong to Shrine and linked
-tablets. Works belongs to City and project objects. Sickness belongs to people,
+tablets. Works belong to City and project objects. Sickness belongs to people,
 routes, places, and a World layer. These may open focused object windows; they
 do not require additional primary doors.
 
@@ -264,101 +337,33 @@ Supporting object windows use a small shared family:
 Opening a door raises its existing room. Rooms remember useful geometry,
 selection, drafts, and filters. Window management never costs court time.
 
-### 3.4 A distinct Bronze Age visual identity
+### 3.4 Text is scarce and specific
 
-The interface is a precise character-cell instrument shaped like a working
-palace, not a generic retro desktop and not a literal archaeological diorama.
-
-Use:
-
-- clay, limestone, timber, bronze, lapis, textile, lamplight, seals, shelves,
-  vessels, figures, walls, and routes;
-- cuneiform-inspired impressions, tablet edges, docket marks, seal fields, and
-  compact angular ornament;
-- room-specific stateful art that changes with vacancy, quantity, wear,
-  congestion, damage, progress, presence, and movement;
-- skeuomorphism where it communicates place, state, capacity, provenance, or
-  relationship.
-
-Use plain software controls for search, scrolling, save/load, settings,
-accessibility, exact entry, sorting, and filtering.
-
-Art contracts before evidence or controls. Decorative texture never runs
-through important text.
-
-The 1.0 type system requires:
-
-- a compact angular display hand for headings, seals, dates, and labels;
-- a narrow readable control and ledger face;
-- a distinct but readable tablet hand;
-- clear numerals and unit marks;
-- scalable and pure-ASCII fallbacks.
-
-It should feel inspired by Bronze Age writing without pretending modern
-Unicode cuneiform is a readable body font.
-
-### 3.5 Text is scarce and specific
-
-Default budgets:
-
-- ordinary event or action result: one line;
-- adviser warning: one or two sentences, attributed;
-- routine institutional report: three to six compact rows;
-- ordinary letter: roughly 25–90 words;
-- long legal, diplomatic, ritual, and archival documents: exceptional and
-  scrollable.
-
-The same warning does not return as new unless evidence, severity, deadline,
-cause, or responsible person changes. The active Inbox is bounded by bundling
-and resolution, never by deleting history.
-
-Room controls speak plainly. Reports are administrative. Letters are formulaic
-and personal. Advisers sound like named people. Help explains software without
-role-play padding.
+Screen text states a fact, a quantity, a date, or a consequence. No flavour
+paragraph where a number belongs, no restating what the layout already shows.
+Prose belongs in tablets, where a person wrote it and a scribe read it out.
 
 ---
 
 ## 4. Shared interaction contract
 
-Every room follows the same dependable rhythm:
+The same action uses the same key everywhere. Tabs cycle with the same keys in
+every room; select, open, confirm, cancel, and close never change meaning
+between windows.
 
-```text
-see state
--> select a person, object, place, or document
--> inspect evidence and relationships
--> choose a relevant action
--> set exact terms
--> preview costs, authority, and wording
--> confirm
--> receive a local result and persistent record
-```
+Every screen works with the keyboard alone. Mouse is an alternative, never the
+only path.
 
-Required behavior:
-
-- click selects; Enter or double-click opens;
-- arrows move through the visible collection or focused pane;
-- the printed key and actual key always agree;
-- number keys can act only on rows currently visible;
-- important disabled actions remain visible with a short reason;
-- impossible or irrelevant actions are absent rather than active at zero;
-- evidence appears before irreversible judgement;
-- every refusal and success appears in the room that initiated it;
-- important names, quantities, costs, and claims never truncate while
-  decorative space remains;
-- compact and minimum layouts retain every enabled action;
-- mouse and keyboard have equivalent routes;
-- closing a room never discards an unsealed draft without an explicit discard.
+Every action states its cost before confirmation and its refusal in plain
+words. Destructive or irreversible orders confirm explicitly.
 
 The Hall is an exception docket, not a second copy of every ledger. It answers:
-who or what has reached the king, what changed, and where the evidence lives.
-
-Rooms show working state. Object windows show detailed evidence and history.
-Orders record what was asked, who should carry it out, what it costs, and what
-happened.
+who or what has reached the king, what changed, and where the evidence is.
+Rooms show working state.
 
 ---
 
-## 5. Technical contract
+## 5. Technical
 
 ### 5.1 Boundaries
 
@@ -393,14 +398,14 @@ The developer's causal inspector may read World. It is never player-facing.
 
 ### 5.4 Performance and scale
 
-The 1.0 simulation must complete a 96-fortnight reference run within the pinned
+The simulation must complete a 96-fortnight reference run within the pinned
 benchmark budget and remain deterministic under reordered iteration and
 headless execution.
 
 Scale is justified by decisions and causal interactions, not by a headline
-agent count. Release content should be large enough that trade, delay,
-substitution, disease, labour conflict, and foreign autonomy are real, while
-small enough to inspect and balance.
+agent count. Content should be large enough that trade, delay, substitution,
+disease, labour conflict, and foreign autonomy are real, while small enough to
+inspect and balance.
 
 ### 5.5 Verification
 
@@ -421,123 +426,83 @@ No release gate is satisfied by prose alone.
 
 ---
 
-## 6. Path to 1.0
+## 6. Path to Alpha 0.7
 
-Only these workstreams may define pre-1.0 scope.
+Only these workstreams may define scope. Ordered.
 
-### 6.1 Finish the correspondence vertical slice
+### 6.1 Retire the legacy court
 
-- foreign need or belief causes an incoming tablet;
-- the player reads and cross-checks it;
-- Address, Recognition, Matter, and Seal compose the reply;
-- exact material terms and attachments are confirmed;
-- Yabninu corrects only the player-written matter;
+One authority per fact. Six remain duplicated: the seat's stores, its ordinary
+people, its labour, foreign court standing, actor belief, and the date.
+`tools/authority_audit.py` is the gate — it must report nothing.
+
+This comes first. Every other workstream that touches the world writes twice
+until it is done. Steps are in `docs/TASK_2_TODO.md`.
+
+### 6.2 Finish the correspondence vertical slice
+
+- a foreign need or belief causes an incoming tablet;
+- the Hall shows the arrival cheaply and immediately;
+- the player composes the reply from the blocks in §3.2.1;
+- parsed orders and tone are shown deterministically and confirmed (§3.2.3);
 - seal, copy, scribe, courier, and route are recorded;
 - dispatch, travel, receipt, silence, response, and consequence occur;
 - gifts and marriage proposals use the same path;
 - accepted text and structured meaning replay exactly.
 
-### 6.2 Unify court and world state
+**Decision — which orders a letter may issue.** The corpus, not invention. A
+Late Bronze Age letter demands or promises goods, grain, metal, timber, and
+labour; asks for or offers troops and escorts; complains of raiding and asks
+for protection; reports enemy movement; arranges marriage and dowry; sends,
+requests, and complains about gifts; cites and demands oaths; asks a detained
+messenger be released; refers a dispute for judgement; asks for a physician,
+a craftsman, or a scribe; announces accession or death; and threatens to go to
+a third court. Each of those is one order kind. Nothing outside that list
+ships in 0.7.
 
-- complete the legacy-court-to-kernel migration;
-- remove duplicate sources of truth;
-- make Ugarit use the same goods, labour, movement, obligation, and Belief
-  grammar as foreign settlements;
-- persist the unified entities and records in the current save version.
-
-### 6.3 Complete the eight-room consolidation
-
-- move advisers into Court;
-- move oaths into Shrine;
-- move Works into City;
-- move sickness controls and evidence into people, routes, places, and World;
-- keep focused object windows and multi-window comparison;
-- remove obsolete primary doors only after their complete action paths have a
-  visible replacement.
-
-### 6.4 Complete release-critical UI work
-
-- explicit person selection for delegation, marriage, succession, and office;
-- only valid actions for the selected subject;
-- responsive Counsel, World layers, Court, Land, and remaining object dossiers;
-- exact quantities and units at minimum sizes;
-- cuneiform/tablet decoration that is recognizable but never noisy;
-- the compact angular release type system;
-- final footer, naming, focus, and accessibility consistency.
-
-### 6.5 Complete the release simulation
+### 6.3 Complete the world and the rooms
 
 - a playable autonomous regional network;
-- grain, labour, trade, transport, obligation, disease, politics, household,
-  succession, justice, religion, and limited conflict interacting through the
-  shared foundations;
-- explainable survival, submission, transformation, and collapse outcomes;
-- enough authored content for a full Ugarit campaign without fixed-cadence
-  filler;
-- balance families in which apparently sensible choices can fail and difficult
-  choices can preserve some form of continuity.
+- grain, labour, trade in more than one good, transport, obligation, disease,
+  politics, household, succession, and limited conflict interacting through
+  the shared foundations;
+- the eight rooms of §3.3 owning their verbs, with no working action lost.
 
-### 6.6 Ship
+**Decision — obligations, and what 0.7 needs.** Four kinds, all letter-facing
+and all with a due date, a debtor, a creditor, and a stated remedy on failure:
+deliver goods, supply labour or troops, pay tribute, and keep an oath. That is
+enough for tribute, corvée, trade contracts, and diplomacy. No fifth kind
+without a rule that reads it.
 
-- complete save migration and release packaging;
-- pass all verification gates;
-- perform keyboard, mouse, scaling, multi-window, setup, and accessibility
-  usability reviews;
-- provide a campaign epilogue generated from stored outcomes and archives, not
-  a predetermined ending.
+**Decision — justice and religion in 0.7.** Both stay, both stay small.
+Justice is petitions, rulings, and precedent that people remember; it feeds
+legitimacy and grievance and nothing else. Religion is §2.8: rites cost goods
+and days, omens move expectations, oaths are political facts. Neither grows a
+subsystem in 0.7.
 
-Work not required by these six workstreams is post-1.0 unless it fixes a
-release-blocking defect.
+### 6.4 Balance the collapse
+
+Not a system. Knob-turning against long headless runs, once §6.1 to §6.3 are
+real. The targets:
+
+- an unshocked world stays mostly stable;
+- one shock is usually survivable;
+- connected shocks can cascade across settlements;
+- across seeds, an unaided world fails between year 15 and year 30;
+- every failure is reconstructable from stored events.
+
+Nothing here may add a `collapsed` flag, a scripted victim, or a hidden
+countdown.
 
 ---
 
 ## 7. Anti-goals
 
-Release 1.0 will not:
-
-- copy another game's interface, species, terminology, or progression;
-- add mechanics merely because they are historically imaginable;
-- expose an omniscient map, adviser, confidence score, or protocol score;
-- use generated prose as authoritative simulation state;
-- make the small model optional while silently degrading the intended product;
-- turn every record or filter into a top-level window;
-- replace culturally specific rooms with a generic dashboard;
-- replace multi-window comparison with a single full-screen shell;
-- add another primary room when an existing room or object naturally owns the
-  mechanic;
-- preserve duplicate legacy and replacement systems indefinitely;
-- fill letters, reports, or chronicles with atmospheric padding;
-- make objective supernatural causality;
-- guarantee Ugarit's destruction or survival;
-- chase a huge population count before the smaller world is causal, playable,
-  and explainable.
-
----
-
-## 8. Definition of 1.0
-
-The game is ready when:
-
-- the world continues and changes without waiting for the player;
-- important material and political outcomes are conserved and explainable;
-- the court knows only what its Belief permits;
-- a complete correspondence chain can cause and resolve material action;
-- letters are brief, expressive, socially meaningful, and materially exact;
-- the required local model gives the court language without deciding truth;
-- the eight rooms have distinct purposes and changing visual state;
-- several windows support comparison without becoming window-management work;
-- every enabled action has visible subject, evidence, terms, cost, and result;
-- the Bronze Age identity is unmistakable without sacrificing readability;
-- religion, justice, household, diplomacy, trade, and disease remain culturally
-  specific and materially connected;
-- a full campaign remains triageable rather than drowning in repeated text;
-- saves replay, audits balance, and all release verification passes;
-- outcomes emerge from the run and produce an honest archive and epilogue.
-
-The final test for simplification is:
-
-> Does it remove friction while preserving the court, the letters, the rooms,
-> the culture, and the interacting simulation?
-
-If it removes the game's identity along with the friction, it is the wrong
-simplification.
+- no omniscient map, no fog-free strategy layer;
+- no model-authored facts, numbers, or decisions;
+- no scripted collapse, doom timer, or chosen victim;
+- no abstract relationship, posture, or protocol score shown to the player;
+- no entity type without a rule that consumes it;
+- no research tree, technology bar, or iron victory in 0.7;
+- no tactical battle layer;
+- no second full-screen dashboard replacing the rooms.
