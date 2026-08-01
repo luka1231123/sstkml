@@ -197,6 +197,46 @@ class RaiseCorvee:
 
 
 @dataclasses.dataclass(frozen=True)
+class LevyCohort:
+    cohort_id: str
+    heads: int
+    destination: str
+    duration: int
+    task: str = "work"
+    ration_source: str = ""
+    official: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class ReleaseCohort:
+    detachment_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ReceiveCohort:
+    cohort_id: str
+    decision: str
+    destination: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class FinanceTrade:
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
+class RequisitionTrade:
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ExemptTrade:
+    pass
+
+
+@dataclasses.dataclass(frozen=True)
 class DredgeCanal:
     """Restore an irrigated estate's canal. Only in the low-water window."""
     estate_id: str
@@ -557,6 +597,65 @@ class CorveeRaised:
 
 
 @dataclasses.dataclass(frozen=True)
+class CohortDetached:
+    cohort: str
+    detachment: str
+    heads: int
+    destination: str
+    until: int
+
+
+@dataclasses.dataclass(frozen=True)
+class CohortReturned:
+    detachment: str
+    cohort: str
+    survivors: int
+
+
+@dataclasses.dataclass(frozen=True)
+class CohortDisplaced:
+    cohort: str
+    people: int
+    origin: str
+    destination: str
+
+
+@dataclasses.dataclass(frozen=True)
+class CohortReceived:
+    cohort: str
+    decision: str
+    destination: str
+
+
+@dataclasses.dataclass(frozen=True)
+class TradeFinanced:
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
+class TradeRequisitioned:
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
+class SeatDefended:
+    attackers: int
+    defenders: int
+    dead: int
+    grain: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class SeatFell:
+    attackers: int
+    defenders: int
+    cause: str
+    grain: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
 class CanalDredged:
     estate_id: str
     days: int
@@ -710,6 +809,21 @@ class PlagueProgressed:
 class PlagueDeaths:
     place_id: str
     dead: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ShockLanded:
+    shock: str
+    kind: str
+    target: str
+    severity: int
+    until: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ShockRecovered:
+    shock: str
+    target: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -908,11 +1022,17 @@ _TYPES = {
         EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, ArchiveLetter,
         DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
         RecordReplyText, CargoLanded,
-        InspectLedger, SendGift, SendToHarvest, RaiseCorvee, DredgeCanal,
+        InspectLedger, SendGift, SendToHarvest, RaiseCorvee, LevyCohort,
+        ReleaseCohort, ReceiveCohort, FinanceTrade, RequisitionTrade,
+        ExemptTrade,
+        DredgeCanal,
         HearPetition, RulePetition,
         SetLandDue, SetHarbourDue, PlacePerson, DismissPerson, NameHeir,
         AssignTroops, TroopsAssigned, SummonsReceived,
-        Sown, Harvested, Threshed, SentToHarvest, CorveeRaised, CanalDredged,
+        Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
+        CohortDetached, CohortReturned, CohortDisplaced, CohortReceived,
+        TradeFinanced, TradeRequisitioned,
+        SeatDefended, SeatFell, CanalDredged,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,
         BronzeMelted, WorkshopDemandMet,
         InstitutionDecayed, InstitutionUpkeepConsumed,
@@ -923,7 +1043,8 @@ _TYPES = {
         SuccessionFailed, MarriedAbroad, OmenTaken, OmenSuppressed,
         OmenLeaked, OmenDefied, OathSworn, OathLapsed,
         Quarantine, Expiate, SearchArchive,
-        PlagueBegan, PlagueSpread, PlagueProgressed, PlagueDeaths, OathExpiated,
+        PlagueBegan, PlagueSpread, PlagueProgressed, PlagueDeaths,
+        ShockLanded, ShockRecovered, OathExpiated,
         QuarantineSet, ArchiveSearched,
         PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
         LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,

@@ -14,14 +14,14 @@ import dataclasses
 
 import pytest
 
-from load import kernel_settlement, load_idmap, load_scenario
+from load import kernel_settlement, load_idmap, load_campaign
 
 SEED = 8814402919
 
 
 def test_every_court_place_answers_to_a_settlement():
     """The finding the audit used to report twenty-six of, all of them false."""
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     orphans = [place for place in world.places
                if kernel_settlement(world, place)
                not in world.kernel.registry.settlements]
@@ -30,7 +30,7 @@ def test_every_court_place_answers_to_a_settlement():
 
 def test_a_mark_answers_to_its_alu_and_not_to_its_own_name():
     """The case the string match could never have got right."""
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     assert kernel_settlement(world, "mari") == "settlement:dur_katlimmu"
     assert kernel_settlement(world, "argos") == "settlement:mycenae"
     assert kernel_settlement(world, "ma_hadu") == "settlement:seat"
@@ -68,7 +68,7 @@ def test_the_id_map_cannot_name_an_entity_that_does_not_exist():
 
     import load
 
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     with TemporaryDirectory() as directory:
         content = Path(directory) / "kernel"
         content.mkdir()
@@ -89,7 +89,7 @@ def test_an_empty_section_is_not_an_error():
     Empty because its step has not run is a different thing from wrong, and an
     id map that raised on the first would never survive to catch the second.
     """
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     idmap = load_idmap(world.kernel.registry)
     assert idmap == {
         "actors": {},

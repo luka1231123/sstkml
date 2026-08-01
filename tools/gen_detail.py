@@ -322,13 +322,14 @@ def build():
                 "good": "copper", "quantity": MERCHANT_COPPER,
             })
 
-        if power != FREE and f"polity:{power}" in reg.polities:
+        overlord = reg.polities[f"polity:{slug}"].overlord
+        if power != FREE and overlord:
             obligations.append({
                 "id": f"{sid}/0/obligation/0", "party": sid,
-                "beneficiary": f"polity:{power}", "clause": "fixed_quantity",
+                "beneficiary": overlord, "clause": "fixed_quantity",
                 "good": "grain", "quantity": int(pop * TRIBUTE_PER_HEAD * yld),
                 "due_kind": "season", "due_span": "harvest",
-                "authority": f"polity:{power}",
+                "authority": overlord,
                 "consequence": "the overlord would send for the elders",
             })
 

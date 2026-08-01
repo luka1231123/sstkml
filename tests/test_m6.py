@@ -15,7 +15,7 @@ from engine.reduce import apply
 from engine.relations import audit_oaths, deliver_protocol, evaluate_gift
 from engine.state import GiftRecord, Letter, ProtocolRecord, Relation
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import play, replay, save
 
 SEED = 8814402919
@@ -51,7 +51,7 @@ def test_integer_table_and_every_gift_band_boundary():
 
 
 def _pending_world():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     letter = Letter(
         id="P1", sender="byblos_king", recipient="ammurapi",
         topic="vassal_plea", facts=(), sent_turn=0,
@@ -92,9 +92,9 @@ def test_unanswered_decay_reading_reply_and_patron_notice():
 
 
 def _protocol_world(recipient: str, total: int, violations: tuple[str, ...]):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     world = dataclasses.replace(
-        world, date=Date(1, 10, 10),
+        world, kernel=dataclasses.replace(world.kernel, date=Date(1, 10, 10)),
         protocol_log=(ProtocolRecord(
             "PX", recipient, "hatti.servant_to_lord",
             total, violations),))
@@ -134,13 +134,14 @@ def test_protocol_penalties_wrong_gods_and_delivery_idempotence():
     queued, letter = _protocol_world(
         "hatti_king", 900, ("wrong_oath_gods",))
     queued = dataclasses.replace(
-        queued, date=Date(1, 7, 7), letters_in_transit=(letter,))
+        queued, kernel=dataclasses.replace(queued.kernel, date=Date(1, 7, 7)),
+        letters_in_transit=(letter,))
     queued, _events = advance(queued)
     assert queued.relations["hatti_king"].reply_delay_until == 10
 
 
 def test_status_mismatch_only_bites_when_brotherhood_is_used():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     inbound = Letter(
         id="B1", sender="byblos_king", recipient="ammurapi",
         topic="vassal_plea", facts=(), sent_turn=0,
@@ -167,18 +168,20 @@ def test_status_mismatch_only_bites_when_brotherhood_is_used():
 
 
 def test_oath_deadline_records_breach_without_causing_random_physics():
-    world = load_scenario("ugarit", SEED)
-    world = dataclasses.replace(world, date=Date(1, 24, 24))
+    world = load_campaign("seat", SEED)
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, date=Date(1, 24, 24)))
     audited, events = audit_oaths(world)
     assert audited == world
     assert events == [A.OathViolated("oath_hatti_grain", "provide_goods")]
 
-    fulfilled = load_scenario("ugarit", SEED)
+    fulfilled = load_campaign("seat", SEED)
     record = GiftRecord(
         "Gx", "ammurapi", "hatti_king", "grain", 48000, 48000,
         1, arrive_turn=24, adequacy=1000)
     fulfilled = dataclasses.replace(
-        fulfilled, date=Date(1, 24, 24),
+        fulfilled, kernel=dataclasses.replace(
+            fulfilled.kernel, date=Date(1, 24, 24)),
         court=dataclasses.replace(
             fulfilled.court, treasury_gifts_sent=(record,)))
     audited, events = audit_oaths(fulfilled)
@@ -187,7 +190,7 @@ def test_oath_deadline_records_breach_without_causing_random_physics():
 
 
 def test_removed_divine_liability_and_gifts_are_written_at_the_desk():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     assert "liability" not in {
         field.name for field in dataclasses.fields(type(world.court))}
     belief = project(world)

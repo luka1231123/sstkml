@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from belief.project import project
-from load import load_scenario
+from load import load_campaign
 from tui import desktop, plague
 from tui.grid import plain_text
 
@@ -11,7 +11,7 @@ SEED = 8_814_402_919
 
 
 def _belief() -> dict:
-    return project(load_scenario("ugarit", SEED))
+    return project(load_campaign("seat", SEED))
 
 
 def _assert_frame_is_intact(text: str, width: int, height: int) -> None:

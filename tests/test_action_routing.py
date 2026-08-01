@@ -11,7 +11,7 @@ from __future__ import annotations
 from belief.project import project
 from engine import actions as A
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import style
 from tui.grid import Surface, plain_text, pure_ascii
 
@@ -21,7 +21,7 @@ SEED = 8814402919
 
 
 def _world(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world

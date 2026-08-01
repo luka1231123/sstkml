@@ -7,7 +7,7 @@ from engine import actions as A
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import replay, save
 SEED = 8814402919
 
@@ -22,7 +22,7 @@ def test_the_scribe_sometimes_slips_and_reproduces_exactly():
     that now stands still.)"""
     from belief.distortion import p_error, transcribe
 
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     perr = p_error(world.court.scribe_competence, world.court.scribe_fatigue)
     truth = 123_456
     key = "ledger:grain"
@@ -36,7 +36,7 @@ def test_the_scribe_sometimes_slips_and_reproduces_exactly():
 
 
 def test_replay_with_inspect():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     log: list[dict] = []
     turns = 0
     for _ in range(25):
@@ -45,5 +45,5 @@ def test_replay_with_inspect():
         for act in (A.InspectLedger("granary"), A.InspectLedger("seed")):
             world, _ = apply(world, act)
             log.append({"turn": world.date.absolute, "action": A.to_dict(act)})
-    save("/tmp/m3_test.json", SEED, "ugarit", turns, log, world)
+    save("/tmp/m3_test.json", SEED, "seat", turns, log, world)
     assert state_hash(replay("/tmp/m3_test.json")) == state_hash(world)

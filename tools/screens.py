@@ -30,7 +30,7 @@ from belief.project import project              # noqa: E402
 from engine import actions as A                 # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
-from load import load_scenario                  # noqa: E402
+from load import load_campaign                  # noqa: E402
 from tui import desktop, inbox, ledgers, orders, palace, works
 from tui import (altar, archive, alu, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
@@ -116,9 +116,9 @@ def _desk(b: dict):
         width=width, height=height, blocks=blocks, matter=matter)
 
 
-def state(scenario: str = "ugarit", seed: int = SEED, turns: int = 6):
+def state(chosen_alu: str = "seat", seed: int = SEED, turns: int = 6):
     """A world advanced `turns` fortnights."""
-    world = load_scenario(scenario, seed)
+    world = load_campaign(chosen_alu, seed)
     for _ in range(turns):
         world, _ = advance(world)
     return world

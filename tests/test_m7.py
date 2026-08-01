@@ -18,14 +18,14 @@ from engine import report
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import replay, save
 
 SEED = 8814402919
 
 
-def _run(turns: int, seed: int = SEED, scenario: str = "ugarit"):
-    world = load_scenario(scenario, seed)
+def _run(turns: int, seed: int = SEED, scenario: str = "seat"):
+    world = load_campaign(scenario, seed)
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -114,7 +114,7 @@ def test_belief_shows_the_assertion_and_never_the_truth():
 def test_replay_still_matches_with_asserted_and_true_facts_on_letters():
     world = _run(12)
     path = "/tmp/m7_test.json"
-    save(path, SEED, "ugarit", 12, [], world, [])
+    save(path, SEED, "seat", 12, [], world, [])
     assert state_hash(replay(path)) == state_hash(world)
 
 

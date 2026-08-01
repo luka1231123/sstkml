@@ -36,13 +36,14 @@ def capable(formation) -> int:
     return max(0, min(formation.strength, formation.ready))
 
 
-def garrison_strength(court, place: str) -> int:
+def garrison_strength(world, place: str) -> int:
     """Spec 6.13's `garrison_strength[place]`, the term M11 raids read.
 
     Only men standing at the place and tasked to hold it count. Troops sent to
     the harvest or to a muster in the north are not defending anything, and
     that is the point of being able to order them there.
     """
+    court = world.court
     raw = sum(
         capable(formation)
         * (_WATCH_SHARE if formation.task == "watch" else 1000)
@@ -52,7 +53,7 @@ def garrison_strength(court, place: str) -> int:
     )
     from engine.institution import factor_at
 
-    walls = factor_at(court, "walls", place)
+    walls = factor_at(world, "walls", place)
     fortification = _UNFORTIFIED_SHARE + walls * (
         1000 - _UNFORTIFIED_SHARE) // 1000
     return raw * fortification // 1000

@@ -25,20 +25,20 @@ sys.path.insert(0, str(ROOT))
 from engine import actions as A            # noqa: E402
 from engine.reduce import apply            # noqa: E402
 from engine.tick import advance            # noqa: E402
-from load import load_scenario             # noqa: E402
+from load import load_campaign             # noqa: E402
 
 
 def _prudent_allocations(world, budget: int) -> list:
     """Pay down the priority list until the budget is gone; cut the rest."""
     from engine import seat
 
-    court = world.court
+    roll = seat.groups(world)
     order = list(seat.order_of_payment(world))
-    order += sorted(g for g in court.dependents if g not in order)
+    order += sorted(g for g in roll if g not in order)
     allowances = seat.allowances(world)
     actions, left = [], budget
     for gid in order:
-        group = court.dependents[gid]
+        group = roll[gid]
         owed = group.size * group.entitlement
         give = min(owed, max(0, left))
         left -= give
@@ -48,12 +48,15 @@ def _prudent_allocations(world, budget: int) -> list:
 
 
 def run(policy: str = "prudent", turns: int = 72,
-        seed: int = 8814402919, scenario: str = "ugarit") -> dict:
-    world = load_scenario(scenario, seed)
+        seed: int = 8814402919, chosen_alu: str = "seat") -> dict:
+    world = load_campaign(chosen_alu, seed)
     rows = []
     for turn in range(1, turns + 1):
         world, events = advance(world)
         court = world.court
+        from engine import seat
+        stores = seat.held(world)
+        roll = seat.groups(world)
         if policy == "prudent":
             # Spend against what the land actually returned last year, not
             # against the entitlement. One-turn lag applies (D3).
@@ -63,17 +66,17 @@ def run(policy: str = "prudent", turns: int = 72,
             for action in _prudent_allocations(world, budget):
                 world, _ = apply(world, action)
             # Hands to the fields when the granary is thin and the crop is standing.
-            if court.stores.get("grain", 0) < annual // 4:
+            if stores.get("grain", 0) < annual // 4:
                 for gid in ("weavers", "garrison_mahadu"):
-                    if gid in court.dependents and not court.dependents[gid].at_fields:
+                    if gid in roll and not roll[gid].at_fields:
                         world, _ = apply(world, A.SendToHarvest(gid, True))
         court = world.court
         rows.append({
             "turn": turn, "fortnight": world.date.fortnight,
             "climate": world.climate[world.date.absolute],
-            "grain": court.stores.get("grain", 0),
-            "seed": court.stores.get("seed_grain", 0),
-            "tin": court.stores.get("tin", 0),
+            "grain": stores.get("grain", 0),
+            "seed": stores.get("seed_grain", 0),
+            "tin": stores.get("tin", 0),
             "circulation": court.metals.bronze_in_circulation,
             "melt": court.metals.melt_ledger,
             "unrest": court.unrest,

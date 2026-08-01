@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from engine.actors import slug
 
 _CONTENT = Path(__file__).parent.parent / "content"
 _LETTERS = tomllib.loads((_CONTENT / "corpus" / "letters.toml").read_text())
@@ -18,8 +19,9 @@ def actor_name(actor: str, house: dict | None = None) -> str:
     """Correspondents are named in actors.toml; a successor who took the seat
     mid-run is only named in the house, so fall back to it rather than printing
     a person id at the player."""
-    if actor in _ACTORS:
-        return _ACTORS[actor]
+    key = slug(actor)
+    if key in _ACTORS:
+        return _ACTORS[key]
     if house:
         for person in house.get("members", ()):
             if person["id"] == actor:

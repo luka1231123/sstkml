@@ -6,16 +6,16 @@ import dataclasses
 import pytest
 
 from engine import actions as A
-from engine import letter_terms
+from engine import letter_terms, seat
 from engine.state import Letter
-from load import load_scenario
+from load import load_campaign
 
 
 SEED = 8814402919
 
 
 def _world():
-    return load_scenario("ugarit", SEED)
+    return load_campaign("seat", SEED)
 
 
 def _letter(world, *terms: A.LetterTerm, letter_id: str = "L-terms") -> Letter:
@@ -47,7 +47,7 @@ def test_world_validation_rejects_unknown_or_impossible_terms() -> None:
             world,
             A.LetterTerm(
                 "gift", good="oil",
-                quantity=world.court.stores["oil"] + 1),
+                quantity=seat.held(world)["oil"] + 1),
             "hatti_king")
     with pytest.raises(ValueError, match="future due turn"):
         letter_terms.validate_term(
@@ -80,12 +80,12 @@ def test_gift_is_reserved_once_and_delivery_never_mints_goods() -> None:
     world = _world()
     letter = _letter(
         world, A.LetterTerm("gift", good="oil", quantity=20))
-    opening = world.court.stores["oil"]
+    opening = seat.held(world)["oil"]
 
     first = letter_terms.reserve_terms_at_dispatch(world, letter)
     second = letter_terms.reserve_terms_at_dispatch(first.world, letter)
 
-    assert first.world.court.stores["oil"] == opening - 20
+    assert seat.held(first.world)["oil"] == opening - 20
     assert second.world == first.world
     assert second.reservations == first.reservations
     assert sum(
@@ -96,7 +96,7 @@ def test_gift_is_reserved_once_and_delivery_never_mints_goods() -> None:
         first.world, letter)
     again_world, again = letter_terms.apply_delivered_terms(
         delivered_world, letter)
-    assert delivered_world.court.stores["oil"] == opening - 20
+    assert seat.held(delivered_world)["oil"] == opening - 20
     assert again_world == delivered_world
     assert again == delivered
     assert delivered.gifts[0].status == "delivered"
@@ -104,7 +104,7 @@ def test_gift_is_reserved_once_and_delivery_never_mints_goods() -> None:
 
 def test_all_gifts_are_checked_as_one_atomic_reservation() -> None:
     world = _world()
-    half = world.court.stores["wine"] // 2 + 1
+    half = seat.held(world)["wine"] // 2 + 1
     letter = _letter(
         world,
         A.LetterTerm("gift", good="wine", quantity=half),
@@ -112,7 +112,7 @@ def test_all_gifts_are_checked_as_one_atomic_reservation() -> None:
     )
     with pytest.raises(ValueError, match="all gifts"):
         letter_terms.reserve_terms_at_dispatch(world, letter)
-    assert world.court.stores["wine"] == 3000
+    assert seat.held(world)["wine"] == 3000
     assert not world.court.treasury_gifts_sent
 
 
@@ -125,10 +125,10 @@ def test_promise_and_service_create_records_without_a_goods_faucet() -> None:
         A.LetterTerm(
             "service", quantity=12, destination="carchemish", due_turn=7),
     )
-    opening = dict(world.court.stores)
+    opening = seat.held(world)
 
     dispatched = letter_terms.reserve_terms_at_dispatch(world, letter)
-    assert dispatched.world.court.stores == opening
+    assert seat.held(dispatched.world) == opening
     assert [item.kind for item in dispatched.obligations] == [
         "promise_good", "service"]
     assert dispatched.obligations[0].due_turn == 9
@@ -136,7 +136,7 @@ def test_promise_and_service_create_records_without_a_goods_faucet() -> None:
 
     delivered_world, delivered = letter_terms.apply_delivered_terms(
         dispatched.world, letter)
-    assert delivered_world.court.stores == opening
+    assert seat.held(delivered_world) == opening
     assert all(item.status == "delivered"
                for item in delivered.obligations)
     assert all(item.source_letter == letter.id

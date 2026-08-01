@@ -75,10 +75,11 @@ def test_the_registry_reports_what_it_cannot_resolve() -> None:
         regions={region.id: region},
         polities={E.authored("polity", "ugarit"):
                   E.Polity(id=E.authored("polity", "ugarit"), name="Ugarit",
-                           seat=UGARIT, controls=(UGARIT,))},
+                           ruler="person:king", seat=UGARIT)},
+        persons={"person:king": E.Person(id="person:king", name="king")},
         settlements={UGARIT: E.Settlement(
             id=UGARIT, name="Ugarit", region=region.id,
-            polity=E.authored("polity", "ugarit"), sites=(HARBOUR,))},
+            owner=E.authored("polity", "ugarit"), sites=(HARBOUR,))},
         sites={HARBOUR: E.Site(id=HARBOUR, name="Ma'hadu", settlement=UGARIT,
                                function="harbour", region=region.id)})
     assert E.check(good) == ()

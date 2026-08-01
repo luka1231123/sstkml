@@ -307,8 +307,24 @@ id = "site:babylon_586_120"
 settlement = "settlement:babylon"
 region = "region:lower_mesopotamia"
 function = "palace_centre"
-capacity = 48000
-extent = 240000
+capacity = 16000
+extent = 80000
+
+[[sites]]
+id = "site:kish"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 16000
+extent = 80000
+
+[[sites]]
+id = "site:sippar"
+settlement = "settlement:babylon"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 16000
+extent = 80000
 
 [[sites]]
 id = "site:babylon_590_124"
@@ -379,16 +395,24 @@ id = "site:carchemish_416_62"
 settlement = "settlement:carchemish"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 12000
-extent = 60000
+capacity = 8000
+extent = 40000
 
 [[sites]]
 id = "site:carchemish_426_56"
 settlement = "settlement:carchemish"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 12000
-extent = 60000
+capacity = 8000
+extent = 40000
+
+[[sites]]
+id = "site:harran"
+settlement = "settlement:carchemish"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 8000
+extent = 40000
 
 [[sites]]
 id = "site:damascus_382_115"
@@ -427,8 +451,16 @@ id = "site:dur_katlimmu_494_76"
 settlement = "settlement:dur_katlimmu"
 region = "region:upper_mesopotamia"
 function = "palace_centre"
-capacity = 18000
-extent = 90000
+capacity = 9000
+extent = 45000
+
+[[sites]]
+id = "site:mari"
+settlement = "settlement:dur_katlimmu"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 9000
+extent = 45000
 
 [[sites]]
 id = "site:dur_kurigalzu_576_114"
@@ -487,20 +519,44 @@ capacity = 11200
 extent = 0
 
 [[sites]]
+id = "site:djanet"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "palace_centre"
+capacity = 18600
+extent = 93000
+
+[[sites]]
 id = "site:egypt_270_158"
 settlement = "settlement:egypt"
 region = "region:nile"
 function = "palace_centre"
-capacity = 46500
-extent = 232500
+capacity = 18600
+extent = 93000
 
 [[sites]]
 id = "site:egypt_280_152"
 settlement = "settlement:egypt"
 region = "region:nile"
 function = "palace_centre"
-capacity = 46500
-extent = 232500
+capacity = 18600
+extent = 93000
+
+[[sites]]
+id = "site:hut_herib"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "palace_centre"
+capacity = 18600
+extent = 93000
+
+[[sites]]
+id = "site:per_bastet"
+settlement = "settlement:egypt"
+region = "region:nile"
+function = "palace_centre"
+capacity = 18600
+extent = 93000
 
 [[sites]]
 id = "site:emar_426_70"
@@ -575,6 +631,14 @@ capacity = 6300
 extent = 0
 
 [[sites]]
+id = "site:yafa"
+settlement = "settlement:gezer"
+region = "region:south_levant"
+function = "palace_centre"
+capacity = 7000
+extent = 35000
+
+[[sites]]
 id = "site:halab_400_74"
 settlement = "settlement:halab"
 region = "region:north_levant"
@@ -639,6 +703,46 @@ capacity = 4900
 extent = 0
 
 [[sites]]
+id = "site:ankura"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 17600
+extent = 88000
+
+[[sites]]
+id = "site:arinna"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 17600
+extent = 88000
+
+[[sites]]
+id = "site:nerik"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 17600
+extent = 88000
+
+[[sites]]
+id = "site:samuha"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 17600
+extent = 88000
+
+[[sites]]
+id = "site:sapinuwa"
+settlement = "settlement:hattusa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 17600
+extent = 88000
+
+[[sites]]
 id = "site:hattusa_340_10"
 settlement = "settlement:hattusa"
 region = "region:anatolia"
@@ -679,12 +783,20 @@ capacity = 4550
 extent = 0
 
 [[sites]]
+id = "site:dimini"
+settlement = "settlement:iolcos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 3750
+extent = 18750
+
+[[sites]]
 id = "site:iolcos_38_24"
 settlement = "settlement:iolcos"
 region = "region:aegean"
 function = "palace_centre"
-capacity = 7500
-extent = 37500
+capacity = 3750
+extent = 18750
 
 [[sites]]
 id = "site:jerusalem_356_133"
@@ -739,8 +851,16 @@ id = "site:kanesh_366_28"
 settlement = "settlement:kanesh"
 region = "region:anatolia"
 function = "palace_centre"
-capacity = 27000
-extent = 135000
+capacity = 13500
+extent = 67500
+
+[[sites]]
+id = "site:lawazantiya"
+settlement = "settlement:kanesh"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 13500
+extent = 67500
 
 [[sites]]
 id = "site:kanesh_362_32"
@@ -775,20 +895,36 @@ capacity = 11200
 extent = 0
 
 [[sites]]
+id = "site:hut_nesut"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "palace_centre"
+capacity = 9500
+extent = 47500
+
+[[sites]]
 id = "site:khemenu_244_192"
 settlement = "settlement:khemenu"
 region = "region:nile"
 function = "palace_centre"
-capacity = 19000
-extent = 95000
+capacity = 9500
+extent = 47500
 
 [[sites]]
 id = "site:khemenu_248_196"
 settlement = "settlement:khemenu"
 region = "region:nile"
 function = "palace_centre"
-capacity = 19000
-extent = 95000
+capacity = 9500
+extent = 47500
+
+[[sites]]
+id = "site:per_medjed"
+settlement = "settlement:khemenu"
+region = "region:nile"
+function = "palace_centre"
+capacity = 9500
+extent = 47500
 
 [[sites]]
 id = "site:knossos_100_88"
@@ -927,12 +1063,20 @@ capacity = 11200
 extent = 0
 
 [[sites]]
+id = "site:iunu"
+settlement = "settlement:memphis"
+region = "region:nile"
+function = "palace_centre"
+capacity = 30000
+extent = 150000
+
+[[sites]]
 id = "site:memphis_252_170"
 settlement = "settlement:memphis"
 region = "region:nile"
 function = "palace_centre"
-capacity = 60000
-extent = 300000
+capacity = 30000
+extent = 150000
 
 [[sites]]
 id = "site:millawanda_154_50"
@@ -1047,20 +1191,52 @@ capacity = 4550
 extent = 0
 
 [[sites]]
+id = "site:argos"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7250
+extent = 36250
+
+[[sites]]
+id = "site:korinthos"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7250
+extent = 36250
+
+[[sites]]
+id = "site:lerna"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7250
+extent = 36250
+
+[[sites]]
 id = "site:mycenae_36_50"
 settlement = "settlement:mycenae"
 region = "region:aegean"
 function = "palace_centre"
-capacity = 21750
-extent = 108750
+capacity = 7250
+extent = 36250
 
 [[sites]]
 id = "site:mycenae_44_54"
 settlement = "settlement:mycenae"
 region = "region:aegean"
 function = "palace_centre"
-capacity = 21750
-extent = 108750
+capacity = 7250
+extent = 36250
+
+[[sites]]
+id = "site:tiryns"
+settlement = "settlement:mycenae"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7250
+extent = 36250
 
 [[sites]]
 id = "site:nagar_502_60"
@@ -1077,6 +1253,14 @@ region = "region:upper_mesopotamia"
 function = "food"
 capacity = 7700
 extent = 0
+
+[[sites]]
+id = "site:shubat_enlil"
+settlement = "settlement:nagar"
+region = "region:upper_mesopotamia"
+function = "palace_centre"
+capacity = 12000
+extent = 60000
 
 [[sites]]
 id = "site:nineveh_550_68"
@@ -1135,6 +1319,14 @@ capacity = 10500
 extent = 0
 
 [[sites]]
+id = "site:isin"
+settlement = "settlement:nippur"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 21000
+extent = 105000
+
+[[sites]]
 id = "site:nuzi_582_88"
 settlement = "settlement:nuzi"
 region = "region:upper_mesopotamia"
@@ -1175,6 +1367,14 @@ capacity = 4550
 extent = 0
 
 [[sites]]
+id = "site:gla"
+settlement = "settlement:orchomenos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 7000
+extent = 35000
+
+[[sites]]
 id = "site:pylos_18_54"
 settlement = "settlement:pylos"
 region = "region:aegean"
@@ -1195,16 +1395,24 @@ id = "site:pylos_16_52"
 settlement = "settlement:pylos"
 region = "region:aegean"
 function = "palace_centre"
-capacity = 9250
-extent = 46250
+capacity = 6166
+extent = 30833
 
 [[sites]]
 id = "site:pylos_26_58"
 settlement = "settlement:pylos"
 region = "region:aegean"
 function = "palace_centre"
-capacity = 9250
-extent = 46250
+capacity = 6166
+extent = 30833
+
+[[sites]]
+id = "site:sparta"
+settlement = "settlement:pylos"
+region = "region:aegean"
+function = "palace_centre"
+capacity = 6166
+extent = 30833
 
 [[sites]]
 id = "site:sau_240_148"
@@ -1303,36 +1511,52 @@ capacity = 7000
 extent = 0
 
 [[sites]]
+id = "site:gibala"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 1333
+extent = 6666
+
+[[sites]]
+id = "site:ma_hadu"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "palace_centre"
+capacity = 1333
+extent = 6666
+
+[[sites]]
 id = "site:seat_374_78"
 settlement = "settlement:seat"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 2000
-extent = 10000
+capacity = 1333
+extent = 6666
 
 [[sites]]
 id = "site:seat_376_76"
 settlement = "settlement:seat"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 2000
-extent = 10000
+capacity = 1333
+extent = 6666
 
 [[sites]]
 id = "site:seat_380_80"
 settlement = "settlement:seat"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 2000
-extent = 10000
+capacity = 1333
+extent = 6666
 
 [[sites]]
 id = "site:seat_382_80"
 settlement = "settlement:seat"
 region = "region:north_levant"
 function = "palace_centre"
-capacity = 2000
-extent = 10000
+capacity = 1333
+extent = 6666
 
 [[sites]]
 id = "site:shechem_357_126"
@@ -1427,24 +1651,32 @@ id = "site:tarhuntassa_314_68"
 settlement = "settlement:tarhuntassa"
 region = "region:anatolia"
 function = "palace_centre"
-capacity = 6666
-extent = 33333
+capacity = 5000
+extent = 25000
 
 [[sites]]
 id = "site:tarhuntassa_316_68"
 settlement = "settlement:tarhuntassa"
 region = "region:anatolia"
 function = "palace_centre"
-capacity = 6666
-extent = 33333
+capacity = 5000
+extent = 25000
 
 [[sites]]
 id = "site:tarhuntassa_328_64"
 settlement = "settlement:tarhuntassa"
 region = "region:anatolia"
 function = "palace_centre"
-capacity = 6666
-extent = 33333
+capacity = 5000
+extent = 25000
+
+[[sites]]
+id = "site:ura"
+settlement = "settlement:tarhuntassa"
+region = "region:anatolia"
+function = "palace_centre"
+capacity = 5000
+extent = 25000
 
 [[sites]]
 id = "site:tarhuntassa_324_64"
@@ -1591,6 +1823,14 @@ capacity = 10500
 extent = 0
 
 [[sites]]
+id = "site:lagash"
+settlement = "settlement:ur"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 20000
+extent = 100000
+
+[[sites]]
 id = "site:uruk_616_140"
 settlement = "settlement:uruk"
 region = "region:lower_mesopotamia"
@@ -1605,6 +1845,14 @@ region = "region:lower_mesopotamia"
 function = "food"
 capacity = 10500
 extent = 0
+
+[[sites]]
+id = "site:larsa"
+settlement = "settlement:uruk"
+region = "region:lower_mesopotamia"
+function = "palace_centre"
+capacity = 26000
+extent = 130000
 
 [[sites]]
 id = "site:waset_288_228"
@@ -1631,20 +1879,28 @@ capacity = 11200
 extent = 0
 
 [[sites]]
+id = "site:abw"
+settlement = "settlement:waset"
+region = "region:nile"
+function = "palace_centre"
+capacity = 19000
+extent = 95000
+
+[[sites]]
 id = "site:waset_288_222"
 settlement = "settlement:waset"
 region = "region:nile"
 function = "palace_centre"
-capacity = 28500
-extent = 142500
+capacity = 19000
+extent = 95000
 
 [[sites]]
 id = "site:waset_292_232"
 settlement = "settlement:waset"
 region = "region:nile"
 function = "palace_centre"
-capacity = 28500
-extent = 142500
+capacity = 19000
+extent = 95000
 
 [[sites]]
 id = "site:waset_296_224"
@@ -4248,13 +4504,13 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:amurru/0/obligation/0"
 party = "settlement:amurru"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 150000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4270,39 +4526,15 @@ authority = "polity:egypt"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
-id = "settlement:assur/0/obligation/0"
-party = "settlement:assur"
-beneficiary = "polity:assyria"
-clause = "fixed_quantity"
-good = "grain"
-quantity = 825000
-due_kind = "season"
-due_span = "harvest"
-authority = "polity:assyria"
-consequence = "the overlord would send for the elders"
-
-[[obligations]]
 id = "settlement:athens/0/obligation/0"
 party = "settlement:athens"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 175500
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
-consequence = "the overlord would send for the elders"
-
-[[obligations]]
-id = "settlement:babylon/0/obligation/0"
-party = "settlement:babylon"
-beneficiary = "polity:karduniash"
-clause = "fixed_quantity"
-good = "grain"
-quantity = 2160000
-due_kind = "season"
-due_span = "harvest"
-authority = "polity:karduniash"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4320,61 +4552,49 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:carchemish/0/obligation/0"
 party = "settlement:carchemish"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 720000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:dur_katlimmu/0/obligation/0"
 party = "settlement:dur_katlimmu"
-beneficiary = "polity:assyria"
+beneficiary = "polity:assur"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 594000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:assyria"
+authority = "polity:assur"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:dur_kurigalzu/0/obligation/0"
 party = "settlement:dur_kurigalzu"
-beneficiary = "polity:karduniash"
+beneficiary = "polity:babylon"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 540000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:karduniash"
-consequence = "the overlord would send for the elders"
-
-[[obligations]]
-id = "settlement:egypt/0/obligation/0"
-party = "settlement:egypt"
-beneficiary = "polity:egypt"
-clause = "fixed_quantity"
-good = "grain"
-quantity = 4464000
-due_kind = "season"
-due_span = "harvest"
-authority = "polity:egypt"
+authority = "polity:babylon"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:emar/0/obligation/0"
 party = "settlement:emar"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 198000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4404,25 +4624,13 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:halab/0/obligation/0"
 party = "settlement:halab"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 360000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
-consequence = "the overlord would send for the elders"
-
-[[obligations]]
-id = "settlement:hattusa/0/obligation/0"
-party = "settlement:hattusa"
-beneficiary = "polity:hatti"
-clause = "fixed_quantity"
-good = "grain"
-quantity = 1847999
-due_kind = "season"
-due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4440,13 +4648,13 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:iolcos/0/obligation/0"
 party = "settlement:iolcos"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 146250
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4464,25 +4672,25 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:kadesh/0/obligation/0"
 party = "settlement:kadesh"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 150000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:kanesh/0/obligation/0"
 party = "settlement:kanesh"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 567000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4500,25 +4708,25 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:knossos/0/obligation/0"
 party = "settlement:knossos"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 312000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:kydonia/0/obligation/0"
 party = "settlement:kydonia"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 107250
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4560,121 +4768,109 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:millawanda/0/obligation/0"
 party = "settlement:millawanda"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 87750
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:mira/0/obligation/0"
 party = "settlement:mira"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 189000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:mukish/0/obligation/0"
 party = "settlement:mukish"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 90000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
-consequence = "the overlord would send for the elders"
-
-[[obligations]]
-id = "settlement:mycenae/0/obligation/0"
-party = "settlement:mycenae"
-beneficiary = "polity:ahhiyawa"
-clause = "fixed_quantity"
-good = "grain"
-quantity = 848250
-due_kind = "season"
-due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:nagar/0/obligation/0"
 party = "settlement:nagar"
-beneficiary = "polity:assyria"
+beneficiary = "polity:assur"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 396000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:assyria"
+authority = "polity:assur"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:nineveh/0/obligation/0"
 party = "settlement:nineveh"
-beneficiary = "polity:assyria"
+beneficiary = "polity:assur"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 660000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:assyria"
+authority = "polity:assur"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:nippur/0/obligation/0"
 party = "settlement:nippur"
-beneficiary = "polity:karduniash"
+beneficiary = "polity:babylon"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 945000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:karduniash"
+authority = "polity:babylon"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:nuzi/0/obligation/0"
 party = "settlement:nuzi"
-beneficiary = "polity:assyria"
+beneficiary = "polity:assur"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 165000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:assyria"
+authority = "polity:assur"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:orchomenos/0/obligation/0"
 party = "settlement:orchomenos"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 136500
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:pylos/0/obligation/0"
 party = "settlement:pylos"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 360750
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4692,13 +4888,13 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:seat/0/obligation/0"
 party = "settlement:seat"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 240000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4728,49 +4924,49 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:tabetu/0/obligation/0"
 party = "settlement:tabetu"
-beneficiary = "polity:assyria"
+beneficiary = "polity:assur"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 165000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:assyria"
+authority = "polity:assur"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:tarhuntassa/0/obligation/0"
 party = "settlement:tarhuntassa"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 420000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:tarsa/0/obligation/0"
 party = "settlement:tarsa"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 210000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:thebes_gr/0/obligation/0"
 party = "settlement:thebes_gr"
-beneficiary = "polity:ahhiyawa"
+beneficiary = "polity:mycenae"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 214500
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:ahhiyawa"
+authority = "polity:mycenae"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4800,25 +4996,25 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:ur/0/obligation/0"
 party = "settlement:ur"
-beneficiary = "polity:karduniash"
+beneficiary = "polity:babylon"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 900000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:karduniash"
+authority = "polity:babylon"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
 id = "settlement:uruk/0/obligation/0"
 party = "settlement:uruk"
-beneficiary = "polity:karduniash"
+beneficiary = "polity:babylon"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 1170000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:karduniash"
+authority = "polity:babylon"
 consequence = "the overlord would send for the elders"
 
 [[obligations]]
@@ -4836,11 +5032,11 @@ consequence = "the overlord would send for the elders"
 [[obligations]]
 id = "settlement:wilusa/0/obligation/0"
 party = "settlement:wilusa"
-beneficiary = "polity:hatti"
+beneficiary = "polity:hattusa"
 clause = "fixed_quantity"
 good = "grain"
 quantity = 378000
 due_kind = "season"
 due_span = "harvest"
-authority = "polity:hatti"
+authority = "polity:hattusa"
 consequence = "the overlord would send for the elders"

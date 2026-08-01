@@ -24,60 +24,61 @@ def drain_schedule(world: World) -> tuple[World, list]:
     return dataclasses.replace(world, schedule=remaining), list(fired)
 
 
-def step_kernel(world: World) -> tuple[World, list]:
-    """A2: advance the autonomous world one fortnight (Task 2 C1).
-
-    Kernel events are tuples, not `engine.actions` records, and they describe
-    settlements the player has no standing to see. They are returned in the
-    turn's event list because dropping them would make the world's turn
-    unobservable to `tools/kernel_inspect.py`; every reader downstream
-    isinstance-filters on the action types, so they are inert until C6 gives
-    the belief layer somewhere to put them.
-    """
-    from engine.kernel import world as K
-    kernel, events = K.advance(world.kernel)
-    return dataclasses.replace(world, kernel=kernel), events
-
-
 def advance(world: World) -> tuple[World, list]:
-    """Phase A + B(pre-belief). Returns the events describing this turn's advance."""
-    events: list = []
+    """Advance the shared world through one declared phase sequence."""
+    if world.ended:
+        return world, []
+    from engine.kernel import turn as T
+    from engine.kernel import world as K
 
-    # A1: date advance. A fresh fortnight: last turn's ledger inspections lapse,
-    # so the scribe's count is what the ruler sees again until he inspects anew.
-    world = dataclasses.replace(world, date=world.date.advance())
+    held = [world]
+    phase_events: dict[str, list] = {}
+
+    def step(phase: str, name: str, run) -> T.Step:
+        def invoke(kernel):
+            current = dataclasses.replace(held[0], kernel=kernel)
+            current, produced = run(current)
+            held[0] = current
+            return current.kernel, produced
+        return T.Step(phase, name, invoke)
+
+    extra = (
+        step("calendar", "court calendar", _calendar),
+        step("arrivals", "court arrivals", _arrivals),
+        step("production", "court production",
+             lambda w: _production(w, phase_events.get("production", []))),
+        step("consumption", "court consumption", _consumption),
+        step("health", "court health", _health),
+        step("politics", "court politics", _politics),
+        step("reports", "court reports", _reports),
+        step("project", "court projection", _project),
+    )
+    kernel, events, _log = K.advance_logged(
+        world.kernel, extra_steps=extra, phase_events=phase_events)
+    return dataclasses.replace(held[0], kernel=kernel), events
+
+
+def _calendar(world: World) -> tuple[World, list]:
     world = dataclasses.replace(
         world, court=dataclasses.replace(
             world.court, inspected=(), searched=()))
-    events.append(_turn_advanced(world))
+    return world, [_turn_advanced(world)]
 
-    # A2: the world outside the seat. Every other settlement crosses the same
-    # fortnight -- sows, tends, reaps, eats, and settles what it owes -- on its
-    # own region's weather. Kept here, immediately after A1, because the court
-    # phases below are the seat's own turn and the world does not wait on them.
-    #
-    # The kernel keeps its own date and steps it itself, so this is one advance
-    # per world advance and the two dates stay level. Nothing in the court reads
-    # kernel state yet (Task 2 C2 onward moves the readers over), so the seat's
-    # numbers are unchanged by this call.
-    world, e = step_kernel(world); events += e
-    # The crown's grain year, said in the court's own vocabulary (C4/C5).
-    world, e = seat.harvest(world, e); events += e
-    # The year closes: this season's labour figures belong to the season.
-    world = seat.close_year(world)
 
-    # A3: drain the schedule
-    world, fired = drain_schedule(world)
-    from engine import relations
-    world, fired = relations.resolve_scheduled(world, fired)
-    from engine import justice
-    world, fired = justice.resolve_scheduled(world, fired)
-    from engine import revenue
-    world, fired = revenue.resolve_scheduled(world, fired)
-    # Births are scheduled 20 fortnights out at conception (spec 6.10); the
-    # child's sex and health are drawn on arrival, not before.
+def _arrivals(world: World) -> tuple[World, list]:
     from engine import actions as A
-    from engine import house
+    from engine import displacement, house, justice, mail, relations, revenue, troops
+
+    events: list = []
+    world = seat.arrive_detachments(world)
+    world, arrived = displacement.arrivals(world)
+    events += arrived
+    world, returned = seat.return_due(world)
+    events += returned
+    world, fired = drain_schedule(world)
+    world, fired = relations.resolve_scheduled(world, fired)
+    world, fired = justice.resolve_scheduled(world, fired)
+    world, fired = revenue.resolve_scheduled(world, fired)
     remaining = []
     for payload in fired:
         if isinstance(payload, A.ChildBorn) and not payload.child_id:
@@ -86,114 +87,74 @@ def advance(world: World) -> tuple[World, list]:
         else:
             remaining.append(payload)
     events += remaining
-
-    # Letters already in transit arrive in A3. Delivery-time protocol effects
-    # must therefore exist before the A10 oath audit.
-    from engine import mail
-    world, e = mail.step_letters(world); events += e
+    world, produced = mail.step_letters(world); events += produced
     world = relations.update_unanswered(world)
-    # A demand for men becomes a standing summons the moment it is delivered,
-    # read or not (D25). Before the A10 audit, so a summons that came due this
-    # turn is judged this turn.
-    from engine import troops
-    world, e = troops.note_summons(world); events += e
-
-    # A4 plague: introduction off this turn's arrivals, then the compartment
-    # step and mortality. Before the house, because a member of the household
-    # who dies of the sickness should not also age into a mortality check, and
-    # before rations, because the dead are not fed.
-    from engine import plague
-    world, e = plague.step(world); events += e
-
-    # A5 the house: aging, health, conception, and the yearly mortality check
-    # that may kill the ruler and hand the seat to somebody else mid-turn.
-    from engine import house
-    world, e = house.step(world); events += e
-
-    # A7 workshops and metals.
-    from engine import metal
-    world, e = metal.step(world); events += e
-    # A7b: the fabric of the city goes, a little, every fortnight. After the
-    # workshops, because what a forge could do this turn is what it could do
-    # before the roof leaked another fortnight's worth.
-    from engine import institution
-    world, e = institution.step(world); events += e
-    # Cargo is assessed against what the harbour can actually clear after this
-    # fortnight's decay. Merchant withdrawals arrived in A3 and already reduce
-    # the traffic presented to it.
-    world, e = revenue.collect_harbour(world); events += e
-
-    # A7c: the men on the building site work, or the season is wrong, or the
-    # storehouse cannot feed them, and nothing distinguishes the three (6.21).
-    # After A7b, so a fortnight's decay is never cancelled by the same
-    # fortnight's repair -- the fabric goes first and the men catch up.
-    from engine import works
-    world, e = works.step(world); events += e
-
-    court = world.court
-    # A8 spoilage (stock sitting through the fortnight), then rites take their
-    # cut, then rations pay from the remainder. Grain enters only at threshing.
-    court, e = systems.spoilage(court); events += e
-    # Spoilage crosses on its own, because it is the one sink here that is not
-    # somebody eating: spec 2.2 counts spoiled apart from consumed, and a
-    # single crossing for the whole block would file rot as a meal.
-    world = seat.record(world, court, reason_down="spoiled")
-    court = world.court
-    court, e = systems.do_rites(court, world.date.fortnight); events += e
-    # A8 rations. The payroll is a body of cohorts now and it eats in the
-    # kernel, out of the palace's lots (Task 2 C3); `seat.feed` is only the
-    # moment, kept where `systems.pay_rations` used to stand so the fortnight's
-    # grain still leaves after the rot and after the gods. `seat.mirror` writes
-    # the result back onto `Court.dependents` and raises the events the log,
-    # the hall and the advisors read. The retired system is in
-    # `engine/legacy/rations.py`.
-    world = seat.record(world, court, reason_down="consumed")
-    world = seat.feed(world)
-    world, e = seat.mirror(world); events += e
-    # The kernel spent lots directly, so the court's mapping is read back off
-    # the Book rather than written to it. Recording it instead would reconcile
-    # the Book to a figure taken before the meal, and put the ration back.
-    world = seat.refresh(world)
-    # A9 unrest
-    court, e = systems.recompute_unrest(world.court); events += e
-    world = dataclasses.replace(world, court=court)
-    # High land dues are an additional pressure, not part of ration arrears,
-    # and flight is permanent even if the next order lowers the rate.
-    world, e = revenue.pressure(world); events += e
-    # A9b: the queue in the hall ages after ordinary unrest is recomputed.
-    # Cases arriving today start at zero; old cases add their own pressure once
-    # they have stood six fortnights.
-    world, e = justice.step(world); events += e
-
-    # A10: audit explicit oath clauses for the human/archive record.
-    world, e = relations.audit_oaths(world); events += e
-
-    # A14: the far side of the correspondence. Each foreign court counts its own
-    # place, then answers the tablets that have reached it. Observation before
-    # decision, and both after arrivals: a court answering today decides from
-    # what it can see today, and from a tablet delivered no later than this turn.
-    from engine import correspondence_policy, foreign_belief
-    world, e = foreign_belief.step(world); events += e
-    world, e = correspondence_policy.step(world); events += e
-
-    # A15: generate new intents after arrivals, so each new travelling letter
-    # still carries at least one full turn of latency.
-    world, e = mail.generate_incoming(world); events += e
-
-    # 6.17: file the pile. This runs LAST, after A15, because a correspondent
-    # who is standing in the same city has no transit to cross -- a letter from
-    # the same settlement is generated and delivered inside the same turn, and
-    # filing any earlier misses it. Every letter is offered, not only this
-    # turn's arrivals: the scenario's opening inbox predates turn 1 and would
-    # otherwise leave a hole exactly where the player's first correspondence
-    # belongs. `file_letter` dedupes on ref, so this is idempotent and replay-safe.
-    from engine import archive
-    world = archive.file_letters(world, world.inbox)
-
-    # D4-adjacent: the stock readings the STORES sparkline draws from (9.4).
-    world = _record_stores(world)
-
+    world, produced = troops.note_summons(world); events += produced
     return world, events
+
+
+def _production(world: World, kernel_events: list) -> tuple[World, list]:
+    from engine import institution, metal, revenue, works
+
+    events: list = []
+    world, produced = seat.harvest(world, kernel_events); events += produced
+    world = seat.close_year(world)
+    world, produced = metal.step(world); events += produced
+    world, produced = institution.step(world); events += produced
+    world, produced = revenue.collect_harbour(world); events += produced
+    world, produced = works.step(world); events += produced
+    return world, events
+
+
+def _consumption(world: World) -> tuple[World, list]:
+    events: list = []
+    world, produced = systems.spoilage(world); events += produced
+    world, produced = systems.do_rites(
+        world, world.date.fortnight); events += produced
+    world = seat.feed(world)
+    world, produced = seat.settle_payroll(world); events += produced
+    return world, events
+
+
+def _health(world: World) -> tuple[World, list]:
+    from engine import house, plague, shocks
+
+    events: list = []
+    world, produced = shocks.step(world); events += produced
+    world, produced = plague.step(world); events += produced
+    world, produced = house.step(world); events += produced
+    return world, events
+
+
+def _politics(world: World) -> tuple[World, list]:
+    from engine import correspondence_policy, defence, displacement, justice
+    from engine import relations, revenue
+
+    events: list = []
+    world, produced = systems.recompute_unrest(world); events += produced
+    world, produced = revenue.pressure(world); events += produced
+    world, produced = justice.step(world); events += produced
+    world, produced = relations.audit_oaths(world); events += produced
+    world, produced = correspondence_policy.step(world); events += produced
+    world, produced = displacement.step(world); events += produced
+    world, produced = defence.step(world); events += produced
+    return world, events
+
+
+def _reports(world: World) -> tuple[World, list]:
+    from engine import archive, mail
+
+    world, events = mail.generate_incoming(world)
+    world = archive.file_letters(world, world.inbox)
+    return world, events
+
+
+def _project(world: World) -> tuple[World, list]:
+    world = _record_stores(world)
+    seat_id = f"settlement:{world.chosen_alu}"
+    population = world.kernel.people(seat_id)
+    return dataclasses.replace(
+        world, population_history=world.population_history + (population,)), []
 
 
 _HISTORY = 24                      # one full year, one column per fortnight

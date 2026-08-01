@@ -56,9 +56,7 @@ class DependentGroup:
     output_modifier: int = 1000  # 0..1000, derived + cached
     member_name: str = ""     # the face of a cut (spec 6.3); assigned at load
     revolting: bool = False   # withdraws all labour until arrears leave the revolt band
-    # Standing in the fields instead of doing its own work. The cohort holds
-    # this fact; the flag is the court's mirror of it, the way `size` is, and
-    # it is here so the institutions can read it without the kernel.
+    # Projected from the cohort for court-facing readers.
     at_fields: bool = False
 
 
@@ -285,8 +283,6 @@ class Court:
     actor: ActorId
     seat: PlaceId
     attention_base: int                          # hours per fortnight
-    stores: Mapping[GoodId, int]                 # includes "grain" and "seed_grain"
-    dependents: Mapping[GroupId, DependentGroup]
     rites: tuple[Rite, ...]
     unrest: int = 0                              # seat unrest, 0..1000
     legitimacy: int = 700                        # 0..1000
@@ -432,12 +428,26 @@ class PlagueState:
     # and cleared by the disease phase.  Sorting by both ids makes results
     # independent of container iteration order.
     infectious_arrivals: tuple[tuple[str, PlaceId], ...] = ()
-    # The compartments, keyed by place (Task 2 C5). `(S, I, R, dead)`, and a
-    # place absent from here is wholly susceptible at its authored size. They
-    # live on the epidemic rather than on the map because a settlement is the
-    # registry's now and the disease is not a property of geography.
-    sir: Mapping[PlaceId, tuple[int, int, int, int]] = dataclasses.field(
-        default_factory=dict)
+
+
+@dataclasses.dataclass(frozen=True)
+class ShockChange:
+    table: str
+    entity: str
+    field: str
+    before: object
+
+
+@dataclasses.dataclass(frozen=True)
+class Shock:
+    id: str
+    kind: str
+    target: str
+    turn: int
+    until: int
+    severity: int
+    changes: tuple[ShockChange, ...] = ()
+    recovered_turn: int = -1
 
 
 @dataclasses.dataclass(frozen=True)
@@ -651,29 +661,6 @@ CORRESPONDENCE_DECISIONS = frozenset({
 
 
 @dataclasses.dataclass(frozen=True)
-class ForeignCourt:
-    """What an autonomous correspondent has and needs, in its own units.
-
-    Deliberately small, and a deletion target: SPEC.md 6.2 unifies Ugarit and
-    the foreign settlements onto one material grammar, and when that lands this
-    record is replaced by the kernel's stores, cohorts, and obligations. Until
-    then a foreign court still has to be able to decide from something material
-    rather than from an authored mood, or "the court knows its own shortage" is
-    prose.
-
-    `need` is the fortnightly draw against `stores`; `floor` is the quantity the
-    court will not part with whatever it is asked, because a granary emptied for
-    a friend is a granary emptied.
-    """
-    actor: ActorId
-    place: PlaceId
-    stores: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
-    need: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
-    floor: Mapping[GoodId, int] = dataclasses.field(default_factory=dict)
-    people: int = 0
-
-
-@dataclasses.dataclass(frozen=True)
 class CorrespondenceCase:
     """One delivered tablet awaiting, or having received, a foreign answer.
 
@@ -731,11 +718,8 @@ class ProtocolRecord:
 
 @dataclasses.dataclass(frozen=True)
 class World:
-    seed: int
-    scenario: str
-    date: Date
+    chosen_alu: str
     court: Court
-    # The autonomous world (Task 2). Always present; not yet wired into play.
     kernel: "Kernel"
     # Anything that "arrives later" is a Scheduled (spec 3.3). Sorted, stable.
     schedule: tuple["Scheduled", ...] = ()
@@ -750,15 +734,6 @@ class World:
     letter_obligations: tuple["LetterObligation", ...] = ()
     letter_claims: tuple["RequestClaim", ...] = ()
     marriage_proposals: tuple["MarriageProposal", ...] = ()
-    # --- the far side of the correspondence (SPEC.md 6.1 phase B) ---
-    # What each autonomous correspondent holds and needs, what it believes, and
-    # every tablet of ours that has reached it. `foreign_beliefs` values are
-    # engine.believe.Belief; the annotation stays loose so state.py keeps
-    # importing nothing but the date.
-    foreign_courts: Mapping[ActorId, ForeignCourt] = dataclasses.field(
-        default_factory=dict)
-    foreign_beliefs: Mapping[ActorId, object] = dataclasses.field(
-        default_factory=dict)
     correspondence: tuple[CorrespondenceCase, ...] = ()
     case_seq: int = 0
     protocol_log: tuple[ProtocolRecord, ...] = ()
@@ -808,6 +783,12 @@ class World:
     house_names_m: tuple[str, ...] = ()
     # --- M10: plague and the archive ---
     plague: PlagueState = dataclasses.field(default_factory=PlagueState)
+    pressure_turn: int = 24
+    shocks: tuple[Shock, ...] = ()
+    ended: bool = False
+    end_reason: str = ""
+    ended_turn: int = -1
+    population_history: tuple[int, ...] = ()
     # The archive proper (spec 6.17): the authored predecessor documents from
     # turn 1, plus every letter in and out as it happens. Ordered by
     # received_turn, because that is the only order the court can actually sort.
@@ -819,6 +800,14 @@ class World:
     # `World.places` and `World.routes` were the second copy of the geography.
     # They are views now: the registry is the authority, and these say the same
     # thing in the vocabulary the court's systems and the tablet already use.
+
+    @property
+    def seed(self) -> int:
+        return self.kernel.seed
+
+    @property
+    def date(self) -> Date:
+        return self.kernel.date
 
     @property
     def places(self) -> Mapping[PlaceId, Place]:
@@ -877,21 +866,21 @@ def lines(world: World) -> tuple["Route", ...]:
 
 def _places_of(world: World) -> Mapping[PlaceId, Place]:
     registry = world.kernel.registry
-    return _memo(_PLACE_CACHE, (registry, world.plague),
-                 lambda: _build_places(registry, world.plague))
+    return _memo(_PLACE_CACHE, (registry,), lambda: _build_places(registry))
 
 
-def _build_places(registry, plague: PlagueState) -> Mapping[PlaceId, Place]:
+def _build_places(registry) -> Mapping[PlaceId, Place]:
     places: dict[PlaceId, Place] = {}
-
-    def compartments(place_id: PlaceId, population: int):
-        return plague.sir.get(place_id, (population, 0, 0, 0))
 
     for sid in sorted(registry.settlements):
         s = registry.settlements[sid]
         place_id = sid.split(":", 1)[1]
-        susceptible, infected, recovered, dead = compartments(
-            place_id, s.population)
+        cohorts = [c for c in registry.cohorts.values()
+                   if c.settlement == sid and not c.in_transit]
+        susceptible = sum(c.susceptible for c in cohorts)
+        infected = sum(c.infected for c in cohorts)
+        recovered = sum(c.recovered for c in cohorts)
+        dead = sum(c.dead for c in cohorts)
         places[place_id] = Place(
             id=place_id, name=s.name, col=s.col, row=s.row, power=s.power,
             rank=s.rank, glyph=s.glyph, role=s.role, kind="alu",
@@ -905,15 +894,12 @@ def _build_places(registry, plague: PlagueState) -> Mapping[PlaceId, Place]:
         place_id = site_id.split(":", 1)[1]
         alu = site.settlement.split(":", 1)[1]
         owner = registry.settlements.get(site.settlement)
-        susceptible, infected, recovered, dead = compartments(
-            place_id, site.population)
         places[place_id] = Place(
             id=place_id, name=site.name, col=site.col, row=site.row,
             power=owner.power if owner else "", rank="centre",
             glyph=site.glyph, role=site.role, kind="palace_centre", alu=alu,
             harbour=site.harbour, population=site.population,
-            susceptible=susceptible, infected=infected,
-            recovered=recovered, dead=dead)
+            susceptible=0, infected=0, recovered=0, dead=0)
     return places
 
 

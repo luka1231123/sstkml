@@ -25,6 +25,7 @@ from __future__ import annotations
 import textwrap
 import tomllib
 from pathlib import Path
+from engine.actors import slug
 
 from ai.client import ModelUnavailable, safe_fields
 from ai.grader import load_formulae
@@ -37,6 +38,11 @@ from ai.voicer import persona
 
 _CONTENT = Path(__file__).parent.parent / "content"
 _ACTORS = tomllib.loads((_CONTENT / "actors.toml").read_text())["names"]
+
+
+def _name(actor: str) -> str:
+    key = slug(actor)
+    return _ACTORS.get(key, key.replace("_", " "))
 _GOODS = tomllib.loads((_CONTENT / "goods.toml").read_text())
 
 # The three topics `engine/mail.py` puts on a returning tablet. A delay or an
@@ -104,7 +110,7 @@ def term_phrase(term: dict) -> str:
         parts.append(good.replace("_", " "))
     person = str(term.get("person_id", "") or "")
     if person:
-        parts.append(_ACTORS.get(person, person.replace("_", " ")))
+        parts.append(_name(person))
     destination = str(term.get("destination", "") or "")
     if destination:
         parts.append("to " + destination.replace("_", " "))
@@ -207,7 +213,7 @@ def build_prompt(item: dict, decision: str) -> list[dict]:
         "terms": "; ".join(term_phrase(term) for term in terms) or "none",
     })
     prompt = (
-        f"YOU ARE {_ACTORS.get(sender, sender)}. {fields['who']}\n"
+        f"YOU ARE {_name(sender)}. {fields['who']}\n"
         f"TEMPER: {fields['temper']}\n"
         f"TONE: {fields['tone']}\n"
         f"RELATIONS ARE: {fields['esteem']}\n"
@@ -234,8 +240,7 @@ def recovery_text(item: dict, width: int = 64) -> str:
     Formulaic and short, and built from the same facts the model would have
     been given. It exists for a failed service; it is not a mode.
     """
-    sender = _ACTORS.get(str(item.get("sender", "")),
-                         str(item.get("sender", "a foreign court")))
+    sender = _name(str(item.get("sender", "a foreign court")))
     decision = decision_of(item)
     if not decision:
         return (f"An answer from {sender}. The seal is unbroken; nothing of "

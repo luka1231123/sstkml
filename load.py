@@ -16,6 +16,7 @@ from engine.core import Date, stream
 from engine.entity import Cohort as KernelCohort
 from engine.entity import Leg as KernelLeg
 from engine.entity import Organization as KernelOrganization
+from engine.entity import Person as KernelPerson
 from engine.entity import Polity as KernelPolity
 from engine.entity import Region as KernelRegion
 from engine.entity import Registry
@@ -35,17 +36,23 @@ from engine.kernel.world import Kernel
 # else's, which is the fact a flat mapping could not state.
 SEAT_SETTLEMENT = "settlement:seat"
 SEAT_OWNER = "org:seat_palace"
-from engine.legacy.land import climate_series
+from engine.climate import series as climate_series
 from engine.state import (Clause, Correspondent, Court, DependentGroup,
-                          Document, ForeignCourt, Formation,
+                          Document, Formation,
                           HarbourCargoLot,
                           HouseMember, Institution, MetalState, Oath, Petition,
                           Place, PlagueState, Relation, Rite, Site,
                           Terrain, Workshop, World)
 
-# The five overlords a place's `power` may name. "free" is not among them: a
-# free place is its own polity, not headless.
-OVERLORDS = ("egypt", "hatti", "ahhiyawa", "assyria", "karduniash")
+# The Alu where each imperial power sits. `power` authors overlordship, not
+# ownership: every Alu has its own polity and king.
+OVERLORD_SEATS = {
+    "egypt": "egypt",
+    "hatti": "hattusa",
+    "ahhiyawa": "mycenae",
+    "assyria": "assur",
+    "karduniash": "babylon",
+}
 
 # Every site.function a scenario may author: the palace itself, or one of the
 # capacities a holding can be classified as (spec 8.3). Closed so a typo in a
@@ -170,7 +177,7 @@ def mint_from_scenario(cfg: dict) -> Registry:
     """The registry a scenario file implies, without the detail file.
 
     `tools/gen_detail.py` writes that detail file, so it cannot go through
-    `load_scenario`, which reads it.
+    `load_campaign`, which reads it.
     """
     places = parse_places(cfg)
     return mint_registry(places, parse_sites(cfg, places), cfg)
@@ -207,39 +214,23 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
         return tenure_by_polity.get(pid, tenure_default)
 
     polities: dict[str, KernelPolity] = {}
-    settlement_polity: dict[str, str] = {}
-    overlord_controls: dict[str, list[str]] = {o: [] for o in OVERLORDS}
+    persons: dict[str, KernelPerson] = {}
+    ruler_cfg = dict(cfg.get("rulers", {}))
     for place in alus.values():
         settlement_id = f"settlement:{place.id}"
-        if place.power in OVERLORDS:
-            settlement_polity[place.id] = f"polity:{place.power}"
-            overlord_controls[place.power].append(settlement_id)
-        else:
-            pid = f"polity:{place.id}"
-            polities[pid] = KernelPolity(id=pid, name=place.name,
-                                         seat=settlement_id,
-                                         tenure=tenure_for(pid))
-            settlement_polity[place.id] = pid
-    # Where an overlord sits, which is the place a tribute is carried to. Its
-    # own Alu where one is named after it -- Egypt is a country and a city on
-    # this map -- and otherwise the one Alu it holds that is ranked imperial:
-    # Hattusa for Hatti, Assur for Assyria, Babylon for Karduniash. The rank is
-    # authored and only ever one per power, so this is reading the content
-    # rather than guessing at a capital from a name.
-    imperial = {p.power: p.id for p in alus.values()
-                if p.power in OVERLORDS and p.rank == "imperial"}
-    for overlord in OVERLORDS:
-        controlled = tuple(sorted(overlord_controls[overlord]))
-        seat = ""
-        overlord_place = alus.get(overlord)
-        if overlord_place is not None and overlord_place.power == overlord:
-            seat = f"settlement:{overlord}"
-        elif overlord in imperial:
-            seat = f"settlement:{imperial[overlord]}"
-        pid = f"polity:{overlord}"
+        pid = f"polity:{place.id}"
+        authored_ruler = ruler_cfg.get(place.id, {})
+        ruler_slug = str(authored_ruler.get("id", f"{place.id}_king"))
+        ruler_id = f"person:{ruler_slug}"
+        persons[ruler_id] = KernelPerson(
+            id=ruler_id,
+            name=str(authored_ruler.get("name", f"the king of {place.name}")))
+        overlord_alu = OVERLORD_SEATS.get(place.power, "")
+        overlord = (f"polity:{overlord_alu}"
+                    if overlord_alu and overlord_alu != place.id else "")
         polities[pid] = KernelPolity(
-            id=pid, name=overlord, seat=seat, controls=controlled,
-            tenure=tenure_for(pid))
+            id=pid, name=place.name, ruler=ruler_id, seat=settlement_id,
+            overlord=overlord, tenure=tenure_for(pid))
 
     reg_sites: dict[str, KernelSite] = {}
     settlement_sites: dict[str, list[str]] = {alu: [] for alu in alus}
@@ -285,7 +276,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
         settlements[settlement_id] = KernelSettlement(
             id=settlement_id, name=place.name,
             region=f"region:{place_region[place.id]}",
-            polity=settlement_polity[place.id],
+            owner=f"polity:{place.id}",
             sites=tuple(sorted(settlement_sites[place.id])),
             autonomous=place.id != cfg.get("seat", ""),
             col=place.col, row=place.row, power=place.power, rank=place.rank,
@@ -296,6 +287,8 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
         cohorts[cohort_id] = KernelCohort(
             id=cohort_id, settlement=settlement_id, kind="field_labour",
             households=max(1, place.population // 5), people=place.population,
+            ethnicity=f"region:{place_region[place.id]}", status="household",
+            institution=f"polity:{place.id}",
         )
 
     def route_settlement(place_id: str) -> str:
@@ -323,7 +316,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
             ends=(r["a"], r["b"]),
         )
 
-    registry = Registry(regions=regions, polities=polities,
+    registry = Registry(regions=regions, polities=polities, persons=persons,
                         settlements=settlements, sites=reg_sites,
                         routes=routes, cohorts=cohorts)
 
@@ -388,7 +381,10 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
             raise ValueError(f"detail.toml: two cohorts called {row['id']!r}")
         cohorts[row["id"]] = KernelCohort(
             id=row["id"], settlement=row["settlement"], kind=row["kind"],
-            households=int(row["households"]), people=int(row["people"]))
+            households=int(row["households"]), people=int(row["people"]),
+            ethnicity=registry.settlements[row["settlement"]].region,
+            status="household",
+            institution=registry.settlements[row["settlement"]].owner)
         split_people[row["settlement"]] = (
             split_people.get(row["settlement"], 0) + int(row["people"]))
     for settlement, people in sorted(split_people.items()):
@@ -549,7 +545,7 @@ CONTENT = Path(__file__).parent / "content"
 CLIMATE_YEARS = 30
 
 
-def load_predecessor_archive(scenario: str) -> tuple[Document, ...]:
+def load_predecessor_archive(chosen_alu: str) -> tuple[Document, ...]:
     """The documents that exist before turn 1 (spec 6.12, 6.17).
 
     Their `received_turn` is negative, so they sort to the top of every result
@@ -557,7 +553,7 @@ def load_predecessor_archive(scenario: str) -> tuple[Document, ...]:
     tablets every year and is the whole reason 7.4 is interesting -- simply has
     no file, and gets an empty one rather than an error.
     """
-    path = CONTENT / "corpus" / "predecessor_archive" / f"{scenario}.toml"
+    path = CONTENT / "corpus" / "predecessor_archive" / f"{chosen_alu}.toml"
     if not path.exists():
         return ()
     cfg = tomllib.loads(path.read_text())
@@ -577,10 +573,21 @@ def _requires(d: dict) -> tuple[tuple[str, int], ...]:
     return tuple(sorted((k, int(v)) for k, v in d.items()))
 
 
-def load_scenario(name: str, seed: int) -> World:
+def playable_alus() -> tuple[str, ...]:
+    return tuple(sorted(path.stem for path in (CONTENT / "courts").glob("*.toml")))
+
+
+def load_campaign(chosen_alu: str, seed: int) -> World:
     world_cfg = tomllib.loads((CONTENT / "world.toml").read_text())
-    scenario_cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
-    cfg = {**world_cfg, **scenario_cfg}  # scenario wins on key overlap
+    alus = {row["id"] for row in world_cfg.get("places", [])
+            if row.get("kind", "alu") == "alu"}
+    if chosen_alu not in alus:
+        raise ValueError(f"unknown Alu {chosen_alu!r}")
+    court_path = CONTENT / "courts" / f"{chosen_alu}.toml"
+    if not court_path.exists():
+        raise ValueError(f"{chosen_alu!r} has no playable court")
+    court_cfg = tomllib.loads(court_path.read_text())
+    cfg = {**world_cfg, **court_cfg}
     relation_cfg = tomllib.loads((CONTENT / "relations.toml").read_text())
     names = cfg["names"]
 
@@ -629,9 +636,17 @@ def load_scenario(name: str, seed: int) -> World:
     # carry belong to steps that have not run -- but a name that has gone stale
     # should fail on the run that broke it, not on the one that first needs it.
     load_idmap(kernel_registry)
+
+    rulers = {polity.ruler for polity in kernel_registry.polities.values()}
+
+    def actor_id(value: str) -> str:
+        person = f"person:{value}"
+        return person if person in rulers else value
+
     correspondents = tuple(
         Correspondent(
-            actor=c["actor"], place=c["place"], cadence=int(c["cadence"]),
+            actor=actor_id(c["actor"]), place=c["place"],
+            cadence=int(c["cadence"]),
             offset=int(c["offset"]), topic=c["topic"],
             facts=tuple(sorted(((k, v) for k, v in c.get("facts", {}).items()),
                                key=lambda kv: kv[0])),
@@ -644,7 +659,7 @@ def load_scenario(name: str, seed: int) -> World:
     actor_places = {c.actor: c.place for c in correspondents}
     relations = {}
     for r in cfg.get("relations", []):
-        other = r["other"]
+        other = actor_id(r["other"])
         relations[other] = Relation(
             other=other, place=actor_places[other],
             status_claim=r["status_claim"],
@@ -654,31 +669,17 @@ def load_scenario(name: str, seed: int) -> World:
             last_gift_from_us=int(r.get("last_gift_from_us", 0)),
             last_gift_from_them=int(r.get("last_gift_from_them", 0)),
             best_known_rival_gift=int(r.get("best_known_rival_gift", 0)),
-            known_rival_gift_source=r.get("known_rival_gift_source"),
+            known_rival_gift_source=actor_id(
+                r.get("known_rival_gift_source", "")) or None,
             is_vassal=bool(r.get("is_vassal", False)),
             report_bias=int(r.get("report_bias", 0)),
         )
-    # The material standing of the courts on the far side of the letters. Their
-    # place is the one they already write from: a court cannot be somewhere else
-    # for the purpose of deciding than it is for the purpose of posting.
-    foreign_courts = {}
-    for row in cfg.get("foreign_courts", []):
-        actor = row["actor"]
-        if actor not in actor_places:
-            raise ValueError(
-                f"foreign court {actor!r} is not a known correspondent")
-        foreign_courts[actor] = ForeignCourt(
-            actor=actor, place=actor_places[actor],
-            stores={k: int(v) for k, v in row.get("stores", {}).items()},
-            need={k: int(v) for k, v in row.get("need", {}).items()},
-            floor={k: int(v) for k, v in row.get("floor", {}).items()},
-            people=int(row.get("people", 0)),
-        )
     oaths = tuple(
         Oath(
-            id=o["id"], parties=tuple(o["parties"]),
-            superior=o.get("superior") or None, gods=tuple(o.get("gods", [])),
-            sworn_turn=int(o["sworn_turn"]), sworn_by=o["sworn_by"],
+            id=o["id"], parties=tuple(actor_id(p) for p in o["parties"]),
+            superior=actor_id(o.get("superior", "")) or None,
+            gods=tuple(o.get("gods", [])),
+            sworn_turn=int(o["sworn_turn"]), sworn_by=actor_id(o["sworn_by"]),
             clauses=tuple(
                 Clause(c["kind"], tuple(sorted(
                     (k, v) for k, v in c.items() if k != "kind")))
@@ -756,8 +757,6 @@ def load_scenario(name: str, seed: int) -> World:
     court = Court(
         actor=cfg["actor"], seat=cfg["seat"],
         attention_base=int(cfg["attention_base"]),
-        stores=stores,
-        dependents=groups,
         rites=rites,
         scribe_competence=int(scribe.get("competence", 850)),
         scribe_fatigue=int(scribe.get("fatigue", 300)),
@@ -827,7 +826,7 @@ def load_scenario(name: str, seed: int) -> World:
     # mapping and the Book's lots are the same quantities counted twice over
     # rather than two stocks that have to be kept level.
     book, seat_view = seat_goods.deposit(
-        book, court.stores, seat=SEAT_SETTLEMENT, owner=SEAT_OWNER,
+        book, stores, seat=SEAT_SETTLEMENT, owner=SEAT_OWNER,
         authority=SEAT_OWNER)
 
     kernel = Kernel(
@@ -843,15 +842,15 @@ def load_scenario(name: str, seed: int) -> World:
     kernel, _ = farm.divide(kernel)
 
     world = World(
-        seed=seed, scenario=cfg["scenario"],
-        date=date,
+        chosen_alu=chosen_alu,
         court=court,
         kernel=kernel,
         terrain=terrain,
         correspondents=correspondents, season=seasons,
-        relations=relations, oaths=oaths, foreign_courts=foreign_courts,
+        relations=relations, oaths=oaths,
         plague=plague_state,
-        documents=load_predecessor_archive(cfg["scenario"]),
+        pressure_turn=(1 + seed % 3) * 24,
+        documents=load_predecessor_archive(chosen_alu),
         gift_values={k: int(v) for k, v in relation_cfg["gifts"]["value_per_unit"].items()},
         gift_status_floors={
             k: int(v) for k, v in relation_cfg["gifts"]["status_floor"].items()},
@@ -901,10 +900,9 @@ def load_scenario(name: str, seed: int) -> World:
         house_names_m=tuple(cfg.get("house_names_m", [])),
     )
 
-    # The crown's payroll joins the registry (Task 2 C3). After this the kernel
-    # holds those heads and feeds them, and the court's mapping is the mirror.
+    # The crown's payroll joins the registry; the kernel holds and feeds it.
     from engine import seat as seat_door
-    world = seat_door.enrol(world)
+    world = seat_door.enrol(world, groups)
     # The authored pay-down order is a fact about those people, so it is
     # written on them (Task 2 C3). `enrol` has to have run first: the cohorts
     # it ranks are the ones enrolment just put in the registry.

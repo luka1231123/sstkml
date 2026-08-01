@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from belief.project import project
-from load import load_scenario
+from load import load_campaign
 from tui import works
 from tui.grid import plain_text
 
@@ -12,7 +12,7 @@ MINIMUM = (62, 21)
 
 
 def _belief() -> dict:
-    return project(load_scenario("ugarit", SEED))
+    return project(load_campaign("seat", SEED))
 
 
 def test_minimum_works_wraps_complete_costs_and_names_visible_keys() -> None:
@@ -32,7 +32,7 @@ def test_minimum_works_cannot_commission_a_plan_it_does_not_show() -> None:
     import play_gui
 
     game = play_gui.Game.__new__(play_gui.Game)
-    game.world = load_scenario("ugarit", SEED)
+    game.world = load_campaign("seat", SEED)
     game.works_pick = ""
     game.works_scroll = 0
     game.works_plan_scroll = 0

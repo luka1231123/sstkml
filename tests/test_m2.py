@@ -8,14 +8,14 @@ from engine.mail import _route_between
 from engine.reduce import apply
 from engine.systems import sea_open
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import replay, save
 
 SEED = 8814402919
 
 
 def test_closed_sea_backlogs_then_releases_distinct_tablets():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     winter_sea_backlog = 0
     max_sea_arrivals = 0
     for _ in range(40):
@@ -40,7 +40,7 @@ def test_closed_sea_backlogs_then_releases_distinct_tablets():
 
 def test_replay_with_mail_actions():
     # Drive live (ids depend on letter_seq, which replies advance), log, replay.
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     log: list[dict] = []
     turns = 0
     for _ in range(30):
@@ -52,5 +52,5 @@ def test_replay_with_mail_actions():
                 world, _ = apply(world, act)
                 log.append({"turn": world.date.absolute, "action": A.to_dict(act)})
 
-    save("/tmp/m2_test.json", SEED, "ugarit", turns, log, world)
+    save("/tmp/m2_test.json", SEED, "seat", turns, log, world)
     assert state_hash(replay("/tmp/m2_test.json")) == state_hash(world)

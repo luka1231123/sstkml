@@ -18,7 +18,7 @@ def apply(world: World, action) -> tuple[World, list]:
         return world, []
 
     if isinstance(action, A.Allocate):
-        if action.group_id not in world.court.dependents:
+        if action.group_id not in seat.groups(world):
             raise ValueError(f"unknown group: {action.group_id}")
         qa = max(0, action.qa)
         world = seat.allow(world, action.group_id, qa)
@@ -26,7 +26,7 @@ def apply(world: World, action) -> tuple[World, list]:
 
     if isinstance(action, A.SetPriority):
         for gid in action.order:
-            if gid not in world.court.dependents:
+            if gid not in seat.groups(world):
                 raise ValueError(f"unknown group in priority: {gid}")
         world = seat.rank(world, tuple(action.order))
         return world, [A.PrioritySet(tuple(action.order))]
@@ -137,7 +137,7 @@ def apply(world: World, action) -> tuple[World, list]:
         if good is None:
             raise ValueError(f"no such ledger: {action.ledger}")
         inspected = tuple(sorted(set(world.court.inspected) | {action.ledger}))
-        true_value = world.court.stores.get(good, 0)
+        true_value = seat.held(world).get(good, 0)
         return replace_court(world, inspected=inspected), [A.LedgerInspected(action.ledger, true_value)]
 
     if isinstance(action, A.SendGift):
@@ -145,7 +145,7 @@ def apply(world: World, action) -> tuple[World, list]:
         return send_gift(world, action)
 
     if isinstance(action, A.SendToHarvest):
-        if action.group_id not in world.court.dependents:
+        if action.group_id not in seat.groups(world):
             raise ValueError(f"unknown group: {action.group_id}")
         world = seat.to_fields(world, action.group_id, action.to_fields)
         return world, [A.SentToHarvest(action.group_id, action.to_fields)]
@@ -155,12 +155,10 @@ def apply(world: World, action) -> tuple[World, list]:
         return assign(world, action)
 
     if isinstance(action, A.RaiseCorvee):
-        from engine.legacy.land import source_corvee
-
         rules = world.land_rules
         cap = rules.get("corvee_max_days", 6000)
         wanted = max(0, min(action.days, cap - seat.corvee_days(world)))
-        days, sources, incremental = source_corvee(world, wanted)
+        days, sources, incremental = seat.source_corvee(world, wanted)
         if days <= 0:
             raise ValueError("no field-labour days remain to levy this season")
         delta = days * rules.get("corvee_unrest_per_1000_days", 40) // 1000
@@ -171,6 +169,34 @@ def apply(world: World, action) -> tuple[World, list]:
             [A.CorveeRaised(
                 days, unrest - world.court.unrest, incremental)],
         )
+
+    if isinstance(action, A.LevyCohort):
+        world, event = seat.detach(
+            world, action.cohort_id, action.heads, action.destination,
+            action.duration, action.task, action.ration_source, action.official)
+        delta = action.heads * world.land_rules.get(
+            "corvee_unrest_per_1000_days", 40) // 1000
+        world = replace_court(
+            world, unrest=min(1000, world.court.unrest + delta))
+        return world, [event]
+
+    if isinstance(action, A.ReleaseCohort):
+        world, event = seat.release(world, action.detachment_id)
+        return world, [event]
+
+    if isinstance(action, A.ReceiveCohort):
+        from engine import displacement
+        world, event = displacement.receive(
+            world, action.cohort_id, action.decision, action.destination)
+        return world, [event]
+
+    if isinstance(action, (A.FinanceTrade, A.RequisitionTrade)):
+        from engine import trade_policy
+        return trade_policy.apply(world, action)
+
+    if isinstance(action, A.ExemptTrade):
+        from engine import revenue
+        return revenue.set_harbour_due(world, 0)
 
     if isinstance(action, (A.BeginBuild, A.BeginRepair, A.AbandonWork)):
         from engine import works
@@ -264,7 +290,7 @@ def apply(world: World, action) -> tuple[World, list]:
         if oath is None:
             raise ValueError(f"no such oath: {action.oath_id}")
         offering = max(0, action.offering)
-        if offering > world.court.stores.get("grain", 0):
+        if offering > seat.held(world).get("grain", 0):
             raise ValueError("the granary does not hold that much")
         return plague.expiate(world, action.oath_id, offering)
 

@@ -1,6 +1,6 @@
 """The Alu's minimum geometry is a real, playable street."""
 from belief.project import project
-from load import load_scenario
+from load import load_campaign
 from tui import alu, desktop
 from tui.grid import cells, plain_text
 
@@ -9,7 +9,7 @@ SEED = 8814402919
 
 
 def _belief():
-    return project(load_scenario("ugarit", SEED))
+    return project(load_campaign("seat", SEED))
 
 
 def _lines(screen):

@@ -291,20 +291,25 @@ able to keep a tablet beside a store account, route, person, or older record.
 Consolidation means fewer duplicated rooms and clearer ownership, not replacing
 the palace with one full-screen dashboard.
 
-There are eight primary rooms:
+There are nine primary rooms:
 
 1. **Hall** — matters, arrivals, audience, and passage.
-2. **Court** — people, offices, household, audience, justice, and advisers.
-3. **Scribes' Room** — Inbox, Filed, Sent, Records, reading, writing, and
+2. **Scribes' Room** — Inbox, Filed, Sent, Records, reading, writing, and
    dispatch.
-4. **Storehouse** — stores, labour roll, land, reserves, dues, and exact
+3. **Alu** — cohorts, institutions, sites, damage, repair, works, and the
+   reception of displaced people.
+4. **Trade** — the exchange, cargo, trade routes, caravans, dues, finance,
+   requisition, escort, closure, and correspondence-backed foreign orders.
+5. **Storehouse** — stores, labour roll, land, reserves, dues, and exact
    accounts.
-5. **City** — institutions, sites, assets, damage, repair, and works.
-6. **Muster Yard** — troops, and corvée: how many people, for how many days,
-   and what that costs elsewhere.
-7. **Known World** — places, routes, journeys, foreign courts, trade, news,
-   and disease layers.
+6. **Muster Yard** — formations, escorts, detachments, and the one exact
+   cohort levy/corvée order: who, how many, where, how long, for what work,
+   rationed by whom, and under which official.
+7. **Court** — people, offices, household, audience, justice, and advisers.
 8. **Shrine** — rites and offerings, oaths and obligations.
+9. **Known World** — places, routes, journeys, foreign courts, news, disease,
+   and displacement; it inspects and links but does not issue another room's
+   orders.
 
 #### 3.3.1 The Hall
 
@@ -315,14 +320,15 @@ from. Three columns:
   with its change since the last fortnight, each dated to the record it came
   from;
 - **centre** — the doors, listed vertically, each with its access letter, its
-  ASCII mark, and the count of matters flagged in that room;
+  mark (a plain placeholder is sufficient), and the count of matters flagged
+  in that room;
 - **right** — what is in motion: envoys and where they are believed to be, and
   orders dispatched but not yet resolved.
 
 Counts are the only alert. A door with nothing behind it shows nothing.
 
 Counsel belongs to named people in Court. Oaths belong to Shrine and linked
-tablets. Works belong to City and project objects. Sickness belongs to people,
+tablets. Works belong to Alu and project objects. Sickness belongs to people,
 routes, places, and a World layer. These may open focused object windows; they
 do not require additional primary doors.
 
@@ -347,9 +353,14 @@ Prose belongs in tablets, where a person wrote it and a scribe read it out.
 
 ## 4. Shared interaction contract
 
-The same action uses the same key everywhere. Tabs cycle with the same keys in
-every room; select, open, confirm, cancel, and close never change meaning
-between windows.
+The same action uses the same key everywhere. Tab and Shift-Tab cycle room
+tabs; arrows select; Enter opens or confirms a displayed preview; Space
+toggles, except in Hall where it previews ending the fortnight; Escape cancels
+the active mode and otherwise closes; `:` opens Command and `?` opens Help.
+Ctrl-H raises Hall, Ctrl-G opens the window switcher, Ctrl-Tab and
+Ctrl-Shift-Tab cycle windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S
+saves, Ctrl-O reloads, and Ctrl-+/Ctrl--/Ctrl-0 change type size. Function keys
+are not part of the interface.
 
 Every screen works with the keyboard alone. Mouse is an alternative, never the
 only path.
@@ -390,7 +401,8 @@ The developer's causal inspector may read World. It is never player-facing.
 
 ### 5.3 Saves and replay
 
-- Saves are versioned, atomic, and replay-verified.
+- Saves are versioned action logs.
+- Loading starts the same campaign and reapplies the log in order.
 - Confirmed player actions and accepted generated text are persisted.
 - Loading does not rerun the language model.
 - Incompatible semantic versions fail with a direct explanation.
@@ -409,20 +421,10 @@ inspect and balance.
 
 ### 5.5 Verification
 
-The release remains covered by:
-
-- unit and integration tests;
-- deterministic replay and hash tests;
-- conservation and labour-exclusivity audits;
-- causal scenario tests;
-- corpus and prompt-boundary lint;
-- minimum/default/resized screen tests;
-- mouse and keyboard action-path tests;
-- required-model availability, guard, timeout, and stored-output tests;
-- headless foreign-world and player-deletion tests;
-- long balance sweeps and the pinned benchmark.
-
-No release gate is satisfied by prose alone.
+Release checks stay small: authority, inventory, conservation, compilation,
+one save/load smoke, representative headless runs, and the pinned benchmark.
+They verify the seams most likely to corrupt a campaign without turning the
+test suite into a second implementation.
 
 ---
 
@@ -432,12 +434,10 @@ Only these workstreams may define scope. Ordered.
 
 ### 6.1 Retire the legacy court
 
-One authority per fact. Six remain duplicated: the seat's stores, its ordinary
-people, its labour, foreign court standing, actor belief, and the date.
-`tools/authority_audit.py` is the gate — it must report nothing.
-
-This comes first. Every other workstream that touches the world writes twice
-until it is done. Steps are in `docs/TASK_2_TODO.md`.
+Done. Stores, ordinary people, labour, land, geography, foreign actor belief,
+seed, and date have one kernel authority. Court-facing records are projections,
+and one phase runner advances the world. `tools/authority_audit.py` reports no
+findings. The completion record is `docs/archive/TASK_2_TODO.md`.
 
 ### 6.2 Finish the correspondence vertical slice
 

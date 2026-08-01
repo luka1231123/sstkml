@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.kernel.world import Kernel          # noqa: E402
 from engine.state import World                  # noqa: E402
-from load import kernel_settlement, load_scenario  # noqa: E402
+from load import kernel_settlement, load_campaign  # noqa: E402
 
 SEED = 8814402919
 
@@ -73,6 +73,8 @@ def _quantity(text: str, amount: int) -> str:
 
 
 def _court_goods(world: World) -> int:
+    if "stores" not in {f.name for f in dataclasses.fields(world.court)}:
+        return 0
     return sum(world.court.stores.values())
 
 
@@ -83,6 +85,8 @@ def _kernel_goods(kernel: Kernel) -> int:
 def _court_people(world: World) -> int:
     """Heads the crown feeds. `size` is the court's word for what a cohort calls
     `people`, which is itself one of the things Phase C stops having twice."""
+    if "dependents" not in {f.name for f in dataclasses.fields(world.court)}:
+        return 0
     return sum(group.size for group in world.court.dependents.values())
 
 
@@ -98,6 +102,8 @@ def _court_labour(world: World) -> int:
     days already raised and the groups sent to the fields. That absence is the
     duplication this row is about, so heads stand in for capacity here.
     """
+    if "dependents" not in {f.name for f in dataclasses.fields(world.court)}:
+        return 0
     from engine import seat as seat_module
 
     return (seat_module.corvee_days(world)
@@ -147,7 +153,7 @@ ROWS: tuple[tuple[str, object, object, str], ...] = (
     ("ordinary people at the seat", _court_people, _kernel_people,
      "Court.dependents"),
     ("labour available at the seat", _court_labour, _kernel_labour,
-     "Court.dependents (the last labour mirror)"),
+     "Court.dependents"),
     ("land under the seat", _court_land, _kernel_land,
      "Court.estates"),
     ("places", _stored("places"),
@@ -155,13 +161,14 @@ ROWS: tuple[tuple[str, object, object, str], ...] = (
     ("routes", _stored("routes"),
      lambda k: len(k.registry.routes), "World.routes"),
     ("foreign court standing",
-     lambda w: len(w.foreign_courts),
+     _stored("foreign_courts"),
      lambda k: max(0, len(k.autonomous())),
      "World.foreign_courts / ForeignCourt"),
     ("actor belief",
-     lambda w: len(w.foreign_beliefs),
+     _stored("foreign_beliefs"),
      lambda k: len(k.beliefs), "World.foreign_beliefs"),
-    ("the date", lambda w: w.date.absolute + 1,
+    ("the date", lambda w: int(
+        "date" in {f.name for f in dataclasses.fields(w)}),
      lambda k: k.date.absolute + 1, "one of World.date / Kernel.date"),
 )
 
@@ -210,15 +217,12 @@ def unmapped(world: World, kernel: Kernel) -> list[Finding]:
 
 
 def run(seed: int = SEED) -> dict:
-    # One fortnight on both sides before counting. Belief, in either half, only
-    # exists once somebody has looked at something, so auditing the opening state
-    # would report no duplicate beliefs and be wrong about it.
-    from engine.kernel.world import advance as advance_kernel
-    from engine.tick import advance as advance_court
+    # Advance once so actors have observed their surroundings.
+    from engine.tick import advance
 
-    scenario = load_scenario("ugarit", seed)
-    world, _ = advance_court(scenario)
-    kernel, _ = advance_kernel(scenario.kernel)
+    scenario = load_campaign("seat", seed)
+    world, _ = advance(scenario)
+    kernel = world.kernel
     duplicates = findings(world, kernel)
     gaps = unmapped(world, kernel)
     return {

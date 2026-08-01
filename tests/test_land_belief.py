@@ -13,13 +13,13 @@ from belief.project import project
 from engine.kernel import farm as F
 from engine.kernel import seat_people as SP
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 SEED = 8814402919
 
 
 def _belief(turns: int) -> tuple[dict, object]:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return project(world), world

@@ -1,18 +1,7 @@
-"""What a foreign court knows: its own place, and the tablets that reach it.
+"""Claims foreign actors learn from delivered tablets.
 
-The mirror of `engine/observe.py`, pointed outward (spec 2.4, 3.2). A foreign
-court counts its own granary because it is standing next to it, and learns
-everything about Ugarit from tablets that arrived late, through a named courier,
-saying what the king chose to have written. Nothing here reads Ugarit's stores
-on the foreign court's behalf, and nothing here decides: this module only mints
-claims, and `engine/correspondence_policy.py` is handed those claims and no
-world at all.
-
-Two entry points, and the boundary between them is the whole point.
-
-`step` is the fortnightly look around the courtyard: stores, mouths, the draw
-against them, and the quantity the court will not part with. First-hand,
-`observed`, confidence 1000.
+Local observation lives in the kernel. This module adds claims carried by
+letters and opens the cases those letters require.
 
 `receive` is a tablet finishing its journey, and it leaves three kinds of trace.
 
@@ -42,19 +31,8 @@ from __future__ import annotations
 
 import dataclasses
 
-from engine.believe import Belief, Claim, Observation, infer
-from engine import observe as OB
-from engine.state import CorrespondenceCase, ForeignCourt, World
-
-# What a foreign court counts at home each fortnight. Same test as
-# `engine.observe.LOCAL`: could this actor learn it by walking round its own
-# place? Its own granary, its own mouths, the fortnightly draw against the
-# granary, and the quantity its steward will not release, yes. Ugarit's, never.
-#
-# The names are grain-shaped because `ForeignCourt` is grain-shaped and both are
-# deletion targets: SPEC.md 6.2 puts the foreign settlements on the kernel's
-# stores and cohorts, and these four readings go when that lands.
-FOREIGN_LOCAL = ("stores_grain", "need_grain", "floor_grain", "people")
+from engine.believe import Belief, Claim, infer
+from engine.state import CorrespondenceCase, World
 
 # What a tablet is worth as evidence, scaled 1000.
 #
@@ -68,79 +46,36 @@ TABLET_ASSERTS = 1000
 SENDER_ON_HIMSELF = 800
 
 
-def readings(court: ForeignCourt) -> dict[str, int]:
-    """The figures a court can count where it stands, keyed as in FOREIGN_LOCAL."""
-    return {
-        "stores_grain": int(court.stores.get("grain", 0)),
-        "need_grain": int(court.need.get("grain", 0)),
-        "floor_grain": int(court.floor.get("grain", 0)),
-        "people": int(court.people),
-    }
+def settlement_of(world: World, actor: str) -> str:
+    relation = world.relations.get(actor)
+    place_id = relation.place if relation is not None else next(
+        (c.place for c in world.correspondents if c.actor == actor), "")
+    place = world.places.get(place_id)
+    if place is None:
+        return ""
+    alu = place_id if place.kind == "alu" else place.alu
+    return f"settlement:{alu}"
+
+
+def actor_of(world: World, actor: str) -> str:
+    return world.kernel.controller(settlement_of(world, actor))
 
 
 def belief_of(world: World, actor: str) -> Belief:
     """That court's belief, or an empty one. Never None, so policies stay simple."""
-    held = world.foreign_beliefs.get(actor)
-    return held if isinstance(held, Belief) else Belief(holder=actor)
+    holder = actor_of(world, actor)
+    held = world.kernel.beliefs.get(holder)
+    return held if isinstance(held, Belief) else Belief(holder=holder)
 
 
 def _with_belief(world: World, actor: str, belief: Belief) -> World:
-    beliefs = dict(world.foreign_beliefs)
-    beliefs[actor] = belief
-    return dataclasses.replace(world, foreign_beliefs=beliefs)
-
-
-def observations(court: ForeignCourt, turn: int) -> tuple[Observation, ...]:
-    """What this court counted at home this fortnight.
-
-    Minted here rather than through `engine.observe.observe_local` because
-    FOREIGN_LOCAL is a different list: the court's own fortnightly draw against
-    its own granary is something its steward knows and Ugarit's does not, and
-    adding it to the shared LOCAL list would hand it to every actor in the game.
-    """
-    figures = readings(court)
-    return tuple(
-        Observation(
-            id=f"{court.actor}|{turn}|{court.place}|{attribute}",
-            observer=court.actor, subject=court.place, attribute=attribute,
-            value=figures[attribute], turn=turn, method="counted",
-            place=court.place)
-        for attribute in FOREIGN_LOCAL if attribute in figures)
-
-
-def _recounted(belief: Belief, fresh: tuple[Claim, ...]) -> Belief:
-    """This fortnight's count of its own place, replacing last fortnight's.
-
-    The one place a claim is dropped rather than kept, and the reason is that it
-    is not testimony. `engine/believe.py` keeps contradictions because two people
-    disagreeing is a fact about the world; a steward who counted the granary this
-    morning is not in disagreement with the steward who counted it a fortnight
-    ago, he has simply counted it again. Keeping every reading would grow the
-    saved state without end -- a hundred years of Ma'hadu counting its own barley
-    -- and would tell a policy nothing that `best` does not already give it.
-
-    Only the holder's own `observed` claims about its own place are replaced.
-    Everything reported, inferred, or held about anyone else stays exactly where
-    it was (spec 2.4).
-    """
-    superseded = {(claim.subject, claim.attribute) for claim in fresh}
-    kept = tuple(
-        claim for claim in belief.claims
-        if claim.source != "observed"
-        or (claim.subject, claim.attribute) not in superseded)
-    return dataclasses.replace(belief, claims=kept).add(*fresh)
-
-
-def step(world: World) -> tuple[World, list]:
-    """Every foreign court counts its own place (phase 3, from the far side)."""
-    now = world.date.absolute
-    beliefs = dict(world.foreign_beliefs)
-    for actor in sorted(world.foreign_courts):
-        court = world.foreign_courts[actor]
-        belief = belief_of(world, actor)
-        beliefs[actor] = _recounted(
-            belief, OB.as_claims(observations(court, now), now))
-    return dataclasses.replace(world, foreign_beliefs=beliefs), []
+    holder = actor_of(world, actor)
+    if not holder:
+        return world
+    beliefs = dict(world.kernel.beliefs)
+    beliefs[holder] = dataclasses.replace(belief, holder=holder)
+    kernel = dataclasses.replace(world.kernel, beliefs=beliefs)
+    return dataclasses.replace(world, kernel=kernel)
 
 
 def term_attribute(term) -> str:
@@ -231,7 +166,8 @@ def learn(belief: Belief, letter, turn: int) -> Belief:
     a belief and a letter. Direct claims first, then the conclusions drawn from
     them, because an inference must be able to name inputs that exist.
     """
-    minted = claims_for(letter, turn)
+    minted = tuple(dataclasses.replace(claim, holder=belief.holder)
+                   for claim in claims_for(letter, turn))
     belief = belief.add(*minted)
     # A king who asks for grain is short of grain. That is the one thing about
     # Ugarit a foreign court may conclude from a tablet without having been
@@ -285,8 +221,8 @@ def receive(world: World, letter) -> tuple[World, list]:
     """
     if any(case.letter_id == letter.id for case in world.correspondence):
         return world, []
-    court = world.foreign_courts.get(letter.recipient)
-    if court is None:
+    holder = actor_of(world, letter.recipient)
+    if not holder:
         # Not an autonomous court in this scenario: the tablet still arrives and
         # its terms still take material effect, but nobody there decides.
         return world, []
@@ -300,7 +236,7 @@ def receive(world: World, letter) -> tuple[World, list]:
         id=f"C{seq}",
         letter_id=letter.id,
         actor=letter.recipient,
-        place=court.place,
+        place=world.relations.get(letter.recipient).place,
         received_turn=now,
         terms=tuple(letter.terms),
     )

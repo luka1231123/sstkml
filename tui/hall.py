@@ -8,11 +8,11 @@ C = INDEX
 
 # Eight rooms. Orders lives inside the Alu, Counsel inside the Court,
 # Oaths inside the Shrine, and Sickness inside the World, so the halls of the
-# kingdom are the Hall, the Scribes' Room, the Storehouse, the Alu, the
-# Court, the Shrine, the World, and the Muster. Help is a utility, not a door.
+# kingdom are the Hall, Scribes, Alu, Trade, Court, Shrine, World, and Muster.
+# Help and the Storehouse station are utilities, not doors.
 DOORS = (
     ("s", "Scribes", "stack"),
-    ("t", "Storehouse", "stores"),
+    ("x", "Trade", "trade"),
     ("m", "Muster", "muster"),
     ("y", "Alu", "alu"),
     ("j", "Court", "palace"),
@@ -21,12 +21,12 @@ DOORS = (
 )
 
 BUILT = frozenset({
-    "stack", "stores", "muster",
-    "alu", "palace", "altar", "world",
+    "stack", "muster",
+    "alu", "trade", "palace", "altar", "world",
 })
 
 GROUPS = (
-    ("KINGDOM", (("t", "Storehouse"), ("y", "Alu"))),
+    ("KINGDOM", (("y", "Alu"), ("x", "Trade"))),
     ("DUTY", (("m", "Muster"),)),
     ("COURT", (("j", "Court"), ("v", "Shrine"))),
     ("BEYOND", (("w", "World"),)),

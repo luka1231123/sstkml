@@ -6,7 +6,7 @@ from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import altar, archive, alu, counsel, inbox, plague, render
 from tui.grid import plain_text
 from engine import seat
@@ -15,7 +15,7 @@ SEED = 8814402919
 
 
 def _world(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world

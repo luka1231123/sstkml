@@ -12,26 +12,7 @@ import dataclasses
 
 from engine import actions as A
 from engine.core import in_range
-from engine.state import Court, DependentGroup, World
-
-# --- Arrears effect bands (spec 6.3) -----------------------------------------
-# (debt_weeks_threshold, loyalty_delta, output_modifier, desertion_per_mille, revolt)
-_BANDS = (
-    (0,   +8, 1000,   0, False),
-    (1,  -20,  920,   0, False),
-    (2,  -60,  780,   0, False),
-    (4, -140,  520,  30, False),   # desertion begins, 3%/turn
-    (6, -260,  300,  30, False),   # function begins to fail
-    (8, -400,   80,  30, True),    # flight or revolt
-)
-
-
-def _band(debt_weeks: int):
-    chosen = _BANDS[0]
-    for band in _BANDS:
-        if debt_weeks >= band[0]:
-            chosen = band
-    return chosen
+from engine.state import Court, World
 
 
 def _clamp(x: int, lo: int = 0, hi: int = 1000) -> int:
@@ -42,7 +23,7 @@ def _clamp(x: int, lo: int = 0, hi: int = 1000) -> int:
 _SPOILAGE_PER_1000 = {"grain": 4, "seed_grain": 4, "oil": 6, "wine": 3}
 
 
-def spoilage(court: Court) -> tuple[Court, list]:
+def spoilage(world: World) -> tuple[World, list]:
     """A8. What sits through the fortnight and does not keep.
 
     The granary's condition rides on the grain only (6.18): a roof that lets the
@@ -53,9 +34,11 @@ def spoilage(court: Court) -> tuple[Court, list]:
     """
     from engine import institution
 
+    from engine import seat
+    court = world.court
     events: list = []
-    stores = dict(court.stores)
-    granary = institution.factor(court, "granary")
+    stores = seat.held(world)
+    granary = institution.factor(world, "granary")
     for good, rate in _SPOILAGE_PER_1000.items():
         if good in ("grain", "seed_grain"):
             rate = rate * (1500 - granary // 2) // 1000
@@ -64,13 +47,15 @@ def spoilage(court: Court) -> tuple[Court, list]:
         if loss:
             stores[good] = stock - loss
             events.append(A.Spoiled(good, loss))
-    return dataclasses.replace(court, stores=stores), events
+    return seat.put(world, stores, reason_down="spoiled"), events
 
 
 # --- A-phase: rites -----------------------------------------------------------
-def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
+def do_rites(world: World, fortnight: int) -> tuple[World, list]:
+    from engine import seat
+    court = world.court
     events: list = []
-    stores = dict(court.stores)
+    stores = seat.held(world)
     legitimacy = court.legitimacy
     unrest = court.unrest
     for rite in court.rites:
@@ -85,20 +70,21 @@ def do_rites(court: Court, fortnight: int) -> tuple[Court, list]:
             # the priesthood has been saying so for years and now has its
             # proof. Half again at a ruin, the authored figure at a sound one.
             from engine import institution
-            temple = institution.factor(court, "temple")
+            temple = institution.factor(world, "temple")
             bite = 1500 - temple // 2
             legitimacy = _clamp(legitimacy + rite.skip_legitimacy * bite // 1000)
             unrest = _clamp(unrest + rite.skip_unrest * bite // 1000)
             events.append(A.RiteSkipped(rite.id))
-    return dataclasses.replace(court, stores=stores, legitimacy=legitimacy,
-                               unrest=unrest), events
+    court = dataclasses.replace(court, legitimacy=legitimacy, unrest=unrest)
+    world = dataclasses.replace(world, court=court)
+    return seat.put(world, stores, reason_down="consumed"), events
 
 
 # --- A9: unrest recompute -----------------------------------------------------
 _UNREST_SATURATION_WEEKS = 8      # spec 6.3's bottom band: flight or revolt
 
 
-def recompute_unrest(court: Court) -> tuple[Court, list]:
+def recompute_unrest(world: World) -> tuple[World, list]:
     """Unrest pulls toward a target set by aggregate arrears, and decays down.
 
     The target is the *share of the population* in arrears, not the sum of every
@@ -109,8 +95,10 @@ def recompute_unrest(court: Court) -> tuple[Court, list]:
     how many people you actually stopped feeding, which is the thing the system
     is meant to be about.
     """
+    from engine import seat
+    court = world.court
     heads = weighted = 0
-    for g in court.dependents.values():
+    for g in seat.groups(world).values():
         owed = max(1, g.size * g.entitlement)
         debt_weeks = min(g.arrears // owed, _UNREST_SATURATION_WEEKS)
         heads += g.size
@@ -121,7 +109,8 @@ def recompute_unrest(court: Court) -> tuple[Court, list]:
     unrest = _clamp(unrest)
     delta = unrest - court.unrest
     events = [A.UnrestChanged(delta, "arrears")] if delta else []
-    return dataclasses.replace(court, unrest=unrest), events
+    return dataclasses.replace(
+        world, court=dataclasses.replace(court, unrest=unrest)), events
 
 
 # --- 6.1: the attention budget ------------------------------------------------

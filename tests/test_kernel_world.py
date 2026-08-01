@@ -21,7 +21,7 @@ from engine.entity import Registry
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
 from engine.kernel import world as K
-from load import load_scenario
+from load import load_campaign
 
 SEAT = "settlement:seat"
 ALASHIYA = "settlement:alashiya"
@@ -31,7 +31,7 @@ MUKISH = "settlement:mukish"
 
 
 def _world() -> K.Kernel:
-    return load_scenario("ugarit", seed=1).kernel
+    return load_campaign("seat", seed=1).kernel
 
 
 def _run(kernel: K.Kernel, turns: int = 24):
@@ -56,6 +56,8 @@ def _without_ugarit(kernel: K.Kernel) -> K.Kernel:
     gone_settlements = {SEAT}
     gone_sites = {s for s, site in registry.sites.items()
                   if site.settlement == SEAT}
+    gone_polities = {registry.settlements[s].owner for s in gone_settlements}
+    gone_persons = {registry.polities[p].ruler for p in gone_polities}
     gone = gone_settlements | gone_sites
     registry = dataclasses.replace(
         registry,
@@ -69,10 +71,10 @@ def _without_ugarit(kernel: K.Kernel) -> K.Kernel:
         routes={i: r for i, r in registry.routes.items()
                 if not any(SEAT in (leg.origin, leg.destination)
                            for leg in r.legs)},
-        polities={i: dataclasses.replace(
-            p, seat="" if p.seat == SEAT else p.seat,
-            controls=tuple(c for c in p.controls if c != SEAT))
-            for i, p in registry.polities.items()})
+        polities={i: p for i, p in registry.polities.items()
+                  if i not in gone_polities},
+        persons={i: p for i, p in registry.persons.items()
+                 if i not in gone_persons})
     book = dataclasses.replace(
         kernel.book,
         lots={i: lot for i, lot in kernel.book.lots.items()
@@ -110,7 +112,7 @@ def test_a_palace_controls_its_settlement_same_as_a_council() -> None:
         registry,
         settlements={**registry.settlements, town: Settlement(
             id=town, name="Test Palace Town", region="region:test",
-            polity="polity:test", orgs=(org,), autonomous=True)},
+            owner="polity:alashiya", orgs=(org,), autonomous=True)},
         orgs={**registry.orgs, org: Organization(
             id=org, name="Test Palace", settlement=town, kind="palace")})
     kernel = dataclasses.replace(kernel, registry=registry)

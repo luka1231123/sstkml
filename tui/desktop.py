@@ -86,6 +86,7 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("orders", "Orders", "workbench", (72, 24), (66, 22)),
         # The World is intentionally exempt from the compact desktop pass.
         _spec("world", "The Known World", "workbench", (104, 32), (68, 22)),
+        _spec("trade", "Trade", "workbench", (72, 24), (66, 22)),
         _spec("palace", "The Palace", "workbench", (74, 25), (68, 24)),
         _spec("works", "Works", "ledger", (66, 23), (62, 21)),
         _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),

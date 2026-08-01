@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from belief.project import project
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import altar, desktop
 from tui.grid import plain_text
 
@@ -13,7 +13,7 @@ COMMANDS = {"h", "d", "r", "[", "]", "1", "2", "3", "Return"}
 
 
 def _belief() -> dict:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(8):
         world, _ = advance(world)
     return project(world)

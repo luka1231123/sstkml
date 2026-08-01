@@ -361,13 +361,13 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     if compact:
         if shown:
             footer = (f" [1-{len(shown)}] go and look — one hour"
-                      "   [n] the works   [o] orders   [esc] close")
+                      "   [s] stores   [n] works   [o] orders   [esc] close")
         else:
-            footer = (" no houses stand here   [n] the works"
-                      "   [o] orders   [esc] close")
+            footer = (" no houses stand here   [s] stores"
+                      "   [n] works   [o] orders   [esc] close")
     else:
-        footer = (" [1-9] go and look for yourself — one hour"
-                  "   [n] the works   [o] orders   [esc] close")
+        footer = (" [1-9] go and look — one hour   [s] stores"
+                  "   [n] works   [o] orders   [esc] close")
     style.bar(surface, 2, height - 2, width - 4, footer,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

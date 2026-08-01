@@ -76,7 +76,7 @@ def collect_harbour(world: World) -> tuple[World, list]:
         return world, []
     court = world.court
     capacity = (
-        effective(court, harbour)
+        effective(world, harbour)
         * court.harbour_traffic
         * world.revenue_rules.get("clearance_units_per_1000", 100)
         // 1_000_000

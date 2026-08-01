@@ -6,18 +6,18 @@ import json
 
 from belief.project import project
 from engine import actions as A
-from engine import divine, house, relations
+from engine import divine, house, relations, seat
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import replay, save
 
 SEED = 8814402919
 
 
 def _run(turns: int, seed: int = SEED):
-    world = load_scenario("ugarit", seed)
+    world = load_campaign("seat", seed)
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -34,7 +34,7 @@ def _kill(world, person_id: str):
 # --- the cast (spec 6.10) ----------------------------------------------------
 
 def test_the_house_is_a_cast_of_named_people_who_age():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     assert world.court.ruler == world.court.actor == "ammurapi"
     assert world.court.house["ammurapi"].age_turns == 34 * 24
     assert any(p.is_queen_mother for p in world.court.house.values())
@@ -64,7 +64,7 @@ def test_child_mortality_is_high_enough_that_one_heir_is_none():
 
     from engine import house
 
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     base = world.court.house["niqmaddu"]
     fort = house._rule(world, "mortality_fortnight", 6)
     died_young = 0
@@ -186,9 +186,9 @@ def test_an_offering_buys_a_rite_not_better_access_to_tomorrow():
     _, rich = divine.consult(world, "harvest", "", 4000)
     assert plain[0].reported == rich[0].reported
 
-    before = world.court.stores["wine"]
+    before = seat.held(world)["wine"]
     world, _ = apply(world, A.ConsultDiviner("harvest", "", "wine", 40))
-    assert world.court.stores["wine"] == before - 40
+    assert seat.held(world)["wine"] == before - 40
 
     # Nothing anywhere records whether the forecast later proved right.
     world, _ = apply(world, A.ConsultDiviner("harvest"))
@@ -235,9 +235,9 @@ def test_defying_an_omen_costs_legitimacy_whether_or_not_it_was_right():
 
 def test_an_offering_is_actually_paid_for():
     world = _run(30)
-    before = world.court.stores["wine"]
+    before = seat.held(world)["wine"]
     world, _ = apply(world, A.ConsultDiviner("harvest", "", "wine", 40))
-    assert world.court.stores["wine"] == before - 40
+    assert seat.held(world)["wine"] == before - 40
     try:
         apply(world, A.ConsultDiviner("harvest", "", "wine", 10 ** 9))
         raise AssertionError("offered wine the storehouse did not hold")
@@ -264,7 +264,7 @@ def test_a_successor_actors_toml_never_heard_of_is_still_named():
     on a child born mid-run, since 'Niqmaddu' the name and 'niqmaddu' the id
     are the same word and would prove nothing."""
     from tui import render
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     born = None
     while born is None:
         world, events = advance(world)
@@ -281,4 +281,3 @@ def test_a_successor_actors_toml_never_heard_of_is_still_named():
 
 
 # --- determinism -------------------------------------------------------------
-

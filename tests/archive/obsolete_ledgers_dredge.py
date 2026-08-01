@@ -10,7 +10,7 @@ Kept verbatim so the UX claim is not lost.
 from __future__ import annotations
 
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 import registry
 

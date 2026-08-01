@@ -18,7 +18,7 @@ from engine import ownership as W
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import world as K
-from load import load_scenario
+from load import load_campaign
 from tests.test_kernel_world import landlocked
 
 SEAT = "settlement:seat"
@@ -30,7 +30,7 @@ IMPORTER = "org:mukish_palace"
 
 
 def _world() -> K.Kernel:
-    return load_scenario("ugarit", seed=1).kernel
+    return load_campaign("seat", seed=1).kernel
 
 
 def _run(kernel: K.Kernel, turns: int):

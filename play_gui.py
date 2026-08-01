@@ -1,4 +1,4 @@
-"""The windowed game (M11, D33). `python3 play_gui.py [scenario] [seed]`
+"""The windowed game. `python3 play_gui.py [chosen_alu] [seed]`
 
 The hall is a real operating-system window and owns the session; every tablet
 opens as another one, with its own title bar, moved and closed on its own. Put
@@ -34,7 +34,7 @@ from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 help_agent, librarian, parser as ai_parser,
@@ -43,6 +43,7 @@ from tui import advice, collection, palace
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
 from tui import plague as plague_page
+from tui import trade as trade_page
 from tui import orders as orders_page
 from tui import works as works_page
 from tui import (altar, archive, atlas, alu, command as command_page,
@@ -87,6 +88,7 @@ ROOMS: dict[str, tuple[str, str, str]] = {
     "v": ("altar", "The Altar", "on_altar_key"),
     "y": ("alu", "The Alu", "on_alu_key"),
     "j": ("palace", "The Palace", "on_palace_key"),
+    "x": ("trade", "Trade", "on_trade_key"),
 }
 
 # The hall advertises every door and marks the ones that are not built (D33:
@@ -98,7 +100,8 @@ ROOMS: dict[str, tuple[str, str, str]] = {
 # those are top-level windows.
 assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
     {window_key for window_key, _t, _how in TABLETS.values()}
-    | {window_key for window_key, _t, _h in LEDGERS.values()}
+    | {window_key for window_key, _t, _h in LEDGERS.values()
+       if window_key != "stores"}
     | {window_key for window_key, _t, _h in ROOMS.values()})
 
 
@@ -149,16 +152,16 @@ class Game:
     altar_notice = _window_notice("altar")
     switcher_notice = _window_notice("switcher")
 
-    def __init__(self, scenario: str = "ugarit", seed: int | None = None) -> None:
+    def __init__(self, chosen_alu: str = "seat", seed: int | None = None) -> None:
         from tui.backend_tk import App
 
         self.seed = new_seed() if seed is None else seed
         seed = self.seed
-        self.scenario = scenario
-        self.save_path = Path(__file__).parent / "saves" / scenario / "autosave.json"
+        self.chosen_alu = chosen_alu
+        self.save_path = Path(__file__).parent / "saves" / chosen_alu / "autosave.json"
         self.session_notice = ""
         self.load_armed = False
-        self.world = load_scenario(scenario, seed)
+        self.world = load_campaign(chosen_alu, seed)
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
         self.log: list[dict] = []
@@ -172,7 +175,7 @@ class Game:
         # constructing Game directly remains useful to the Tk probe and
         # headless controller tests, and still creates the same shared client.
         from ai.client import OllamaClient
-        self.client = OllamaClient(None, f"saves/{scenario}/ai_cache")
+        self.client = OllamaClient(None, f"saves/{chosen_alu}/ai_cache")
         self.voicer = ai_voicer.Voicer(self.client, seed)
         self._model_results: queue.SimpleQueue = queue.SimpleQueue()
         self._model_jobs = 0
@@ -263,6 +266,7 @@ class Game:
         self.command_line = ""
         self.command_history: list[str] = []
         self.command_recall = 0
+        self.pending_action: tuple[object, int, str] | None = None
         self.app.desktop_bindings = self._desktop_bindings()
 
         hall_width, hall_height = desktop.default_size("hall")
@@ -475,7 +479,8 @@ class Game:
             self.notices.pop("hall", None)
 
     def do(self, action, cost: int | None = None,
-           window: str | None = None) -> registry.ActionResult:
+           window: str | None = None, confirmed: bool = False
+           ) -> registry.ActionResult:
         """Apply an action if the hours are there. Logged the same way the
         headless driver logs it, so a session here saves and replays.
 
@@ -494,6 +499,16 @@ class Game:
         if cost is None:
             cost = registry.cost_of(action)
         target = self.active_window() if window is None else window
+        if descriptor and descriptor.confirm and not confirmed:
+            self.pending_action = (action, cost, target)
+            unit = "hour" if cost == 1 else "hours"
+            result = registry.ActionResult(
+                registry.PREVIEW, action_id,
+                f"{self._describe_order(action)} — {cost} {unit}. "
+                "Enter confirms; Escape cancels.", cost, self.hours)
+            self.notify(result.message, result.status, window=target)
+            self.repaint()
+            return result
         if cost > self.hours:
             unit = "hour" if cost == 1 else "hours"
             result = registry.ActionResult(
@@ -521,11 +536,29 @@ class Game:
         self.repaint()
         return result
 
+    def confirm_pending(self) -> bool:
+        pending = getattr(self, "pending_action", None)
+        if pending is None:
+            return False
+        self.pending_action = None
+        action, cost, window = pending
+        self.do(action, cost, window, confirmed=True)
+        return True
+
+    def cancel_pending(self) -> bool:
+        pending = getattr(self, "pending_action", None)
+        if pending is None:
+            return False
+        self.pending_action = None
+        self.notify("Order cancelled.", registry.PREVIEW, window=pending[2])
+        self.repaint()
+        return True
+
     def save_current(self, automatic: bool = False) -> bool:
         """Atomically save the replayable campaign at its current turn."""
         try:
             save_session(
-                self.save_path, self.seed, self.scenario,
+                self.save_path, self.seed, self.chosen_alu,
                 self.world.date.absolute, self.log, self.world,
                 hours_left=self.hours)
         except (OSError, ValueError, TypeError) as error:
@@ -554,7 +587,7 @@ class Game:
             return False
         self.world = world
         self.seed = int(data["seed"])
-        self.scenario = str(data["scenario"])
+        self.chosen_alu = str(data["chosen_alu"])
         self.log = list(data["log"])
         saved_hours = data.get("hours_left")
         attention = self.belief["attention"]
@@ -728,6 +761,8 @@ class Game:
                 self.world_place_pick, notice=notice, wide=self.world_wide,
                 layer=self.world_layer, focus=self.world_focus,
                 all_routes=getattr(self, "world_all_routes", False))
+        if key == "trade":
+            return trade_page.compose(b, width, height, notice=notice)
         if key == "alu":
             return alu.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("alu_scroll"))
@@ -822,18 +857,25 @@ class Game:
                 return "break"
             return wrapped
 
+        def pending(handler):
+            def wrapped(_event=None):
+                return "break" if handler() else None
+            return wrapped
+
         bindings = {
-            "<F1>": bind(self.open_help),
-            "<F2>": bind(self.raise_hall),
-            "<F6>": bind(self.open_switcher),
             "<colon>": bind(self.open_palette),
             "<grave>": bind(self.open_palette),
-            "<F8>": bind(self.tile_windows),
-            "<Shift-F8>": bind(self.cascade_windows),
+            "<question>": bind(self.open_help),
+            "<Return>": pending(self.confirm_pending),
+            "<Escape>": pending(self.cancel_pending),
             "<Control-Tab>": bind(self.cycle_windows),
             "<Control-Shift-Tab>": bind(lambda: self.cycle_windows(True)),
         }
         for modifier in ("Control", "Command"):
+            bindings[f"<{modifier}-h>"] = bind(self.raise_hall)
+            bindings[f"<{modifier}-g>"] = bind(self.open_switcher)
+            bindings[f"<{modifier}-Shift-t>"] = bind(self.tile_windows)
+            bindings[f"<{modifier}-Shift-c>"] = bind(self.cascade_windows)
             bindings[f"<{modifier}-plus>"] = bind(lambda: self.zoom(1))
             # The unshifted key on most layouts is `=`, and a player pressing
             # it means "bigger" whatever the keycap says.
@@ -2279,14 +2321,10 @@ class Game:
             self.do(A.SetLandDue(max(0, rate - step)), window=window)
         elif char == ">":
             self.do(A.SetLandDue(min(1000, rate + step)), window=window)
-        elif char.lower() == _key("raise_corvee") or wanted == "raise_corvee":
-            if state["amount"] <= 0:
-                self.notify("choose how many days to call up.",
-                            registry.REFUSAL, window=window)
-                self.repaint()
-                return
-            if self.do(A.RaiseCorvee(state["amount"]), window=window):
-                state["amount"] = 0
+        elif char.lower() == _key("levy_cohort") or wanted == "levy_cohort":
+            self.notify("open Command to name the cohort, heads, destination, task, rations, and official.",
+                        registry.PREVIEW, window=window)
+            self.repaint()
         elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
             estate = next(
                 (e for e in data.get("estates", [])
@@ -2335,15 +2373,10 @@ class Game:
         formation = next(
             (f for f in formations if f["id"] == state["pick"]), None)
         places = [place["id"] for place in affordances.places(b)]
-        if char == _key("raise_corvee") or wanted == "raise_corvee":
-            if state["amount"] <= 0:
-                self.notify(
-                    "choose how many person-days to call with [ and ].",
-                    registry.REFUSAL, window="muster")
-                self.repaint()
-                return
-            if self.do(A.RaiseCorvee(state["amount"]), window="muster"):
-                state["amount"] = 0
+        if char == _key("levy_cohort") or wanted == "levy_cohort":
+            self.notify("open Command to name the cohort, heads, destination, task, rations, and official.",
+                        registry.PREVIEW, window="muster")
+            self.repaint()
         elif char == "t":
             tasks = ledger_page.TASKS
             state["task"] = tasks[
@@ -3150,6 +3183,9 @@ class Game:
         if char.lower() == "o":
             self.open_orders()
             return
+        if char.lower() == "s":
+            self.open_ledger("t")
+            return
         institutions = self.belief.get("institutions", [])
         _width, height = self._size("alu")
         room = alu.table_room(height)
@@ -3657,6 +3693,18 @@ class Game:
                     registry.REFUSAL, window="world")
         self.repaint()
 
+    def on_trade_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("trade")
+            return
+        char = (event.char or "").lower()
+        if char in {"f", "r", "c"}:
+            self.command_line = {"f": "finance ", "r": "requisition ",
+                                 "c": "quarantine "}[char]
+            self.open_palette()
+        elif char == "e":
+            self.do(A.ExemptTrade(), window="trade")
+
     def on_plague_key(self, event) -> None:
         """Navigate every known place and issue or lift a physical closure."""
         if event.keysym == "Escape":
@@ -4144,11 +4192,11 @@ def main(argv: list[str]) -> int:
         print(required_model_message(detail))
         return 1
     args = [a for a in argv[1:] if not a.startswith("-")]
-    scenario = args[0] if args else "ugarit"
+    chosen_alu = args[0] if args else "seat"
     seed = int(args[1]) if len(args) > 1 else new_seed()
     print(f"seed {seed} — pass it back to play this same world again:\n"
-          f"  ./run.sh {scenario} {seed}")
-    Game(scenario, seed).run()
+          f"  ./run.sh {chosen_alu} {seed}")
+    Game(chosen_alu, seed).run()
     return 0
 
 

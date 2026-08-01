@@ -7,12 +7,12 @@ import pytest
 
 from engine.entity import check
 from load import CONTENT, mint_registry
-from load import load_scenario, parse_places, parse_sites
+from load import load_campaign, parse_places, parse_sites
 
 
 def _mint():
-    name = "ugarit"
-    scenario_cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
+    name = "seat"
+    scenario_cfg = tomllib.loads((CONTENT / "courts" / f"{name}.toml").read_text())
     world_cfg = tomllib.loads((CONTENT / "world.toml").read_text())
     cfg = {**world_cfg, **scenario_cfg}
     places = parse_places(cfg)
@@ -40,13 +40,15 @@ def test_registry_has_no_referential_faults():
     assert check(registry) == ()
 
 
-def test_overlord_polities_control_real_settlements():
+def test_every_alu_has_one_local_owner_and_overlordship_is_separate():
     _, registry = _mint()
-    for overlord in ("egypt", "hatti", "ahhiyawa", "assyria", "karduniash"):
-        polity = registry.polities[f"polity:{overlord}"]
-        assert polity.controls
-        for held in polity.controls:
-            assert held in registry.settlements
+    assert len(registry.polities) == len(registry.settlements)
+    for sid, settlement in registry.settlements.items():
+        assert registry.holdings(settlement.owner) == (sid,)
+        polity = registry.polities[settlement.owner]
+        assert polity.ruler in registry.persons
+    assert registry.polities["polity:seat"].overlord == "polity:hattusa"
+    assert registry.polities["polity:hattusa"].overlord == ""
 
 
 def test_routes_are_minted_one_per_scenario_row():
@@ -56,8 +58,8 @@ def test_routes_are_minted_one_per_scenario_row():
 
 
 def test_bad_site_function_raises():
-    name = "ugarit"
-    cfg = tomllib.loads((CONTENT / "scenarios" / f"{name}.toml").read_text())
+    name = "seat"
+    cfg = tomllib.loads((CONTENT / "courts" / f"{name}.toml").read_text())
     full = {**tomllib.loads((CONTENT / "world.toml").read_text()), **cfg}
     places = parse_places(full)
     sites = list(parse_sites(full, places))
@@ -70,7 +72,7 @@ def test_bad_site_function_raises():
 # --- detail.toml: the numbers the map cannot carry (Task 2, C1) ----------------
 
 def _kernel():
-    return load_scenario("ugarit", seed=1).kernel
+    return load_campaign("seat", seed=1).kernel
 
 
 def test_the_detail_file_gives_the_ground_its_numbers():

@@ -9,7 +9,7 @@ from engine import obligation as O
 from engine import observe as OB
 from engine import ownership as W
 from engine.core import Date, stream
-from engine.entity import HUNGER_MAX, Cohort, EntityId, Registry, check, mint
+from engine.entity import HUNGER_MAX, Cohort, EntityId, Person, Polity, Registry, check, mint
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
@@ -45,6 +45,7 @@ class Kernel:
     seat_goods: "SG.SeatGoods | None" = None
     # Cargo at sea.
     voyages: tuple[C.Voyage, ...] = ()
+    trade_routes: Mapping[EntityId, int] = dataclasses.field(default_factory=dict)
 
     # --- reading ------------------------------------------------------------
 
@@ -56,13 +57,21 @@ class Kernel:
                 return org_id
         return ""
 
+    def owner(self, settlement: EntityId) -> Polity | None:
+        held = self.registry.settlements.get(settlement)
+        return self.registry.polities.get(held.owner) if held else None
+
+    def king(self, settlement: EntityId) -> Person | None:
+        polity = self.owner(settlement)
+        return self.registry.persons.get(polity.ruler) if polity else None
+
     def tenure_of(self, cohort: Cohort) -> str:
         """How this cohort comes by its food."""
         if cohort.tenure:
             return cohort.tenure
         settlement = self.registry.settlements.get(cohort.settlement)
         polity = self.registry.polities.get(
-            settlement.polity) if settlement else None
+            settlement.owner) if settlement else None
         return polity.tenure if polity else "pooled"
 
     def cohorts_of(self, settlement: EntityId) -> tuple[Cohort, ...]:
@@ -74,10 +83,16 @@ class Kernel:
                    if lot.good == good)
 
     def people(self, settlement: EntityId) -> int:
-        return sum(c.people for c in self.cohorts_of(settlement))
+        return sum(c.people for c in self.cohorts_of(settlement)
+                   if not c.in_transit)
+
+    def commercial_routes(self) -> tuple[EntityId, ...]:
+        return tuple(sorted(route for route, strength in self.trade_routes.items()
+                            if strength >= 3))
 
     def labour(self, settlement: EntityId) -> int:
-        return sum(c.labour() for c in self.cohorts_of(settlement))
+        return sum(c.labour() for c in self.cohorts_of(settlement)
+                   if not c.in_transit and not c.parent)
 
     def field_site(self, settlement: EntityId, actor: EntityId = "") -> EntityId:
         """The estate an actor works at a place, or the place's first estate."""
@@ -341,21 +356,6 @@ def _capacity(kernel: Kernel) -> dict[EntityId, int]:
     return pools
 
 
-def _farm_steps(intents: tuple[Intent, ...],
-                allocation: R.Allocation) -> tuple[T.Step, ...]:
-    """Phase 6, in calendar order."""
-    return (
-        T.Step("production", "sowing", lambda k: F.sow(k, intents, allocation)),
-        T.Step("production", "growing", lambda k: F.tend(k, intents, allocation)),
-        T.Step("production", "harvest", lambda k: F.reap(k, intents, allocation)),
-        T.Step("production", "threshing",
-               lambda k: F.thresh(k, intents, allocation)),
-        T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
-        T.Step("production", "the share", F.share_out),
-        T.Step("production", "the stack", F.keep),
-    )
-
-
 def _food_owners(kernel: Kernel, cohort: Cohort) -> set[EntityId]:
     """Whose grain this cohort may eat."""
     settlement = cohort.settlement
@@ -411,6 +411,8 @@ def _mouths(kernel: Kernel) -> tuple[Cohort, ...]:
     out: list[Cohort] = []
     for settlement in kernel.autonomous():
         for cohort in kernel.cohorts_of(settlement):
+            if cohort.in_transit:
+                continue
             seen.add(cohort.id)
             out.append(cohort)
     return tuple(out)
@@ -596,46 +598,70 @@ def advance(kernel: Kernel) -> tuple[Kernel, list]:
     return kernel, events
 
 
-def advance_logged(kernel: Kernel) -> tuple[Kernel, list, TurnLog]:
-    """`advance`, and the workings alongside the result."""
-    date = kernel.date
-    fortnight = date.fortnight % 24 + 1
-    kernel = dataclasses.replace(kernel, date=Date(
-        year=date.year + (1 if fortnight == 1 else 0), fortnight=fortnight,
-        absolute=date.absolute + 1))
-
-    events: list = []
-
-    # Phases 2 to 5 run outside the phase runner, because between them they build the two things.
-    kernel, produced = C.arrivals(kernel)
-    events.extend(produced)
-
-    snapshot = open_turn(kernel, kernel.date.absolute)
-    kernel, produced = _observe(kernel, snapshot)
-    events.extend(produced)
-
-    intents = _intents(kernel, snapshot)
-    allocation = R.allocate(
-        intents, _capacity(kernel),
-        authority_rank=lambda i: kernel.registry.orgs[i.actor].authority
-        if i.actor in kernel.registry.orgs else 0)
-
+def advance_logged(kernel: Kernel, extra_steps: tuple[T.Step, ...] = (),
+                   phase_events: dict[str, list] | None = None,
+                   ) -> tuple[Kernel, list, TurnLog]:
+    """Advance one ordered turn, optionally including another world layer."""
+    snapshot = None
+    intents: tuple[Intent, ...] = ()
+    allocation = R.Allocation()
     struck: list[C.Contract] = []
+    captured = phase_events if phase_events is not None else {}
 
-    def _market(state):
+    def calendar(state):
+        return dataclasses.replace(state, date=state.date.advance()), []
+
+    def observe(state):
+        nonlocal snapshot
+        snapshot = open_turn(state, state.date.absolute)
+        return _observe(state, snapshot)
+
+    def decide(state):
+        nonlocal intents
+        intents = _intents(state, snapshot)
+        return state, []
+
+    def allocate(state):
+        nonlocal allocation
+        allocation = R.allocate(
+            intents, _capacity(state),
+            authority_rank=lambda i: state.registry.orgs[i.actor].authority
+            if i.actor in state.registry.orgs else 0)
+        return state, []
+
+    def market(state):
         state, produced, contracts = C.market(state, intents)
         struck.extend(contracts)
         return state, produced
 
-    # Through the phase runner rather than around it, so that the order these run in is checked.
-    kernel, produced, _trace = T.run(kernel, _farm_steps(intents, allocation) + (
+    def record(step: T.Step) -> T.Step:
+        def run(state):
+            state, produced = step.run(state)
+            captured.setdefault(step.phase, []).extend(produced or ())
+            return state, produced
+        return T.Step(step.phase, step.name, run)
+
+    core = tuple(map(record, (
+        T.Step("calendar", "date", calendar),
+        T.Step("arrivals", "journeys", C.arrivals),
+        T.Step("observe", "local knowledge", observe),
+        T.Step("intents", "decisions", decide),
+        T.Step("allocate", "capacity", allocate),
+        T.Step("production", "sowing", lambda k: F.sow(k, intents, allocation)),
+        T.Step("production", "growing", lambda k: F.tend(k, intents, allocation)),
+        T.Step("production", "harvest", lambda k: F.reap(k, intents, allocation)),
+        T.Step("production", "threshing", lambda k: F.thresh(k, intents, allocation)),
+        T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
+        T.Step("production", "the share", F.share_out),
+        T.Step("production", "the stack", F.keep),
         T.Step("consumption", "rations", _consume),
-        T.Step("market", "bargains", _market),
-        T.Step("movement", "sailings",
-               lambda k: C.movement(k, intents, allocation)),
+        T.Step("market", "bargains", market),
+        T.Step("movement", "sailings", lambda k: C.movement(k, intents, allocation)),
         T.Step("settlement", "obligations", lambda k: _settle(k, intents)),
-        T.Step("settlement", "the stores", C.consolidate)))
-    events.extend(produced)
+        T.Step("settlement", "the stores", C.consolidate),
+    )))
+    steps = tuple(sorted(core + extra_steps, key=lambda step: T.index(step.phase)))
+    kernel, events, _trace = T.run(kernel, steps)
 
     log = TurnLog(
         turn=kernel.date.absolute, intents=intents, allocation=allocation,

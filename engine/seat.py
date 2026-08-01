@@ -1,42 +1,18 @@
-"""What the seat holds, for the court's own systems (Task 2 C2).
-
-`engine.kernel.seat_goods` is the seam; this is the doorway the court walks
-through it. The systems that spend the seat's goods -- metal, works, revenue,
-institutions, the terms of a letter -- ask `held` for the figures and hand the
-result to `put`, and from there the Book is what the answer came out of.
-
-`Court.stores` is still written, as a mirror. It is read by belief projection,
-by the interface, and by a long tail of tests, and those move in C5; until they
-do, a system that updated only one of the two records would leave the other
-saying something false for the rest of the turn. Writing both from one place is
-what keeps the overlap honest, and it is one line to delete when the mirror
-goes.
-
-A world with no kernel falls back to the flat mapping. Tests build courts
-directly, without a scenario behind them, and a system that raised on those
-would be untestable in isolation for the sake of a migration.
-"""
+"""The player's stores in the shared Book."""
 from __future__ import annotations
 
 import dataclasses
 
 from engine.entity import GoodId
+from engine.core import in_range
 from engine.kernel import seat_goods as SG
 from engine.kernel import seat_people as SP
 from engine.state import World
 
 
-def _view(world: World):
-    kernel = getattr(world, "kernel", None)
-    return kernel.seat_goods if kernel is not None else None
-
-
 def held(world: World) -> dict[GoodId, int]:
     """The seat's stores, out of the Book. A fresh mapping, safe to mutate."""
-    view = _view(world)
-    if view is None:
-        return dict(world.court.stores)
-    return SG.in_hand(world.kernel.book, view)
+    return SG.in_hand(world.kernel.book, world.kernel.seat_goods)
 
 
 def put(world: World, stores: dict[GoodId, int], *,
@@ -49,43 +25,17 @@ def put(world: World, stores: dict[GoodId, int], *,
     `melted` one way and `produced` the other. The defaults are the honest
     answer for a system whose flat arithmetic never said.
     """
-    court = dataclasses.replace(world.court, stores=dict(stores))
-    view = _view(world)
-    if view is None:
-        return dataclasses.replace(world, court=court)
+    view = world.kernel.seat_goods
     book, view = SG.settle(world.kernel.book, view, stores,
                            reason_down=reason_down, reason_up=reason_up,
                            authority=authority)
     kernel = dataclasses.replace(world.kernel, book=book, seat_goods=view)
-    return dataclasses.replace(world, court=court, kernel=kernel)
+    return dataclasses.replace(world, kernel=kernel)
 
 
-def record(world: World, court, **why) -> World:
-    """Put a court back on the world, and its stores through the seam.
+# --- the seat's people --------------------------------------------------------
 
-    For the systems that still take and return a bare `Court` -- spoilage,
-    rites, rations. They cannot reach the Book from where they stand, so the
-    caller carries their figures across, and the Book is in step again before
-    anything downstream reads it.
-    """
-    world = dataclasses.replace(world, court=court)
-    return put(world, dict(court.stores), **why)
-
-
-# --- the seat's people (Task 2 C3) --------------------------------------------
-# The same move C2 made for the seat's goods, one record later. The kernel's
-# `Cohort` is the authority for the crown's payroll: it holds the heads, the
-# hunger and the grievance, and its consumption phase is where those people
-# actually eat, out of the palace's lots in the Book. `Court.dependents` is
-# written from it as a mirror, because the interface, belief projection, the
-# advisors and a long tail of tests read that mapping and they move in C5.
-#
-# Two fields stay the court's own arithmetic and are recomputed here rather than
-# carried: `output_modifier` and `revolting` are consequences of a debt, and the
-# table that reads a debt into a consequence is `systems._BANDS` (spec 6.3). A
-# kernel module holding a copy of it would be the duplicate authority again.
-
-def enrol(world: World) -> World:
+def enrol(world: World, groups) -> World:
     """Put the court's dependent groups into the registry, once, at load.
 
     After this the 1,010 heads on the crown's payroll are cohorts standing at
@@ -103,10 +53,10 @@ def enrol(world: World) -> World:
     crown = kernel.controller(SP.SEAT)
     moved: dict[str, int] = {}
     for entry in SP.PLACEMENTS:
-        group = world.court.dependents.get(entry.group)
+        group = groups.get(entry.group)
         if group is None:
             continue
-        cohort, _ = SP.as_cohort(group)
+        cohort = SP.as_cohort(group)
         cohort = dataclasses.replace(cohort, shortfall=max(0, group.arrears))
         if entry.settlement not in kernel.registry.settlements:
             # The map has no such place. `PLACEMENTS` names `settlement:mahadu`
@@ -127,6 +77,10 @@ def enrol(world: World) -> World:
             # by the house it serves, and the crown is the house.
             cohort = dataclasses.replace(
                 cohort, tenure="prebendal", origin=crown)
+        settlement = kernel.registry.settlements[cohort.settlement]
+        cohort = dataclasses.replace(
+            cohort, ethnicity=settlement.region, status="dependent",
+            institution=crown, armed=group.function == "garrison")
         cohorts[cohort.id] = cohort
         moved[cohort.settlement] = moved.get(cohort.settlement, 0) + cohort.people
     cohorts = _make_room(kernel, cohorts, moved)
@@ -183,18 +137,6 @@ def feed(world: World) -> World:
         return world
     kernel, _ = K.feed(kernel, K.kept_mouths(kernel), starve=False)
     return dataclasses.replace(world, kernel=kernel)
-
-
-def refresh(world: World) -> World:
-    """Read `Court.stores` back off the Book.
-
-    For after something spent the seat's goods without going through `put` --
-    the kernel eating a ration is the one case. Without it the next `record`
-    would carry a mapping the Book has already moved past, and reconciling the
-    two would put the grain back.
-    """
-    return dataclasses.replace(
-        world, court=dataclasses.replace(world.court, stores=held(world)))
 
 
 def harvest(world: World, events: list) -> tuple[World, list]:
@@ -260,54 +202,37 @@ def _at_seat(kernel, actor: str) -> bool:
     return bool(org) and org.settlement == SP.SEAT
 
 
-def mirror(world: World) -> tuple[World, list]:
-    """Write the payroll back onto the court, and say what changed.
-
-    The events are the ones `systems.pay_rations` used to raise, because they
-    are what the log, the advisors and the hall are reading. What raises them
-    has moved; what they mean has not.
-    """
-    from engine import actions as A
-    from engine import systems
-
-    kernel = getattr(world, "kernel", None)
-    if kernel is None:
-        return world, []
-    events: list = []
-    groups = dict(world.court.dependents)
+def groups(world: World) -> dict:
+    """The court roll projected from its cohorts."""
+    found = {}
     for entry in SP.PLACEMENTS:
-        was = groups.get(entry.group)
-        cohort = kernel.registry.cohorts.get(entry.cohort)
-        if was is None or cohort is None:
+        cohort = world.kernel.registry.cohorts.get(entry.cohort)
+        if cohort is not None:
+            found[entry.group] = SP.as_group(cohort)
+    return found
+
+
+def settle_payroll(world: World) -> tuple[World, list]:
+    """Apply payroll consequences and report them."""
+    from engine import actions as A
+    events: list = []
+    for entry in SP.PLACEMENTS:
+        cohort = world.kernel.registry.cohorts.get(entry.cohort)
+        if cohort is None:
             continue
-        _, residue = SP.as_cohort(was)
-        now = SP.as_group(cohort, residue)
-        # The debt in qa, off the cohort, not rebuilt out of `hunger`. Hunger
-        # counts fortnights and rounds a partial shortfall up to a whole
-        # fortnight's ration; the difference is grain the granary still holds
-        # and the roll says it paid out, which is spec 2.2 broken by rounding.
-        now = dataclasses.replace(now, arrears=cohort.shortfall)
+        was = SP.as_group(cohort)
+        now = was
         owed = now.size * now.entitlement
         weeks = now.arrears // max(1, owed)
-        # Spec 6.3, unchanged and still the court's: what a ration debt does to
-        # the people owed it. The kernel says how much was not delivered; this
-        # says what that costs, and then hands the cost back to the kernel,
-        # because the heads it takes are the kernel's heads now.
-        _, loyalty_delta, out_mod, desertion, revolt = systems._band(weeks)
+        _, loyalty_delta, _output, desertion, revolt = SP.band(weeks)
         revolting = bool(revolt)
         gone = now.size * desertion // 1000 if desertion else 0
         size = now.size - gone
-        loyalty = systems._clamp(was.loyalty + loyalty_delta)
-        now = dataclasses.replace(
-            now, size=size, loyalty=loyalty,
-            output_modifier=0 if revolting else out_mod,
-            revolting=revolting)
-        groups[entry.group] = now
+        loyalty = max(0, min(1000, was.loyalty + loyalty_delta))
         world = _amend(
             world, cohort.id, people=size,
             households=min(cohort.households, size),
             grievance=SP.grievance_of(loyalty))
-        kernel = world.kernel
 
         # What the fortnight cost, read off the debt rather than off a payment:
         # the kernel took grain out of a lot and never formed the figure.
@@ -321,8 +246,7 @@ def mirror(world: World) -> tuple[World, list]:
                 entry.group, now.place, revolting, now.size))
         if weeks >= 2 and now.member_name:
             events.append(A.Grumbling(entry.group, now.member_name, weeks))
-    court = dataclasses.replace(world.court, dependents=groups)
-    return dataclasses.replace(world, court=court), events
+    return world, events
 
 
 def _amend(world: World, cohort_id: str, **fields) -> World:
@@ -340,12 +264,7 @@ def _amend(world: World, cohort_id: str, **fields) -> World:
 
 
 def bury(world: World, group: str, dead: int) -> World:
-    """Take the dead off the payroll's cohort. The court's copy is the caller's.
-
-    For anything that kills people at the seat outside the ration roll -- the
-    plague is the one -- because the cohort is where a head count lives now and
-    the mirror would otherwise write the group's size straight back.
-    """
+    """Take the dead off the payroll's cohort."""
     kernel = getattr(world, "kernel", None)
     if kernel is None or dead <= 0:
         return world
@@ -410,7 +329,7 @@ def _cohort_of(world: World, group: str):
 def allowances(world: World) -> dict:
     """Group -> qa the crown will hand it, for groups where an order stands."""
     found = {}
-    for group in sorted(world.court.dependents):
+    for group in sorted(groups(world)):
         cohort = _cohort_of(world, group)
         if cohort is not None and cohort.allowance >= 0:
             found[group] = cohort.allowance
@@ -420,7 +339,7 @@ def allowances(world: World) -> dict:
 def order_of_payment(world: World) -> tuple[str, ...]:
     """The pay-down order the player set. Highest precedence first."""
     ranked = []
-    for group in sorted(world.court.dependents):
+    for group in sorted(groups(world)):
         cohort = _cohort_of(world, group)
         if cohort is not None and cohort.precedence:
             ranked.append((-cohort.precedence, group))
@@ -442,7 +361,7 @@ def levy(world: World, sources: tuple[tuple[str, int], ...]) -> World:
 def corvee_sources(world: World) -> tuple[tuple[str, int], ...]:
     """Days raised this season, per group, in a stable order."""
     found = []
-    for group in sorted(world.court.dependents):
+    for group in sorted(groups(world)):
         cohort = _cohort_of(world, group)
         if cohort is not None and cohort.corvee:
             found.append((group, cohort.corvee))
@@ -451,7 +370,132 @@ def corvee_sources(world: World) -> tuple[tuple[str, int], ...]:
 
 def corvee_days(world: World) -> int:
     """Every day of corvée raised this season, wherever it came from."""
-    return sum(days for _group, days in corvee_sources(world))
+    return sum(c.corvee for c in world.kernel.registry.cohorts.values())
+
+
+def detach(world: World, cohort_id: str, heads: int, destination: str,
+           duration: int, task: str = "work", ration_source: str = "",
+           official: str = "") -> tuple[World, object]:
+    from engine import actions as A
+
+    cohort = world.kernel.registry.cohorts.get(cohort_id)
+    if cohort is None or cohort.parent:
+        raise ValueError(f"unknown cohort: {cohort_id}")
+    if heads <= 0 or heads >= cohort.people:
+        raise ValueError("levy must leave someone in the parent cohort")
+    place = world.places.get(destination)
+    if place is None:
+        raise ValueError(f"unknown destination: {destination}")
+    alu = destination if place.kind == "alu" else place.alu
+    settlement = f"settlement:{alu}"
+    from engine.kernel import travel
+
+    path = travel.shortest_path(
+        world.kernel.registry.routes, cohort.settlement, settlement)
+    if not path:
+        raise ValueError(f"no route to {destination}")
+    journey = travel.latency(
+        world.kernel.registry.routes, cohort.settlement, settlement,
+        world.season, world.date.fortnight)
+    duration = max(1, duration)
+    arrives = world.date.absolute + journey
+    parts = SP.split(cohort, {"detachment": heads}, world.date.absolute)
+    parent = next(c for c in parts if c.id == cohort.id)
+    party = next(c for c in parts if c.id != cohort.id)
+    party = dataclasses.replace(
+        party, parent=parent.id, status="travelling", task=task, path=path,
+        arrives=arrives, until=arrives + duration,
+        ration_source=ration_source or world.kernel.controller(SP.SEAT),
+        official=official, corvee=heads * cohort.labour_per_head * duration,
+        tenure="prebendal")
+    cohorts = dict(world.kernel.registry.cohorts)
+    cohorts[parent.id] = parent
+    cohorts[party.id] = party
+    registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, registry=registry))
+    return world, A.CohortDetached(
+        parent.id, party.id, heads, destination, party.until)
+
+
+def release(world: World, detachment_id: str) -> tuple[World, object]:
+    from engine import actions as A
+
+    cohorts = dict(world.kernel.registry.cohorts)
+    party = cohorts.get(detachment_id)
+    if party is None or not party.parent:
+        raise ValueError(f"unknown detachment: {detachment_id}")
+    parent = cohorts.get(party.parent)
+    if parent is None:
+        raise ValueError(f"missing parent cohort: {party.parent}")
+    party = dataclasses.replace(
+        party, settlement=parent.settlement, kind=parent.kind,
+        status=parent.status, institution=parent.institution,
+        armed=parent.armed, parent="", task="", path=(), arrives=-1, until=-1,
+        ration_source="", official="", corvee=0, tenure=parent.tenure)
+    joined = SP.merge((parent, party), into=parent.id)
+    del cohorts[detachment_id]
+    cohorts[parent.id] = joined
+    registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, registry=registry))
+    return world, A.CohortReturned(detachment_id, parent.id, party.people)
+
+
+def return_due(world: World) -> tuple[World, list]:
+    events = []
+    due = tuple(sorted(
+        c.id for c in world.kernel.registry.cohorts.values()
+        if c.parent and c.until <= world.date.absolute))
+    for cohort_id in due:
+        world, event = release(world, cohort_id)
+        events.append(event)
+    return world, events
+
+
+def arrive_detachments(world: World) -> World:
+    cohorts = dict(world.kernel.registry.cohorts)
+    changed = False
+    for cohort_id in sorted(cohorts):
+        cohort = cohorts[cohort_id]
+        if not cohort.parent or cohort.status != "travelling":
+            continue
+        if cohort.arrives > world.date.absolute:
+            continue
+        cohorts[cohort_id] = dataclasses.replace(
+            cohort, settlement=cohort.path[-1], status="detachment")
+        changed = True
+    if not changed:
+        return world
+    registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
+    return dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, registry=registry))
+
+
+def source_corvee(world: World, requested: int):
+    span = world.season.get("growing")
+    turns = max(1, sum(
+        1 for fortnight in range(1, 25)
+        if span and in_range(fortnight, tuple(span))))
+    per_head = world.land_rules.get("labour_days_per_head", 12)
+    capacity = {
+        group.id: group.size * per_head * turns * group.output_modifier // 1000
+        for group in groups(world).values()
+        if group.function == "field_labour" and not group.revolting
+    }
+    existing = dict(corvee_sources(world))
+    incremental = {}
+    remaining = max(0, requested)
+    for group_id, total in sorted(capacity.items()):
+        take = min(remaining, max(0, total - existing.get(group_id, 0)))
+        if take:
+            existing[group_id] = existing.get(group_id, 0) + take
+            incremental[group_id] = take
+            remaining -= take
+        if not remaining:
+            break
+    return (requested - remaining, tuple(sorted(existing.items())),
+            tuple(sorted(incremental.items())))
 
 
 def to_fields(world: World, group: str, reaping: bool) -> World:
@@ -460,30 +504,13 @@ def to_fields(world: World, group: str, reaping: bool) -> World:
         entry = SP.placement(group)
     except SP.Unmapped:
         return world
-    world = _amend(world, entry.cohort, reaping=bool(reaping))
-    return _mirror_fields(world, {group: bool(reaping)})
-
-
-def _mirror_fields(world: World, wanted: dict) -> World:
-    """Carry `reaping` onto the court's groups, which the institutions read."""
-    groups = dict(world.court.dependents)
-    changed = False
-    for group, reaping in wanted.items():
-        now = groups.get(group)
-        if now is None or now.at_fields == reaping:
-            continue
-        groups[group] = dataclasses.replace(now, at_fields=reaping)
-        changed = True
-    if not changed:
-        return world
-    return dataclasses.replace(
-        world, court=dataclasses.replace(world.court, dependents=groups))
+    return _amend(world, entry.cohort, reaping=bool(reaping))
 
 
 def at_harvest(world: World) -> tuple[str, ...]:
     """The groups standing in the fields instead of doing their own work."""
     return tuple(
-        group for group in sorted(world.court.dependents)
+        group for group in sorted(groups(world))
         if getattr(_cohort_of(world, group), "reaping", False))
 
 
@@ -497,5 +524,4 @@ def close_season(world: World) -> World:
         cohort = world_.kernel.registry.cohorts[cohort_id]
         if cohort.corvee or cohort.reaping:
             world_ = _amend(world_, cohort_id, corvee=0, reaping=False)
-    return _mirror_fields(
-        world_, {group: False for group in world_.court.dependents})
+    return world_

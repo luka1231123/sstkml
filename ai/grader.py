@@ -5,6 +5,7 @@ import dataclasses
 import re
 import tomllib
 from pathlib import Path
+from engine.actors import slug
 
 _CONTENT = Path(__file__).parent.parent / "content"
 _ACTORS = tomllib.loads((_CONTENT / "actors.toml").read_text())["names"]
@@ -37,7 +38,7 @@ def formula(data: dict, profile: str) -> dict:
 
 def profile_for(recipient: str, data: dict | None = None) -> str:
     data = data or load_formulae()
-    return data["recipients"].get(recipient, "ugarit.ruler_to_other")
+    return data["recipients"].get(slug(recipient), "ugarit.ruler_to_other")
 
 
 # A wish for the other house takes several forms across the corpus; any of them
@@ -62,7 +63,7 @@ def grade(text: str, profile: dict, weights: dict,
           recipient: str | None = None) -> ProtocolScore:
     if recipient and "{recipient}" in profile["opening"]:
         expected = profile["opening"].format(
-            recipient=_ACTORS.get(recipient, recipient))
+            recipient=_ACTORS.get(slug(recipient), slug(recipient)))
         address_ok = text.casefold().startswith(expected.casefold())
     else:
         address_ok = bool(re.search(profile["opening_regex"], text, re.I))

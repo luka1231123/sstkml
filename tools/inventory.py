@@ -37,6 +37,8 @@ EVENT_SUFFIXES = (
     "Abandoned", "Fled", "Sought", "Applied", "Violated", "Threshed",
     "Sown", "Harvested", "Dredged", "Raised", "Spoiled", "Grumbling",
     "Conceived", "Revolt", "Landed",
+    "Detached", "Returned", "Displaced", "Defended", "Fell", "Recovered",
+    "Financed", "Requisitioned",
 )
 
 # Events whose names do not end in a past participle the sweep recognises.
@@ -138,7 +140,8 @@ def faults() -> list[str]:
     built = {target for _k, _l, target in hall.DOORS if target in hall.BUILT}
     import play_gui
     openable = ({k for k, _t, _h in play_gui.TABLETS.values()}
-                | {k for k, _t, _h in play_gui.LEDGERS.values()}
+                | {k for k, _t, _h in play_gui.LEDGERS.values()
+                   if k != "stores"}
                 | {k for k, _t, _h in play_gui.ROOMS.values()})
     for target in sorted(built - openable):
         found.append(f"unreachable room: hall advertises '{target}'")
@@ -176,7 +179,7 @@ def faults() -> list[str]:
 DIRECT_CONTEXTS = frozenset({
     "hall", "stack", "letter", "desk", "stores", "roll", "land", "muster",
     "oaths", "works", "alu", "institution", "justice", "house", "altar",
-    "archive", "relations", "world", "plague",
+    "archive", "relations", "world", "plague", "trade",
 })
 
 
@@ -184,10 +187,10 @@ def _workbench_gaps() -> list[str]:
     """Compose each ledger and check it offers every action of its context."""
     from belief.project import project
     from engine.tick import advance
-    from load import load_scenario
+    from load import load_campaign
     from tui import ledgers, palace
 
-    world = load_scenario("ugarit", 8814402919)
+    world = load_campaign("seat", 8814402919)
     for _ in range(8):
         world, _ = advance(world)
     belief = project(world)
