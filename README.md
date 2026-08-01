@@ -4,7 +4,7 @@ Information-constrained rulership sim. Fragile Late Bronze Age world.
 
 People, households, institutions, goods, labour, obligations, journeys, disease, foreign courts — all simulated deterministically. Player hold Ugarit together through fallible people and delayed, interested information. No omniscient strategy layer.
 
-[`SPEC.md`](SPEC.md) = sole current product and release authority. Superseded specs and plans live in [`docs/archive`](docs/archive/README.md) — history, not active requirements.
+[`SPEC.md`](SPEC.md) = sole current product and release authority (Alpha 0.7). Superseded specs and plans live in [`docs/archive`](docs/archive/README.md) — history, not active requirements.
 
 ## What is here now
 
@@ -18,7 +18,7 @@ People, households, institutions, goods, labour, obligations, journeys, disease,
 - four-part writing desk: Address, Recognition, player-written Matter, Seal;
 - versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
 
-Court and regional kernel not yet unified. Full world-to-letter-to-material-consequence loop still release work. Remaining scope short, lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-10).
+Court and kernel not yet one authority: six facts still held twice. Remaining scope lives only in [`SPEC.md` section 10](SPEC.md#10-alpha-07-implementation-tasks).
 
 ## Run
 
@@ -74,5 +74,5 @@ content/         scenarios, people, goods, formulae, and correspondence
 tools/           audit, benchmark, balance, inspection, screens, and probes
 tests/           deterministic engine, controller, UI, and AI contracts
 docs/archive/    retired specifications and post-1.0 idea parking
-SPEC.md          sole current 1.0 product specification
+SPEC.md          sole current product specification (Alpha 0.7)
 ```

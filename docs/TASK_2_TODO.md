@@ -1,5 +1,8 @@
 # Task 2 — to do, in order
 
+Status: **live.** The open boxes below are the remaining work of `SPEC.md`
+Task 2. Six duplicated facts left.
+
 Design: `docs/ONE_AUTHORITY_DESIGN.md`. Each step end green: full test run, one fewer finding from `tools/authority_audit.py`, no new field caching deleted one.
 
 Decisions: archive by `git mv` into `engine/legacy/` (no comment-out in place); eight climate series, one per region; every palace centre get name.

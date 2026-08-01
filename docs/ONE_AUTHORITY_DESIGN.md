@@ -1,6 +1,7 @@
 # One authority per fact — design pass for Alpha 0.7 Task 2
 
-Status: design only. No code changes in this document.
+Status: **live.** Design only, no code changes in this document. Retire when
+`tools/authority_audit.py` reports no findings. See `SPEC.md` Task 2.
 
 Supersedes `docs/PHASE_C_AUTHORITY.md` where they differ; that file's duplicated-facts table restated here with Alu model applied. Task 1's classification (`docs/ALU_CLASSIFICATION.md`) is input: scenario now says what every place and mark is, so kernel built from it, not authored twice.
 
