@@ -17,7 +17,7 @@ from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import new_seed
 from tui import render
 
@@ -130,7 +130,7 @@ def _raw_tablet() -> str:
         lines.append(line)
 
 
-def run(scenario: str = "ugarit", seed: int | None = None) -> None:
+def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
     from ai.client import (
         OllamaClient, model_status, required_model_message)
     from ai.composer import compose, raw_draft, split_draft
@@ -144,11 +144,11 @@ def run(scenario: str = "ugarit", seed: int | None = None) -> None:
         print(required_model_message(detail))
         return
     print(f"  seed {seed} — replay this same world with:  "
-          f"./run.sh --cli {scenario} {seed}\n")
-    world = load_scenario(scenario, seed)
+          f"./run.sh --cli {chosen_alu} {seed}\n")
+    world = load_campaign(chosen_alu, seed)
     log: list[dict] = []
     ai_log: list[dict] = []
-    client = OllamaClient(ai_log, f"saves/{scenario}/ai_cache")
+    client = OllamaClient(ai_log, f"saves/{chosen_alu}/ai_cache")
     voicer = Voicer(client, seed)
     turns = 0
     screen = "stack"
@@ -290,7 +290,7 @@ def run(scenario: str = "ugarit", seed: int | None = None) -> None:
             elif verb == "save":
                 from session import save
                 path = args[0] if args else "save.json"
-                save(path, seed, scenario, turns, log, world, ai_log)
+                save(path, seed, chosen_alu, turns, log, world, ai_log)
                 print(f"  saved to {path}")
             elif verb in ("end", "e"):
                 end = True

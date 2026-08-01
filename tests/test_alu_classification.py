@@ -20,14 +20,14 @@ from belief.project import project
 from engine import actions as A
 from engine import plague
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import worldmap
 
 SEED = 8814402919
 
 
 def _world():
-    return load_scenario("ugarit", SEED)
+    return load_campaign("seat", SEED)
 
 
 def test_every_mark_has_a_classification_and_an_owning_alu() -> None:
@@ -79,17 +79,17 @@ def _load_text(root: Path, *, world_text: str | None = None):
     """Load the scenario through the real loader, with real content."""
     root.mkdir(parents=True, exist_ok=True)
     for item in loader.CONTENT.iterdir():
-        if item.name != "scenarios":
+        if item.name != "courts":
             if item.name == "world.toml" and world_text is not None:
                 (root / item.name).write_text(world_text)
             else:
                 (root / item.name).symlink_to(item)
-    (root / "scenarios").symlink_to(loader.CONTENT / "scenarios",
-                                    target_is_directory=True)
+    (root / "courts").symlink_to(loader.CONTENT / "courts",
+                                 target_is_directory=True)
     real = loader.CONTENT
     try:
         loader.CONTENT = root
-        return loader.load_scenario("ugarit", SEED)
+        return loader.load_campaign("seat", SEED)
     finally:
         loader.CONTENT = real
 
@@ -127,7 +127,7 @@ def test_the_authored_import_sickens_the_alu_that_holds_the_harbour() -> None:
     """The tablet lands travellers at Ma'hadu; the people are Ugarit's."""
     world = _world()
     authored = tomllib.loads(
-        (Path(loader.CONTENT) / "scenarios" / "ugarit.toml").read_text()
+        (Path(loader.CONTENT) / "courts" / "seat.toml").read_text()
     )["plague"]
     assert authored["import_place"] == "ma_hadu"
     assert world.plague.import_place == "seat"

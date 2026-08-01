@@ -365,8 +365,8 @@ def generate_incoming(world: World) -> tuple[World, list]:
     # kernel's ground now. They return when the belief re-points at C5.
 
     # A group deep in arrears: a named member writes. Sparse, offset by group.
-    for gid in sorted(world.court.dependents):
-        g = world.court.dependents[gid]
+    from engine import seat
+    for gid, g in sorted(seat.groups(world).items()):
         weeks = g.arrears // max(1, g.size * g.entitlement)
         off = sum(ord(ch) for ch in gid) % 6      # stable; builtin hash() is randomized
         if weeks >= 2 and g.member_name and (now - off) % 6 == 0:

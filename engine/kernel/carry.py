@@ -79,6 +79,7 @@ class Voyage:
     destination: EntityId
     departed: int
     arrives: int
+    mode: str = "sea"
     cargo: tuple[EntityId, ...] = ()     # lot ids
     news: tuple[tuple[str, int], ...] = ()
 
@@ -432,10 +433,12 @@ def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
             id=mint(route.id, turn, "journey", ordinal), route=route.id,
             carrier=intent.actor, origin=origin, destination=intent.subject,
             departed=turn, arrives=turn + route.fortnights(),
+            mode=route.legs[0].mode,
             cargo=tuple(cargo),
             news=tuple(sorted(readings(kernel, origin).items())))
         voyages.append(voyage)
-        events.append(("sailed", voyage.id, origin, intent.subject,
+        events.append(("sailed" if voyage.mode == "sea" else "caravan_departed",
+                       voyage.id, origin, intent.subject,
                        intent.task, aboard))
 
     kernel = dataclasses.replace(kernel, book=book, voyages=tuple(voyages))
@@ -462,6 +465,7 @@ def _dispatch(kernel, events: list):
                 route=route_id, carrier=origin, origin=origin,
                 destination=destination, departed=turn,
                 arrives=turn + route.fortnights(),
+                mode=route.legs[0].mode,
                 news=tuple(sorted(readings(kernel, origin).items()))))
     return dataclasses.replace(kernel, voyages=tuple(voyages)), events
 
@@ -483,6 +487,7 @@ def arrivals(kernel):
     still = tuple(v for v in kernel.voyages if v.arrives > turn)
     due = tuple(v for v in kernel.voyages if v.arrives <= turn)
     landed: list[Voyage] = []
+    successful: set[EntityId] = set()
 
     for voyage in due:
         risk = kernel.registry.routes[voyage.route].risk
@@ -495,7 +500,8 @@ def arrivals(kernel):
                                         authority=voyage.id)
             # A cargo lost is an event with a hole in the ledger behind it.
             events.append((
-                "lost_at_sea" if voyage.cargo else "no_word",
+                ("lost_at_sea" if voyage.mode == "sea" else "lost_on_road")
+                if voyage.cargo else "no_word",
                 voyage.id, voyage.route, voyage.destination))
             continue
 
@@ -510,9 +516,16 @@ def arrivals(kernel):
                                  authority=voyage.id)
             events.append(("landed", voyage.id, voyage.destination, lot.good,
                            lot.quantity))
+            successful.add(voyage.route)
         landed.append(voyage)
 
-    kernel = dataclasses.replace(kernel, book=book, voyages=still)
+    trade_routes = {
+        route: strength - 1 for route, strength in kernel.trade_routes.items()
+        if strength > 1}
+    for route in sorted(successful):
+        trade_routes[route] = min(1000, trade_routes.get(route, 0) + 2)
+    kernel = dataclasses.replace(
+        kernel, book=book, voyages=still, trade_routes=trade_routes)
     return _tell(kernel, tuple(landed), events)
 
 

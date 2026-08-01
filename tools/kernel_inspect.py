@@ -36,14 +36,14 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from engine.kernel.world import Kernel, advance_logged  # noqa: E402
-from load import load_scenario                          # noqa: E402
+from load import load_campaign                          # noqa: E402
 
 SCENARIO, SEED = "ugarit", 1
 
 
 def opening() -> Kernel:
     """The world every query below replays from."""
-    return load_scenario(SCENARIO, SEED).kernel
+    return load_campaign(SCENARIO, SEED).kernel
 
 
 def replay(turns: int) -> tuple[Kernel, list]:

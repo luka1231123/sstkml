@@ -9,14 +9,14 @@ from engine import archive, justice
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import play, replay, save
 
 SEED = 8814402919
 
 
 def _world(turns: int = 1):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -174,7 +174,7 @@ def test_justice_actions_save_and_replay_through_a_correction() -> None:
     petition_id = "boundary_ashiranu"
     script = [[A.HearPetition(petition_id),
                A.RulePetition(petition_id, "for")]] + [[] for _ in range(6)]
-    world, log, _ = play(SEED, "ugarit", script)
+    world, log, _ = play(SEED, "seat", script)
     path = "/tmp/m12_justice_replay.json"
-    save(path, SEED, "ugarit", len(script), log, world)
+    save(path, SEED, "seat", len(script), log, world)
     assert state_hash(replay(path)) == state_hash(world)

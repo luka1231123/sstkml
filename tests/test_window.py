@@ -13,7 +13,7 @@ from tempfile import TemporaryDirectory
 import registry
 from belief.project import project
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import document, hall, inbox
 from tui import desktop
 from tui.backend_tk import App, available
@@ -23,7 +23,7 @@ SEED = 8814402919
 
 
 def _belief(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world, project(world)
@@ -417,17 +417,17 @@ def test_the_seed_given_back_reproduces_the_world_exactly():
     """The printed seed has to be the whole story, or it is decoration."""
     from engine.core import state_hash
     from engine.tick import advance
-    from load import load_scenario
+    from load import load_campaign
     from session import new_seed
     seed = new_seed()
     runs = []
     for _ in range(2):
-        world = load_scenario("ugarit", seed)
+        world = load_campaign("seat", seed)
         for _ in range(6):
             world, _ = advance(world)
         runs.append(state_hash(world))
     assert runs[0] == runs[1]
-    other = load_scenario("ugarit", new_seed())
+    other = load_campaign("seat", new_seed())
     for _ in range(6):
         other, _ = advance(other)
     assert state_hash(other) != runs[0]

@@ -52,7 +52,7 @@ def search(world: World, query: str, limit: int = 12) -> tuple[Document, ...]:
     # the floor, because a search that returns nothing at all reads as a bug
     # rather than as neglect.
     from engine import institution
-    keeping = institution.factor(world.court, "archive")
+    keeping = institution.factor(world, "archive")
     limit = max(2, limit * keeping // 1000)
     return tuple(hits[:limit])
 

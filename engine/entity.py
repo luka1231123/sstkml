@@ -162,7 +162,7 @@ class Polity:
     name: str
     ruler: EntityId = ""
     seat: EntityId = ""                      # settlement id
-    controls: tuple[EntityId, ...] = ()      # settlements held
+    overlord: EntityId = ""                  # another polity, not an owner
     claims: tuple[EntityId, ...] = ()        # settlements asserted, not held
     # How this polity's people come by their food. Not a detail: it decides
     # whether a hungry village beside a full granary is a possible state of the
@@ -178,7 +178,7 @@ class Settlement:
     id: EntityId
     name: str
     region: EntityId
-    polity: EntityId
+    owner: EntityId
     sites: tuple[EntityId, ...] = ()
     cohorts: tuple[EntityId, ...] = ()
     orgs: tuple[EntityId, ...] = ()
@@ -326,6 +326,20 @@ class Cohort:
     households: int
     people: int
     origin: EntityId = ""        # where they are from, if not where they live
+    ethnicity: str = ""
+    status: str = ""
+    institution: EntityId = ""
+    armed: bool = False
+    parent: EntityId = ""
+    task: str = ""
+    path: tuple[EntityId, ...] = ()
+    arrives: int = -1
+    until: int = -1
+    ration_source: EntityId = ""
+    official: EntityId = ""
+    infected: int = 0
+    recovered: int = 0
+    dead: int = 0
     labour_per_head: int = 12    # person-days per fortnight
     ration_per_head: int = 10    # units of grain per person per fortnight
     hunger: int = 0              # fortnights of shortfall; the cohort's memory
@@ -360,6 +374,11 @@ class Cohort:
     # to reap could be levied for the canal on the same morning.
     corvee: int = 0
     reaping: bool = False
+    roll_id: str = ""
+    name: str = ""
+    representative: str = ""
+    roll_place: str = ""
+    roll_function: str = ""
 
     def labour(self) -> int:
         # Hunger takes the strength before it takes the numbers, but never all
@@ -370,6 +389,14 @@ class Cohort:
 
     def ration(self) -> int:
         return self.people * self.ration_per_head
+
+    @property
+    def susceptible(self) -> int:
+        return max(0, self.people - self.infected - self.recovered)
+
+    @property
+    def in_transit(self) -> bool:
+        return self.status.startswith("travelling")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -383,6 +410,13 @@ class Organization:
     authority: int = 0           # rank, used to break allocation ties
 
 
+@dataclasses.dataclass(frozen=True)
+class Person:
+    """A named individual whose identity matters to a rule."""
+    id: EntityId
+    name: str
+
+
 # --- registries ---------------------------------------------------------------
 
 @dataclasses.dataclass(frozen=True)
@@ -390,6 +424,7 @@ class Registry:
     """The kernel's flat entity tables. One mapping per kind, keyed by ID."""
     regions: Mapping[EntityId, Region] = dataclasses.field(default_factory=dict)
     polities: Mapping[EntityId, Polity] = dataclasses.field(default_factory=dict)
+    persons: Mapping[EntityId, Person] = dataclasses.field(default_factory=dict)
     settlements: Mapping[EntityId, Settlement] = dataclasses.field(
         default_factory=dict)
     sites: Mapping[EntityId, Site] = dataclasses.field(default_factory=dict)
@@ -402,6 +437,7 @@ class Registry:
         return (
             ("regions", self.regions),
             ("polities", self.polities),
+            ("persons", self.persons),
             ("settlements", self.settlements),
             ("sites", self.sites),
             ("routes", self.routes),
@@ -418,6 +454,11 @@ class Registry:
             found.extend(sorted(table))
         return tuple(found)
 
+    def holdings(self, polity: EntityId) -> tuple[EntityId, ...]:
+        return tuple(sorted(
+            sid for sid, settlement in self.settlements.items()
+            if settlement.owner == polity))
+
 
 def check(registry: Registry) -> tuple[str, ...]:
     """Referential faults, as sentences. Empty means the registry is sound."""
@@ -430,7 +471,9 @@ def check(registry: Registry) -> tuple[str, ...]:
     for sid in sorted(registry.settlements):
         settlement = registry.settlements[sid]
         require(sid, "region", settlement.region, registry.regions)
-        require(sid, "polity", settlement.polity, registry.polities)
+        require(sid, "owner", settlement.owner, registry.polities)
+        if not settlement.owner:
+            faults.append(f"{sid}: has no owner")
         for site_id in settlement.sites:
             require(sid, "site", site_id, registry.sites)
 
@@ -442,8 +485,10 @@ def check(registry: Registry) -> tuple[str, ...]:
     for pid in sorted(registry.polities):
         polity = registry.polities[pid]
         require(pid, "seat", polity.seat, registry.settlements)
-        for held in polity.controls:
-            require(pid, "controls", held, registry.settlements)
+        require(pid, "ruler", polity.ruler, registry.persons)
+        require(pid, "overlord", polity.overlord, registry.polities)
+        if polity.overlord == pid:
+            faults.append(f"{pid}: is its own overlord")
 
     for cid in sorted(registry.cohorts):
         cohort = registry.cohorts[cid]

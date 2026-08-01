@@ -289,11 +289,21 @@ def succeed(world: World) -> tuple[World, list]:
         actor=heir.id)
     # A NEW regnal year 1. Every date correlation the player built is now void,
     # which is the historical condition and not a punishment.
-    world = dataclasses.replace(
-        world, court=court,
+    from engine.entity import Person
+    from engine.kernel import politics
+
+    ruler_id = f"person:{heir.id}"
+    persons = dict(world.kernel.registry.persons)
+    persons[ruler_id] = Person(ruler_id, heir.name)
+    registry = dataclasses.replace(world.kernel.registry, persons=persons)
+    settlement = registry.settlements[f"settlement:{world.chosen_alu}"]
+    registry = politics.succeed(registry, settlement.owner, ruler_id)
+    kernel = dataclasses.replace(
+        world.kernel,
+        registry=registry,
         date=Date(year=1, fortnight=world.date.fortnight,
-                  absolute=world.date.absolute),
-        oaths=oaths)
+                  absolute=world.date.absolute))
+    world = dataclasses.replace(world, court=court, kernel=kernel, oaths=oaths)
     world = _rank_heirs(world)
     return world, [A.RulerSucceeded(heir.id, heir.name, contested,
                                     len(ranked) - 1)]

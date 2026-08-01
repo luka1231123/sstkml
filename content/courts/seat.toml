@@ -6,7 +6,7 @@
 # The economy runs a structural deficit: you cannot feed everyone forever.
 # The game is the order in which you let them starve.
 
-scenario = "ugarit"
+chosen_alu = "seat"
 actor = "ammurapi"
 seat = "seat"
 attention_base = 10

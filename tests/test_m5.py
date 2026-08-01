@@ -10,7 +10,7 @@ from engine import actions as A
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import replay, save
 from tools.corpus_lint import lint
 
@@ -107,7 +107,7 @@ def test_multi_topic_draft_can_split_into_two_tablets():
 
 def test_reply_text_round_trips_and_replays_without_model():
     seed = 8814402919
-    world = load_scenario("ugarit", seed)
+    world = load_campaign("seat", seed)
     turns = 0
     while not world.inbox:
         world, _ = advance(world)
@@ -122,7 +122,7 @@ def test_reply_text_round_trips_and_replays_without_model():
     world, _ = apply(world, action)
     log = [{"turn": world.date.absolute, "action": A.to_dict(action)}]
     path = "/tmp/m5_replay.json"
-    save(path, seed, "ugarit", turns, log, world)
+    save(path, seed, "seat", turns, log, world)
 
     encoded = json.loads(open(path).read())["log"][0]["action"]
     assert encoded["text"] == text and encoded["profile"] == profile

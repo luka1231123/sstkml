@@ -12,7 +12,7 @@ from belief.project import project
 from engine import actions as A
 from engine import house, relations
 from engine.reduce import apply
-from load import load_scenario
+from load import load_campaign
 
 
 SEED = 8_814_402_919
@@ -20,7 +20,7 @@ LEGACY_TYPES = (A.SendGift, A.MarryAbroad)
 
 
 def _belief() -> dict:
-    return project(load_scenario("ugarit", SEED))
+    return project(load_campaign("seat", SEED))
 
 
 def test_legacy_descriptors_keep_compatibility_but_leave_player_contexts():

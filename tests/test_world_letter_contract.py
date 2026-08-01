@@ -17,7 +17,7 @@ from engine import letter_terms
 from engine.state import Letter
 from belief.project import project
 from engine.reduce import apply
-from load import load_scenario
+from load import load_campaign
 
 
 def _dispatch() -> A.DispatchLetter:
@@ -122,7 +122,7 @@ def test_existing_letter_construction_gets_empty_outgoing_contract_fields() -> N
 
 
 def test_delivery_records_are_idempotent_across_later_turns() -> None:
-    world = load_scenario("ugarit", 8814402919)
+    world = load_campaign("seat", 8814402919)
     letter = Letter(
         id="L-repeat",
         sender=world.court.actor,
@@ -144,7 +144,8 @@ def test_delivery_records_are_idempotent_across_later_turns() -> None:
     )
     reserved = letter_terms.reserve_terms_at_dispatch(world, letter).world
     once, _ = letter_terms.apply_delivered_terms(reserved, letter)
-    later = dataclasses.replace(once, date=once.date.advance())
+    later = dataclasses.replace(once, kernel=dataclasses.replace(
+        once.kernel, date=once.date.advance()))
     twice, _ = letter_terms.apply_delivered_terms(later, letter)
 
     assert twice.letter_obligations == once.letter_obligations
@@ -153,7 +154,7 @@ def test_delivery_records_are_idempotent_across_later_turns() -> None:
 
 
 def test_unread_tablet_contents_do_not_cross_the_belief_boundary() -> None:
-    world = load_scenario("ugarit", 8814402919)
+    world = load_campaign("seat", 8814402919)
     letter = Letter(
         id="L-sealed",
         sender="sinaranu",

@@ -312,7 +312,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     controls = []
     if days > 0:
         controls.append(affordable(Control(
-            "raise_corvee", key_for("raise_corvee"),
+            "levy_cohort", key_for("levy_cohort"),
             label=f"raise corvée {days}d"), hours))
     if estate is not None and estate.get("irrigated") and days > 0:
         controls.append(affordable(Control(
@@ -453,7 +453,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
     ]
     controls = [
         affordable(Control(
-            "raise_corvee", key_for("raise_corvee"),
+            "levy_cohort", key_for("levy_cohort"),
             label=f"raise corvée {amount:,}d" if amount else "raise corvée",
             enabled=amount > 0,
             why="choose person-days with [ and ]"), hours),

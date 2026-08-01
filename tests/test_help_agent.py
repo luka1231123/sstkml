@@ -4,7 +4,7 @@ from __future__ import annotations
 from ai import help_agent, parser
 from belief.project import project
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import hall, help as help_page
 from tui.grid import plain_text
 
@@ -12,7 +12,7 @@ SEED = 8814402919
 
 
 def _world(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world

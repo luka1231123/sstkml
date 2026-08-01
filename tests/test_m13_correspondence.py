@@ -14,7 +14,7 @@ from engine.reduce import apply
 from engine.state import Document
 from engine.tick import advance
 from engine.state import with_routes
-from load import load_scenario
+from load import load_campaign
 from session import play, replay, save
 from tui import archive, inbox
 from tui.grid import plain_text
@@ -23,7 +23,7 @@ SEED = 8814402919
 
 
 def _world(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     # Zero route risk so replies are never randomly intercepted: the outbox
     # and in-transit assertions must not depend on interception RNG.
     world = with_routes(world, tuple(
@@ -318,7 +318,7 @@ def test_archive_hit_projects_and_scrolls_the_complete_body() -> None:
 
 
 def test_correspondence_actions_round_trip_through_a_verified_save() -> None:
-    probe = load_scenario("ugarit", SEED)
+    probe = load_campaign("seat", SEED)
     probe, _ = advance(probe)
     probe, _ = advance(probe)
     item = _unread(probe)
@@ -328,10 +328,10 @@ def test_correspondence_actions_round_trip_through_a_verified_save() -> None:
         A.DictateReply(item["id"], "answer", "A replayable reply."),
         A.ArchiveLetter(item["id"]),
     ]
-    final, log, _ = play(SEED, "ugarit", [[], actions])
+    final, log, _ = play(SEED, "seat", [[], actions])
     with TemporaryDirectory() as directory:
         path = Path(directory) / "campaign.json"
-        save(path, SEED, "ugarit", 2, log, final)
+        save(path, SEED, "seat", 2, log, final)
         loaded = replay(path)
     assert state_hash(loaded) == state_hash(final)
     filed = next(

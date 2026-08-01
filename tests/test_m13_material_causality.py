@@ -10,13 +10,13 @@ from engine import divine, mail, plague
 from engine.core import state_hash
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 SEED = 8814402919
 
 
 def _without_authored_import(seed: int = SEED):
-    world = load_scenario("ugarit", seed)
+    world = load_campaign("seat", seed)
     return dataclasses.replace(
         world, plague=dataclasses.replace(
             world.plague, import_place="", import_turn=-1, import_cases=0))
@@ -91,7 +91,7 @@ def test_plague_progress_event_reconciles_every_nonfatal_sir_change():
 def test_competence_changes_evidence_interpretation_not_future_access():
     low_matches = high_matches = 0
     for seed in range(SEED, SEED + 120):
-        world = load_scenario("ugarit", seed)
+        world = load_campaign("seat", seed)
         evidence = divine.evidence_forecast(world, "harvest", "")
         court = dataclasses.replace(
             world.court, diviner_faction="court", diviner_loyalty=1000)

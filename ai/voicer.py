@@ -23,6 +23,7 @@ from __future__ import annotations
 import threading
 import tomllib
 from pathlib import Path
+from engine.actors import slug
 
 from ai.client import ModelUnavailable, safe_fields
 from ai.grader import load_formulae
@@ -121,7 +122,7 @@ def build_prompt(item: dict) -> list[dict]:
     # The facts are already distorted. To the model they are simply true.
     fact_lines = _fact_lines(item)
     prompt = (
-        f"YOU ARE {_ACTORS.get(item['sender'], item['sender'])}. "
+        f"YOU ARE {_ACTORS.get(slug(item['sender']), slug(item['sender']))}. "
         f"{fields['who']}\n"
         f"TEMPER: {fields['temper']}\n"
         f"TONE: {fields['tone']}\n"

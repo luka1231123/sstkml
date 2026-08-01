@@ -3,6 +3,50 @@
 # This is THE authoritative map. Scenarios inherit from it.
 #
 # Copied from content/scenarios/ugarit.toml at Task 2 refactor.
+[rulers.seat]
+id = "ammurapi"
+name = "Ammurapi"
+
+[rulers.hattusa]
+id = "hatti_king"
+name = "the Great King of Hatti"
+
+[rulers.carchemish]
+id = "carchemish_viceroy"
+name = "the king of Carchemish, viceroy of the Sun"
+
+[rulers.egypt]
+id = "pharaoh"
+name = "Pharaoh, the Sun"
+
+[rulers.byblos]
+id = "byblos_king"
+name = "the king of Gubla"
+
+[rulers.amurru]
+id = "amurru_king"
+name = "the king of Amurru"
+
+[rulers.sidon]
+id = "sidon_king"
+name = "the king of Sidon"
+
+[rulers.tyre]
+id = "tyre_king"
+name = "the king of Tyre"
+
+[rulers.assur]
+id = "assyria_king"
+name = "the king of Assur"
+
+[rulers.babylon]
+id = "babylon_king"
+name = "the king of Karduniash"
+
+[rulers.apasa]
+id = "mira_king"
+name = "the king of Mira"
+
 [terrain]
 west = 21.00          # degrees east at column 0
 north = 41.00         # degrees north at row 0
@@ -313,7 +357,7 @@ default = "pooled"
 
 [tenure.polities]
 "polity:egypt" = "redistributive"
-"polity:assyria" = "redistributive"
+"polity:assur" = "redistributive"
 
 [[regions]]
 id = "north_levant"

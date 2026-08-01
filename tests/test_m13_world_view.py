@@ -4,7 +4,7 @@ from __future__ import annotations
 import dataclasses
 
 from belief.project import project
-from load import load_scenario
+from load import load_campaign
 from tui.grid import InteractiveScreen, plain_text
 from tui import atlas, worldmap
 
@@ -92,7 +92,7 @@ def _belief(places: list[dict], routes: list[dict],
 
 
 def test_projection_exposes_only_court_map_geography() -> None:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     graph = project(world)["world_graph"]
 
     assert {place["id"] for place in graph["places"]} == set(world.places)
@@ -125,10 +125,10 @@ def test_projection_exposes_only_court_map_geography() -> None:
 
 
 def test_projected_map_age_advances_but_calendar_state_is_current() -> None:
-    world = load_scenario("ugarit", SEED)
-    world = dataclasses.replace(
-        world, date=dataclasses.replace(
-            world.date, fortnight=5, absolute=5))
+    world = load_campaign("seat", SEED)
+    world = dataclasses.replace(world, kernel=dataclasses.replace(
+        world.kernel, date=dataclasses.replace(
+            world.date, fortnight=5, absolute=5)))
     graph = project(world)["world_graph"]
 
     assert graph["age_turns"] == 5
@@ -323,7 +323,7 @@ def test_the_ground_is_drawn_from_the_scenario_and_from_nowhere_else() -> None:
 
 
 def test_the_scenario_authors_ground_that_reaches_the_tablet() -> None:
-    world = load_scenario("ugarit", seed=SEED)
+    world = load_campaign("seat", seed=SEED)
     assert world.terrain.rows, "the scenario authors no ground"
     assert world.kernel.registry.sites, "the scenario authors no hinterland"
     graph = project(world)["world_graph"]
@@ -493,7 +493,7 @@ def _game():
     import play_gui
     from engine.tick import advance
 
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(6):
         world, _ = advance(world)
     game = play_gui.Game.__new__(play_gui.Game)

@@ -97,7 +97,7 @@ def _head_factor(court, inst) -> int:
     return min(1000, 750 + competence // 2)
 
 
-def _staff_factor(court, inst) -> int:
+def _staff_factor(world, inst) -> int:
     """0..1000 labour available to this institution this fortnight.
 
     A payroll modifier describes willingness and arrears, not how many workers
@@ -106,7 +106,7 @@ def _staff_factor(court, inst) -> int:
     """
     if inst.capacity <= 0:
         return 0
-    group = court.dependents.get(inst.group)
+    group = seat.groups(world).get(inst.group)
     if not inst.group:
         return UNASSIGNED_STAFF_OUTPUT
     if (group is None or group.size <= 0 or group.revolting
@@ -124,7 +124,7 @@ def _staff_factor(court, inst) -> int:
     return quantity * willingness // 1000
 
 
-def _decay_for(court, inst, *, upkeep_met: bool | None = None) -> int:
+def _decay_for(court, inst, *, upkeep_met: bool) -> int:
     decay = DECAY.get(inst.kind, 6)
     if not inst.head:
         decay += HEADLESS_DECAY
@@ -135,8 +135,6 @@ def _decay_for(court, inst, *, upkeep_met: bool | None = None) -> int:
             decay = max(1, decay // 2)
         elif competence < 300:
             decay *= 2
-    if upkeep_met is None:
-        upkeep_met = _upkeep_met(court, inst)
     if inst.upkeep and not upkeep_met:
         decay += UNPAID_UPKEEP_DECAY
     return decay
@@ -148,12 +146,6 @@ def _upkeep_required(inst) -> dict[str, int]:
         if qty > 0:
             required[good] = required.get(good, 0) + qty
     return required
-
-
-def _upkeep_met(court, inst) -> bool:
-    return all(
-        court.stores.get(good, 0) >= qty
-        for good, qty in _upkeep_required(inst).items())
 
 
 def _consume_upkeep(stores: dict[str, int], inst) -> bool:
@@ -173,14 +165,15 @@ def _consume_upkeep(stores: dict[str, int], inst) -> bool:
     return True
 
 
-def effective(court, inst) -> int:
+def effective(world, inst) -> int:
     """What it can actually do this fortnight. Derived, never stored."""
-    staff = _staff_factor(court, inst)
+    court = world.court
+    staff = _staff_factor(world, inst)
     return (inst.capacity * inst.condition // 1000 * staff // 1000
             * _head_factor(court, inst) // 1000)
 
 
-def factor(court, kind: str) -> int:
+def factor(world, kind: str) -> int:
     """0..1000: how well the city's institution of this kind is working.
 
     The multipliers folded into one number, for the systems that consume it.
@@ -189,11 +182,12 @@ def factor(court, kind: str) -> int:
     perfect 1000. Absence used to make missing infrastructure strictly better
     than a neglected building.
     """
-    return factor_at(court, kind)
+    return factor_at(world, kind)
 
 
-def factor_at(court, kind: str, place: str | None = None) -> int:
+def factor_at(world, kind: str, place: str | None = None) -> int:
     """Working factor for a kind, optionally at one physical place."""
+    court = world.court
     matching = sorted((
         inst for inst in court.institutions.values()
         if inst.kind == kind and (place is None or inst.place == place)
@@ -201,13 +195,13 @@ def factor_at(court, kind: str, place: str | None = None) -> int:
     if not matching:
         return 0
     inst = matching[0]
-    staff = _staff_factor(court, inst)
+    staff = _staff_factor(world, inst)
     return max(0, min(
         1000, inst.condition * staff // 1000
         * _head_factor(court, inst) // 1000))
 
 
-def reported_condition(court, inst, seed: int, turn: int) -> int:
+def reported_condition(world, inst, seed: int, turn: int) -> int:
     """The figure the head puts in his report, which is not the figure.
 
     A head whose men are in arrears is a head with something to explain, and he
@@ -216,7 +210,8 @@ def reported_condition(court, inst, seed: int, turn: int) -> int:
     is what makes `inspect` worth an hour precisely when the player can least
     spare one.
     """
-    group = court.dependents.get(inst.group)
+    court = world.court
+    group = seat.groups(world).get(inst.group)
     weeks = 0
     if group is not None:
         owed_per_turn = max(1, group.size * group.entitlement)
@@ -265,7 +260,7 @@ def step(world: World) -> tuple[World, list]:
         # What he says this fortnight, kept for the shape it makes. A head deep
         # in arrears draws a reassuringly level line over a building that is
         # quietly going, and that line is the tell -- not any number on it.
-        said = reported_condition(court, inst, world.seed, world.date.absolute)
+        said = reported_condition(world, inst, world.seed, world.date.absolute)
         history[key] = (history.get(key, ()) + (said,))[-24:]
     world = dataclasses.replace(
         world, court=dataclasses.replace(

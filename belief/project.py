@@ -21,9 +21,8 @@ _MONTHS = tomllib.loads((Path(__file__).parent.parent / "content" / "months.toml
 _LEDGERS = {"granary": "grain", "seed": "seed_grain"}
 
 
-def date_label(scenario: str, year: int, fortnight: int) -> str:
-    culture = {"ugarit": "ugarit", "amurru": "ugarit", "pharaoh": "egypt",
-               "pylos": "pylos"}.get(scenario, "ugarit")
+def date_label(chosen_alu: str, year: int, fortnight: int) -> str:
+    culture = "ugarit"
     labels = _MONTHS[culture]
     if fortnight < 1:
         return f"yr {year}, before the year turns"
@@ -325,10 +324,11 @@ def _stores(world, perr: int) -> dict:
     ledger this turn shows the true count with no marker either way (spec 9.2)."""
     c = world.court
     now = world.date.absolute
+    stores = seat_door.held(world)
     inspected_goods = {_LEDGERS[l] for l in c.inspected if l in _LEDGERS}
     out = {}
-    for good in sorted(c.stores):
-        val = c.stores[good]
+    for good in sorted(stores):
+        val = stores[good]
         if good in ("grain", "seed_grain") and good not in inspected_goods:
             # Bulk written in sexagesimal places, so a lost or gained place is
             # the error that matters here (and is the drama of the granary).
@@ -386,7 +386,7 @@ def _land(world, perr: int) -> dict:
     """
     from engine.kernel import farm as F
     from engine.kernel import seat_people as SP
-    from engine.legacy.land import gauge_reading
+    from engine.climate import gauge
 
     court = world.court
     kernel = world.kernel
@@ -435,7 +435,7 @@ def _land(world, perr: int) -> dict:
     return {
         "estates": estates,
         "stage": stage,
-        "gauge": transcribe(gauge_reading(world), world.seed, now,
+        "gauge": transcribe(gauge(world), world.seed, now,
                             f"gauge:{now}", perr),
         "last_land_due": court.last_land_due,
         "land_due_rate": court.land_due_rate,
@@ -471,8 +471,8 @@ def _institutions(world) -> list[dict]:
         inst = court.institutions[key]
         seen = f"institution:{inst.id}" in court.inspected
         condition = (inst.condition if seen else I.reported_condition(
-            court, inst, world.seed, world.date.absolute))
-        group = court.dependents.get(inst.group)
+            world, inst, world.seed, world.date.absolute))
+        group = seat_door.groups(world).get(inst.group)
         staff = group.output_modifier if group is not None else 1000
         out.append({
             "id": inst.id, "name": inst.name, "kind": inst.kind,
@@ -630,7 +630,7 @@ def _troops(world) -> dict:
              "task": f.task, "place": f.place, "commander": f.commander}
             for f in sorted(court.formations, key=lambda f: f.id)
         ],
-        "garrisons": {p: garrison_strength(court, p) for p in places},
+        "garrisons": {p: garrison_strength(world, p) for p in places},
         "summons": [
             {"oath_id": s.oath_id, "place": s.place, "required": s.n,
              "due_turn": s.due_turn,
@@ -859,6 +859,44 @@ def _world_graph(world) -> dict:
     }
 
 
+def _trade(world, perr: int) -> dict:
+    from engine.kernel import carry
+
+    seat = f"settlement:{world.chosen_alu}"
+    controller = world.kernel.controller(seat)
+    market = carry.readings(world.kernel, seat)
+    cargo: dict[str, int] = {}
+    for lot in world.kernel.book.at(seat):
+        if lot.owner != controller and lot.quantity:
+            cargo[lot.good] = cargo.get(lot.good, 0) + lot.quantity
+    routes = []
+    for route_id in world.kernel.commercial_routes():
+        route = world.kernel.registry.routes[route_id]
+        if not any(seat in (leg.origin, leg.destination) for leg in route.legs):
+            continue
+        routes.append({"id": route_id, "name": route.name,
+                       "strength": world.kernel.trade_routes[route_id],
+                       "mode": route.legs[0].mode})
+    movements = [{
+        "id": voyage.id,
+        "origin": voyage.origin.split(":", 1)[-1],
+        "destination": voyage.destination.split(":", 1)[-1],
+        "arrives": voyage.arrives,
+        "mode": voyage.mode,
+        "cargo": len(voyage.cargo),
+    } for voyage in world.kernel.voyages
+        if voyage.origin == seat or voyage.carrier == controller]
+    return {
+        "grain_price": transcribe(
+            market["price_grain"], world.seed, world.date.absolute,
+            "trade:grain_price", perr),
+        "cargo": [{"good": good, "quantity": quantity}
+                  for good, quantity in sorted(cargo.items())],
+        "routes": routes,
+        "movements": movements,
+    }
+
+
 def project(world) -> dict:
     c = world.court
     d = world.date
@@ -877,8 +915,9 @@ def project(world) -> dict:
     outbox = _outbox(world)
     allowances = seat_door.allowances(world)
     groups = []
-    for gid in sorted(c.dependents):
-        g = c.dependents[gid]
+    roll = seat_door.groups(world)
+    for gid in sorted(roll):
+        g = roll[gid]
         owed = g.size * g.entitlement
         groups.append({
             "id": gid, "name": g.name, "size": g.size,
@@ -890,13 +929,33 @@ def project(world) -> dict:
             "loyalty": _loyalty_word(g.loyalty),
             "member_name": g.member_name,
         })
+    seat_id = f"settlement:{world.chosen_alu}"
+    cohorts = []
+    for cohort in sorted(world.kernel.registry.cohorts.values(),
+                         key=lambda item: item.id):
+        if cohort.settlement != seat_id and not cohort.parent:
+            continue
+        cohorts.append({
+            "id": cohort.id,
+            "name": cohort.name or cohort.kind.replace("_", " "),
+            "size": transcribe(cohort.people, world.seed, d.absolute,
+                               f"cohort:{cohort.id}", perr),
+            "ethnicity": cohort.ethnicity,
+            "status": cohort.status,
+            "place": cohort.settlement.split(":", 1)[-1],
+            "parent": cohort.parent,
+            "task": cohort.task,
+            "until": cohort.until,
+        })
     relations = []
     for actor, relation in sorted(world.relations.items()):
+        person = world.kernel.registry.persons.get(actor)
         claim_known = (
             relation.status_claim == relation.their_status_claim
             or relation.status_mismatch_known)
         relations.append({
-            "other": actor, "place": relation.place,
+            "other": actor, "name": person.name if person else actor,
+            "place": relation.place,
             "status_claim": relation.status_claim,
             "their_status_claim": (
                 relation.their_status_claim if claim_known else "uncertain"),
@@ -925,9 +984,10 @@ def project(world) -> dict:
     } for oath in world.oaths]
     stores = _stores(world, perr)
     return {
-        "scenario": world.scenario,
+        "scenario": world.kernel.registry.settlements[
+            f"settlement:{world.chosen_alu}"].name,
         "actor": c.actor,
-        "date": date_label(world.scenario, d.year, d.fortnight),
+        "date": date_label(world.chosen_alu, d.year, d.fortnight),
         "year": d.year, "fortnight": d.fortnight,
         "attention": attention_available(c, d.fortnight),
         "attention_base": c.attention_base,
@@ -942,11 +1002,13 @@ def project(world) -> dict:
         "stores": stores,
         "priority": list(seat_door.order_of_payment(world)),
         "groups": groups,
+        "cohorts": cohorts,
         "relations": relations,
         "oaths": oaths,
         "regnal_year": d.year,
         "house": _house(world),
         "world_graph": _world_graph(world),
+        "trade": _trade(world, perr),
         "land": _land(world, perr),
         "plague": _plague(world, perr),
         "archive_index": _archive(world),

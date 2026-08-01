@@ -18,6 +18,8 @@ TROOP_TASKS = ("garrison", "watch", "harvest", "campaign")
 LEDGERS = ("granary", "seed")
 VERDICTS = ("for", "against", "split", "defer")
 QUESTIONS = ("harvest", "sickness", "war", "voyage", "death")
+RECEPTIONS = ("accept", "settle", "redirect", "refuse")
+CORVEE_TASKS = ("work", "dredge", "build", "repair", "harvest", "escort")
 
 
 def normal(value: str) -> str:
@@ -52,6 +54,7 @@ def resolve_named(value: str, rows: list[dict], id_key: str = "id",
         item_id = row[id_key]
         names = {
             normal(item_id),
+            normal(str(item_id).split(":", 1)[-1]),
             normal(str(row.get(name_key, ""))),
             normal(str(row.get(name_key, "")).split(",", 1)[0]),
         }
@@ -82,6 +85,19 @@ def matches_for(value: str, rows: list[dict], id_key: str = "id",
 
 def groups(belief: dict) -> list[dict]:
     return list(belief.get("groups", []))
+
+
+def cohorts(belief: dict) -> list[dict]:
+    return [row for row in belief.get("cohorts", []) if not row.get("parent")]
+
+
+def detachments(belief: dict) -> list[dict]:
+    return [row for row in belief.get("cohorts", []) if row.get("parent")]
+
+
+def displaced(belief: dict) -> list[dict]:
+    return [row for row in belief.get("cohorts", [])
+            if row.get("status") == "petitioning"]
 
 
 def formations(belief: dict) -> list[dict]:
@@ -122,7 +138,7 @@ def petitions(belief: dict) -> list[dict]:
 
 
 def actors(belief: dict) -> list[dict]:
-    return [{"id": relation["other"], "name": relation["other"]}
+    return [{"id": relation["other"], "name": relation.get("name", relation["other"])}
             for relation in belief.get("relations", [])]
 
 
@@ -169,6 +185,9 @@ def _closed(values) -> list[dict]:
 # one of these; anything not listed is free text and is not completed.
 DOMAINS = {
     "group": groups,
+    "cohort": cohorts,
+    "detachment": detachments,
+    "displaced": displaced,
     "formation": formations,
     "institution": institutions,
     "plan": plans,
@@ -187,6 +206,8 @@ DOMAINS = {
     "ledger": lambda b: _closed(LEDGERS),
     "verdict": lambda b: _closed(VERDICTS),
     "question": lambda b: _closed(QUESTIONS),
+    "reception": lambda b: _closed(RECEPTIONS),
+    "corvee_task": lambda b: _closed(CORVEE_TASKS),
 }
 
 

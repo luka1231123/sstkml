@@ -90,18 +90,17 @@ def seed_cases(place: Place) -> int:
     return max(SEED_FLOOR, living(place) // SEED_DIVISOR)
 
 
-def _record(world: World, changed: dict[str, Place]) -> World:
-    """Write compartments back onto the epidemic (Task 2 C5).
+def _settlement(world: World, place_id: str) -> str:
+    place = world.places.get(place_id)
+    if place is None:
+        return ""
+    return f"settlement:{place_id if place.kind == 'alu' else place.alu}"
 
-    The map is the registry's; only S/I/R/dead are the plague's, so this is the
-    one channel by which a place's numbers move.
-    """
-    sir = dict(world.plague.sir)
-    for place_id, place in changed.items():
-        sir[place_id] = (place.susceptible, place.infected, place.recovered,
-                         place.dead)
+
+def _put(world: World, cohorts: dict) -> World:
+    registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
-        world, plague=dataclasses.replace(world.plague, sir=sir))
+        world, kernel=dataclasses.replace(world.kernel, registry=registry))
 
 
 def seed_place(world: World, place_id: str, cases: int = 0) -> World:
@@ -113,9 +112,19 @@ def seed_place(world: World, place_id: str, cases: int = 0) -> World:
     cases = max(0, cases) or seed_cases(place)
     if place.infected > 0 or place.susceptible < cases:
         return world
-    return _record(world, {place_id: dataclasses.replace(
-        place, susceptible=place.susceptible - cases,
-        infected=place.infected + cases)})
+    settlement = _settlement(world, place_id)
+    cohorts = dict(world.kernel.registry.cohorts)
+    left = cases
+    for cohort in sorted(
+            (c for c in cohorts.values() if c.settlement == settlement),
+            key=lambda c: (-c.susceptible, c.id)):
+        take = min(left, cohort.susceptible)
+        cohorts[cohort.id] = dataclasses.replace(
+            cohort, infected=cohort.infected + take)
+        left -= take
+        if not left:
+            break
+    return _put(world, cohorts)
 
 
 def begin(world: World, place_id: str, cases: int = 0) -> tuple[World, list]:
@@ -208,92 +217,48 @@ def step(world: World) -> tuple[World, list]:
         return world, events
 
     places = world.places
-    changed: dict[str, Place] = {}
+    cohorts = dict(world.kernel.registry.cohorts)
+    changed = False
     deaths_by_place: dict[str, int] = {}
     progress: list = []
     for place_id in sorted(places):
         before = places[place_id]
         if before.infected <= 0:
             continue
-        after = step_place(before, beta, plague.gamma, plague.mortality)
-        if after == before:
-            continue
-        changed[place_id] = after
-        new_infections = before.susceptible - after.susceptible
-        recovered = after.recovered - before.recovered
+        pop = living(before)
+        new_infections = recovered = died = 0
+        settlement = _settlement(world, place_id)
+        for cohort in sorted(cohorts.values(), key=lambda c: c.id):
+            if cohort.settlement != settlement:
+                continue
+            new = cohort.susceptible * before.infected * beta // (pop * 1000)
+            new = min(new, cohort.susceptible)
+            rec = cohort.infected * plague.gamma // 1000
+            dead = cohort.infected * plague.mortality // 1000
+            if rec + dead > cohort.infected:
+                dead = min(dead, cohort.infected)
+                rec = cohort.infected - dead
+            if not (new or rec or dead):
+                continue
+            people = cohort.people - dead
+            cohorts[cohort.id] = dataclasses.replace(
+                cohort, people=people,
+                households=min(cohort.households, people),
+                infected=cohort.infected - rec - dead + new,
+                recovered=cohort.recovered + rec, dead=cohort.dead + dead)
+            new_infections += new
+            recovered += rec
+            died += dead
+            changed = True
         if new_infections or recovered:
             progress.append(
                 A.PlagueProgressed(place_id, new_infections, recovered))
-        died = after.dead - before.dead
         if died:
             deaths_by_place[place_id] = died
     if not changed:
         return world, events
-    world = _record(world, changed)
+    world = _put(world, cohorts)
     events += progress
-
-    # The dead at the seat are the ruler's own dependents, and they come off the
-    # ration lists. This is the only channel by which the epidemic touches the
-    # economy directly, and it is the one the player feels first.
-    seat_deaths = deaths_by_place.get(world.court.seat, 0)
-    if seat_deaths:
-        world, dependent_events = _kill_dependents(world, seat_deaths)
-        events += dependent_events
     for place_id in sorted(deaths_by_place):
         events.append(A.PlagueDeaths(place_id, deaths_by_place[place_id]))
-    return world, events
-
-
-def _kill_dependents(world: World, deaths: int) -> tuple[World, list]:
-    """Apply the court-dependent share of city deaths, largest group first.
-
-    Deliberately not weighted by payroll or ritual choices. Infection is not a
-    punishment mechanic.  Court dependents are only part of the settlement, so
-    assigning every city burial to the ration lists would erase the palace
-    while most of the city's SIR population was still alive.
-    """
-    court = world.court
-    groups = sorted((g for g in court.dependents.values() if g.place == court.seat),
-                    key=lambda g: (-g.size, g.id))
-    if not groups:
-        return world, []
-    total = sum(g.size for g in groups)
-    if total <= 0:
-        return world, []
-    seat = world.places.get(court.seat)
-    city_before_deaths = living(seat) + deaths if seat is not None else total
-    dependent_deaths = deaths * total // max(1, city_before_deaths)
-    if dependent_deaths <= 0:
-        return world, []
-    dependents = dict(court.dependents)
-    events = []
-    remaining = min(dependent_deaths, total - 1)
-    for group in groups:
-        if remaining <= 0:
-            break
-        share = min(
-            remaining, max(1, dependent_deaths * group.size // total))
-        share = min(share, group.size - 1 if group.size > 1 else 0)
-        if share <= 0:
-            continue
-        dependents[group.id] = dataclasses.replace(
-            dependents[group.id], size=group.size - share)
-        events.append(A.DependentsDied(
-            group.id, group.place, share, "plague"))
-        remaining -= share
-    # The heads come off the cohort as well, and that is not bookkeeping: since
-    # Task 2 C3 the cohort is the authority and `Court.dependents` is written
-    # back from it every turn. Killing only the court's copy would have the
-    # mirror hand the dead their places back on the same turn, and the audit
-    # would see a burial nothing accounted for -- which is exactly how this was
-    # found.
-    from engine import seat as seat_door
-
-    world = dataclasses.replace(
-        world, court=dataclasses.replace(court, dependents=dependents))
-    for group_id, group in sorted(dependents.items()):
-        was = court.dependents[group_id]
-        if group.size >= was.size:
-            continue
-        world = seat_door.bury(world, group_id, was.size - group.size)
     return world, events

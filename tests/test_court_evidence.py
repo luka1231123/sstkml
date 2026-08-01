@@ -7,7 +7,7 @@ from belief.project import project
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import palace
 from tui.grid import plain_text
 
@@ -17,7 +17,7 @@ SIZES = ((92, 30), (68, 24))
 
 
 def _heard_case() -> tuple[dict, dict]:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     world, _ = advance(world)
     petition_id = project(world)["justice"]["petitions"][0]["id"]
     world, _ = apply(world, A.HearPetition(petition_id))

@@ -8,7 +8,7 @@ from pathlib import Path
 from belief.project import project
 from engine import archive
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from session import SAVE_VERSION, load_session, save
 from tools.m13_benchmark import DEFAULT_TURNS, measure, over_budget
 from tui import document, palace, plague as plague_page
@@ -18,7 +18,7 @@ SEED = 8814402919
 
 
 def _world(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _events = advance(world)
     return world
@@ -39,13 +39,13 @@ def test_m13_save_boundary_is_versioned_and_round_trips() -> None:
     world = _world(4)
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "nested" / "campaign.json"
-        save(path, SEED, "ugarit", world.date.absolute, [], world,
+        save(path, SEED, "seat", world.date.absolute, [], world,
              hours_left=7)
         payload = json.loads(path.read_text())
-        assert payload["version"] == SAVE_VERSION == 14
+        assert payload["version"] == SAVE_VERSION == 17
         loaded, metadata = load_session(path)
         assert loaded == world
-        assert metadata["scenario"] == "ugarit"
+        assert metadata["chosen_alu"] == "seat"
         assert metadata["hours_left"] == 7
         assert not path.with_suffix(".json.tmp").exists()
 

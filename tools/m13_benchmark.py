@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.core import canonical_json, state_hash  # noqa: E402
 from engine.tick import advance                     # noqa: E402
-from load import load_scenario                       # noqa: E402
+from load import load_campaign                       # noqa: E402
 
 SEED = 8814402919
 DEFAULT_TURNS = 240
@@ -41,8 +41,8 @@ FOUNDATION_BUDGET = {
 
 
 def measure(turns: int = DEFAULT_TURNS, seed: int = SEED,
-            scenario: str = "ugarit") -> dict[str, int]:
-    world = load_scenario(scenario, seed)
+            chosen_alu: str = "seat") -> dict[str, int]:
+    world = load_campaign(chosen_alu, seed)
     started = time.perf_counter_ns()
     for _ in range(turns):
         world, _events = advance(world)

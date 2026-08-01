@@ -17,10 +17,10 @@ import dataclasses
 import pytest
 
 from engine.entity import TENURES, Cohort, Organization, Polity, Registry
-from engine.entity import Settlement
+from engine.entity import Person, Settlement
 from engine.kernel import farm as F
 from engine.kernel.world import _food_owners
-from load import load_scenario
+from load import load_campaign
 
 SEED = 8814402919
 
@@ -33,10 +33,12 @@ def _kernel():
     from engine.ownership import Book
 
     registry = Registry(
-        polities={"polity:p": Polity(id="polity:p", name="p", seat="settlement:s",
+        polities={"polity:p": Polity(id="polity:p", name="p", ruler="person:k",
+                                     seat="settlement:s",
                                      tenure="subsistence")},
+        persons={"person:k": Person(id="person:k", name="king")},
         settlements={"settlement:s": Settlement(
-            id="settlement:s", name="s", region="region:r", polity="polity:p")},
+            id="settlement:s", name="s", region="region:r", owner="polity:p")},
         orgs={"org:council": Organization(
             id="org:council", name="council", settlement="settlement:s",
             kind="council", policy="subsistence")},
@@ -151,7 +153,8 @@ def test_an_unknown_tenure_fails_to_load():
 
 def test_the_authored_world_says_what_it_means_by_egypt():
     """The one claim this table exists to make."""
-    kernel = load_scenario("ugarit", SEED).kernel
+    kernel = load_campaign("seat", SEED).kernel
     assert kernel.registry.polities["polity:egypt"].tenure == "redistributive"
+    assert kernel.registry.polities["polity:assur"].tenure == "redistributive"
     for polity in kernel.registry.polities.values():
         assert polity.tenure in TENURES

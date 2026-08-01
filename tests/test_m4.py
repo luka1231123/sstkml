@@ -7,7 +7,7 @@ from ai.parser import parse, preparse
 from belief.project import project
 from engine import actions as A
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 
 def test_digit_and_word_forms_share_a_value():
@@ -43,7 +43,7 @@ class _Client:
 
 
 def _belief():
-    return project(load_scenario("ugarit", 8814402919))
+    return project(load_campaign("seat", 8814402919))
 
 
 def test_preparser_handles_high_confidence_prose():
@@ -51,7 +51,7 @@ def test_preparser_handles_high_confidence_prose():
     assert result.actions == (A.Allocate("smiths_palace", 8400),)
     assert result.source == "preparser"
 
-    world = load_scenario("ugarit", 8814402919)
+    world = load_campaign("seat", 8814402919)
     while not world.inbox:
         world, _ = advance(world)
     result = preparse(

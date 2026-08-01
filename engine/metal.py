@@ -58,8 +58,9 @@ def step(world: World) -> tuple[World, list]:
     # exempt from the payroll, and starving the smiths is another slow way to
     # stop being able to re-equip.
     smith_modifier = 1000
-    smith_groups = [court.dependents[w.group_id] for w in court.workshops
-                    if w.group_id in court.dependents]
+    roll = seat.groups(world)
+    smith_groups = [roll[w.group_id] for w in court.workshops
+                    if w.group_id in roll]
     if smith_groups:
         smith_modifier = min(g.output_modifier for g in smith_groups)
     demand = sum(w.bronze_demand for w in court.workshops) * smith_modifier // 1000
@@ -106,7 +107,7 @@ def step(world: World) -> tuple[World, list]:
             # what a ruined forge cannot do is smelt new metal to supply them,
             # so the shortfall goes to the melting pot instead.
             from engine import institution
-            forge = institution.factor(court, "workshop")
+            forge = institution.factor(world, "workshop")
             wanted_batches = wanted_batches * forge // 1000
             bronze, copper_used, tin_used = smelt(
                 min(stores.get("copper", 0), wanted_batches * copper_per_tin),

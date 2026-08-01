@@ -29,6 +29,7 @@ DOMAINS: frozenset[str] = frozenset({
     "divination",
     "rivals",
     "displacement",
+    "world.shock",
     "relations.patron_notice",
     "report.bias",
     "house.mortality",

@@ -37,11 +37,11 @@ def _band(value: int, ceilings: tuple[int, ...]) -> int:
 
 def _harvest_evidence(world: World) -> str:
     """A coarse reading of today's gauge and completed harvest records only."""
-    from engine.legacy.land import gauge_reading
+    from engine.climate import gauge
 
     # The well/gauge is a present observation.  These coarse bands deliberately
     # throw away the exact climate index from which the proxy was produced.
-    water = _band(gauge_reading(world), (18, 24, 33, 39))
+    water = _band(gauge(world), (18, 24, 33, 39))
 
     # C4: the harvest record was the court's (`last_harvest`) and is deleted;
     # the kernel keeps no completed record for the seat while the court still

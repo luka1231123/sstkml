@@ -12,13 +12,13 @@ from engine.core import Date
 from engine.reduce import apply
 from engine.state import Place
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 SEED = 8814402919
 
 
 def _run(turns: int, seed: int = SEED):
-    world = load_scenario("ugarit", seed)
+    world = load_campaign("seat", seed)
     for _ in range(turns):
         world, _ = advance(world)
     return world
@@ -26,7 +26,7 @@ def _run(turns: int, seed: int = SEED):
 
 def _isolated(turns: int = 0, seed: int = SEED):
     """A unit-test world with the authored campaign import disabled."""
-    world = load_scenario("ugarit", seed)
+    world = load_campaign("seat", seed)
     world = dataclasses.replace(
         world, plague=dataclasses.replace(
             world.plague, import_place="", import_turn=-1, import_cases=0))
@@ -89,12 +89,13 @@ def test_the_vows_of_the_predecessors_do_not_lapse_and_two_of_them_are_broken():
         13: A.OathViolated("vow_dead_at_the_gate", "maintain_rite"),
     }
     for fortnight, breach in expected.items():
-        dated = dataclasses.replace(
-            world, date=Date(world.date.year, fortnight, world.date.absolute))
+        dated = dataclasses.replace(world, kernel=dataclasses.replace(
+            world.kernel, date=Date(
+                world.date.year, fortnight, world.date.absolute)))
         unchanged, events = relations.audit_oaths(dated)
         assert unchanged == dated and breach in events
-    dated = dataclasses.replace(
-        world, date=Date(world.date.year, 9, world.date.absolute))
+    dated = dataclasses.replace(world, kernel=dataclasses.replace(
+        world.kernel, date=Date(world.date.year, 9, world.date.absolute)))
     _, events = relations.audit_oaths(dated)
     assert A.OathViolated(
         "vow_threshing_floor", "maintain_rite") not in events
@@ -103,13 +104,13 @@ def test_the_vows_of_the_predecessors_do_not_lapse_and_two_of_them_are_broken():
 
 def test_plague_state_has_no_objective_oath_cause_or_correct_ritual():
     names = {field.name for field in dataclasses.fields(type(
-        load_scenario("ugarit", SEED).plague))}
+        load_campaign("seat", SEED).plague))}
     assert "cause_oath_id" not in names
     assert "expiated_correctly_turn" not in names
 
 
 def test_hidden_divine_liability_and_misfortune_state_are_gone():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     court_fields = {
         field.name for field in dataclasses.fields(type(world.court))}
     world_fields = {
@@ -121,7 +122,7 @@ def test_hidden_divine_liability_and_misfortune_state_are_gone():
 
 # --- the archive --------------------------------------------------------------
 def test_the_predecessor_archive_is_there_before_turn_one():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     assert len(world.documents) >= 20, "spec 6.12 asks for 20 to 40 documents"
     assert all(d.received_turn < 0 for d in world.documents)
     # The three vows have tablets, and the tablets say which festival and when.
@@ -270,5 +271,4 @@ def test_an_offering_is_reported_only_as_a_ritual_act():
     assert "offering is made" in lines
     for word in ("correct", "right", "accepted", "worked", "heard"):
         assert word not in lines.lower()
-
 

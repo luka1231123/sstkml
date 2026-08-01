@@ -6,6 +6,7 @@ import re
 import tomllib
 from collections import Counter
 from pathlib import Path
+from engine.actors import slug
 
 from ai.client import ModelUnavailable
 from ai.grader import ProtocolScore, formula, grade_for, load_formulae, profile_for
@@ -17,6 +18,11 @@ from ai.numeric_guard import (
 
 _CONTENT = Path(__file__).parent.parent / "content"
 _ACTORS = tomllib.loads((_CONTENT / "actors.toml").read_text())["names"]
+
+
+def _name(actor: str) -> str:
+    key = slug(actor)
+    return _ACTORS.get(key, key.replace("_", " "))
 _EXEMPLARS = tomllib.loads(
     (_CONTENT / "corpus" / "outgoing.toml").read_text()
 )["letters"]
@@ -55,7 +61,7 @@ def scribe_messages(recipient: str, matter: str) -> list[dict]:
             continue
         messages.append({"role": "user", "content": pair["rough"]})
         messages.append({"role": "assistant", "content": pair["formatted"]})
-    recipient_name = _ACTORS.get(recipient, recipient.replace("_", " "))
+    recipient_name = _name(recipient)
     messages.append({
         "role": "user",
         "content": (f"Recipient: {recipient_name} ({rule['label']}).\n"
@@ -182,7 +188,7 @@ def fallback_text(recipient: str, intent: str, profile_id: str,
                   seed: int = 0, turn: int = 0) -> str:
     data = load_formulae()
     rule = formula(data, profile_id)
-    name = _ACTORS.get(recipient, recipient)
+    name = _name(recipient)
     opening = rule["opening"].format(recipient=name)
     lines = [opening]
     prostration = rule.get("prostration", "")
@@ -225,7 +231,7 @@ def split_draft(draft: Draft, recipient: str) -> tuple[Draft, ...]:
 
     def make(part: list[str]) -> Draft:
         text = "\n".join(value for value in (
-            rule["opening"].format(recipient=_ACTORS.get(recipient, recipient)),
+            rule["opening"].format(recipient=_name(recipient)),
             rule.get("prostration", ""), "\n".join(part),
         ) if value)
         return Draft(
@@ -356,9 +362,9 @@ def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
     allowed.update(extract_numerals_and_number_words(
         " ".join(str(value) for _, value in sorted(facts.items()))))
     exemplars = [item["text"] for item in _EXEMPLARS if item["profile"] == profile_id][:2]
-    opening = rule["opening"].format(recipient=_ACTORS.get(recipient, recipient))
+    opening = rule["opening"].format(recipient=_name(recipient))
     prompt = (
-        f"RECIPIENT: {_ACTORS.get(recipient, recipient)}\n"
+        f"RECIPIENT: {_name(recipient)}\n"
         f"RELATION: {rule['label']}\nINTENT: {intent}\n"
         f"REQUIRED OPENING: {opening}\n"
         f"REQUIRED PROSTRATION: {rule.get('prostration', '')}\n"

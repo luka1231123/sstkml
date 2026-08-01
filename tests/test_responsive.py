@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from belief.project import project
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import (altar, archive, alu, counsel, desktop, document, hall,
                  help as help_page, inbox, orders, palace, plague, works,
                  worldmap)
@@ -23,7 +23,7 @@ SEED = 8814402919
 
 
 def _belief(turns: int = 8):
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return world, project(world)

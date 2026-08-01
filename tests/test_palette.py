@@ -14,7 +14,7 @@ import palette
 import registry
 from belief.project import project
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 from tui import command
 from tui.grid import plain_text
 
@@ -22,7 +22,7 @@ SEED = 8814402919
 
 
 def _belief(turns: int = 8) -> dict:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     for _ in range(turns):
         world, _ = advance(world)
     return project(world)

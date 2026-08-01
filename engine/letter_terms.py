@@ -19,6 +19,7 @@ import dataclasses
 from collections.abc import Iterable
 
 from engine import actions as A
+from engine import actors
 from engine import seat
 from engine import obligation as O
 from engine.state import GiftRecord, World
@@ -50,7 +51,7 @@ def _known_actors(world: World) -> set[str]:
 
 def _known_goods(world: World) -> set[str]:
     return (
-        set(world.court.stores)
+        set(seat.held(world))
         | set(world.gift_values)
         | set(world.works_materials)
         | ({world.revenue_good} if world.revenue_good else set())
@@ -63,6 +64,7 @@ def _validate_term(world: World, term: A.LetterTerm, recipient: str,
                    require_living_person: bool = True) -> A.LetterTerm:
     if not isinstance(term, A.LetterTerm):
         raise TypeError("letter terms must be LetterTerm values")
+    recipient = actors.canonical(world, recipient)
     if recipient not in _known_actors(world):
         raise ValueError(f"unknown letter recipient: {recipient}")
 
@@ -72,8 +74,7 @@ def _validate_term(world: World, term: A.LetterTerm, recipient: str,
     if term.kind == "gift":
         if term.good not in world.gift_values:
             raise ValueError(f"{term.good} is not a gift good")
-        if check_inventory and (
-                world.court.stores.get(term.good, 0) < term.quantity):
+        if check_inventory and seat.held(world).get(term.good, 0) < term.quantity:
             raise ValueError(f"not enough {term.good} for that gift")
     elif term.kind == "promise_good":
         if term.due_turn <= promise_after:
@@ -105,8 +106,10 @@ def _carrier(world: World, letter_or_action) -> tuple[
         raise TypeError("letter terms must be LetterTerm values")
     source = str(
         getattr(letter_or_action, "id", "") or f"L{world.letter_seq + 1}")
-    sender = str(getattr(letter_or_action, "sender", "") or world.court.actor)
-    recipient = str(getattr(letter_or_action, "recipient", ""))
+    sender = actors.canonical(
+        world, str(getattr(letter_or_action, "sender", "") or world.court.actor))
+    recipient = actors.canonical(
+        world, str(getattr(letter_or_action, "recipient", "")))
     sent_turn = int(
         getattr(letter_or_action, "sent_turn", world.date.absolute))
     return source, sender, recipient, sent_turn, terms
@@ -224,7 +227,7 @@ def reserve_terms_at_dispatch(
     for _index, term, _reservation_record in new_gifts:
         totals[term.good] = totals.get(term.good, 0) + term.quantity
     for good, quantity in totals.items():
-        if world.court.stores.get(good, 0) < quantity:
+        if seat.held(world).get(good, 0) < quantity:
             raise ValueError(f"not enough {good} for all gifts on this letter")
 
     if new_gifts:
@@ -387,11 +390,14 @@ def spare_in_court(world: World, actor: str, good: str) -> int:
     tablet states the quantity that was loaded rather than the quantity the
     steward expected to find.
     """
-    court = world.foreign_courts.get(actor)
-    if court is None:
+    from engine import foreign_belief
+
+    owner = foreign_belief.actor_of(world, actor)
+    settlement = foreign_belief.settlement_of(world, actor)
+    if not owner or not settlement:
         return 0
-    return max(0, int(court.stores.get(good, 0))
-               - int(court.floor.get(good, 0)))
+    return sum(lot.free for lot in world.kernel.book.at(settlement)
+               if lot.owner == owner and lot.good == good)
 
 
 def load_court_cargo(world: World, actor: str, letter,
@@ -407,12 +413,15 @@ def load_court_cargo(world: World, actor: str, letter,
     empties the granary once. An intercepted caravan is still gone from the
     granary; it simply never arrives, and the record says which happened.
     """
+    from engine import foreign_belief
+
     source, sender, recipient, sent_turn, terms = _carrier(world, letter)
-    court = world.foreign_courts.get(actor)
-    if court is None:
+    owner = foreign_belief.actor_of(world, actor)
+    settlement = foreign_belief.settlement_of(world, actor)
+    if not owner or not settlement:
         return world
     held = {record.id: record for record in world.letter_reservations}
-    stores = dict(court.stores)
+    book = world.kernel.book.at_phase(sent_turn, "movement")
     recorded: list[O.GoodsReservation] = []
     for index, term in enumerate(terms):
         if term.kind != "gift" or term.quantity <= 0:
@@ -422,10 +431,21 @@ def load_court_cargo(world: World, actor: str, letter,
             continue
         # Never more than is there. The policy has already cut the quantity to
         # fit; this is the guard that keeps a bug from minting grain.
-        moved = min(term.quantity, int(stores.get(term.good, 0)))
-        stores[term.good] = int(stores.get(term.good, 0)) - moved
+        wanted = term.quantity
+        moved = 0
+        lots = tuple(lot for lot in book.at(settlement)
+                     if lot.owner == owner and lot.good == term.good)
+        for lot in lots:
+            take = min(wanted - moved, lot.free)
+            if take:
+                book = book.consume(
+                    lot.id, take, "lost" if intercepted else "expended",
+                    authority=owner)
+                moved += take
+            if moved >= wanted:
+                break
         note = (
-            f"turn {sent_turn}: {moved} {term.good} left {court.place} "
+            f"turn {sent_turn}: {moved} {term.good} left {settlement} "
             f"with {source} for {recipient}")
         recorded.append(O.GoodsReservation(
             id=record_id, source_letter=source, term_index=index,
@@ -439,11 +459,9 @@ def load_court_cargo(world: World, actor: str, letter,
         ))
     if not recorded:
         return world
-    courts = dict(world.foreign_courts)
-    courts[actor] = dataclasses.replace(court, stores=stores)
+    kernel = dataclasses.replace(world.kernel, book=book)
     return dataclasses.replace(
-        world,
-        foreign_courts=courts,
+        world, kernel=kernel,
         letter_reservations=_merge_records(
             world.letter_reservations, recorded),
     )
@@ -452,7 +470,7 @@ def load_court_cargo(world: World, actor: str, letter,
 def apply_incoming_terms(world: World, letter) -> tuple[World, list]:
     """Apply terms carried by a tablet that has reached the court.
 
-    The mirror of `apply_delivered_terms`. Two things land here, and the
+    The receiving counterpart to `apply_delivered_terms`. Two things land here, and the
     difference between them is SPEC.md 2.2 entire.
 
     A promise becomes a dated obligation the court can hold the sender to. No

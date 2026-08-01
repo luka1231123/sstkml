@@ -4,7 +4,7 @@ from __future__ import annotations
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_scenario
+from load import load_campaign
 
 SEED = 8814402919
 
@@ -24,14 +24,14 @@ def _matter(world, sender: str, topic: str):
 
 
 def test_an_unchanged_unanswered_matter_has_one_active_tablet() -> None:
-    world = _advance(load_scenario("ugarit", SEED), 30)
+    world = _advance(load_campaign("seat", SEED), 30)
     tablets = _matter(world, "alashiya_gov", "ships_sighted")
     assert len(tablets) == 1
     assert tablets[0].answered_turn is None
 
 
 def test_answering_allows_the_sender_to_raise_the_matter_again() -> None:
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     while not any(
         letter.sender == "alashiya_gov" and letter.topic == "ships_sighted"
         for letter in world.inbox

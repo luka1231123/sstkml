@@ -13,14 +13,14 @@ import pytest
 
 from engine import actions as A
 from engine import mail
-from load import load_scenario
+from load import load_campaign
 
 
 SEED = 8_814_402_919
 
 
 def _world():
-    world = load_scenario("ugarit", SEED)
+    world = load_campaign("seat", SEED)
     from engine.state import with_routes
     return with_routes(world, tuple(
         dataclasses.replace(route, risk=0) for route in world.routes))
