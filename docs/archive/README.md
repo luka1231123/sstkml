@@ -10,6 +10,8 @@ backlog:
   status records, and UI plans;
 - [`2026-07-30-pre-consolidation`](2026-07-30-pre-consolidation/README.md) —
   the three large specifications replaced by the 1.0 release contract;
+- [`2026-08-01-release-1.0`](2026-08-01-release-1.0/SPEC.md) — the release-1.0
+  contract, replaced by the Alpha 0.7 specification;
 - [`post-1.0`](post-1.0/README.md) — deliberately deferred ideas, with no
   release commitment.
 

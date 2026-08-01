@@ -1,23 +1,26 @@
 # SAY TO THE KING, MY LORD
 
-## Alpha 0.7 specification — collaborative draft
+## Alpha 0.7 — world model and task list
 
-- Status: discussion draft
-- Revision: 2026-07-30
+- Status: live, and **subordinate to the root `SPEC.md`**. It may sequence
+  work and describe the world model in detail. It may not add scope. Where the
+  two disagree, `SPEC.md` wins.
+- Revision: 2026-08-01
 - Scope: Alpha 0.7 and the agreed direction toward 1.0
-- Post-0.7, post-1.0, and DLC ideas remain pinned separately.
+- Post-0.7, post-1.0, and DLC ideas remain pinned separately (§11).
 
 This document begins with the game that exists today. It is deliberately
 honest about the difference between working simulation, authored content,
 representational UI, partial systems, and absent systems.
 
-It then states the proposed foundation for Alpha 0.7: this is not the Ugarit
+It then states the foundation for Alpha 0.7: this is not the Ugarit
 campaign. It is one shared autonomous world in which the player may begin as
 the king of any major **Alu**. The world already contains everything needed to
 start a campaign; there are no separate campaign packages in 0.7.
 
-Nothing below the **Proposed Alpha 0.7 contract** heading is final until we
-agree on it together.
+Sections 1 to 7 describe the build. Section 8 is the world model; section 10 is
+the task list. Section 12 holds the decisions taken and the questions still
+marked **[OPEN]**.
 
 ---
 
@@ -92,19 +95,22 @@ special type. Its generic entities include:
 - labour, obligations, reservations, contracts, and claims;
 - actor observations, beliefs, intentions, and decisions.
 
-Its present authored test world contains four settlements: Ugarit, Mahadu, an
-Alashiyan port, and Ari. It is a small economic network, not yet a complete
-campaign.
+The kernel now carries the whole authored map, not a test corner of it. One
+registry holds 8 regions, 8 polities, 55 settlements, 240 sites, 99 routes,
+171 cohorts, and 75 organizations. 54 of the 55 settlements run autonomously;
+the fifty-fifth is the player's seat.
 
 ### 2.3 The current split is unfinished
 
-The legacy world and kernel both represent goods, people, labour, land, places,
-routes, foreign standing, beliefs, and time. They are not yet one authoritative
-world.
+The consolidation is under way, not finished. Places, routes, sites, land,
+harvest, the seat's stores, and the seat's people have moved to the kernel.
+`tools/authority_audit.py` still reports six facts held twice: the seat's
+stores, its ordinary people, its labour, foreign court standing, actor belief,
+and the date. The legacy `Court` keeps a mirror of each.
 
 This means the current build is not yet a coherent general campaign
-simulation. It is a detailed Ugarit-shaped court game connected to a smaller,
-more general world foundation.
+simulation. It is a detailed Ugarit-shaped court game standing on a shared
+world that most of it already reads from.
 
 ### 2.4 The intended scale of the existing map
 
@@ -129,11 +135,11 @@ production, cohorts, and capacities of their owning Alu. Named minor
 places may appear in reports or map detail, but they do not run a second,
 hidden settlement simulation.
 
-The 146 currently authored palace, grain, metal, timber, horse, and luxury
-symbols therefore need to be classified as capacities or dependent centres of
-an Alu rather than promoted into autonomous settlements. Roads and sea legs
-connect Alu; their maintenance, safety, and access may belong to the Alu along
-the route.
+Every authored palace, grain, metal, timber, horse, and luxury symbol now
+carries one classification — Alu, dependent palace centre, or capacity — and
+one owning Alu. `docs/ALU_CLASSIFICATION.md` records the verdicts. No
+decorative mark runs a settlement simulation. Roads and sea legs connect Alu;
+their maintenance, safety, and access may belong to the Alu along the route.
 
 The world model should follow the way the world map already describes the
 region rather than replacing it with a different geography.
@@ -368,7 +374,7 @@ Those commitments are meant to travel through correspondence.
 
 ### 6.4 Current reliability
 
-At the time of this draft, the repository's full automated suite passes 834
+At the time of writing the repository's automated suite collects 817
 tests. This is strong evidence that the implemented actions, state
 transitions, rendering paths, and keyboard contracts work as tested. It is not
 evidence that the game is complete, balanced, understandable, or enjoyable.
@@ -380,7 +386,8 @@ evidence that the game is complete, balanced, understandable, or enjoyable.
 The repository currently has one legacy campaign file:
 `content/scenarios/ugarit.toml`.
 
-Ugarit-specific assumptions also appear in:
+It no longer authors the map: places, sites, and routes now live in
+`content/kernel/`. Ugarit-specific assumptions still appear in:
 
 - the singular privileged `World.court`;
 - player, ruler, settlement, officeholder, institution, god, rite, and archive
@@ -642,36 +649,23 @@ condition.
 
 ## 10. Alpha 0.7 implementation tasks
 
-### Task 1 — Classify the existing map as Alu and dependent content
+### Task 1 — Classify the existing map as Alu and dependent content — **Done**
 
-**Current code:** `content/scenarios/ugarit.toml` authors 37 legacy `Place`
-records, 146 decorative `Site` records, and 56 legacy routes. Places currently
-rank as one player seat, four imperial centres, seventeen royal centres, and
-fifteen towns. The kernel currently contains four settlements, seven sites,
-two routes, six cohorts, and five organizations.
+Done and dusted. Every map mark carries one classification and one owning Alu.
+The classification and the reasoning behind each verdict are in
+`docs/ALU_CLASSIFICATION.md`, which is now a record, not a plan.
 
-**Design before implementation:** Review every existing place and site. Decide
-which mapped centres are Alu, which palace marks are dependent palace centres,
-and which remaining marks collapse into Alu capacities. Preserve the current
-geography and approximately 30-centre scale without assuming that every current
-`Place` is automatically an Alu.
+### Task 2 — Finish one-authority world consolidation — **In progress**
 
-**Complete when:** Every map mark has one documented classification and owning
-Alu; the map renders from that classification; no decorative site is silently
-treated as an autonomous settlement.
+**Where it stands:** places, routes, sites, land, harvest, the seat's stores,
+and the seat's people have moved to the kernel. `tools/authority_audit.py`
+reports six remaining duplicates: the seat's stores, its ordinary people, its
+labour, foreign court standing, actor belief, and the date.
 
-### Task 2 — Finish one-authority world consolidation
-
-**Current code:** `tools/authority_audit.py` reports nine duplicated
-authorities—goods, ordinary people, labour, land, places, routes, foreign
-standing, actor Belief, and date—and one missing mapping for 36 legacy places.
-`World`/`Court` drives most gameplay while `Kernel` drives the four-settlement
-autonomous simulation.
-
-**Design before implementation:** Revisit `docs/PHASE_C_AUTHORITY.md` using the
-Alu model. Confirm the final owner of every fact, the adapter needed during
-migration, and the exact deletion target. Resolve identifiers through authored
-maps rather than string inference.
+**Remaining work:** the open boxes in `docs/TASK_2_TODO.md` — the seat's other
+households, the unrest read, deletion of the legacy allocation and corvée
+fields, `ForeignCourt` to organizations and cohorts, `World.foreign_beliefs` to
+kernel beliefs, one date, an ordered tick, and a save-version refusal.
 
 **Complete when:** The authority audit reports no duplicate or missing
 authority; rooms project kernel facts instead of caching writable copies; the
@@ -945,3 +939,43 @@ recovery, and cascading failure without a scripted collapse.
 - additional regions, eras, and larger population simulation.
 
 These ideas must not quietly enlarge the Alpha 0.7 task list.
+
+---
+
+## 12. Decisions and open questions
+
+Settled here, or in `SPEC.md` where marked. Change them there first.
+
+- **Task order.** `SPEC.md` §6 sets it: retire the legacy court (Task 2),
+  then the correspondence slice, then the world and the rooms, then balance.
+  Tasks 3 to 16 below are dependency order inside that.
+- **Save policy.** Refuse a pre-change save with a clear version message. No
+  migration path in Alpha 0.7.
+- **Survival scoring.** The end-of-run record states: chosen Alu, seed,
+  fortnights survived, reigns, population at start and end, goods and routes
+  lost, the shocks that landed, and the cause of the Seat's fall.
+- **Collapse window.** `SPEC.md` §1: a balance target of year 15 to 30 for an
+  unaided world, not a rule the engine enforces.
+
+Still open:
+
+- **[OPEN] Playable Alu.** All 55 settlements, or a named shorter list for
+  Alpha 0.7?
+- **[OPEN] Anything below this line.**
+
+---
+
+## 13. Superseded documents
+
+Done and dusted. Kept as record. Neither adds a requirement to this file.
+
+| Document | Why it is closed |
+| --- | --- |
+| `docs/archive/2026-08-01-release-1.0/SPEC.md` | The release-1.0 contract, replaced by the root `SPEC.md` |
+| `docs/ALU_CLASSIFICATION.md` | Task 1, implemented; now a record of the verdicts |
+| `docs/PHASE_C_AUTHORITY.md` | Superseded by `docs/ONE_AUTHORITY_DESIGN.md` |
+| `docs/WORLD_AGENT_PLAN.md` | Correspondence chain delivered |
+| `docs/FARMING_HISTORICITY.md` | A standing note, never a plan |
+
+`docs/ONE_AUTHORITY_DESIGN.md` and `docs/TASK_2_TODO.md` stay live until the
+authority audit is clean.

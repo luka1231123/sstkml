@@ -1,41 +1,4 @@
-"""One population at the seat, counted once (spec 2.2, 5.2; Phase C).
-
-Today the same people are on two payrolls. The court feeds 1,010 heads at Ugarit
-as `state.DependentGroup`; the kernel holds 1,300 there as `entity.Cohort`; and
-`tools/authority_audit.py` reports both as non-empty because both are true of the
-same town. Spec 2.2 says the same person-days cannot be spent twice, and nothing
-in either half was in a position to notice that they were.
-
-This module is the seam that ends it, and it is deliberately only a seam. It
-converts between the two records without losing a head in either direction, and
-it holds the one ledger that says which body of people a meal or a task was
-drawn from. It changes no system. `engine/systems.py`, `engine/troops.py` and the
-court tick still work exactly as they did; the migration that points them here is
-sequenced after this file exists and after the tests below say it is safe.
-
-Four rules, and each one is a test in `tests/test_seat_people.py`:
-
-    people are conserved   every conversion, split and merge preserves heads,
-                           and the households inside them
-    one meal each          a head fed by the court's ration roll may not also
-                           be fed by the kernel's consumption phase
-    one task each          a head standing on the wall is not also reaping,
-                           which is the garrison-at-harvest case exactly
-    persons are not cohorts
-                           `Court.house` stays as it is. A `HouseMember` is a
-                           named person with an age and an agenda, and there is
-                           no arithmetic that turns one into a body of people
-
-The authority table in `docs/PHASE_C_AUTHORITY.md` says the kernel's `Cohort`
-owns hunger and grievance after Phase C, and that the court's arrears
-bookkeeping is a deletion target. So the translation below reads in the direction
-the migration runs -- arrears become hunger -- and the way back exists to prove
-that nothing was lost on the way in, not because anything should keep using it.
-
-The one import from the court into the kernel is `state.DependentGroup`, and it
-points at the thing being deleted. When `Court.dependents` goes, this module's
-`as_group` and `Residue` go with it, and what is left is cohorts.
-"""
+"""One population at the seat, counted once (spec 2.2, 5.2; Phase C)."""
 from __future__ import annotations
 
 import dataclasses
@@ -47,46 +10,22 @@ from engine.state import DependentGroup, HouseMember
 GroupId = str
 PlaceId = str
 
-# The settlement the legacy court is the seat of. Named once, as in the audit.
-# It was "settlement:ugarit" until Task 2 C3, which is the id in
-# `content/kernel/world.toml` -- an authored world the live scenario stopped
-# building from. Nothing failed, because a placement at a settlement that does
-# not exist simply never matches anything.
+# The settlement the legacy court is the seat of.
 SEAT = "settlement:seat"
 
-# Person-days a head can give in a fortnight. One figure for every function,
-# and that is a claim rather than a shortcut: what differs between a smith and a
-# field hand is what they are skilled at, not how many days there are in their
-# fortnight. `engine/troops.py` says the same thing about a soldier -- "a soldier
-# reaps like a man" -- and uses the caller's per-head figure unaltered. 12 is
-# `Cohort.labour_per_head`'s own default, so a converted group and an authored
-# cohort reckon labour by the same number.
+# Person-days a head can give in a fortnight.
 LABOUR_PER_HEAD = 12
 
-# Heads per household. The court counts heads only, so any figure here is
-# supplied rather than translated; 5 is the ratio authored in
-# content/kernel/world.toml (1,300 people in 260 households at Ugarit, 440 in 90
-# at Ma'hadu). It is a stand-in and it is not load-bearing: a `Residue` carries
-# the real count once content authors one, and every round trip through this
-# module preserves whatever it was given rather than re-deriving it.
+# Heads per household.
 HEADS_PER_HOUSEHOLD = 5
 
-# Loyalty and grievance are one scale read from opposite ends, so the map is
-# `1000 - x` and nothing else. Any map through a base -- `(700 - loyalty) * 1000
-# // 700` and its like -- floors, and a translation that floors is not a
-# translation: run it twice and the group has forgiven you. This one is exactly
-# its own inverse on 0..1000, which is what "lossless in both directions" has to
-# mean if the two fields are ever both live at once.
+# Loyalty and grievance are one scale read from opposite ends, so the map is `1000 - x` and nothing.
 LOYALTY_SPAN = 1000
 
-# Fortnights of shortfall at which a body of people stops working. The bottom
-# band of spec 6.3, and the same figure as the last row of `systems._BANDS`.
-# Restated rather than imported: a kernel module reading a court system's table
-# would be the second authority this whole phase exists to remove.
+# Fortnights of shortfall at which a body of people stops working.
 REVOLT_FORTNIGHTS = 8
 
-# What a cohort calls the work a group does. Not one-to-one -- a smith and a
-# weaver are both `craft` -- which is why `Residue` keeps the court's own word.
+# What a cohort calls the work a group does.
 KIND_FOR: Mapping[str, str] = {
     "bronze_working": "craft",
     "cult": "cult",
@@ -96,13 +35,10 @@ KIND_FOR: Mapping[str, str] = {
     "weaving": "craft",
 }
 
-# What a draw on a body of people can be for. Closed: a third kind would be a
-# third way to spend the same head, and the whole point of the ledger is that
-# there are exactly two.
+# What a draw on a body of people can be for.
 DRAWS = ("food", "work")
 
-# Who is doing the feeding, spelled out, because the double-feed is invisible
-# unless both payers are named in the same ledger.
+# Who is doing the feeding, spelled out, because the double-feed is invisible unless both payers.
 BY_COURT = "court:rations"
 BY_KERNEL = "kernel:consumption"
 
@@ -115,16 +51,7 @@ class Placement:
     settlement: EntityId
 
 
-# The map, authored rather than derived. `docs/PHASE_C_AUTHORITY.md` §2 is
-# explicit about why: court ids are bare authored strings and kernel ids carry a
-# kind prefix, so any rule that turned one into the other would invent an entity
-# the first time an authored name did not match the pattern. A group absent from
-# this table is a fact nobody owns, and `faults` says so rather than guessing.
-#
-# `cohort:ugarit_field_hands` is deliberately not `cohort:ugarit_fields`. The
-# latter is the placeholder body of 1,300 authored in content/kernel/world.toml
-# while the court still owned Ugarit; the two overlap, and `faults` reports the
-# overlap rather than quietly adding the two together.
+# The map, authored rather than derived.
 PLACEMENTS: tuple[Placement, ...] = (
     Placement("cult_baal", "cohort:ugarit_temple_servants", SEAT),
     Placement("field_hands", "cohort:ugarit_field_hands", SEAT),
@@ -134,15 +61,7 @@ PLACEMENTS: tuple[Placement, ...] = (
     Placement("weavers", "cohort:ugarit_weavers", SEAT),
 )
 
-# Which body of people a formation's men are counted among. Empty, and that is
-# the honest state of the content: `content/scenarios/ugarit.toml` authors 390
-# men across three formations and no line anywhere says which payroll feeds
-# them. `engine/troops.py` asserts in prose that a soldier "is fed out of the
-# payroll group he belongs to" and nothing records which group that is.
-#
-# So this table is empty rather than guessed, `faults` reports every formation
-# ordered to the fields that no line accounts for, and a caller who does know
-# passes its own map. Filling it in is a content change, not a code one.
+# Which body of people a formation's men are counted among.
 STAFFED_BY: Mapping[str, GroupId] = {}
 
 
@@ -160,47 +79,24 @@ class DoubleCount(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class Residue:
-    """What one side of the seam records and the other has no field for.
-
-    Not a cache of the authority and not a second copy of anything: every field
-    here is a quantity exactly one side holds. The court has no households and
-    no per-head labour; a cohort has no name, no place-word, no `output_modifier`
-    and no room for the low-order qa of a debt. Keeping them here is what makes
-    the conversion reversible, which is how a migration is checked rather than
-    trusted -- and every field dies with `Court.dependents`.
-    """
+    """What one side of the seam records and the other has no field for."""
     group: GroupId
     cohort: EntityId
     name: str = ""
     place: PlaceId = ""
     function: str = ""
     households: int = 0
-    # Qa of unpaid ration below one whole fortnight of it. `hunger` counts
-    # fortnights, `arrears` counts grain, and the low bits of the second are not
-    # representable in the first. They are kept rather than dropped because a
-    # conversion that loses them is a conversion that forgives a debt.
+    # Qa of unpaid ration below one whole fortnight of it.
     arrears_qa: int = 0
-    # The court's own note that it is derived and cached (`state.py`). Carried,
-    # never recomputed here: recomputing it would need `systems._BANDS`, and a
-    # kernel module holding that table is the duplicate authority again.
+    # The court's own note that it is derived and cached (`state.py`).
     output_modifier: int = 1000
     revolting: bool = False
-    # The face of a cut (spec 6.3). One of the heads already counted in
-    # `people`, not an extra person, and never a `HouseMember`: `load.py` draws
-    # this name from the scenario's name list, and the named cast lives in
-    # `Court.house` and stays there.
+    # The face of a cut (spec 6.3).
     face: str = ""
 
 
 def refuse_named(who: object) -> None:
-    """Rule four, in one call. A person is not a body of people.
-
-    `Court.house` is a cast (spec 6.10): everyone in it has an age, a location
-    that may be a foreign court, a competence, and an agenda of their own. None
-    of that survives being averaged, and averaging is all a cohort can do. So a
-    `HouseMember` is refused here rather than converted approximately, and the
-    refusal is a type error because it is a category error.
-    """
+    """Rule four, in one call."""
     if isinstance(who, HouseMember):
         raise NotACohort(
             f"{getattr(who, 'id', who)!r} is a named person, not a cohort")
@@ -222,18 +118,6 @@ def placements_at(settlement: EntityId) -> tuple[Placement, ...]:
 
 
 # --- the two memories (spec 6.3; the authority table's hunger row) ------------
-#
-# The court remembers going unpaid as `arrears`, a running total of qa owed, and
-# reads a band off it by dividing by one fortnight's full entitlement. The kernel
-# remembers going unfed as `hunger`, a count of short fortnights. They are the
-# same fact -- how long these people have been hungry because of you -- recorded
-# in different units, and `docs/PHASE_C_AUTHORITY.md` says the cohort's is the
-# one that survives.
-#
-# So the division below is not an approximation of the court's figure, it *is*
-# the court's figure: `systems.pay_rations` computes `arrears // max(1, size *
-# entitlement)` and bands on the result. Everything this seam adds is keeping the
-# remainder, so that the trip back is exact.
 
 
 def hunger_of(arrears: int, size: int, entitlement: int) -> tuple[int, int]:
@@ -241,8 +125,7 @@ def hunger_of(arrears: int, size: int, entitlement: int) -> tuple[int, int]:
     owed = max(0, size) * max(0, entitlement)
     arrears = max(0, arrears)
     if owed <= 0:
-        # Nobody left, or nothing promised. There is no fortnight's worth to
-        # divide by, so the whole debt is remainder and no hunger is claimed.
+        # Nobody left, or nothing promised.
         return 0, arrears
     return arrears // owed, arrears % owed
 
@@ -264,11 +147,6 @@ def loyalty_of(grievance: int) -> int:
     return _clamp(LOYALTY_SPAN - grievance)
 
 
-def revolting_at(hunger: int) -> bool:
-    """What `revolting` becomes once hunger is the authority (spec 6.3)."""
-    return hunger >= REVOLT_FORTNIGHTS
-
-
 def _clamp(x: int, lo: int = 0, hi: int = LOYALTY_SPAN) -> int:
     return lo if x < lo else hi if x > hi else x
 
@@ -277,13 +155,7 @@ def _clamp(x: int, lo: int = 0, hi: int = LOYALTY_SPAN) -> int:
 
 def as_cohort(group: DependentGroup,
               previous: Residue | None = None) -> tuple[Cohort, Residue]:
-    """A dependent group as a cohort, plus what a cohort cannot hold.
-
-    `previous` is the residue from an earlier conversion of the same body of
-    people. Given one, the fields the court has no room for are restored from it
-    rather than supplied again -- which is what makes the cohort -> group ->
-    cohort direction lossless, and not merely nearly so.
-    """
+    """A dependent group as a cohort, plus what a cohort cannot hold."""
     refuse_named(group)
     if not isinstance(group, DependentGroup):
         raise NotACohort(f"{group!r} is not a body of dependent people")
@@ -306,11 +178,7 @@ def as_cohort(group: DependentGroup,
         ration_per_head=max(0, group.entitlement),
         hunger=hunger,
         grievance=grievance_of(group.loyalty),
-        # A dependent group is the definition of a redistributive body: it owns
-        # no grain, it is owed a ration, and `arrears` is the record of the
-        # crown failing to pay one. Said on the cohort rather than left to the
-        # polity, because the countryside these people sit in feeds itself and
-        # they do not.
+        # A dependent group owns no grain; it is fed by the body above it.
         tenure="redistributive",
     )
     residue = Residue(
@@ -322,12 +190,7 @@ def as_cohort(group: DependentGroup,
 
 
 def as_group(cohort: Cohort, residue: Residue) -> DependentGroup:
-    """A cohort as the dependent group it came from.
-
-    Exists to be checked against, not to be used. Once `Court.dependents` is
-    gone there is nothing on the other end of this, and a system that still
-    wanted one would be a system that had not been migrated.
-    """
+    """A cohort as the dependent group it came from."""
     refuse_named(cohort)
     if residue.cohort != cohort.id:
         raise Unmapped(
@@ -350,12 +213,7 @@ def as_group(cohort: Cohort, residue: Residue) -> DependentGroup:
 
 @dataclasses.dataclass(frozen=True)
 class Roster:
-    """One settlement's ordinary people, however the two sides record them.
-
-    The whole population of a place and nothing else: no named persons, no
-    formations, no institutions. `people()` is the figure the audit's two rows
-    are arguing about, and after Phase C it is the only one.
-    """
+    """One settlement's ordinary people, however the two sides record them."""
     settlement: EntityId
     cohorts: tuple[Cohort, ...] = ()
     residues: tuple[Residue, ...] = ()
@@ -391,14 +249,7 @@ class Roster:
 
 
 def roster(court, settlement: EntityId = SEAT) -> Roster:
-    """Every dependent group at one settlement, as that settlement's people.
-
-    Iterates the authored map rather than the court's mapping, so the result
-    does not depend on the order `Court.dependents` happens to be built in
-    (spec 2.6). A group the map does not name is left out and reported by
-    `faults`: converting it would need an entity id, and inventing one is how a
-    migration loses a granary.
-    """
+    """Every dependent group at one settlement, as that settlement's people."""
     cohorts: list[Cohort] = []
     residues: list[Residue] = []
     for entry in placements_at(settlement):
@@ -416,13 +267,7 @@ def roster(court, settlement: EntityId = SEAT) -> Roster:
 
 def _apportion(total: int, weights: tuple[tuple[str, int], ...],
                caps: Mapping[str, int]) -> dict[str, int]:
-    """Divide `total` by weight, exactly, capped, in sorted key order.
-
-    Floor shares first, then the leftover one at a time in sorted order. The
-    sort is what makes it replayable: a largest-remainder rule that broke ties
-    by iteration order would move a household between two parts depending on
-    which of them the caller's loop reached first.
-    """
+    """Divide `total` by weight, exactly, capped, in sorted key order."""
     weight = sum(w for _, w in weights) or 1
     share = {key: min(caps.get(key, w), total * w // weight)
              for key, w in weights}
@@ -443,21 +288,7 @@ def _apportion(total: int, weights: tuple[tuple[str, int], ...],
 
 def split(cohort: Cohort, shares: Mapping[str, int],
           turn: int) -> tuple[Cohort, ...]:
-    """Send parts of a cohort somewhere, conserving people and households.
-
-    `shares` maps a destination key -- a site, a settlement, a task -- to heads.
-    Ids come from `entity.mint_all` over the sorted keys, so the ordinals belong
-    to the batch and not to the caller's loop.
-
-    Hunger and grievance are copied unchanged to every part, and that is exact
-    rather than convenient: both are per-head intensities, so `people * hunger`
-    is conserved by construction. The merge below is where that stops being
-    free, and the asymmetry is the reason these are two functions.
-
-    The runtime id domain is `household`, because a split is a body of
-    households moving and `entity.ID_DOMAINS` has no `cohort`. Adding one is a
-    change to `engine/entity.py` and this module did not make it.
-    """
+    """Send parts of a cohort somewhere, conserving people and households."""
     asked = {key: int(shares[key]) for key in sorted(shares)}
     if any(heads < 0 for heads in asked.values()):
         raise ValueError(f"{cohort.id}: cannot split off negative heads")
@@ -487,20 +318,7 @@ def split(cohort: Cohort, shares: Mapping[str, int],
 
 
 def merge(cohorts: tuple[Cohort, ...], into: EntityId = "") -> Cohort:
-    """Two bodies of people becoming one, conserving people and households.
-
-    Refuses cohorts that differ in settlement, kind, ration or per-head labour.
-    An average of two ration rates would either invent grain or destroy it every
-    fortnight after the merge, and spec 2.2 does not have a rounding allowance.
-    Two groups on different rates are two groups; the court's payroll is full of
-    them and that is what makes them separate lines.
-
-    Hunger and grievance are people-weighted and floor, so `people * hunger` can
-    fall by up to `people - 1`. That is stated rather than hidden: hunger is a
-    whole number of fortnights per head, and one body of people cannot carry two
-    memories. `split` has no such loss, which is why a split followed by a merge
-    is not guaranteed to be the identity and no test here pretends otherwise.
-    """
+    """Two bodies of people becoming one, conserving people and households."""
     if not cohorts:
         raise ValueError("nothing to merge")
     ordered = tuple(sorted(cohorts, key=lambda c: c.id))
@@ -540,18 +358,7 @@ class Draw:
 
 @dataclasses.dataclass(frozen=True)
 class Muster:
-    """Every head at a place, and what each one is already spoken for.
-
-    The invariant is one line long: for either kind of draw, the heads claimed
-    from a cohort never exceed the heads in it. That is what makes the
-    double-count impossible rather than merely unlikely -- a system cannot feed
-    a group the court has already fed, or send the wall's garrison to the
-    harvest it is already reaping, without the ledger refusing the draw.
-
-    Person-days are read from the cohort's own `labour()`, applied to the heads
-    drawn, so hunger takes the strength before it takes the numbers here exactly
-    as it does there and there is no second formula to keep in step.
-    """
+    """Every head at a place, and what each one is already spoken for."""
     roster: Roster
     draws: tuple[Draw, ...] = ()
 
@@ -620,20 +427,6 @@ class Muster:
         return tuple(found)
 
 
-def kernel_draws(people: Roster) -> tuple[Draw, ...]:
-    """The kernel's consumption phase, as claims on heads.
-
-    `world._consume` feeds every cohort of every autonomous settlement, and it
-    skips Ugarit today with a comment saying exactly why: the legacy court feeds
-    those households and eating their grain twice would model the same mouths
-    twice. This turns that comment into a ledger entry, so the next person to
-    make Ugarit autonomous finds out from a `DoubleCount` rather than from a
-    granary that empties at twice the rate.
-    """
-    return tuple(Draw(c.id, "food", BY_KERNEL, c.people)
-                 for c in people.cohorts)
-
-
 def _corvee_of(people: Roster) -> tuple[tuple[GroupId, int], ...]:
     """This season's corvée, per group, off the cohorts that owe it."""
     found = []
@@ -647,28 +440,7 @@ def _corvee_of(people: Roster) -> tuple[tuple[GroupId, int], ...]:
 def court_draws(court, people: Roster,
                 staffed_by: Mapping[str, GroupId] = STAFFED_BY,
                 ) -> tuple[Draw, ...]:
-    """Everything the court already spends these heads on, in one ledger.
-
-    Four sources, and the reason they belong in one place is that no two of them
-    can see each other today:
-
-        the ration roll        `systems.pay_rations` feeds every group
-        `at_fields`            groups ordered to the fields instead of their
-                               own work, which is all of their heads
-        `Cohort.corvee`        days already raised from a group this season
-        formations at harvest  `troops.harvest_hands`, which counts a soldier's
-                               person-days and knows nothing about the payroll
-                               group he eats from
-
-    The last two are the garrison-at-harvest case. A king who puts a group in
-    `at_harvest` and also orders the formation his garrison stands in to the
-    fields has, today, twice the hands and the same men. Here the second draw
-    exceeds the cohort and is refused.
-
-    Formations with no line in `staffed_by` raise nothing and draw nothing:
-    nobody has said which people they are, so this cannot say either. `faults`
-    reports them.
-    """
+    """Everything the court already spends these heads on, in one ledger."""
     draws: list[Draw] = []
     for residue in sorted(people.residues, key=lambda r: r.cohort):
         group = court.dependents.get(residue.group)
@@ -688,9 +460,7 @@ def court_draws(court, people: Roster,
         cohort_id = by_group.get(group_id)
         if cohort_id is None or days <= 0:
             continue
-        # Days back into heads, rounding up: a corvée of one day off eleven men
-        # still had eleven men standing in the field that morning, and the head
-        # is the thing that cannot be in two places.
+        # Days back into heads, rounding up: a corvée of one day off eleven men still had eleven.
         heads = -(-int(days) // LABOUR_PER_HEAD)
         draws.append(Draw(cohort_id, "work", "corvee", heads))
 
@@ -709,12 +479,7 @@ def court_draws(court, people: Roster,
 
 def muster(court, settlement: EntityId = SEAT,
            staffed_by: Mapping[str, GroupId] = STAFFED_BY) -> Muster:
-    """The court's fortnight as one ledger over one population.
-
-    Raises `DoubleCount` on a court that is already spending a head twice, which
-    is the point: this is the check the migration runs before it moves a system,
-    not a repair it applies afterwards.
-    """
+    """The court's fortnight as one ledger over one population."""
     people = roster(court, settlement)
     return Muster(roster=people).add(
         *court_draws(court, people, staffed_by))
@@ -724,12 +489,7 @@ def muster(court, settlement: EntityId = SEAT,
 
 def faults(court, settlement: EntityId = SEAT, registry=None,
            staffed_by: Mapping[str, GroupId] = STAFFED_BY) -> tuple[str, ...]:
-    """Everything wrong at this seam, as sentences. Empty means it is sound.
-
-    Reports rather than raises, because this is an inventory in the same sense
-    `tools/authority_audit.py` is one: the two records are allowed to disagree
-    during the migration, and what is not allowed is nobody noticing.
-    """
+    """Everything wrong at this seam, as sentences."""
     found: list[str] = []
     people = roster(court, settlement)
 
@@ -747,10 +507,7 @@ def faults(court, settlement: EntityId = SEAT, registry=None,
             found.append(
                 f"{group_id}: no kernel cohort is authored for this group")
 
-    # A named person who has ended up in the population. Cannot happen through
-    # this module -- `refuse_named` is in the way -- so if it is ever true it was
-    # done elsewhere, and rule four of the header is worth checking rather than
-    # asserting.
+    # A named person who has ended up in the population.
     house = getattr(court, "house", {})
     for member_id in sorted(house):
         for cohort in people.cohorts:
@@ -769,9 +526,7 @@ def faults(court, settlement: EntityId = SEAT, registry=None,
                 f"{formation.id}: reaping, and no line says which people it "
                 "is drawn from")
 
-    # The other population. `content/kernel/world.toml` still authors cohorts at
-    # the seat from before the court gave it up; both are non-empty, so both are
-    # counted, and that is the audit's "ordinary people" row seen from inside.
+    # The other population.
     if registry is not None:
         ours = {c.id for c in people.cohorts}
         for cohort_id in sorted(registry.cohorts):

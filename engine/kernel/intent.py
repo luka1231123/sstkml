@@ -1,26 +1,11 @@
-"""What an actor means to do, and the snapshot it decided from (spec 10.10).
-
-Two records and one rule.
-
-An `Intent` is a decision, not an act. Producing one changes nothing, which is
-what lets every actor in the world decide from the same opening state before
-any of them has moved. It carries the authority relied on and the belief basis
-it came from, so that spec 11.1's "every distant act links to authority and an
-order or policy" is answerable from the record rather than from memory.
-
-A `Snapshot` is the read-only opening world. Phases 3 and 4 receive it and
-nothing else. Handing them the accumulating world would quietly restore the
-walk-through-the-settlements ordering that `engine.kernel.turn` exists to
-prevent -- a later actor would decide against an earlier actor's results.
-"""
+"""What an actor means to do, and the snapshot it decided from (spec 10.10)."""
 from __future__ import annotations
 
 import dataclasses
 
 from engine.entity import EntityId
 
-# What an intent asks for. Closed: an unclassified intent is one the allocator
-# cannot price and the inspector cannot explain.
+# What an intent asks for.
 KINDS = frozenset({
     "work",        # put person-days into something
     "produce",     # run a production process
@@ -64,23 +49,13 @@ class Intent:
     # What the intent is about: a site, a route, an obligation, an office.
     subject: EntityId = ""
     quantity: int = 0
-    # The exclusive pool this intent will draw from, if any. Empty means the
-    # intent competes for nothing and needs no allocation.
+    # The exclusive pool this intent will draw from, if any.
     resource: EntityId = ""
     # Which named process within the kind, where the kind alone does not say.
-    # Sowing, reaping, and threshing are all `produce` drawing on person-days,
-    # and the allocator prices them identically; only the system that issues
-    # them cares which is which, so the vocabulary belongs to that system rather
-    # than here. KINDS stays closed; this does not.
     task: str = ""
-    # What the actor says a thousand units are worth, in the payment good's own
-    # unit. Spec 6.6 makes the unit price part of what a quote *is*, and both
-    # sides of a bargain state one -- a seller's ask and a buyer's ceiling -- so
-    # it belongs on the intent rather than being recomputed by whoever matches
-    # them. Zero on every intent that is not a quote or an acceptance.
+    # What the actor says a thousand units are worth, in the payment good's own unit.
     unit_price: int = 0
-    # The office, obligation, or order relied on. Empty is legal only for an
-    # actor acting on its own account, over its own goods.
+    # The office, obligation, or order relied on.
     authority: EntityId = ""
     # How the actor came to want this: the claim or observation ids behind it.
     basis: tuple[str, ...] = ()
