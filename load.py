@@ -309,8 +309,10 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
                 mode=r["mode"], fortnights=int(r["legs"]),
                 # A seasonal leg is shut outside the sailing window; the season
                 # itself is the scenario's, so a run that renames it here would
-                # silently open the sea all year.
-                season="sailing_open" if r.get("seasonal") else ""),),
+                # silently open the sea all year. Only the sea shuts: the Nile
+                # carries traffic all year, so a river leg keeps no span.
+                season=("sailing_open"
+                        if r.get("seasonal") and r["mode"] == "sea" else "")),),
             risk=int(r["risk"]),
             course=_course(r.get("path", ())),
             ends=(r["a"], r["b"]),

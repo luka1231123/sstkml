@@ -146,7 +146,7 @@ def main():
         mode, legs, risk = make_route(grid, a, b)
         dist = haversine(lon(a["_col"]*2), lat(a["_row"]*2),
                          lon(b["_col"]*2), lat(b["_row"]*2))
-        seasonal = mode != "land"
+        seasonal = mode == "sea"
         nrt = (f"\n[[routes]]\na = \"{a_id}\"\nb = \"{b_id}\"\n"
                f"legs = {legs}\nmode = \"{mode}\"\n"
                f"seasonal = {'true' if seasonal else 'false'}\nrisk = {risk}\n")

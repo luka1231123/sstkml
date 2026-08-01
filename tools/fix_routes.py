@@ -103,7 +103,7 @@ def main():
         dist = km * detour
         legs = max(1, round(dist / leg_km))
         risk = int(40 + dist // (3 if mode == "land" else 6))
-        seasonal = mode != "land"
+        seasonal = mode == "sea"
 
         old_mode = r.get("mode", "?")
         if old_mode != mode:
