@@ -18,7 +18,7 @@ People, households, institutions, goods, labour, obligations, journeys, disease,
 - four-part writing desk: Address, Recognition, player-written Matter, Seal;
 - versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
 
-Court and kernel not yet one authority: six facts still held twice. Remaining scope lives only in [`SPEC.md` section 10](SPEC.md#10-alpha-07-implementation-tasks).
+Court and kernel not yet one authority: six facts still held twice. Remaining scope lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-alpha-07).
 
 ## Run
 
@@ -73,6 +73,6 @@ tui/             character-cell screens and Tk/terminal backends
 content/         scenarios, people, goods, formulae, and correspondence
 tools/           audit, benchmark, balance, inspection, screens, and probes
 tests/           deterministic engine, controller, UI, and AI contracts
-docs/archive/    retired specifications and post-1.0 idea parking
+docs/            live design docs; docs/archive/ is retired material
 SPEC.md          sole current product specification (Alpha 0.7)
 ```

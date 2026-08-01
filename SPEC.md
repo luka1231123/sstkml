@@ -1,974 +1,508 @@
 # SAY TO THE KING, MY LORD
 
-## Alpha 0.7 specification
+## 0.7 alpha product specification
 
-- Status: authoritative. This file replaces the previous release-1.0
-  specification, archived at
-  [`docs/archive/2026-08-01-release-1.0/SPEC.md`](docs/archive/2026-08-01-release-1.0/SPEC.md).
+- Status: authoritative
 - Revision: 2026-08-01
-- Scope: Alpha 0.7 and the agreed direction toward 1.0
-- Post-0.7, post-1.0, and DLC ideas remain pinned separately (§11).
 
-This document begins with the game that exists today. It is deliberately
-honest about the difference between working simulation, authored content,
-representational UI, partial systems, and absent systems.
+This is the only current design specification. Code and tests describe
+implementation detail; archived documents describe how the design evolved.
+Neither may quietly expand the release beyond this document.
 
-It then states the foundation for Alpha 0.7: this is not the Ugarit
-campaign. It is one shared autonomous world in which the player may begin as
-the king of any major **Alu**. The world already contains everything needed to
-start a campaign; there are no separate campaign packages in 0.7.
+The Alpha 0.7 task list lives in
+[`docs/ALPHA_07_TASKS.md`](docs/ALPHA_07_TASKS.md). It is subordinate to this
+file: it may sequence work, never add scope.
 
-Sections 1 to 7 describe the build. Section 8 is the contract; section 10 is
-the task list. Where a section is still open for the author's decision it is
-marked **[OPEN]** with the question left unanswered rather than guessed at.
+The full pre-consolidation specifications are preserved under
+[`docs/archive/2026-07-30-pre-consolidation`](docs/archive/2026-07-30-pre-consolidation/README.md).
+Ideas intentionally postponed until after 1.0 are listed under
+[`docs/archive/post-1.0`](docs/archive/post-1.0/README.md).
 
----
+Older source comments sometimes cite numbered sections of the archived
+specifications. Those are historical implementation citations, not additional
+requirements. New work should cite this specification by named contract rather
+than revive the old milestone numbering.
 
-## 1. The intended game
-
-The player rules a city through its court, households, institutions, records,
-messengers, officials, workers, soldiers, dependants, neighbours, and gods as
-understood by its people.
-
-The player does not control the world directly. Orders pass through people and
-institutions. Knowledge arrives late, incomplete, disputed, damaged, or
-self-interested. The world continues outside the player's sight.
-
-A campaign begins by choosing any of the world's major Alu and a
-deterministic random seed. The seed varies the starting conditions and timing
-without changing the authored geography.
-
-For Alpha 0.7 every playable city uses the same king-and-court systems. The
-chosen Alu still changes the campaign through:
-
-- geography, routes, neighbours, and access to resources;
-- production, labour, trade, tribute, and strategic dependencies;
-- local population, cohorts, court, institutions, and military capacity;
-- available evidence, correspondence, and relationships;
-- opening dangers, opportunities, and plausible forms of survival or collapse.
-
-Greek, Egyptian, Levantine, Anatolian, and other governmental or cultural
-variations would be interesting, but they are not an Alpha 0.7 requirement.
-They are pinned for examination after 0.7. In 0.7, every king and city uses the
-same underlying rules and UI.
-
-The campaign begins at the start of the end of the Bronze Age system. Depending
-on the seed, the player has roughly one, two, or three years of runway before
-the regional crisis becomes acute. The immediate purpose of play is survival:
-last as long as possible while the world around the city displaces people,
-breaks routes, loses production, and transfers pressure to the surviving Alu.
+Questions this document had to answer are marked **Decision:**. A decision is
+a default that works, not a final word; change it here first, then in code.
 
 ---
 
-## 2. What exists in the world today
+## 1. The game
 
-The current repository contains two overlapping versions of the world.
+**SAY TO THE KING, MY LORD** is an information-constrained rulership
+simulation set around 1200 BC, at the end of the Late Bronze Age.
 
-### 2.1 The legacy court world
+The player is not an omniscient cursor over a map. The player is a ruler at a
+court. The distinctive play is holding a social and material system together
+through letters, officials, and institutions.
 
-The larger and more playable implementation has one privileged player court.
-It contains:
+The historical starting situation constrains the run. The historical outcome
+does not. The world is on a course to destruction: shocks cascade, routes
+fail, and cities empty. The player uses the tools of a king to delay that
+failure, survive it, or be buried by it.
 
-- a ruler, household, heirs, kin, officeholders, and dependants;
-- stores, estates, fields, workshops, institutions, formations, and projects;
-- settlements, courts, sites, terrain, routes, seasons, and correspondents;
-- letters, couriers, inboxes, copies, archives, claims, promises, and marriage
-  proposals;
-- foreign courts, relationships, status, gifts, oaths, and partial beliefs;
-- petitions, precedents, rites, omens, revenue, harbour activity, and plague;
-- scheduled events, authored opening conditions, and deterministic random
-  outcomes.
+**Decision — how long the world lasts.** No script and no doom counter. The
+seed sets the timing and severity of shocks; the ordinary rules turn those
+shocks into collapse. Balance targets an unaided world that fails somewhere
+between year 15 and year 30 across seeds. That is a tuning target checked by
+long headless runs, not a rule the engine enforces. A run that survives past
+30 years because the player played well is a correct outcome.
 
-This is the source of most current rooms, actions, campaign material, and
-visible detail. Its data and assumptions are strongly shaped around Ugarit.
+### The fortnight
 
-### 2.2 The general simulation kernel
+Each turn:
 
-The newer kernel represents the world without making the player's city a
-special type. Its generic entities include:
+1. The world resolves production, consumption, labour, movement, obligations,
+   disease, and actor decisions.
+2. Actors observe only what they can encounter or learn.
+3. Reports, tablets, visitors, accounts, and exceptions travel to court.
+4. The Hall shows what has reached the king and what now demands attention.
+5. The player reads, compares, writes, judges, allocates, delegates, or waits.
+6. Confirmed orders enter institutions, missions, and routes.
+7. Consequences continue everywhere, including places the player ignored.
 
-- regions and polities;
-- settlements and sites;
-- routes and journeys;
-- cohorts and organizations;
-- lots of goods, owners, custody, and transfers;
-- labour, obligations, reservations, contracts, and claims;
-- actor observations, beliefs, intentions, and decisions.
-
-The kernel now carries the whole authored map, not a test corner of it. One
-registry holds 8 regions, 8 polities, 55 settlements, 240 sites, 99 routes,
-171 cohorts, and 75 organizations. 54 of the 55 settlements run autonomously;
-the fifty-fifth is the player's seat.
-
-### 2.3 The current split is unfinished
-
-The consolidation is under way, not finished. Places, routes, sites, land,
-harvest, the seat's stores, and the seat's people have moved to the kernel.
-`tools/authority_audit.py` still reports six facts held twice: the seat's
-stores, its ordinary people, its labour, foreign court standing, actor belief,
-and the date. The legacy `Court` keeps a mirror of each.
-
-This means the current build is not yet a coherent general campaign
-simulation. It is a detailed Ugarit-shaped court game standing on a shared
-world that most of it already reads from.
-
-### 2.4 The intended scale of the existing map
-
-The current world map has the right overall selection and scale for Alpha 0.7.
-It should be treated as a network of roughly 30 **Alu** corresponding to major
-cities and regional centres. `Alu` is the product term; current code still uses
-`Place`, `Settlement`, and the `hub` field on decorative sites.
-
-Only Alu are full settlement-level entities. An Alu contains or controls:
-
-- its king, court, Seat, institutions, stores, and named officials;
-- population cohorts whose sum is the authoritative population;
-- its historically associated hinterland;
-- its Exchange, harbour when coastal, and productive capacity;
-- dependent palace centres;
-- the local ends or maintained portions of roads and sea routes;
-- military formations, obligations, production, and local knowledge.
-
-The roughly 400 smaller historical settlements in the represented region are
-not simulated individually. They are abstracted into the population,
-production, cohorts, and capacities of their owning Alu. Named minor
-places may appear in reports or map detail, but they do not run a second,
-hidden settlement simulation.
-
-Every authored palace, grain, metal, timber, horse, and luxury symbol now
-carries one classification — Alu, dependent palace centre, or capacity — and
-one owning Alu. `docs/ALU_CLASSIFICATION.md` records the verdicts. No
-decorative mark runs a settlement simulation. Roads and sea legs connect Alu;
-their maintenance, safety, and access may belong to the Alu along the route.
-
-The world model should follow the way the world map already describes the
-region rather than replacing it with a different geography.
+The game does not reward clearing every notification. Attention is limited
+court work, and deliberate inaction is a valid decision.
 
 ---
 
-## 3. What is simulated today
+## 2. Non-negotiable laws
 
-“Simulated” here means state persists and changes because rules resolve it. It
-does not mean every current system is deep, balanced, or already connected to
-the general kernel.
+### 2.1 The simulated world causes the story
 
-### 3.1 Material and economic life
+Letters, shortages, petitions, offers, prices, illness, conflict, and political
+demands originate in persistent state and actor decisions. Routine cadences may
+bundle accounts; they may not fabricate crises to keep the interface busy.
 
-The current game resolves:
+### 2.2 Material flows are accounted for
 
-- grain stocks, rations, consumption, shortage, and spoilage;
-- land allocation, sowing, harvest, climate effects, and seed use;
-- labour assignment, corvée, transport capacity, and competing demands;
-- workshops, metals, production, and some material requirements;
-- institutional upkeep, maintenance, construction, and repair;
-- harbour cargo, merchants, dues, and revenue;
-- ownership and transfer of lots in the kernel;
-- farming, consumption, market bargains, contracts, and voyages in the
-  kernel's autonomous settlements.
+Consequential goods, labour, people, assets, and obligations have sources,
+owners or authorities, locations, transfers, uses, and losses. The same grain
+or person-days cannot be spent twice.
 
-The legacy economy is broader. The kernel economy is more general and
-accountable. They are not fully unified.
+For conserved goods:
 
-### 3.2 People, household, and government
+```text
+opening + produced + imported + recovered
+  = closing + consumed + exported + spoiled + destroyed
+```
 
-The current game resolves:
+### 2.3 The outside world is autonomous
 
-- aging, health, conception, birth, mortality, heirs, and succession;
-- appointments and dismissals;
-- household needs and some unrest;
-- institutions losing condition or effectiveness without support;
-- petitions, rulings, precedents, and aging justice cases;
-- oaths, rites, divination, expiation, and legitimacy effects;
-- player orders that cost time and pass through defined action contexts.
+Every settlement outside the player's seat farms, eats, trades, levies,
+suffers, and decides without the player. It does not wait to be observed and
+does not act only when addressed. The player's city is one settlement under
+the same rules, distinguished only by who gives its orders.
 
-Named life is concentrated around the player's court. The wider population is
-mostly represented as groups and quantities.
+Foreign courts act on their own beliefs and needs. They write first, refuse,
+delay, lie, and go silent.
 
-For the intended model, cohorts are the population. An Alu's true population is
-derived by summing its cohorts; it is not stored as a second mutable total. The
-player may see only an estimate or range, depending on the quality and age of
-the court's records.
+### 2.4 The player sees mostly Belief, not World
 
-Most people are simulated in aggregate **cohorts** rather than as individuals.
-A cohort combines people with a shared home, current location, ethnicity,
-livelihood, status, material conditions, duties, and institutional ties.
-Cohorts supply labour and levies, consume goods, suffer disease and
-displacement, and may support, resist, bargain with, or abandon institutions.
-Named individuals are reserved for rulers, court members, officials,
-specialists, messengers, and other people whose personal identity matters.
+World holds the truth. The player sees Belief: dated, sourced, incomplete,
+sometimes wrong. Every player-facing number carries the date and origin of the
+record it came from, and stale records stay stale until something arrives to
+correct them.
 
-### 3.3 Movement, information, and diplomacy
+No screen may read World directly. A quantity the court has not measured is
+shown as an estimate or a range, or not shown.
 
-The current game resolves:
+### 2.5 Orders act through people and institutions
 
-- route-based travel time;
-- courier dispatch, letter transit, delay, arrival, and interception;
-- unanswered correspondence and relationship decay;
-- gifts, requests, promises, claims, marriage proposals, and obligations;
-- foreign court observations, needs, decisions, and replies;
-- partial, dated, sourced, and sometimes wrong beliefs;
-- archive filing and later search.
+An order names its subject, its authority, and the person or institution that
+will carry it out. Between the order and the outcome sit travel time,
+competence, competing duties, cost, and self-interest. Orders can be delayed,
+performed badly, performed partly, or refused.
 
-The complete causal chain from an autonomous foreign need, through a letter
-and player reply, to material execution is only partly unified.
+The player never mutates the world from a screen. Every change passes through
+a registered action with a stated cost and a stated refusal.
 
-### 3.4 Disease, security, and military force
+### 2.6 Determinism is structural
 
-The current game resolves:
+Same version, same world data, same seed, same confirmed action log produce
+the same run, byte for byte. Randomness is drawn from named streams, never
+from wall-clock time or iteration order. Accepted model text is stored, not
+regenerated.
 
-- plague introduction, spread, mortality, quarantine, and closures;
-- troop formations, assignments, readiness-related state, and summons;
-- disruption and some political or social pressure.
+### 2.7 The local model supplies language, not truth
 
-It does not resolve tactical battles or a full operational war between
-autonomous powers.
+The supported lightweight local model is required in normal windowed play. It
+voices people, corrects player-written matter, interprets tablets, parses
+orders, and summarizes permitted records.
 
-### 3.5 Time and autonomy
+It may not:
 
-The game advances in fortnights. On advance it processes scheduled events,
-production, consumption, travel, correspondence, disease, household change,
-institutions, construction, unrest, justice, oaths, foreign observations, and
-new reports.
+- see hidden World state;
+- invent an authoritative fact, number, person, promise, or obligation;
+- calculate simulation outcomes;
+- choose player or non-player policy;
+- mutate state;
+- be rerun during replay to recover accepted text.
 
-The kernel also lets non-player settlements farm, consume, plan, trade, move
-goods, and settle obligations without player contact. This autonomy is real
-but currently narrow.
+The supported baseline is `qwen3:4b-instruct`.
+
+### 2.8 Religion has human and institutional causality
+
+Gods do not act. Temples, priests, rites, omens, and oaths act, because people
+believe and because institutions hold grain, land, labour, and authority.
+
+A rite costs real goods and real days. An omen changes what people expect, and
+so what they will do. A broken oath is a political fact other courts can cite.
+No hidden divine favour modifier moves harvests or battles.
 
 ---
 
-## 4. What is authored or representational, not fully simulated
+## 3. Alpha 0.7 pillars
 
-The following may react visually or feed rules, but they are primarily written
-content or map representation:
+### 3.1 A living, inspectable simulation
 
-- the terrain grid, coastlines, place coordinates, glyphs, ranks, and map
-  labels;
-- the route network and travel legs;
-- most named cities, courts, officials, correspondents, opening relationships,
-  and opening stocks;
-- unnamed farm, resource, palace, and hinterland markers;
-- letter formulae, archive texts, justice cases, rites, gods, offices, and
-  institutional descriptions;
-- opening crises and scheduled correspondence cadences;
-- many construction, land, household, revenue, and gift-value tables.
+0.7 includes interacting foundations for:
 
-Terrain is currently scenery. Mountains, coast, and other terrain cells do not
-themselves change travel, agriculture, visibility, or military outcomes.
-Routes determine travel.
-
-Several map layers combine live state with authored symbols:
-
-- **Roads** shows real route legs, availability, and known freshness.
-- **Trade** shows sea lanes and authored trade/resource sites, not a complete
-  live trade-flow model.
-- **Farms** shows sown ground and authored estates, not every active farm and
-  harvest flow.
-- **Holds** shows authored palace or control markers, not dynamic borders or
-  territorial possession.
-- **Courts** shows correspondents and relationship information.
-- **Plague** shows known quarantines and closures, not omniscient epidemic
-  truth.
-
-The local language model is presentation, not simulation authority. It may
-voice, correct, or summarize permitted information. The engine owns facts,
-decisions, quantities, and outcomes.
-
----
-
-## 5. What is not simulated yet
-
-The current game does not yet provide:
-
-- starting a campaign as any Alu directly from shared world data;
-- an Alu model that encapsulates its Seat, dependent palace centres,
-  hinterland, cohorts, Exchange, harbour, roads, production, and institutions;
-- authoritative cohort populations with appropriately uncertain player-facing
-  estimates;
-- procedural world, terrain, polity, or city generation;
-- one authoritative simulation shared by the player city and every foreign
-  settlement;
-- a complete regional economy for all important goods and settlements;
-- dynamic borders, territorial conquest, coalitions, or full political
+- named people, households, kinship, office, health, and movement;
+- stores, lots, ownership, custody, consumption, and loss;
+- land, harvest, workshops, labour, service, corvée, and maintenance;
+- institutions, authority, legitimacy, succession, law, and obligation;
+- routes, cargo, couriers, merchants, trade, tribute, gifts, and news;
+- courts, status, patronage, diplomacy, oath, ritual, and memory;
+- disease, disruption, scarcity, local conflict, submission, and political
   transformation;
-- tactical combat or a complete operational war system;
-- working envoy missions;
-- terrain-driven movement, farming, visibility, or warfare;
-- dynamic creation, destruction, ownership, and loss of sites on the map;
-- a complete map view of journeys, news, obligations, armies, and material
-  flows;
-- the complete survival, displacement, attack, and defeat loop;
-- the Bronze-to-Iron endgame pinned for 1.0.
+- observation, claims, reports, letters, archives, and actor Belief.
 
-A fully named population, procedural geography, campaign packages, cultural
-government variants, and full warfare are not Alpha 0.7 requirements merely
-because they appear in this gap list.
+"Simulate everything" means important causes interact and can be explained. It
+does not mean every imagined subsystem, commodity, profession, or named person
+must ship in 0.7.
 
----
+The rule runs the other way: **when a system can be written short and still
+work, write it short.** A new entity type needs a rule that consumes it.
+Anything without one stays a number on something that already exists.
 
-## 6. What is in the UI today
+### 3.2 Correspondence is a principal game system
 
-The current desktop is a real multi-window interface. Windows retain geometry
-and can be compared side by side. Keyboard and mouse interaction, focus,
-minimum sizing, a window switcher, a command palette, notices, and refusals are
-implemented and covered by headless tests.
+Letters are not event prose wrapped around menu choices. They are how distance,
+status, ambiguity, commitment, and delay become playable.
 
-### 6.1 Main rooms and workbenches
+Incoming tablets show:
 
-| Window | Working content and actions | Current limitation |
+- sender and known standing;
+- date and route when known;
+- concise matter and exact claims;
+- original wording;
+- related people, places, obligations, and older tablets;
+- seal, copy, damage, translation, or provenance where relevant.
+
+#### 3.2.1 The blocks a letter is made of
+
+**Decision — the block list, from the actual corpus.** Late Bronze Age
+Akkadian letters, in the Amarna and Ugarit archives, are built from a small
+set of fixed parts in a fixed order: an address ("Say to the king, my lord"),
+a message marker (*umma* PN, "message of your servant PN"), a self-abasement
+or prostration formula for a superior ("I fall at the feet of my lord seven
+times and seven times"), a well-being formula (*lū šulmu*, "may there be
+well-being"), then the body, then a closing. The opening parts carry the
+relationship; the body carries the business. That is the game's model.
+
+The outgoing tablet is composed of these blocks:
+
+| Block | Required | Carries |
 | --- | --- | --- |
-| Hall | Opens the main rooms and shows the court's entry point | Still reflects the current Ugarit-shaped room organization |
-| Scribes' Room | Inbox, outbox, records, tablets, archive search, reading, filing, delegation, replying, and dispatch | Correspondence causality is not fully unified with the kernel |
-| Writing Table | Address, Recognition, player-written Matter, Seal, corrections, terms, and dispatch | Depends on a local model for intended presentation; structured consequences remain incomplete in places |
-| Storehouse | Stores, rolling accounts, land, allocations, priorities, dues, and seed decisions | Uses much of the legacy court economy |
-| Muster | Formations, assignments, summons, and military records | No full war or battle resolution |
-| Oaths | Oaths and their records or consequences | Intended room consolidation is unfinished |
-| World | Pan, zoom, place selection, route inspection, map layers, courts, plague closures, and starting letters | Gifts and marriage use letters; envoy is visibly disabled |
-| Counsel | Conversation with an adviser using permitted context | Local-model dependent with fallback; adviser is not an autonomous source of truth |
-| Altar | Rites, divination, omen response, and expiation | Uses current culturally specific content |
-| City | Institutions, works, construction, repair, and civic condition | Not yet a generic city-government framework |
-| Palace | Court, household, relationships, offices, succession, and justice | Strongly tied to the single privileged player court |
-| Sickness | Disease evidence and quarantine controls | Separate room remains; world/person/route integration is incomplete |
-| Orders | Available orders, subjects, costs, and execution entry points | Some actions still belong to legacy systems |
-| Help | Searchable controls and contextual help | Content follows the current room layout |
+| Address | yes | rank and claimed relationship: lord, servant, brother, father, son |
+| Message marker | yes | who sends, and by whose authority |
+| Prostration or greeting | by rank | deference, equality, or its pointed absence |
+| Well-being | no | courtesy; its absence is legible as coldness |
+| Recognition | no | what the king admits receiving or hearing |
+| Matter | yes | one or two sentences written by the player |
+| Terms | when material | structured quantities, goods, people, dates, destinations |
+| Precedent | no | a cited oath, kinship, past gift, or earlier tablet |
+| Warning | no | a stated consequence of refusal |
+| Seal | yes | authority and dispatch form |
 
-Focused windows also exist for individual letters, archive records,
-institutions, and the fortnight chronicle.
+Address, marker, and greeting are chosen from the forms the sender's real
+standing permits. A vassal who addresses a great king as "brother" is making a
+claim, and the recipient reads it as one. Rank is never shown as a score.
 
-### 6.2 World map controls that work
+#### 3.2.2 What the model does with the matter
 
-The world map currently supports:
+**Decision — orders versus tone.** The model reads the player's Matter and
+returns two things:
 
-- arrow-key panning with edge clamping;
-- zooming;
-- cycling and clicking places;
-- clicking and inspecting routes;
-- local or all-road lists;
-- Land, Roads, Trade, Farms, Holds, Courts, and Plague layers;
-- opening correspondence with a known court.
+1. **Orders** — a list of structured commitments and requests: send X, promise
+   Y by date Z, demand, refuse, offer marriage, swear. These are the only part
+   with mechanical force.
+2. **Tone** — a confidence reading of the wording, on a small scale from
+   hedged through plain to emphatic.
 
-The map is a knowledge and navigation surface, not an omniscient command map.
-Direct remote action is intentionally limited. Envoys are not wired.
+Everything not parsed into an order is prose. It changes how the reader sees
+the king; it moves nothing material by itself.
 
-### 6.3 Registered player actions
+**Decision — how tone is balanced.** One rule, no second score. Each promise
+recorded from a letter carries the tone it was made in. Tone sets what the
+recipient expects, and the expectation sets what the outcome is worth:
 
-The action registry currently exposes 33 player actions across 19 contexts.
-Twenty-one consume court time. The working verbs include:
+- an emphatic promise raises the recipient's expectation; kept, it gains more
+  standing than a hedged one; broken, it costs more;
+- a hedged promise moves standing little in either direction;
+- emphatic language with nothing delivered is the worst case, and a court that
+  has been burnt discounts the next emphatic letter from that sender.
 
-- advance the fortnight;
-- allocate goods and set priorities;
-- consume seed in an emergency;
-- read, file, delegate, answer, and dispatch letters;
-- inspect ledgers and search the archive;
-- send or recall harvest labour;
-- assign troops;
-- raise corvée and dredge a canal;
-- consult a diviner, suppress or defy an omen, swear an oath, quarantine, and
-  expiate;
-- hear and rule on petitions;
-- set land and harbour dues;
-- appoint or dismiss a person and name an heir;
-- begin construction or repair, or abandon a work.
+So confidence is a wager on delivery, not a persuasion stat. The player can
+see the wager before sealing (§3.2.3). Numbers for it live in
+`content/`, not in code, so tuning does not need a release.
 
-Direct instant gift and foreign-marriage buttons are intentionally unavailable.
-Those commitments are meant to travel through correspondence.
+#### 3.2.3 Nothing is sealed unseen
 
-### 6.4 Current reliability
+Before dispatch the writing table shows a deterministic panel: every order the
+model parsed, in plain words, with quantities, dates, and destinations; the
+recorded tone; and the prose that will travel unparsed. The player may edit,
+remove, or cancel. Sealing without that confirmation is not possible.
 
-At the time of writing the repository's automated suite collects 817
-tests. This is strong evidence that the implemented actions, state
-transitions, rendering paths, and keyboard contracts work as tested. It is not
-evidence that the game is complete, balanced, understandable, or enjoyable.
+If the model is unavailable or its output fails validation, the panel shows
+the failure and the letter is not sent. It never guesses on the player's
+behalf.
+
+#### 3.2.4 The rest of the path
+
+The player chooses among meaningful letter blocks; there is no abstract
+"posture" menu and no exposed protocol score.
+
+Yabninu may correct the player's matter while preserving its meaning, numbers,
+names, conditions, uncertainty, negation, and commitments. The original words
+remain recoverable. The model does not choose the king's position.
+
+Material terms must be explicit structured attachments or clauses: quantities,
+goods, people, destinations, deadlines, gifts, marriage proposals, oaths, and
+other commitments are confirmed separately from decorative prose.
+
+Sealing creates a stored document and dispatch record. Couriers and routes take
+time. Silence, interception, receipt, copying, escalation, and later response
+are state, not flavor text.
+
+Marriage, gifts, foreign requests, counteroffers, and diplomatic warnings use
+this correspondence path. Screens must not bypass it with unrelated instant
+buttons.
+
+Routine letters are compact. Repetition occurs only when something has changed
+or a correspondent intentionally escalates.
+
+### 3.3 The Palace Desktop is multi-window
+
+Real, independently movable windows are a core feature. The player should be
+able to keep a tablet beside a store account, route, person, or older record.
+Consolidation means fewer duplicated rooms and clearer ownership, not replacing
+the palace with one full-screen dashboard.
+
+There are eight primary rooms:
+
+1. **Hall** — matters, arrivals, audience, and passage.
+2. **Court** — people, offices, household, audience, justice, and advisers.
+3. **Scribes' Room** — Inbox, Filed, Sent, Records, reading, writing, and
+   dispatch.
+4. **Storehouse** — stores, labour roll, land, reserves, dues, and exact
+   accounts.
+5. **City** — institutions, sites, assets, damage, repair, and works.
+6. **Muster Yard** — troops, and corvée: how many people, for how many days,
+   and what that costs elsewhere.
+7. **Known World** — places, routes, journeys, foreign courts, trade, news,
+   and disease layers.
+8. **Shrine** — rites and offerings, oaths and obligations.
+
+#### 3.3.1 The Hall
+
+The Hall is the room the player lands in and the room they end the fortnight
+from. Three columns:
+
+- **left** — the believed standing of what matters: grain, copper, tin, each
+  with its change since the last fortnight, each dated to the record it came
+  from;
+- **centre** — the doors, listed vertically, each with its access letter, its
+  ASCII mark, and the count of matters flagged in that room;
+- **right** — what is in motion: envoys and where they are believed to be, and
+  orders dispatched but not yet resolved.
+
+Counts are the only alert. A door with nothing behind it shows nothing.
+
+Counsel belongs to named people in Court. Oaths belong to Shrine and linked
+tablets. Works belong to City and project objects. Sickness belongs to people,
+routes, places, and a World layer. These may open focused object windows; they
+do not require additional primary doors.
+
+Supporting object windows use a small shared family:
+
+- tablet or archive record;
+- person or household;
+- institution, site, or project;
+- place, route, or journey;
+- ledger, lot, obligation, oath, order, or mission.
+
+Opening a door raises its existing room. Rooms remember useful geometry,
+selection, drafts, and filters. Window management never costs court time.
+
+### 3.4 Text is scarce and specific
+
+Screen text states a fact, a quantity, a date, or a consequence. No flavour
+paragraph where a number belongs, no restating what the layout already shows.
+Prose belongs in tablets, where a person wrote it and a scribe read it out.
 
 ---
 
-## 7. Where Ugarit is still hard-coded
+## 4. Shared interaction contract
 
-The repository currently has one legacy campaign file:
-`content/scenarios/ugarit.toml`.
+The same action uses the same key everywhere. Tabs cycle with the same keys in
+every room; select, open, confirm, cancel, and close never change meaning
+between windows.
 
-It no longer authors the map: places, sites, and routes now live in
-`content/kernel/`. Ugarit-specific assumptions still appear in:
+Every screen works with the keyboard alone. Mouse is an alternative, never the
+only path.
 
-- the singular privileged `World.court`;
-- player, ruler, settlement, officeholder, institution, god, rite, and archive
-  identifiers;
-- correspondence personas and letter corpora;
-- climate, land, house, works, revenue, justice, and gift content;
-- the kernel's small authored world;
-- tests that encode the present campaign.
+Every action states its cost before confirmation and its refusal in plain
+words. Destructive or irreversible orders confirm explicitly.
 
-Some mechanics are reusable, and much of the map code is generic. The current
-content architecture is not yet sufficient to select any mapped Alu and derive
-its campaign directly from the shared world.
+The Hall is an exception docket, not a second copy of every ledger. It answers:
+who or what has reached the king, what changed, and where the evidence is.
+Rooms show working state.
 
 ---
 
-## 8. Proposed Alpha 0.7 contract
+## 5. Technical
 
-### 8.1 One authoritative world
+### 5.1 Boundaries
 
-There is one world model for every Alu. Choosing an Alu gives the player
-authority over its king and government; it does not give that Alu different
-physics.
+- `engine/` owns authoritative simulation and actions.
+- `belief/` is the only World-to-player projection boundary.
+- `tui/` composes screens only from Belief, session UI state, and explicit
+  permitted records.
+- `ai/` receives flat, approved prompt data and returns non-authoritative
+  language.
+- `content/` owns authored scenario data, formulae, names, and prose.
 
-The current duplicate court and kernel authorities are transitional code, not
-the intended architecture. Population, goods, land, routes, obligations,
-beliefs, and date must each have one authoritative representation.
+The developer's causal inspector may read World. It is never player-facing.
 
-### 8.2 Alu, kings, and ownership
+### 5.2 State and resolution
 
-An **Alu** is a major city or regional centre together with its historically
-associated hinterland. The existing map supplies the world; Alpha 0.7 does not
-generate a new geography or load a separate campaign package.
+- Strategic state uses integers and explicit units.
+- A fortnight resolves in named phases.
+- Exclusive labour, cargo, authority, and other scarce resources are allocated
+  globally rather than first-come by iteration order.
+- Ownership and custody are distinct.
+- Goods transformations and transfers leave records.
+- Obligations use closed, inspectable clause kinds.
+- Actor policies read `(actor, belief)`, never raw World.
 
-Every Alu has a king. The king owns or holds the Alu through the shared
-political model. There is no abstract relationship score between a king and
-his own Alu.
+### 5.3 Saves and replay
 
-Rule can still fail through concrete state:
+- Saves are versioned, atomic, and replay-verified.
+- Confirmed player actions and accepted generated text are persisted.
+- Loading does not rerun the language model.
+- Incompatible semantic versions fail with a direct explanation.
+- UI-only state may be restored separately but cannot affect replay.
 
-- cohorts become hungry, discontented, uncooperative, or displaced;
-- officials and institutions fail to execute orders;
-- obligations go unpaid;
-- succession fails or a rival takes the kingship;
-- the Seat is abandoned or captured.
+### 5.4 Performance and scale
 
-Relations between different realms are primarily relations and obligations
-between their kings. Alu also have material connections through roads, trade,
-migration, disease, tribute, and conflict.
+The simulation must complete a 96-fortnight reference run within the pinned
+benchmark budget and remain deterministic under reordered iteration and
+headless execution.
 
-### 8.3 Minimum contents of an Alu
+Scale is justified by decisions and causal interactions, not by a headline
+agent count. Content should be large enough that trade, delay, substitution,
+disease, labour conflict, and foreign autonomy are real, while small enough to
+inspect and balance.
 
-An Alu contains only the distinctions needed by rules:
+### 5.5 Verification
 
-- **Seat** — the principal walled palace centre, including court,
-  administration, central stores, and royal authority;
-- **dependent palace centres** — subordinate centres controlled by the Alu,
-  without separate kings or autonomous settlement simulation;
-- **cohorts** — the entire ordinary population;
-- **hinterland** — food, raw materials, and labour-producing capacity;
-- **walls** — defence of the Seat;
-- **Exchange** — merchant, storage, and commercial capacity treated together;
-- **harbour** — only for a coastal Alu;
-- **temple** — religious capacity and rites treated institutionally;
-- **troops**;
-- **road and sea access**.
+The release remains covered by:
 
-Farms, villages, workshops, merchant houses, warehouses, and minor buildings
-are not separate objects unless a rule genuinely requires an individually
-located asset. Their effects normally belong to the Alu's capacities.
+- unit and integration tests;
+- deterministic replay and hash tests;
+- conservation and labour-exclusivity audits;
+- causal scenario tests;
+- corpus and prompt-boundary lint;
+- minimum/default/resized screen tests;
+- mouse and keyboard action-path tests;
+- required-model availability, guard, timeout, and stored-output tests;
+- headless foreign-world and player-deletion tests;
+- long balance sweeps and the pinned benchmark.
 
-### 8.4 Cohorts are the population
-
-Population is not a second mutable record. The true population of an Alu is
-the sum of the people in its cohorts. The king sees an estimate derived from
-dated records and reports.
-
-Every person belongs to exactly one ordinary-population cohort. At minimum a
-cohort records:
-
-- people and households;
-- home Alu and current location;
-- ethnicity;
-- livelihood;
-- legal or institutional status;
-- available labour;
-- ration requirement, nutrition, and health;
-- obligations;
-- cooperation or grievance;
-- whether it is displaced;
-- capacity for organized violence.
-
-Soldiers are assignments drawn from cohorts, not a second population.
-Displacement is a condition, not a permanent occupation or ethnicity.
-Ethnicity may affect language, social connections, reception, and migration
-preferences; it does not mechanically determine loyalty or hostility.
-
-Cohorts split only when some members receive a materially different location,
-duty, treatment, or condition. Compatible cohorts merge when those differences
-end. Both operations conserve people and households.
-
-### 8.5 Corvée
-
-The king may levy all or part of a cohort for corvée. The order names:
-
-- the source cohort;
-- the number of people or share of available labour;
-- the task and destination;
-- the duration;
-- the ration source;
-- the responsible official.
-
-The engine creates a temporary detachment. Its people remain counted once and
-cannot simultaneously perform their ordinary work, serve in a formation, and
-perform corvée. Corvée consumes rations, causes fatigue or losses where
-appropriate, and may increase grievance. Released workers merge back when
-compatible.
-
-There is no general manual “split cohort” action. Corvée, levy, migration, and
-other concrete assignments perform the necessary split.
-
-### 8.6 Roads, trade routes, and caravans
-
-These are three different facts:
-
-- a **road or sea leg** is a physical connection with time, season, capacity,
-  condition, risk, and control;
-- a **trade route** is a repeated commercial pattern across one or more legs;
-- a **caravan or voyage** is a particular moving party with people, transport,
-  provisions, cargo, owner, destination, and current location.
-
-Not every road is a trade route. Roads also carry couriers, troops, corvée,
-tribute, and displaced cohorts.
-
-Trade routes strengthen through repeated successful journeys and weaken when
-merchants reroute or stop travelling. Goods movement must distinguish trade,
-tribute, taxation, gifts, requisition, military supply, and relief even when
-they use the same transport system.
-
-Merchants act autonomously. The king may authorize or finance trade, request
-imports, offer exports, set dues, grant exemptions, requisition goods, provide
-escorts, repair routes, close access, and negotiate through correspondence.
-The king does not direct every caravan.
-
-### 8.7 Initiating shocks
-
-Alpha 0.7 needs a small, coded set of shocks:
-
-1. long drought;
-2. local crop failure;
-3. earthquake;
-4. destructive sea season;
-5. epidemic;
-6. route violence and raiding;
-7. political rupture or succession crisis;
-8. rare volcanic disruption.
-
-A shock changes ordinary world variables. It may reduce fertility or yield,
-damage stores, walls, harbours, and roads, kill people, close capacity, raise
-risk, interrupt obligations, or remove government. It may not set a `collapse`
-flag or choose an Alu to destroy.
-
-Collapse must emerge over years through feedback: shortage weakens people and
-institutions; weak institutions lose routes and revenue; failed routes stop
-trade and reports; failed Alu displace cohorts and transfer pressure to their
-neighbours.
-
-### 8.8 Survival
-
-The seed provides roughly one, two, or three years before regional pressures
-become acute. It determines shocks and initial variation, not a hidden
-countdown or predetermined sequence of fallen Alu.
-
-The player's Alpha 0.7 objective is to keep the chosen Alu alive for as long as
-possible by feeding its population, maintaining authority and essential
-capacity, protecting routes, allocating labour and troops, and responding to
-displaced cohorts.
-
-Combat remains abstract. If a hostile force reaches the Seat, the engine
-resolves defence from committed people, supplies, readiness, walls, route, and
-local conditions. If the defence loses and the Seat falls, the campaign ends.
-
-### 8.9 Royal verbs
-
-The stable Alpha 0.7 verbs are:
-
-- inspect;
-- allocate and ration;
-- levy and assign;
-- appoint and dismiss;
-- judge;
-- demand, offer, promise, and correspond;
-- dispatch;
-- build and repair;
-- tax, exempt, and requisition;
-- protect and close;
-- accept, settle, redirect, and refuse;
-- offer, consult, swear, and expiate;
-- wait and end the fortnight.
-
-The king acts through orders, officials, institutions, and messengers. A valid
-order identifies its subject, authority, executor, material cost, labour,
-destination, and expected delay where those facts apply.
-
-### 8.10 Target window ownership
-
-| Window | Owns | Principal verbs |
-| --- | --- | --- |
-| Hall | urgent matters, passage of time | inspect, open, end fortnight |
-| Alu | cohorts, food, labour, stores, hinterland, walls, works, dependent centres | allocate, ration, levy corvée, release, build, repair, accept, settle, redirect, refuse |
-| Trade | Exchange, merchants, cargo, caravans, commercial routes | finance, authorize, request, offer, tax, exempt, requisition, escort, close |
-| World | Alu, roads, sea legs, moving parties, displacement, known danger | inspect, compare, follow, open correspondence |
-| Scribes | letters, reports, promises, obligations, archives | read, file, delegate, reply, demand, offer, promise, dispatch |
-| Palace | king, court, officials, succession, justice | appoint, dismiss, judge, pardon, name heir |
-| Muster | formations, levies, garrisons, escorts, defence | levy, assign, reinforce, escort, recall |
-| Altar | temple support, rites, divination, oaths | offer, consult, swear, expiate |
-
-Counsel, Orders, and Help remain supporting utilities. An action has one owning
-window even when another window links to it. World displays trade movement;
-Trade owns commercial decisions.
-
-### 8.11 Determinism and knowledge
-
-The same version, shared world data, chosen Alu, seed, and confirmed action log
-produce the same run.
-
-World state contains true cohorts, cargo, conditions, and outcomes. The player
-sees dated Belief: estimates, reports, missing information, and claims. The map
-must not reveal a trade route, epidemic, movement, or failure merely because
-the simulation knows it.
-
-### 8.12 Pinned 1.0 endgame
-
-Iron is a 1.0 endgame, not an Alpha 0.7 task. Alpha 0.7 must not add a research
-bar, iron victory condition, or partial technology system.
+No release gate is satisfied by prose alone.
 
 ---
 
-## 9. How Alpha 0.7 tasks are specified
+## 6. Path to Alpha 0.7
 
-The following tasks are ordered by dependency, but none is permission to code
-from the short description alone.
+Only these workstreams may define scope. Ordered.
 
-Before implementation, every task must receive a focused design pass against:
+### 6.1 Retire the legacy court
 
-- current engine state and authority;
-- existing content and identifiers;
-- current UI and action routes;
-- save and replay compatibility;
-- conservation and deterministic ordering;
-- player knowledge versus hidden World state;
-- performance across the complete shared world;
-- tests that demonstrate causality rather than only a successful function call.
+One authority per fact. Six remain duplicated: the seat's stores, its ordinary
+people, its labour, foreign court standing, actor belief, and the date.
+`tools/authority_audit.py` is the gate — it must report nothing.
 
-If a task exposes a contradiction with an earlier task, the specification is
-revised before code is added. Temporary adapters must have an explicit deletion
-condition.
+This comes first. Every other workstream that touches the world writes twice
+until it is done. Steps are in `docs/TASK_2_TODO.md`.
+
+### 6.2 Finish the correspondence vertical slice
+
+- a foreign need or belief causes an incoming tablet;
+- the Hall shows the arrival cheaply and immediately;
+- the player composes the reply from the blocks in §3.2.1;
+- parsed orders and tone are shown deterministically and confirmed (§3.2.3);
+- seal, copy, scribe, courier, and route are recorded;
+- dispatch, travel, receipt, silence, response, and consequence occur;
+- gifts and marriage proposals use the same path;
+- accepted text and structured meaning replay exactly.
+
+**Decision — which orders a letter may issue.** The corpus, not invention. A
+Late Bronze Age letter demands or promises goods, grain, metal, timber, and
+labour; asks for or offers troops and escorts; complains of raiding and asks
+for protection; reports enemy movement; arranges marriage and dowry; sends,
+requests, and complains about gifts; cites and demands oaths; asks a detained
+messenger be released; refers a dispute for judgement; asks for a physician,
+a craftsman, or a scribe; announces accession or death; and threatens to go to
+a third court. Each of those is one order kind. Nothing outside that list
+ships in 0.7.
+
+### 6.3 Complete the world and the rooms
+
+- a playable autonomous regional network;
+- grain, labour, trade in more than one good, transport, obligation, disease,
+  politics, household, succession, and limited conflict interacting through
+  the shared foundations;
+- the eight rooms of §3.3 owning their verbs, with no working action lost.
+
+**Decision — obligations, and what 0.7 needs.** Four kinds, all letter-facing
+and all with a due date, a debtor, a creditor, and a stated remedy on failure:
+deliver goods, supply labour or troops, pay tribute, and keep an oath. That is
+enough for tribute, corvée, trade contracts, and diplomacy. No fifth kind
+without a rule that reads it.
+
+**Decision — justice and religion in 0.7.** Both stay, both stay small.
+Justice is petitions, rulings, and precedent that people remember; it feeds
+legitimacy and grievance and nothing else. Religion is §2.8: rites cost goods
+and days, omens move expectations, oaths are political facts. Neither grows a
+subsystem in 0.7.
+
+### 6.4 Balance the collapse
+
+Not a system. Knob-turning against long headless runs, once §6.1 to §6.3 are
+real. The targets:
+
+- an unshocked world stays mostly stable;
+- one shock is usually survivable;
+- connected shocks can cascade across settlements;
+- across seeds, an unaided world fails between year 15 and year 30;
+- every failure is reconstructable from stored events.
+
+Nothing here may add a `collapsed` flag, a scripted victim, or a hidden
+countdown.
 
 ---
 
-## 10. Alpha 0.7 implementation tasks
-
-### Task 1 — Classify the existing map as Alu and dependent content — **Done**
-
-Done and dusted. Every map mark carries one classification and one owning Alu.
-The classification and the reasoning behind each verdict are in
-`docs/ALU_CLASSIFICATION.md`, which is now a record, not a plan.
-
-### Task 2 — Finish one-authority world consolidation — **In progress**
-
-**Where it stands:** places, routes, sites, land, harvest, the seat's stores,
-and the seat's people have moved to the kernel. `tools/authority_audit.py`
-reports six remaining duplicates: the seat's stores, its ordinary people, its
-labour, foreign court standing, actor belief, and the date.
-
-**Remaining work:** the open boxes in `docs/TASK_2_TODO.md` — the seat's other
-households, the unrest read, deletion of the legacy allocation and corvée
-fields, `ForeignCourt` to organizations and cohorts, `World.foreign_beliefs` to
-kernel beliefs, one date, an ordered tick, and a save-version refusal.
-
-**Complete when:** The authority audit reports no duplicate or missing
-authority; rooms project kernel facts instead of caching writable copies; the
-legacy tick no longer advances a competing world.
-
-### Task 3 — Make the shared world start every campaign
-
-**Current code:** `load_scenario("ugarit", seed)` loads the only legacy
-scenario. The GUI and session save a scenario name and assume the Ugarit court.
-The kernel loader is separate.
-
-**Design before implementation:** Define the shared-world content boundary,
-the chosen-Alu parameter, assignment of the player to that Alu's existing king,
-and the minimum save migration. Decide how an Alu is refused as unplayable if
-its required king or court data is incomplete during development.
-
-**Complete when:** A new game chooses an Alu and seed, loads the same world for
-every choice, gives the player that Alu's king, and leaves every other Alu
-autonomous. No Alpha 0.7 campaign package is loaded.
-
-### Task 4 — Make kings own Alu
-
-**Current code:** Kernel `Polity` already has `ruler`, `seat`, `controls`, and
-`claims`, but `Kernel.controller()` currently finds a council organization.
-The legacy world separately holds one privileged `Court` and several
-`ForeignCourt` records.
-
-**Design before implementation:** Decide whether one polity may hold several
-Alu in 0.7, how dependent palace centres differ from controlled Alu, how
-succession transfers ownership, and what capture changes. Do not introduce a
-king-to-own-Alu relationship score.
-
-**Complete when:** Every Alu resolves to exactly one current owner and king;
-succession or capture changes that authority explicitly; foreign diplomacy
-addresses kings; discontent remains cohort and institutional state.
-
-### Task 5 — Reduce Alu contents to the minimum authentic model
-
-**Current code:** Legacy Court separately stores estates, workshops,
-institutions, projects, formations, stores, and harbour traffic. Kernel `Site`
-and `Organization` can already represent functions, capacities, holders,
-palaces, temples, merchants, and productive ground, but the data remains much
-more granular and split between systems.
-
-**Design before implementation:** For each proposed distinction—Seat,
-dependent palace centre, hinterland, walls, Exchange, harbour, temple, and
-troops—name the rules that consume it. Anything without a rule remains a
-capacity or description, not a new entity type.
-
-**Complete when:** Every Alu can be simulated with only the agreed contents;
-dependent palace centres belong to an Alu and have no separate king; farms,
-workshops, warehouses, and villages are not needlessly multiplied into
-buildings.
-
-### Task 6 — Complete the cohort population model
-
-**Current code:** Kernel `Cohort` already stores settlement, kind, households,
-people, origin, labour, ration, hunger, and grievance. `seat_people.py` already
-conserves people through split and merge, maps legacy dependent groups, and
-prevents work draws from exceeding the cohort. Legacy `Place.population`,
-plague compartments, and `Court.dependents` remain competing population
-representations.
-
-**Design before implementation:** Define the smallest representation for
-ethnicity, status, health, displacement, institutional tie, and organized
-violence. Specify compatibility rules for merging and whether ethnicity can
-ever change. Decide how disease state composes with cohorts without restoring
-a separate place population.
-
-**Complete when:** Every ordinary person exists in exactly one cohort;
-population totals are derived; ethnicity persists through split, merge,
-migration, hunger, disease, and casualties; player-facing totals remain Belief
-estimates.
-
-### Task 7 — Replace generic corvée days with cohort detachments
-
-**Current code:** `RaiseCorvee` accepts only days. `engine.land` chooses legacy
-dependent groups automatically, `Court.corvee_sources` stores the result, and
-`seat_people.py` adapts those days into cohort work draws. This already prevents
-some double spending but does not let the king choose a cohort, head count,
-destination, duration, ration source, or official.
-
-**Design before implementation:** Define the corvée order and temporary
-detachment lifecycle. Specify conversion between heads and person-days,
-seasonal availability, competing levy or harvest assignments, return and
-merge, refusal, fatigue, mortality, grievance, and cancellation.
-
-**Complete when:** The player can levy all or part of a chosen cohort for a
-specific task; those people are unavailable elsewhere; all people, labour, and
-rations conserve; release returns the surviving detachment without duplication.
-
-### Task 8 — Unify physical roads and sea legs
-
-**Current code:** Legacy routes are 56 courier-oriented edges with mode,
-seasonality, legs, and risk. Kernel routes have explicit legs, cargo capacity,
-toll jurisdictions, season, and risk, but only two are authored. Terrain still
-does not affect travel.
-
-**Design before implementation:** Map every current route into kernel legs.
-Define direction, controller, condition, maintenance, closure, capacity, risk,
-and seasonal rules. Decide which properties belong to a whole route and which
-belong to a leg. Do not add terrain effects without an explicit rule and test.
-
-**Complete when:** Letters, caravans, voyages, troops, disease, and displaced
-cohorts use the same physical network; no legacy route graph remains
-authoritative.
-
-### Task 9 — Build autonomous trade routes and caravans
-
-**Current code:** Kernel trade already matches grain bargains, reserves goods
-and capacity, creates same-turn `Contract` records, and moves cargo in
-`Voyage` state with sea risk and arriving news. It has no land caravan object,
-no durable commercial-route state, no complete merchant population, and no
-Trade window. Legacy harbour traffic and dues are separate abstractions.
-
-**Design before implementation:** Generalize movement without erasing the
-meaningful differences between ships and caravans. Define merchant decision
-inputs, transport ownership, cargo, provisions, guards, rerouting, losses,
-commercial memory, route formation and decay, duties, exemptions, royal
-finance, escorts, requisition, and information carried by travellers.
-
-**Complete when:** Autonomous merchants create real land and sea movements;
-repeated successful movements produce a known trade route; unsafe or
-unprofitable routes decay; goods and transport capacity conserve; not every
-physical road becomes a trade route.
-
-### Task 10 — Implement material shocks
-
-**Current code:** Legacy content contains an authored drought curve; legacy and
-kernel farming consume climate; plague can spread through arrivals; kernel
-voyages can be lost; succession and route risk exist. Earthquake, general
-storm damage, political rupture, route-violence escalation, and a common shock
-framework do not.
-
-**Design before implementation:** Specify each of the eight shocks as changes
-to existing quantities and capacities. Define geographic reach, onset,
-duration, recovery, discoverability, seeded probability, and event records.
-Prefer extending shared climate, health, route, ownership, and capacity rules
-over creating eight isolated minigames.
-
-**Complete when:** Each shock has deterministic unit tests for its direct
-effects and leaves an inspectable causal record. No shock writes “collapsed,”
-selects a scripted victim, or invents consequences outside ordinary systems.
-
-### Task 11 — Implement cascading failure and recovery
-
-**Current code:** Hunger reduces cohort labour and population in the kernel;
-legacy unrest, institution decay, plague, revenue, works, and correspondence
-already interact locally. There is no unified Alu viability model, displacement
-cascade, or long-run collapse audit.
-
-**Design before implementation:** Identify the smallest feedback loops that
-connect food, labour, institutions, routes, trade, reports, obligations,
-displacement, and defence. Define reversible distress separately from
-abandonment or capture. Include recovery and rerouting so collapse is possible,
-not guaranteed.
-
-**Complete when:** Long headless runs demonstrate a mostly stable unshocked
-baseline, frequent recovery from one shock, and possible multi-Alu cascades
-from connected shocks. Every failure can be reconstructed from stored events.
-
-### Task 12 — Implement displacement and abstract defence
-
-**Current code:** The RNG registry names displacement, troop formations can be
-assigned, and garrison strength affects some raid weighting. There is no
-complete cohort migration system, arrival decision, hostile displaced force,
-or Seat-fall outcome.
-
-**Design before implementation:** Define why cohorts leave, how they choose
-destinations, what they carry, and how reception changes cooperation. Define
-the conditions that distinguish petitioners, settlers, raiders, and attackers.
-Specify defence inputs and consequences without a tactical battle layer.
-
-**Complete when:** Cohorts move without duplication, may be accepted, settled,
-redirected, or refused, and can become a hostile force through causal state.
-A defeated Seat ends the chosen-Alu campaign; combat produces an explainable
-record and conserves people and supplies.
-
-### Task 13 — Rebuild royal actions around the agreed verbs
-
-**Current code:** The registry exposes 33 player actions across 19 contexts.
-Many agreed verbs already exist, including allocation, correspondence,
-appointments, justice, dues, works, rites, quarantine, troop assignment, and
-generic corvée. Trade policy, cohort reception, cohort-specific levy, escort,
-requisition, exemption, and shared-world ownership actions are incomplete or
-absent.
-
-**Design before implementation:** Audit each existing action against the target
-verb list. Keep compatible action IDs where semantics remain valid; retire
-obsolete player paths without breaking replay. For every new action define
-subject, authority, executor, cost, delay, refusal, structured outcome, and
-owning window before adding it to the registry.
-
-**Complete when:** Every enabled royal verb has one registered action path,
-one owning window, deterministic cost, explicit confirmation where destructive,
-and tested refusal and success outcomes. No UI mutates world state directly.
-
-### Task 14 — Reorganize windows and add Trade
-
-**Current code:** The Hall currently exposes Scribes, Orders, Counsel,
-Storehouse, City, Corvée/Muster, Oaths, Court, Shrine, World, Sickness, and
-Help. Storehouse embeds land and labour; Palace embeds house, relations,
-justice, and harbour dues; no dedicated Trade window exists.
-
-**Design before implementation:** Compare every existing working action with
-the target ownership table before moving controls. Decide whether Alu absorbs
-Storehouse and City immediately or through a staged adapter. Preserve focused
-letter, archive, institution, and chronicle windows. Do not remove a working
-door until its complete action path is visible elsewhere.
-
-**Complete when:** The eight domain windows own the agreed verbs; Trade has a
-working route/caravan/Exchange view; World links to Trade without owning its
-orders; supporting utilities remain available; keyboard, mouse, focus,
-minimum-size, and window-persistence tests pass.
-
-### Task 15 — Add the Alpha 0.7 campaign lifecycle
-
-**Current code:** A run begins in Ugarit, advances indefinitely by fortnight,
-and has no general chosen-Alu survival score or Seat-fall campaign result.
-Climate is precomputed deterministically, but the one-to-three-year crisis
-runway is not a unified world property.
-
-**Design before implementation:** Define how the seed produces initial
-variation and a pressure window without a hidden destruction schedule. Define
-the minimum campaign result: chosen Alu, reigns, fortnights survived, population
-history, major losses, cause of Seat fall, and world state at the end.
-
-**Complete when:** Any Alu can start reproducibly, the world can remain stable
-or cascade naturally, Seat fall ends the run with an evidence-backed record,
-and no Alpha 0.7 system checks an iron or technology victory.
-
-### Task 16 — Save migration, performance, balance, and release verification
-
-**Current code:** The full suite currently passes 834 tests and already covers
-substantial deterministic, rendering, action, save, kernel, and authority
-behaviour. Existing saves and many tests encode Ugarit and legacy identifiers.
-
-**Design before implementation:** Set migration policy before deleting fields.
-Define representative seeds, chosen Alu, shock combinations, run length, and
-performance budget. Separate invariant tests from balance expectations so
-tuning does not weaken conservation.
-
-**Complete when:** Saves either migrate explicitly or fail with a clear version
-message; authority and inventory audits have no faults; all conservation,
-replay, UI, and long-run tests pass; multiple seeds demonstrate stability,
-recovery, and cascading failure without a scripted collapse.
-
----
-
-## 11. Pinned outside Alpha 0.7
-
-### Release 1.0
-
-- the Iron Age transition and victory condition;
-- other durable survival victories;
-- the final campaign endgame.
-
-### After Alpha 0.7
-
-- civilization-specific kingship, government, court, law, religion,
-  administration, and UI variations;
-- separate campaign or scenario packages;
-- reconsideration of how Greek, Egyptian, Levantine, Anatolian, and other Alu
-  differ beyond shared world data.
-
-### After 1.0
-
-- tactical battles and deeper operational warfare;
-- territorial conquest and detailed army manoeuvre;
-- individually simulating the hundreds of minor settlements;
-- additional regions, eras, and larger population simulation.
-
-These ideas must not quietly enlarge the Alpha 0.7 task list.
-
----
-
-## 12. Open — for the author
-
-Left unanswered on purpose. Fill these in; do not let code guess them.
-
-- **[OPEN] Playable Alu.** All 55 settlements, or a named shorter list for
-  Alpha 0.7?
-- **[OPEN] Task order after Task 2.** Tasks 3 to 16 are ordered by dependency,
-  not by priority. Say which comes first.
-- **[OPEN] Save policy.** Migrate old saves, or refuse them with a version
-  message?
-- **[OPEN] Survival scoring.** What the end-of-run record must state beyond
-  fortnights survived.
-- **[OPEN] Anything below this line.**
-
----
-
-## 13. Superseded documents
-
-Done and dusted. Kept as record. Neither adds a requirement to this file.
-
-| Document | Why it is closed |
-| --- | --- |
-| `docs/archive/2026-08-01-release-1.0/SPEC.md` | The previous authoritative spec, replaced by this file |
-| `docs/ALU_CLASSIFICATION.md` | Task 1, implemented; now a record of the verdicts |
-| `docs/PHASE_C_AUTHORITY.md` | Superseded by `docs/ONE_AUTHORITY_DESIGN.md` |
-| `docs/WORLD_AGENT_PLAN.md` | Correspondence chain delivered |
-| `docs/FARMING_HISTORICITY.md` | A standing note, never a plan |
-
-`docs/ONE_AUTHORITY_DESIGN.md` and `docs/TASK_2_TODO.md` stay live until the
-authority audit is clean.
+## 7. Anti-goals
+
+- no omniscient map, no fog-free strategy layer;
+- no model-authored facts, numbers, or decisions;
+- no scripted collapse, doom timer, or chosen victim;
+- no abstract relationship, posture, or protocol score shown to the player;
+- no entity type without a rule that consumes it;
+- no research tree, technology bar, or iron victory in 0.7;
+- no tactical battle layer;
+- no second full-screen dashboard replacing the rooms.
