@@ -855,6 +855,7 @@ def _world_graph(world) -> dict:
             for site in [world.kernel.registry.sites[i]
                          for i in sorted(world.kernel.registry.sites)]
             if not site.addressable
+            and not world.kernel.registry.settlements[site.settlement].fallen
         ],
     }
 
@@ -872,6 +873,10 @@ def _trade(world, perr: int) -> dict:
     routes = []
     for route_id in world.kernel.commercial_routes():
         route = world.kernel.registry.routes[route_id]
+        if any(world.kernel.registry.settlements[leg.origin].fallen
+               or world.kernel.registry.settlements[leg.destination].fallen
+               for leg in route.legs):
+            continue
         if not any(seat in (leg.origin, leg.destination) for leg in route.legs):
             continue
         routes.append({"id": route_id, "name": route.name,
@@ -898,6 +903,7 @@ def _trade(world, perr: int) -> dict:
 
 
 def project(world) -> dict:
+    from engine import fall
     c = world.court
     d = world.date
     perr = p_error(c.scribe_competence, c.scribe_fatigue)
@@ -949,6 +955,8 @@ def project(world) -> dict:
         })
     relations = []
     for actor, relation in sorted(world.relations.items()):
+        if relation.place not in world.places:
+            continue
         person = world.kernel.registry.persons.get(actor)
         claim_known = (
             relation.status_claim == relation.their_status_claim
@@ -998,6 +1006,9 @@ def project(world) -> dict:
         "archive": archive,
         "inspected": list(c.inspected),
         "unrest": c.unrest,
+        "alu_unrest": fall.unrest(world, seat_id),
+        "ended": world.ended,
+        "end_reason": world.end_reason,
         "legitimacy": c.legitimacy,
         "stores": stores,
         "priority": list(seat_door.order_of_payment(world)),

@@ -34,9 +34,9 @@ from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 
-VIEWS = (("court", "THE COURT · AUDIENCE"),
-         ("house", "THE HOUSEHOLD"),
-         ("relations", "ENVOYS · RELATIONS"))
+VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
+         ("household", "HOUSEHOLD"), ("audience", "AUDIENCE"),
+         ("justice", "JUSTICE"), ("advisers", "ADVISERS"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -501,6 +501,34 @@ def _posts(b: dict) -> list[workbench.Row]:
     return rows
 
 
+def _household(b: dict) -> list[workbench.Row]:
+    seat = _court_place(b)
+    at_court = {p["id"] for p in _people(b) if p.get("location") == seat}
+    return [row for row in _house(b) if row.id in at_court]
+
+
+def _adviser_rows(b: dict) -> list[workbench.Row]:
+    advisers = {p["id"] for p in _people(b) if p.get("post")}
+    advisers |= {str(p.get("id", "")) for p in _advisers(b)}
+    return [row for row in _house(b) if row.id in advisers]
+
+
+def _audience(b: dict) -> list[workbench.Row]:
+    waiting = {p["id"] for p in b.get("justice", {}).get("petitions", [])
+               if p.get("present", True) and not p.get("heard")}
+    return [row for row in _court(b) if row.id in waiting]
+
+
+def _post_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
+    post = next((item for item in b.get("institutions", [])
+                 if item["id"] == chosen), None)
+    if post is None:
+        return [("No office is selected.", "ash")]
+    return [(post["name"], "gold"), (post["kind"], "dim"),
+            ("held by " + (_name(post["head"], b) if post["head"] else "nobody"),
+             "clay" if post["head"] else "blood")]
+
+
 def _house_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
     person = next((p for p in _people(b) if p["id"] == chosen), None)
     if person is None:
@@ -638,10 +666,12 @@ def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
     than by giving an order -- so the action a control belongs to cannot be
     recovered from the drawn screen, and the guard has to read this instead.
     """
-    if view == "court":
+    if view in {"court", "audience", "justice"}:
         return _court_controls(b, chosen, hours)
-    if view == "house":
+    if view in {"house", "people", "household", "advisers"}:
         return _house_controls(b, person or chosen, hours, choosing)
+    if view == "offices":
+        return []
     return _relations_controls(b, chosen, hours, amount, good)
 
 
@@ -651,10 +681,15 @@ HEADERS = {
     "relations": (("court", "regard", "letters", "owed"), (19, 10, 12, 9)),
     "post": (("post", "kind", "who holds it", ""), (21, 10, 17, 2)),
 }
+HEADERS.update({"people": HEADERS["house"], "household": HEADERS["house"],
+                "advisers": HEADERS["house"], "offices": HEADERS["post"],
+                "audience": HEADERS["court"], "justice": HEADERS["court"]})
 
 
 LISTINGS = {"court": _court, "house": _house, "relations": _relations,
-            "post": _posts}
+            "post": _posts, "people": _house, "household": _household,
+            "advisers": _adviser_rows, "offices": _posts,
+            "audience": _audience, "justice": _court}
 
 
 def listing_rows(b: dict, listing: str) -> list[workbench.Row]:
@@ -702,7 +737,8 @@ def compose(b: dict, view: str = "court", selected: str = "",
             height: int = 34) -> InteractiveScreen:
     """`selected` is the row of whatever is listed; `person` is the man being
     placed, which is a different thing the moment the list turns to posts."""
-    listing = "post" if (view == "house" and choosing == "post") else view
+    listing = "post" if (view in {"house", "people", "household", "advisers"}
+                          and choosing == "post") else view
     rows = listing_rows(b, listing)
     chosen = next((row.id for row in rows if row.id == selected),
                   rows[0].id if rows else "")
@@ -710,10 +746,12 @@ def compose(b: dict, view: str = "court", selected: str = "",
     who = person if choosing == "post" else chosen
     headers, widths = HEADERS[listing]
     _stacked, detail_width = _detail_geometry(width, widths)
-    if view == "court":
+    if view in {"court", "audience", "justice"}:
         detail = _court_detail(b, chosen, detail_width)
-    elif view == "house":
+    elif view in {"house", "people", "household", "advisers"}:
         detail = _house_detail(b, who)
+    elif view == "offices":
+        detail = _post_detail(b, chosen)
     else:
         detail = _relations_detail(b, chosen, amount, good)
     controls = controls_for(b, view, chosen, hours, choosing, person=who,
@@ -722,7 +760,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
     band = scene_rows(height)
     queue = rows
 
-    title = "THE COURT"
+    title = "THE COURT — RELATIONS" if view == "relations" else "THE COURT"
     note = "↑↓ choose   Enter open   Tab view   [c] counsel"
     if choosing == "post":
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
@@ -733,7 +771,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
     # the words a verdict acts upon. Supported sizes fit ordinary cases in a
     # compact stacked pane; exceptionally long evidence leaves verdicts
     # visibly disabled rather than asking the king to judge hidden text.
-    if view == "court":
+    if view in {"court", "audience", "justice"}:
         petition = _court_item(b, chosen)
         if petition is not None and petition["heard"]:
             evidence_rows = len(_evidence_lines(b, petition, detail_width))
@@ -769,4 +807,10 @@ def _empty(listing: str) -> str:
         "house": "no adult of the house waits on you.",
         "relations": "no foreign court is in correspondence.",
         "post": "there is no post to give.",
+        "people": "no person is recorded at this court.",
+        "household": "no member of the household is at court.",
+        "advisers": "no adviser holds a court office.",
+        "offices": "there is no court office.",
+        "audience": "nobody waits in audience.",
+        "justice": "no petition is on the docket.",
     }[listing]

@@ -7,6 +7,8 @@ from engine.kernel import world as K
 def faults(kernel: K.Kernel) -> tuple[str, ...]:
     found: list[str] = []
     for settlement_id in sorted(kernel.registry.settlements):
+        if kernel.registry.settlements[settlement_id].fallen:
+            continue
         if kernel.king(settlement_id) is None:
             found.append(f"{settlement_id}: no king")
         if not kernel.controller(settlement_id):

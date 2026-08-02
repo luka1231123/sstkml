@@ -19,7 +19,7 @@ from tui import art, style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
-VIEWS = ("rites", "divination", "oaths")
+VIEWS = ("rites", "offerings", "oaths", "obligations")
 
 # question -> (key, what the king is asking about, what it costs him)
 QUESTIONS = (
@@ -101,15 +101,23 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             offering: tuple[str, int] | None = None,
             width: int = 78, height: int = 32,
             subject: str = "", notice: str = "",
-            view: str = "divination") -> InteractiveScreen:
+            view: str = "rites") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE SHRINE", drop=False)
-    if view == "rites":
+    if view == "offerings":
         workbench.tabs(surface, 2, 2, width,
                        tuple((name, name.title()) for name in VIEWS), view)
-        surface.text(3, 5, "RITES", C["gold"], C["ink"])
-        surface.text(3, 7, "no rite awaits a royal decision", C["ash"], C["ink"])
+        surface.text(3, 5, "OFFERINGS IN THE STOREHOUSE", C["gold"], C["ink"])
+        stores = b.get("stores", {})
+        for row, (key, good, quantity) in enumerate(OFFERINGS, 7):
+            chosen_one = offering is not None and offering[0] == good
+            surface.text(2, row, ">" if chosen_one else " ", C["flame"], C["ink"])
+            style.keycap(surface, 4, row, key, f"{quantity} {good}")
+            surface.text(28, row, f"held {stores.get(good, 0):,}", C["clay"], C["ink"])
+        surface.text(3, 12, "The chosen offering is consumed when a rite is performed.",
+                     C["dim"], C["ink"])
         style.footer(surface, (style.FooterAction("Tab", "view"),
+                               style.FooterAction("Enter", "return to rites"),
                                style.FooterAction("Esc", "close")),
                      y=height - 2, x=2, width=width - 4)
         return surface.interactive()

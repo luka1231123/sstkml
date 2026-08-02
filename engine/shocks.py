@@ -25,6 +25,8 @@ def land(world: World, kind: str, target: str, severity: int,
     settlement = _settlement(world, target)
     if settlement not in world.kernel.registry.settlements:
         raise ValueError(f"unknown Alu {target!r}")
+    if world.kernel.registry.settlements[settlement].fallen:
+        raise ValueError(f"fallen Alu {target!r}")
     severity = max(1, min(900, severity))
     turn = world.date.absolute
     shock_id = f"{turn}:{kind}:{settlement}"
@@ -141,7 +143,11 @@ def step(world: World) -> tuple[World, list]:
     rng = stream(world.seed, world.date.absolute, "world.shock", "regional")
     if not rng.chance(80, 1000):
         return world, events
-    target = rng.pick(tuple(sorted(world.kernel.registry.settlements)))
+    targets = tuple(s for s in sorted(world.kernel.registry.settlements)
+                    if not world.kernel.registry.settlements[s].fallen)
+    if not targets:
+        return world, events
+    target = rng.pick(targets)
     kind = rng.pick(KINDS)
     world, landed = land(
         world, kind, target, 150 + rng.int(351), 2 + rng.int(11))

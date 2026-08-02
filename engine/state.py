@@ -874,6 +874,8 @@ def _build_places(registry) -> Mapping[PlaceId, Place]:
 
     for sid in sorted(registry.settlements):
         s = registry.settlements[sid]
+        if s.fallen:
+            continue
         place_id = sid.split(":", 1)[1]
         cohorts = [c for c in registry.cohorts.values()
                    if c.settlement == sid and not c.in_transit]
@@ -889,6 +891,8 @@ def _build_places(registry) -> Mapping[PlaceId, Place]:
             dead=dead)
     for site_id in sorted(registry.sites):
         site = registry.sites[site_id]
+        if registry.settlements[site.settlement].fallen:
+            continue
         if not site.addressable:
             continue
         place_id = site_id.split(":", 1)[1]
@@ -928,4 +932,7 @@ def _build_routes(registry) -> tuple["Route", ...]:
     """The routes a courier can walk: two named ends and at least one leg."""
     return tuple(registry.routes[rid] for rid in sorted(registry.routes)
                  if registry.routes[rid].legs
-                 and len(registry.routes[rid].ends) == 2)
+                 and len(registry.routes[rid].ends) == 2
+                 and all(not registry.settlements[leg.origin].fallen
+                         and not registry.settlements[leg.destination].fallen
+                         for leg in registry.routes[rid].legs))

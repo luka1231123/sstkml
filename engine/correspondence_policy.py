@@ -408,6 +408,10 @@ def step(world: World) -> tuple[World, list]:
     for index, case in enumerate(cases):
         if not case.open() or case.delay_until > now:
             continue
+        if case.place not in world.places:
+            cases[index] = dataclasses.replace(
+                case, decision="ignore", decided_turn=now, delay_until=0)
+            continue
         belief = foreign_belief.belief_of(world, case.actor)
         decision = decide(case.actor, belief, case, now)
         decision = _affordable(world, case.actor, decision)

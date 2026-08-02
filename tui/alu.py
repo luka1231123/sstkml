@@ -35,6 +35,15 @@ C = INDEX
 VIEWS = ("overview", "cohorts", "institutions", "sites", "works")
 
 
+def sites(b: dict) -> list[dict]:
+    seat = b.get("seat", "seat")
+    return [dict(site, id=f"site:{index}", place=seat,
+                 name=site.get("name") or f"{site.get('kind', 'site')} {index + 1}")
+            for index, site in enumerate(
+                b.get("world_graph", {}).get("sites", ()))
+            if site.get("alu") == seat]
+
+
 def _plain(b: dict, view: str, width: int, height: int, notice: str,
            selected: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
@@ -44,6 +53,7 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
     rows = []
     if view == "overview":
         rows = [("people", sum(c.get("size", 0) for c in b.get("cohorts", ()))),
+                ("unrest", f"{b.get('alu_unrest', 0)} / 1000"),
                 ("cohorts", len(b.get("cohorts", ()))),
                 ("awaiting reception", sum(c.get("status") in {"displaced", "petitioning"}
                                            for c in b.get("cohorts", ()))),
@@ -53,8 +63,8 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
         rows = [(c.get("name", c["id"]), f"{c.get('size', 0):,} · {c.get('place', '')}")
                 for c in b.get("cohorts", ())]
     elif view == "sites":
-        rows = [(i["name"], f"{i.get('place', '')} · {i.get('kind', '')}")
-                for i in b.get("institutions", ())]
+        rows = [(i["name"], i.get("capacity") or i.get("role", ""))
+                for i in sites(b)]
     else:
         rows = [(p.get("what", p.get("id", "work")),
                  f"{p.get('days_done', 0):,}/{p.get('days_needed', 0):,} days")
@@ -63,7 +73,7 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
         surface.text(3, y, str(name)[:max(8, width // 2 - 4)], C["clay"], C["ink"])
         surface.text(width // 2, y, str(value)[:max(0, width // 2 - 3)], C["dim"], C["ink"])
         source = (b.get("cohorts", ()) if view == "cohorts" else
-                  b.get("institutions", ()) if view == "sites" else ())
+                  sites(b) if view == "sites" else ())
         item = next((item for item in source if item.get("name", item.get("id")) == name), None)
         if item:
             surface.text(2, y, ">" if item["id"] == selected else " ",

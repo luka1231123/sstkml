@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from collections.abc import Mapping
 
 from engine.entity import Cohort, EntityId, mint, mint_all
@@ -216,7 +217,8 @@ def split(cohort: Cohort, shares: Mapping[str, int],
         return (cohort,)
     if "/" in cohort.id:
         root = cohort.id.split("/", 1)[0]
-        base = int.from_bytes(cohort.id.encode()) * len(keys)
+        base = int.from_bytes(hashlib.blake2b(
+            cohort.id.encode(), digest_size=8).digest()) * len(keys)
         ids = {key: mint(root, turn, "household", base + i)
                for i, key in enumerate(keys)}
     else:

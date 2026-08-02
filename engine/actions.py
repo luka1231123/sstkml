@@ -659,6 +659,15 @@ class SeatFell:
 
 
 @dataclasses.dataclass(frozen=True)
+class AluFell:
+    alu: str
+    cause: str
+    population: int
+    unrest: int
+    elites: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class CanalDredged:
     estate_id: str
     days: int
@@ -1035,7 +1044,7 @@ _TYPES = {
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
         CohortDetached, CohortReturned, CohortDisplaced, CohortReceived,
         TradeFinanced, TradeRequisitioned,
-        SeatDefended, SeatFell, CanalDredged,
+        SeatDefended, SeatFell, AluFell, CanalDredged,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,
         BronzeMelted, WorkshopDemandMet,
         InstitutionDecayed, InstitutionUpkeepConsumed,

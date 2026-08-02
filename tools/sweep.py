@@ -10,12 +10,12 @@ pattern is not balanced.
 This plays the same scripted policies over many seeds and reports the *spread*.
 What matters is not the median; it is the tails:
 
-* a seed where the prudent policy still starves is a seed where competent play
-  loses to weather, and the player will read it as the game being unfair
+* whether austerity conserves stores, and what it costs the dependent groups
+  and connected settlements
 * a seed where the passive policy never empties the granary is a seed with no
   game in it at all
 
-Both are failures. The distance between them is the design.
+The distance between them is the design.
 
     python3 tools/sweep.py [count] [turns]
     python3 tools/sweep.py 40 96 --csv > sweep.csv
@@ -123,18 +123,18 @@ def main(argv: list[str]) -> int:
     seeds = SEEDS[:count]
 
     if "--csv" in argv:
-        keys = ("policy",) + tuple(metrics("prudent", seeds[0], 4).keys())
+        keys = ("policy",) + tuple(metrics("austerity", seeds[0], 4).keys())
         print(",".join(keys))
-        for policy in ("passive", "prudent"):
+        for policy in ("passive", "austerity"):
             for seed in seeds:
                 row = metrics(policy, seed, turns)
                 print(",".join(str(row.get(key, policy)) for key in keys))
         return 0
 
-    for policy in ("passive", "prudent"):
+    for policy in ("passive", "austerity"):
         rows = [metrics(policy, seed, turns) for seed in seeds]
         print("\n".join(report(policy, rows, turns)))
-    print("\n  a seed where PRUDENT starves is a seed that punishes competence.")
+    print("\n  AUSTERITY should conserve stores, with visible social costs.")
     print("  a seed where PASSIVE never empties is a seed with no game in it.")
     return 0
 

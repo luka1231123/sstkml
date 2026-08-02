@@ -11,7 +11,9 @@ from engine.state import World
 def _destination(world: World, origin: str, exclude: str = "") -> str:
     edges = travel.adjacency(world.kernel.registry.routes).get(origin, ())
     choices = sorted({edge.destination for edge in edges
-                      if edge.destination != exclude})
+                      if edge.destination != exclude
+                      and not world.kernel.registry.settlements[
+                          edge.destination].fallen})
     if not choices:
         return ""
 
@@ -90,7 +92,7 @@ def step(world: World) -> tuple[World, list]:
         destination = _destination(world, cohort.settlement)
         if not destination:
             continue
-        heads = max(1, cohort.people * min(400, cohort.hunger * 40) // 1000)
+        heads = max(1, cohort.people * min(250, cohort.hunger * 20) // 1000)
         if heads >= cohort.people:
             continue
         parent, party = SP.split(

@@ -6,13 +6,12 @@ Two policies, because they answer different questions:
   `passive`  pays every group its full entitlement and never adjusts. This is
              the deficit made visible: how many turns before the granary is
              empty, and what the collapse looks like on the way down.
-  `prudent`  cuts the payroll from the bottom of the priority list to fit the
-             grain actually coming in. This is the game played competently, and
-             it is the run the metal story has to be legible in -- because a
-             court in ruins has stopped commissioning bronze, and the point of
-             6.5 is that the chain fails while everything looks fine.
+  `austerity` cuts the payroll from the bottom of the priority list to fit the
+             grain actually coming in. It is a deliberate stress policy, not
+             competent play: it exposes who bears a short ration and whether
+             material conservation actually buys survival.
 
-Usage:  python3 tools/balance.py [passive|prudent] [turns] [seed]
+Usage:  python3 tools/balance.py [passive|austerity] [turns] [seed]
 """
 from __future__ import annotations
 
@@ -28,7 +27,7 @@ from engine.tick import advance            # noqa: E402
 from load import load_campaign             # noqa: E402
 
 
-def _prudent_allocations(world, budget: int) -> list:
+def _austerity_allocations(world, budget: int) -> list:
     """Pay down the priority list until the budget is gone; cut the rest."""
     from engine import seat
 
@@ -47,7 +46,7 @@ def _prudent_allocations(world, budget: int) -> list:
     return actions
 
 
-def run(policy: str = "prudent", turns: int = 72,
+def run(policy: str = "austerity", turns: int = 72,
         seed: int = 8814402919, chosen_alu: str = "seat") -> dict:
     world = load_campaign(chosen_alu, seed)
     rows = []
@@ -57,13 +56,14 @@ def run(policy: str = "prudent", turns: int = 72,
         from engine import seat
         stores = seat.held(world)
         roll = seat.groups(world)
-        if policy == "prudent":
+        if policy == "austerity":
             # Spend against what the land actually returned last year, not
             # against the entitlement. One-turn lag applies (D3).
             annual = court.last_land_due
-            budget = annual // 24
+            budget = (annual // 24 if annual else
+                      sum(g.size * g.entitlement for g in roll.values()))
             # A cushion: never spend the granary below one year of seed.
-            for action in _prudent_allocations(world, budget):
+            for action in _austerity_allocations(world, budget):
                 world, _ = apply(world, action)
             # Hands to the fields when the granary is thin and the crop is standing.
             if stores.get("grain", 0) < annual // 4:
@@ -115,7 +115,7 @@ def report(result: dict) -> None:
 
 
 if __name__ == "__main__":
-    policy = sys.argv[1] if len(sys.argv) > 1 else "prudent"
+    policy = sys.argv[1] if len(sys.argv) > 1 else "austerity"
     turns = int(sys.argv[2]) if len(sys.argv) > 2 else 72
     seed = int(sys.argv[3]) if len(sys.argv) > 3 else 8814402919
     report(run(policy, turns, seed))

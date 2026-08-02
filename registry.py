@@ -141,7 +141,7 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     _d("delegate_letter", A.DelegateLetter, "Delegate", "Delegate",
        ("stack", "letter"), ("delegate <tablet> to <person>",), 1,
        (Field("tablet", "tablet"), Field("person", "person")),
-       mnemonic="g", help_topic="delegate_letter", confirm=True),
+       mnemonic="g", help_topic="delegate_letter"),
     _d("dictate_reply", A.DictateReply, "Answer", "Answer",
        ("stack", "letter", "desk"), ("answer <tablet>",), 2,
        (Field("tablet", "tablet"),), mnemonic="w",

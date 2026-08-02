@@ -662,6 +662,10 @@ class Game:
         return True
 
     def end_fortnight(self) -> None:
+        if self.world.ended:
+            self.session_notice = self.world.end_reason
+            self.repaint()
+            return
         if self.counsel_pending is not None:
             self.counsel_pending = None
             self.counsel_said.append((
@@ -814,7 +818,8 @@ class Game:
                 return alu.detail(b, inst, inst.get("history"), width, height)
         if key.startswith("focus:"):
             item = self.focused_objects.get(key)
-            return object_page.compose(item, width, height) if item else None
+            kind = key.split(":", 2)[1]
+            return object_page.compose(item, width, height, kind) if item else None
         if key == "counsel":
             suggestions = [
                 concern.order_prompt or concern.suggestion
@@ -837,7 +842,8 @@ class Game:
                 width, height, self.help_query, self.help_pick,
                 self.help_screen)
         if key == "altar":
-            if getattr(self, "shrine_view", "divination") == "oaths":
+            shrine_view = getattr(self, "shrine_view", "rites")
+            if shrine_view == "oaths":
                 state = self.ledger_state["oaths"]
                 return ledger_page.oaths(
                     b, selected=state["pick"], scroll=state["scroll"],
@@ -845,11 +851,16 @@ class Game:
                     width=width, height=height,
                     views=tuple((name, name.title()) for name in altar.VIEWS),
                     view="oaths")
+            if shrine_view == "obligations":
+                state = self.ledger_state["oaths"]
+                return ledger_page.obligations(
+                    b, selected=state["pick"], scroll=state["scroll"],
+                    notice=notice, hours=self.hours, width=width, height=height)
             return altar.compose(b, self.altar_readings, self.altar_question,
                                  self.altar_offering, width, height,
                                  subject=self.altar_subject,
                                  notice=self.altar_notice,
-                                 view=getattr(self, "shrine_view", "divination"))
+                                 view=shrine_view)
         if key == "archive":
             return archive.compose(b, self.archive_query, self.archive_hits,
                                    self.archive_summary, self.archive_typing,
@@ -2024,7 +2035,8 @@ class Game:
         if state is None:
             state = self.__dict__["_ledger_state"] = {
                 key: {"pick": "", "scroll": 0, "amount": 0}
-                for key in ("stores", "roll", "land", "muster", "oaths")
+                for key in ("stores", "roll", "land", "reserves", "dues",
+                            "muster", "oaths")
             }
             state["roll"]["priority"] = []
             state["land"]["group"] = ""
@@ -2038,7 +2050,7 @@ class Game:
 
     @storehouse_view.setter
     def storehouse_view(self, view: str) -> None:
-        if view in {"stores", "roll", "land"}:
+        if view in {key for key, _label in ledger_page.STOREHOUSE_VIEWS}:
             self.__dict__["_storehouse_view"] = view
 
     # --- the Orders workbench (UI/UX spec 13) ---------------------------------
@@ -2204,6 +2216,8 @@ class Game:
                 return ledger_page.land(
                     b, days=state["amount"],
                     group=state.get("group", ""), **common)
+            if view in {"reserves", "dues"}:
+                return ledger_page.storehouse_account(b, view, **common)
             return ledger_page.stores(
                 b, amount=state["amount"], **common)
         state = self.ledger_state[key]
@@ -2335,22 +2349,40 @@ class Game:
         if command.startswith("tab:"):
             chosen = command.split(":", 1)[1]
         elif event.keysym in {"Tab", "ISO_Left_Tab"}:
-            views = ("stores", "roll", "land")
+            views = tuple(key for key, _label in ledger_page.STOREHOUSE_VIEWS)
             step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
             chosen = views[(views.index(self.storehouse_view) + step) % len(views)]
-        elif char in {"1", "2", "3"}:
-            chosen = {"1": "stores", "2": "roll", "3": "land"}[char]
-        if chosen in {"stores", "roll", "land"}:
+        elif char.isdigit() and 1 <= int(char) <= len(ledger_page.STOREHOUSE_VIEWS):
+            chosen = ledger_page.STOREHOUSE_VIEWS[int(char) - 1][0]
+        if chosen in {key for key, _label in ledger_page.STOREHOUSE_VIEWS}:
             self.storehouse_view = chosen
             self.clear_notice("stores")
             self.repaint()
             return
-        if self.storehouse_view == "roll":
+        if self.storehouse_view in {"reserves", "dues"}:
+            self.on_storehouse_account_key(event)
+        elif self.storehouse_view == "roll":
             self.on_roll_key(event, window="stores")
         elif self.storehouse_view == "land":
             self.on_land_key(event, window="stores")
         else:
             self.on_stores_key(event, window="stores")
+
+    def on_storehouse_account_key(self, event) -> None:
+        view = self.storehouse_view
+        state = self.ledger_state[view]
+        if self.ledger_key(view, event, 0, "stores"):
+            return
+        if view != "dues" or (event.char or "") not in {"<", ">"}:
+            return
+        step = -25 if event.char == "<" else 25
+        target = state["pick"] or "land"
+        if target == "land":
+            rate = self.belief.get("land", {}).get("land_due_rate", 0)
+            self.do(A.SetLandDue(max(0, min(1000, rate + step))), window="stores")
+        elif target == "harbour":
+            rate = self.belief.get("revenue", {}).get("harbour_rate", 0)
+            self.do(A.SetHarbourDue(max(0, min(1000, rate + step))), window="stores")
 
     def on_stores_key(self, event, window: str = "stores") -> None:
         state = self.ledger_state["stores"]
@@ -2425,9 +2457,13 @@ class Game:
         elif char == ">":
             self.do(A.SetLandDue(min(1000, rate + step)), window=window)
         elif char.lower() == _key("levy_cohort") or wanted == "levy_cohort":
-            self.notify("open Command to name the cohort, heads, destination, task, rations, and official.",
-                        registry.PREVIEW, window=window)
-            self.repaint()
+            self.command_line = "levy "
+            if hasattr(self, "app"):
+                self.open_palette()
+            else:
+                self.notify("Command is ready: levy …", registry.PREVIEW,
+                            window=window)
+                self.repaint()
         elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
             estate = next(
                 (e for e in data.get("estates", [])
@@ -2498,7 +2534,12 @@ class Game:
         if view in {"cohorts", "draft"} and (
                 char == _key("levy_cohort") or wanted == "levy_cohort"):
             self.command_line = "levy "
-            self.open_palette()
+            if hasattr(self, "app"):
+                self.open_palette()
+            else:
+                self.notify("Command is ready: levy …", registry.PREVIEW,
+                            window="muster")
+                self.repaint()
         elif view == "detachments" and (char == "r" or wanted == "release_cohort"):
             self.command_line = "release "
             self.open_palette()
@@ -3123,7 +3164,7 @@ class Game:
 
     def on_altar_key(self, event) -> None:
         views = altar.VIEWS
-        view = getattr(self, "shrine_view", "divination")
+        view = getattr(self, "shrine_view", "rites")
         command = getattr(event, "command", "")
         if command.startswith("tab:"):
             self.shrine_view = command.split(":", 1)[1]
@@ -3134,15 +3175,23 @@ class Game:
             self.shrine_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
-        if view == "oaths":
+        if view in {"oaths", "obligations"}:
             self.on_oaths_key(event, window="altar")
             return
         if event.keysym == "Escape":
             self.app.close("altar")
             return
-        if view == "rites":
-            return
         char = (event.char or "").lower()
+        if view == "offerings":
+            for key, good, quantity in altar.OFFERINGS:
+                if char == key:
+                    self.altar_offering = (good, quantity)
+                    self.repaint()
+                    return
+            if event.keysym == "Return":
+                self.shrine_view = "rites"
+                self.repaint()
+            return
         omen = next((o for o in reversed(self.belief.get("house", {}).get("omens", ()))
                      if o.get("published") and not o.get("defied")), None)
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
@@ -3330,6 +3379,8 @@ class Game:
                          if item["id"] == ref), None)
             item = item or next((item for item in self.belief.get("institutions", ())
                                  if item["id"] == ref), None)
+            item = item or next((item for item in alu.sites(self.belief)
+                                 if item["id"] == ref), None)
             if item:
                 self.open_focus("cohort" if ref.startswith("cohort:") else "site", item)
             return
@@ -3359,7 +3410,7 @@ class Game:
         if view in {"cohorts", "sites"} and (
                 event.keysym in {"Up", "Down"} or command == "alu:next"):
             source = (self.belief.get("cohorts", ()) if view == "cohorts"
-                      else self.belief.get("institutions", ()))
+                      else alu.sites(self.belief))
             ids = [item["id"] for item in source]
             if ids:
                 here = ids.index(getattr(self, "alu_pick", "")) if getattr(self, "alu_pick", "") in ids else 0
@@ -3370,7 +3421,7 @@ class Game:
             ref = getattr(self, "alu_pick", "")
             item = next((item for item in self.belief.get("cohorts", ())
                          if item["id"] == ref), None)
-            item = item or next((item for item in self.belief.get("institutions", ())
+            item = item or next((item for item in alu.sites(self.belief)
                                  if item["id"] == ref), None)
             if item:
                 self.open_focus("cohort" if view == "cohorts" else "site", item)
@@ -3483,6 +3534,27 @@ class Game:
                 len(refs), here, self.STEPS.get(event.keysym, 1))]
             self.repaint()
             return
+        if char.isdigit() and char != "0" and self.archive_hits:
+            size = self._size("stack" if embedded else "archive") \
+                if hasattr(self, "app") else (84, 32)
+            selected = next(
+                (i for i, hit in enumerate(self.archive_hits)
+                 if str(hit.get("ref", "")) == getattr(self, "archive_pick", "")), -1)
+            page = archive.result_page(
+                len(self.archive_hits), getattr(self, "archive_summary", ""), *size,
+                self.scroll_of("archive_scroll"), embedded, selected)
+            index = page.absolute(int(char))
+            if index < 0:
+                return
+            item = self.archive_hits[index]
+            self.archive_pick = str(item.get("ref", ""))
+            if embedded:
+                self.archive_open_ref = self.archive_pick
+                self.archive_document_scroll["embedded"] = 0
+                self.repaint()
+            else:
+                self.open_archive_document(item)
+            return
         if char == "/":
             self.archive_typing = True
             self.archive_query = ""
@@ -3518,7 +3590,8 @@ class Game:
 
     def palace_listing(self) -> str:
         state = self.palace_state
-        if state["view"] == "house" and state["choosing"] == "post":
+        if state["view"] in {"house", "people", "household", "advisers"} \
+                and state["choosing"] == "post":
             return "post"
         return state["view"]
 
@@ -3565,11 +3638,16 @@ class Game:
             ref = self.palace_pick()
             pools = (self.belief.get("justice", {}).get("petitions", ()),
                      self.belief.get("house", {}).get("members", ()),
+                     self.belief.get("institutions", ()),
                      self.belief.get("relations", ()))
             item = next((item for pool in pools for item in pool
                          if item.get("id", item.get("other")) == ref), None)
             if item:
-                self.open_focus(listing, item)
+                kind = ("person" if listing in {"house", "people", "household", "advisers"}
+                        else "institution" if listing in {"post", "offices"}
+                        else "petition" if listing in {"court", "audience", "justice"}
+                        else listing)
+                self.open_focus(kind, item)
             return
         if event.keysym in ("Up", "Down"):
             # Walked over everything the view lists, not over the rows that
@@ -3610,15 +3688,16 @@ class Game:
         if state["choosing"] == "post":
             self.palace_place(command, event.keysym, lower)
             return
-        if state["view"] == "court":
+        if state["view"] in {"court", "audience", "justice"}:
             self.palace_court(command, lower)
-        elif state["view"] == "house":
+        elif state["view"] in {"house", "people", "household", "advisers"}:
             self.palace_house(command, lower)
-        else:
+        elif state["view"] == "relations":
             self.palace_relations(command, char)
 
     def palace_court(self, command: str, char: str) -> None:
-        petition = self.palace_pick("court")
+        listing = self.palace_listing()
+        petition = self.palace_pick(listing)
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         if not petition:
             return
@@ -3648,11 +3727,11 @@ class Game:
             self.repaint()
             return
         if self.do(A.RulePetition(petition, verdict), window="palace"):
-            self.palace_state["pick"].pop("court", None)
+            self.palace_state["pick"].pop(listing, None)
 
     def palace_house(self, command: str, char: str) -> None:
         state = self.palace_state
-        person_id = self.palace_pick("house")
+        person_id = self.palace_pick(self.palace_listing())
         person = next((p for p in palace._people(self.belief)
                        if p["id"] == person_id), None)
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
@@ -3927,13 +4006,13 @@ class Game:
         command = getattr(event, "command", "")
         if command.startswith("trade:open:"):
             _trade, _open, kind, number = command.split(":", 3)
-            source = {"exchange": self.belief.get("trade", {}).get("cargo", ()),
+            source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
                       "movements": self.belief.get("trade", {}).get("movements", ()),
                       "routes": self.belief.get("trade", {}).get("routes", ())}.get(kind, ())
             index = int(number)
             if index < len(source):
                 self.trade_pick = str(source[index].get("id") or f"{kind}:{index}")
-                self.open_focus(kind.rstrip("s"), source[index])
+                self.open_focus("cargo" if kind == "cargo" else kind.rstrip("s"), source[index])
             return
         if command.startswith("tab:"):
             self.trade_view = command.split(":", 1)[1]
@@ -3944,7 +4023,7 @@ class Game:
             self.trade_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
-        source = {"exchange": self.belief.get("trade", {}).get("cargo", ()),
+        source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
                   "movements": self.belief.get("trade", {}).get("movements", ()),
                   "routes": self.belief.get("trade", {}).get("routes", ())}.get(view, ())
         ids = [str(item.get("id") or f"{view}:{index}")
@@ -3958,13 +4037,13 @@ class Game:
             here = ids.index(getattr(self, "trade_pick", "")) if getattr(self, "trade_pick", "") in ids else 0
             self.open_focus(view.rstrip("s"), source[here])
             return
-        if view == "exchange" and char in {"f", "r"}:
+        if view in {"exchange", "cargo"} and char in {"f", "r"}:
             self.command_line = {"f": "finance ", "r": "requisition ",
                                  }[char]
             self.open_palette()
-        elif view == "exchange" and char == "e":
+        elif view in {"exchange", "cargo"} and char == "e":
             self.do(A.ExemptTrade(), window="trade")
-        elif view == "orders" and char in {"<", ">"}:
+        elif view == "dues" and char in {"<", ">"}:
             rate = self.belief.get("revenue", {}).get("harbour_rate", 0)
             self.do(A.SetHarbourDue(max(0, min(1000, rate + (-25 if char == "<" else 25)))),
                     window="trade")
@@ -3974,7 +4053,7 @@ class Game:
         elif view in {"movements", "routes"} and char == "c":
             self.command_line = "quarantine "
             self.open_palette()
-        elif view == "orders" and char in {"a", "o", "p"}:
+        elif view == "dues" and char in {"a", "o", "p"}:
             relation = next(iter(self.belief.get("relations", ())), None)
             if relation:
                 self.open_new_letter(relation["other"], relation["place"],
@@ -4138,10 +4217,11 @@ class Game:
         if not archive_typing and char in views:
             choose_view(views[char])
             return
-        if not archive_typing and event.keysym in {"Tab", "ISO_Left_Tab"}:
+        if not archive_typing and event.keysym in {
+                "Tab", "ISO_Left_Tab", "Left", "Right"}:
             stations = [key for key, _label in inbox_page.VIEWS]
             here = stations.index(self.inbox_filter) if self.inbox_filter in stations else 0
-            step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
+            step = -1 if event.keysym in {"ISO_Left_Tab", "Left"} or getattr(event, "state", 0) & 1 else 1
             choose_view(stations[(here + step) % len(stations)])
             return
         if self.inbox_filter == "records":

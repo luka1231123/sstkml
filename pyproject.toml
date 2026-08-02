@@ -1,20 +1,9 @@
 [project]
 name = "sttkml"
-version = "0.0.1"
+version = "0.5.2"
 description = "SAY TO THE KING, MY LORD — a deterministic Late Bronze Age archive game"
 requires-python = ">=3.12"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-# Run in parallel by default. The suite is mostly whole-world simulation -- a
-# few hundred tests that each advance fifty-five settlements for tens or
-# hundreds of fortnights -- so it is CPU-bound and serial it takes a quarter of
-# an hour, which is long enough that people stop running it.
-#
-# `--dist load` hands out one test at a time. `loadfile` keeps a file on one
-# worker, which sounds tidier and is worse here: `test_m9.py` alone is minutes,
-# so one file would set the floor for everything.
-#
-# Nothing shares state between tests -- the world is frozen dataclasses and the
-# only I/O is reading content -- so there is nothing for workers to race on.
 addopts = "-n auto --dist load"

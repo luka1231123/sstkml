@@ -16,6 +16,8 @@ from engine.state import World, replace_court
 def apply(world: World, action) -> tuple[World, list]:
     if isinstance(action, A.EndTurn):
         return world, []
+    if world.ended:
+        raise ValueError(world.end_reason or "the game is over")
 
     if isinstance(action, A.Allocate):
         if action.group_id not in seat.groups(world):

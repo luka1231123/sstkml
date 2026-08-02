@@ -3,15 +3,12 @@
 ## 0.7 alpha product specification
 
 - Status: authoritative
-- Revision: 2026-08-01
+- Revision: 2026-08-02
+- Current release: 0.5.2
 
 This is the only current design specification. Code and tests describe
 implementation detail; archived documents describe how the design evolved.
 Neither may quietly expand the release beyond this document.
-
-The Alpha 0.7 task list lives in
-[`docs/ALPHA_07_TASKS.md`](docs/ALPHA_07_TASKS.md). It is subordinate to this
-file: it may sequence work, never add scope.
 
 The full pre-consolidation specifications are preserved under
 [`docs/archive/2026-07-30-pre-consolidation`](docs/archive/2026-07-30-pre-consolidation/README.md).
@@ -291,25 +288,22 @@ able to keep a tablet beside a store account, route, person, or older record.
 Consolidation means fewer duplicated rooms and clearer ownership, not replacing
 the palace with one full-screen dashboard.
 
-There are nine primary rooms:
+There are nine primary rooms. Each named view is real and opens typed objects,
+not raw dictionaries or aliases for another view:
 
-1. **Hall** — matters, arrivals, audience, and passage.
-2. **Scribes' Room** — Inbox, Filed, Sent, Records, reading, writing, and
-   dispatch.
-3. **Alu** — cohorts, institutions, sites, damage, repair, works, and the
-   reception of displaced people.
-4. **Trade** — the exchange, cargo, trade routes, caravans, dues, finance,
-   requisition, escort, closure, and correspondence-backed foreign orders.
-5. **Storehouse** — stores, labour roll, land, reserves, dues, and exact
-   accounts.
-6. **Muster Yard** — formations, escorts, detachments, and the one exact
-   cohort levy/corvée order: who, how many, where, how long, for what work,
-   rationed by whom, and under which official.
-7. **Court** — people, offices, household, audience, justice, and advisers.
-8. **Shrine** — rites and offerings, oaths and obligations.
-9. **Known World** — places, routes, journeys, foreign courts, news, disease,
-   and displacement; it inspects and links but does not issue another room's
-   orders.
+1. **Hall** — dated standing, passages, audience, arrivals, and matters moving.
+2. **Scribes** — Inbox, Filed, Sent, Records, tablet, Desk, review, and dispatch.
+3. **Alu** — Overview, Cohorts, Institutions, Sites, Works, and reception.
+4. **Trade** — Exchange, Cargo, Routes, Movements, Dues, and letter-backed
+   foreign orders.
+5. **Storehouse** — Stores, Labour, Land, Reserves, Dues, and exact accounts.
+6. **Muster** — formations, detachments, escorts, missions, and the same exact
+   parsed order as corvee: who, number, destination, duration, purpose,
+   rations, and official.
+7. **Court** — People, Offices, Household, Audience, Justice, and Advisers.
+8. **Shrine** — Rites, Offerings, Oaths, and Obligations.
+9. **World** — Places, Routes, Journeys, Courts, News, Disease, and
+   Displacement. It inspects and links; it does not issue another room's order.
 
 #### 3.3.1 The Hall
 
@@ -428,7 +422,7 @@ test suite into a second implementation.
 
 ---
 
-## 6. Path to Alpha 0.7
+## 6. Release boundary
 
 Only these workstreams may define scope. Ordered.
 
@@ -482,17 +476,44 @@ subsystem in 0.7.
 
 ### 6.4 Balance the collapse
 
-Not a system. Knob-turning against long headless runs, once §6.1 to §6.3 are
+Collapse is caused by ordinary population and grievance rules. A completed
+fall is a terminal state, not a forecast or a timer.
+
+- Whole-Alu unrest is the living-population-weighted grievance of resident
+  cohorts, scaled 0..1000. Palace-dependent unrest remains a narrower court
+  pressure and cannot by itself destroy the city.
+- An active Alu falls when its living population is at or below 400 per
+  thousand of its authored opening population, or whole-Alu unrest reaches
+  1000. Limited conflict may bring it to the same fallen state.
+- Falling records turn, cause, remaining population, unrest, and killed ruling
+  elite. The ruler and represented local ruling house die. Autonomous
+  decisions and new correspondence stop.
+- Historical people, goods, transfers, tablets, and the fall event remain in
+  World for reconstruction. The settlement mark, dependent site marks, usable
+  routes, trade entries, and available foreign court disappear from Belief.
+- If the player's Alu falls, the campaign ends immediately with the cause. No
+  further order may mutate World. Other Alus may fall while play continues.
+
+Balance remains knob-turning against long headless runs, once §6.1 to §6.3 are
 real. The targets:
 
 - an unshocked world stays mostly stable;
 - one shock is usually survivable;
 - connected shocks can cascade across settlements;
 - across seeds, an unaided world fails between year 15 and year 30;
-- every failure is reconstructable from stored events.
+- every failure is reconstructable from stored events;
+- population collapse, maximum unrest, survival, foreign fall, and player game
+  over are exercised by the longitudinal probe;
+- passive and austerity policies produce meaningfully different material and
+  network outcomes; the probe must name what each policy actually does and may
+  not present austerity as competent play.
 
-Nothing here may add a `collapsed` flag, a scripted victim, or a hidden
-countdown.
+The probe reports every event type, fall turn and cause, population trough,
+unrest peak, shock kind, surviving Alu count, player outcome, and impossible
+state. It checks that fallen rulers are dead, fallen marks are absent, no
+population is negative, and terminal state and cause agree. A `fell_turn` and
+cause may be written only after ordinary rules complete the fall; they must
+never act as a predictive `collapsed` flag, scripted victim, or countdown.
 
 ---
 

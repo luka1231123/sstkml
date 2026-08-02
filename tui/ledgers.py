@@ -74,6 +74,8 @@ STOREHOUSE_VIEWS = (
     ("stores", "STORES"),
     ("roll", "LABOUR"),
     ("land", "LAND"),
+    ("reserves", "RESERVES"),
+    ("dues", "DUES"),
 )
 
 
@@ -336,6 +338,41 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         views=STOREHOUSE_VIEWS if room else (), view="land")
 
 
+def storehouse_account(b: dict, view: str, selected: str = "",
+                       width: int = 80, height: int = 28, scroll: int = 0,
+                       notice: str = "", hours: int = 0,
+                       **_ignored) -> InteractiveScreen:
+    dated = b.get("date", "this fortnight")
+    if view == "reserves":
+        wanted = ("grain", "seed_grain", "bronze", "copper", "tin")
+        rows = [Row(good, ((_spoken(good), "clay"),
+                           (render.fmt_good(good, b.get("stores", {}).get(good, 0)), "gold"),
+                           (dated, "dim"))) for good in wanted]
+        headers, widths = ("reserve", "counted", "record"), (18, 24, 18)
+    else:
+        revenue, land_data = b.get("revenue", {}), b.get("land", {})
+        rows = [Row("land", (("land due", "clay"),
+                              (f"{land_data.get('land_due_rate', 0)}/1000", "gold"),
+                              (f"last {land_data.get('last_land_due', 0):,} grain", "dim"))),
+                Row("harbour", (("harbour due", "clay"),
+                                 (f"{revenue.get('harbour_rate', 0)}/1000", "gold"),
+                                 (f"last {revenue.get('last_harbour_due', 0):,} {revenue.get('harbour_good', 'oil')}", "dim")))]
+        headers, widths = ("account", "rate", "last taken"), (18, 14, 28)
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    chosen = next((row for row in rows if row.id == selected), None)
+    detail = [("DATED ACCOUNT", "gold"), (str(dated), "sky")]
+    if chosen:
+        detail += [("", "ink")] + list(chosen.cells)
+    if view == "dues":
+        detail += [("", "ink"), ("[< >] changes the selected rate by 25", "dim")]
+    return compose(
+        f"THE STOREHOUSE — {view.upper()}", headers, widths, rows, selected,
+        detail, [], hours, width, height, scroll, notice,
+        note="Tab view   ↑↓ choose" + ("   [< >] rate" if view == "dues" else ""),
+        views=STOREHOUSE_VIEWS, view=view)
+
+
 # --- the corvée: labour and arms ----------------------------------------------
 
 def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
@@ -506,3 +543,37 @@ def _clause(clause: dict) -> str:
     """A clause in the words the tablet uses. Kept identical to `document`."""
     from tui.document import _clause as spoken
     return spoken(clause)
+
+
+def obligations(b: dict, selected: str = "", width: int = 78,
+                height: int = 28, scroll: int = 0,
+                notice: str = "", hours: int = 0) -> InteractiveScreen:
+    rows = []
+    records = {}
+    for oath in b.get("oaths", []):
+        for index, clause in enumerate(oath.get("clauses", [])):
+            key = f"{oath['id']}:{index}"
+            records[key] = (oath, clause)
+            rows.append(Row(key, ((_clause(clause), "bone"),
+                                  (_spoken(oath["id"]), "dim"),
+                                  ("lapsed" if oath["lapsed"] else "binding",
+                                   "wine" if oath["lapsed"] else "clay"))))
+    if not any(row.id == selected for row in rows):
+        selected = rows[0].id if rows else ""
+    detail = []
+    if selected in records:
+        oath, clause = records[selected]
+        detail = [("OBLIGATION", "gold"), ("", "ink"),
+                  (_clause(clause), "bone"),
+                  ("tablet " + _spoken(oath["id"]), "dim"),
+                  ("sworn turn " + str(oath["sworn_turn"]), "sky"),
+                  ("parties " + ", ".join(render.actor_name(
+                      party, b.get("house")) for party in oath["parties"]), "clay")]
+    return compose(
+        "THE SHRINE — OBLIGATIONS", ("clause", "tablet", "standing"),
+        (31, 22, 10), rows, selected, detail, [], hours, width, height,
+        scroll, notice, empty="no obligation is written on an oath tablet.",
+        note="Tab / Shift-Tab view   ↑↓ choose",
+        views=tuple((name, name.title()) for name in
+                    ("rites", "offerings", "oaths", "obligations")),
+        view="obligations")

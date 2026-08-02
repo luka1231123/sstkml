@@ -24,6 +24,19 @@ C = INDEX
 RESULT_ROOM = 9          # the nine digits that open a result
 
 
+def result_page(total: int, summary: str = "", width: int = 84,
+                height: int = 32, scroll: int = 0, embedded: bool = False,
+                selected: int = -1) -> collection.Page:
+    top = 4 if embedded else 2
+    aside = 24 if width >= 70 else 0
+    field = width - aside - 6
+    y = top + 4
+    if summary:
+        y += min(4, len(textwrap.wrap(" ".join(summary.split()), field - 2))) + 2
+    room = max(1, min(RESULT_ROOM, (height - 6 - y) // 2))
+    return collection.page(total, room, scroll, selected)
+
+
 def compose(b: dict, query: str = "", hits: list[dict] | None = None,
             summary: str = "", typing: bool = False,
             width: int = 84, height: int = 32,
@@ -103,10 +116,10 @@ def compose(b: dict, query: str = "", hits: list[dict] | None = None,
                      C["ash"], C["ink"])
         y += 1
     # Results page without dropping anything the search found.
-    room = max(1, min(RESULT_ROOM, (height - 6 - y) // 2))
     selected_index = next((i for i, hit in enumerate(hits)
                            if str(hit.get("ref", "")) == selected), -1)
-    visible = collection.page(len(hits), room, scroll, selected_index)
+    visible = result_page(len(hits), summary, width, height, scroll,
+                          embedded, selected_index)
     for index, _absolute, hit in visible.rows(hits):
         if y >= height - 6:
             break

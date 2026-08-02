@@ -4,7 +4,7 @@ Information-constrained rulership sim. Fragile Late Bronze Age world.
 
 People, households, institutions, goods, labour, obligations, journeys, disease, and foreign courts are simulated deterministically. The player holds the Seat through fallible people and delayed, interested information. No omniscient strategy layer.
 
-[`SPEC.md`](SPEC.md) = sole current product and release authority (Alpha 0.7). Superseded specs and plans live in [`docs/archive`](docs/archive/README.md) — history, not active requirements.
+[`SPEC.md`](SPEC.md) is the sole product authority. Superseded plans live in [`docs/archive`](docs/archive/README.md) as history only.
 
 ## What is here now
 
@@ -18,13 +18,12 @@ People, households, institutions, goods, labour, obligations, journeys, disease,
 - corpus-derived writing blocks and a parsed order/tone review before sealing;
 - versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
 
-The shared world contains 55 simulated Alu; authored court content currently makes only `seat` playable. Remaining scope lives only in [`SPEC.md` section 6](SPEC.md#6-path-to-alpha-07).
+The shared world contains 55 simulated Alu; authored court content currently makes only `seat` playable.
 
 ## Run
 
 ```sh
 ./run.sh                  # windowed game
-./run.sh --cli seat       # terminal game
 ./run.sh --check          # interpreter, Tk, display, Ollama, and model
 ./run.sh --screens all    # render every screen as text
 ./run.sh --probe          # live Tk probe
@@ -54,7 +53,8 @@ Model supply language, not simulation truth. It may correct player's one- or two
 .venv/bin/python tools/corpus_lint.py
 .venv/bin/python tools/m13_audit.py
 .venv/bin/python tools/m13_benchmark.py
-.venv/bin/python tools/balance.py prudent 96
+.venv/bin/python tools/balance.py austerity 96
+.venv/bin/python tools/gameplay_probe.py 4 180
 .venv/bin/python tools/kernel_inspect.py where grain
 ```
 
@@ -74,5 +74,5 @@ content/         scenarios, people, goods, formulae, and correspondence
 tools/           audit, benchmark, balance, inspection, screens, and probes
 tests/           deterministic engine, controller, UI, and AI contracts
 docs/            live design docs; docs/archive/ is retired material
-SPEC.md          sole current product specification (Alpha 0.7)
+SPEC.md          sole current product specification
 ```

@@ -334,6 +334,8 @@ def generate_incoming(world: World) -> tuple[World, list]:
             transit.append(L)
 
     for c in world.correspondents:
+        if c.place not in world.places:
+            continue
         relation = world.relations.get(c.actor)
         delayed = relation is not None and now < relation.reply_delay_until
         if (not delayed and c.cadence > 0 and now - c.offset >= 0
@@ -412,6 +414,8 @@ def _validate_dispatch(world: World, action: A.DispatchLetter) -> Letter | None:
     if not action.text.strip():
         raise ValueError("dispatch text must not be blank")
     destination = _recipient_place(world, action.recipient)
+    if destination not in world.places:
+        raise ValueError(f"the Alu at {destination} has fallen")
     path = tuple(action.path)
     if not path or path[0] != world.court.seat:
         raise ValueError(

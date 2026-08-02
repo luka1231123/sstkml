@@ -63,7 +63,8 @@ class Kernel:
 
     def king(self, settlement: EntityId) -> Person | None:
         polity = self.owner(settlement)
-        return self.registry.persons.get(polity.ruler) if polity else None
+        person = self.registry.persons.get(polity.ruler) if polity else None
+        return person if person and person.alive else None
 
     def tenure_of(self, cohort: Cohort) -> str:
         """How this cohort comes by its food."""
@@ -113,6 +114,8 @@ class Kernel:
         return tuple(
             org_id for org_id in sorted(self.registry.orgs)
             if self.registry.orgs[org_id].policy in POLICIES
+            and not self.registry.settlements[
+                self.registry.orgs[org_id].settlement].fallen
             and self.registry.settlements[
                 self.registry.orgs[org_id].settlement].autonomous)
 
@@ -121,6 +124,8 @@ class Kernel:
         driven = set(self.deciders())
         out = list(driven)
         for sid in sorted(self.registry.settlements):
+            if self.registry.settlements[sid].fallen:
+                continue
             if sid in {self.registry.orgs[o].settlement for o in driven}:
                 continue
             holder = self.controller(sid)
@@ -132,7 +137,8 @@ class Kernel:
         """The settlements that decide for themselves, in a stable order."""
         return tuple(
             s for s in sorted(self.registry.settlements)
-            if self.registry.settlements[s].autonomous and self.controller(s))
+            if not self.registry.settlements[s].fallen
+            and self.registry.settlements[s].autonomous and self.controller(s))
 
     def climate_at(self, absolute: int, region: EntityId = "") -> int:
         series = self.region_climate.get(region) or self.climate
@@ -481,13 +487,13 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
             rng = stream(kernel.seed, kernel.date.absolute, "kernel.hunger",
                          cohort.id)
             lost = min(cohort.people,
-                       1 + rng.int(max(1, cohort.people // 20)))
+                       1 + rng.int(max(1, cohort.people // 320)))
         cohorts[cohort.id] = dataclasses.replace(
             cohort, hunger=hunger, people=cohort.people - lost,
             households=min(cohort.households, cohort.people - lost),
             shortfall=max(0, cohort.shortfall + want - got),
             grievance=cohort.grievance if not starve
-            else min(1000, cohort.grievance + 50))
+            else min(1000, cohort.grievance + 4))
         events.append(("hungry", cohort.id, want - got, lost))
 
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)

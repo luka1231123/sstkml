@@ -88,12 +88,13 @@ SHUT_MARK = "✗"
 # where the sickness is come out as one wash of marks in which nothing can be
 # found -- so each is a tab, the ground is the one you land on, and every other
 # layer draws the ground faintly underneath itself to say where you are.
-LAYERS = ("land", "roads", "trade", "courts", "sickness", "holds")
+LAYERS = ("land", "roads", "trade", "courts", "news", "sickness", "holds")
 LAYER_NAME = {
     "land": "PLACES",
     "roads": "ROUTES",
     "trade": "JOURNEYS",
-    "courts": "NEWS",
+    "courts": "COURTS",
+    "news": "NEWS",
     "sickness": "DISEASE",
     "holds": "DISPLACEMENT",
 }
@@ -102,8 +103,9 @@ LAYER_LEGEND = {
     "roads": "─ road  ╌ sea lane  ≈ river  Nf fortnights  · shut this season",
     "trade": "╌ sea lane  Nf fortnights  * metal  Y cedar  n horses",
     "farms": ", sown ground  % a grain estate  : desert",
-    "holds": "x a small palace",
+    "holds": "! displaced people reported here  · no displacement reported",
     "courts": "◇ a court that writes to you  · silence from there",
+    "news": "! a court with unanswered news  · no report waiting",
     "sickness": "✗ the road is shut by your order  ○ nothing reported",
 }
 LAYER_UNDER = {
@@ -111,8 +113,9 @@ LAYER_UNDER = {
     "roads": "every way there is, in fortnights of courier time",
     "trade": "what crosses the sea, and where the metal comes from",
     "farms": "the sown ground, and the estates that work it",
-    "holds": "the small palaces: your hinterland, and everyone else's",
+    "holds": "where displaced or petitioning cohorts were last reported",
     "courts": "the courts that write to you, and how they hold you",
+    "news": "courts from which a report or demand remains unanswered",
     "sickness": "the roads you have shut, and the ones you have not",
 }
 
@@ -129,7 +132,7 @@ LAYER_MODES = {
 
 # Which holdings are the subject of which layer.
 LAYER_SITES = {
-    "holds": ("palace",),
+    "holds": (),
     "farms": ("grain",),
     "trade": ("copper", "tin", "gold", "silver", "lapis", "cedar", "horses"),
 }
@@ -318,6 +321,8 @@ def _second_claim(place_id: str, b: dict, courts: dict[str, dict],
     """
     if layer == "courts":
         return place_id not in courts
+    if layer == "news":
+        return not (place_id in courts and courts[place_id].get("unanswered"))
     if layer == "sickness":
         return place_id not in _shut(b)
     return False
@@ -362,6 +367,17 @@ def _mark_of(place: dict, b: dict, courts: dict[str, dict],
                     ESTEEM_TONE.get(esteem, "clay"))
         if place_id not in (selected, str(b.get("seat", ""))):
             tone = "ash"
+    elif layer == "news":
+        if place_id in courts and courts[place_id].get("unanswered"):
+            return f"{open_mark}!{close_mark}", "flame"
+        tone = "ash" if place_id != selected else "bone"
+    elif layer == "holds":
+        displaced = {str(cohort.get("place", ""))
+                     for cohort in b.get("cohorts", ())
+                     if cohort.get("status") in {"displaced", "petitioning"}}
+        if place_id in displaced:
+            return f"{open_mark}!{close_mark}", "blood"
+        tone = "ash" if place_id != selected else "bone"
     return f"{open_mark}{letter}{close_mark}", tone
 
 

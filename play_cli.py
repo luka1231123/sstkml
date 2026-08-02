@@ -166,6 +166,9 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
         print(render.header(b))
         for ln in render.events_lines(events, world.court):
             print(ln)
+        if world.ended:
+            print(f"\n  GAME OVER — {world.end_reason}")
+            return
         if voicer.note():
             print(voicer.note())
         print()

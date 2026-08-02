@@ -197,6 +197,12 @@ class Settlement:
     role: str = ""
     harbour: bool = False
     population: int = 0        # authored opening size
+    fell_turn: int = -1
+    fall_cause: str = ""
+
+    @property
+    def fallen(self) -> bool:
+        return self.fell_turn >= 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -415,6 +421,8 @@ class Person:
     """A named individual whose identity matters to a rule."""
     id: EntityId
     name: str
+    alive: bool = True
+    died_turn: int = -1
 
 
 # --- registries ---------------------------------------------------------------

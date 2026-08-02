@@ -28,10 +28,10 @@ def step(world: World) -> tuple[World, list]:
     stores["grain"] = stores.get("grain", 0) - grain
     world = royal_store.put(world, stores, reason_down="consumed")
     if attack > defence:
-        world = dataclasses.replace(
-            world, ended=True, end_reason="the Seat fell to a displaced force",
-            ended_turn=world.date.absolute)
-        return world, [A.SeatFell(attack, defence, world.end_reason, grain)]
+        from engine import fall
+        world, fell = fall.bring_down(
+            world, seat, "a displaced force")
+        return world, [A.SeatFell(attack, defence, world.end_reason, grain), fell]
 
     dead = min(attack, max(1, defence // 2))
     left = dead

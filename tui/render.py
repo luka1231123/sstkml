@@ -610,6 +610,9 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.SuccessionFailed):
             out.append("  There is no heir. The seat is empty and the "
                        "household looks at the door.")
+        elif isinstance(e, A.AluFell):
+            out.append(f"  {e.alu} has fallen through {e.cause}. "
+                       f"{len(e.elites)} of its ruling house are dead.")
         elif isinstance(e, A.OmenLeaked):
             out.append("  What the diviner said is being repeated in the "
                        "lower town, and not as you told it.")
