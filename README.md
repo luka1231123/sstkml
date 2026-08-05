@@ -60,6 +60,16 @@ Model supply language, not simulation truth. It may correct player's one- or two
 
 `tools/kernel_inspect.py` = omniscient developer inspector. Explain why lot exist, where quantity went, why actor decided, what evidence belief rest on, what obligation authorized, which request unsatisfied. Never player-facing.
 
+`tools/look.py` = read a run without reading a screen.
+
+```sh
+.venv/bin/python tools/look.py figures --turns 60 --every 4   # numbers, one row a turn
+.venv/bin/python tools/look.py events --turns 40              # events by domain, not 767 lines
+.venv/bin/python tools/look.py events --turns 40 --each --kind hungry
+.venv/bin/python tools/look.py belief justice.petitions       # what a screen could show
+.venv/bin/python tools/look.py belief stores --diff --turns 8 # what the last turn changed
+```
+
 Runtime engine standard-library-only, integer-state, immutable, seeded, replayable. `belief/` = only World-to-player projection boundary.
 
 ## Repository map
