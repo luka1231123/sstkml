@@ -81,23 +81,6 @@ def test_the_stores_can_have_a_ledger_counted() -> None:
     assert game.notices["stores"].kind == registry.SUCCESS
 
 
-def test_the_stores_can_open_seed_for_food_and_say_when_they_cannot() -> None:
-    game = _game()
-    state = game.ledger_state["stores"]
-    state["pick"] = "grain"
-    game.on_stores_key(_Key("e"))
-    assert not game.log
-    assert game.notices["stores"].kind == registry.REFUSAL
-    assert "seed" in game.notices["stores"]
-
-    state["pick"] = "seed_grain"
-    game.on_stores_key(_Key("]"))
-    assert state["amount"] == ledgers.STEPS["stores"]
-    game.on_stores_key(_Key("e"))
-    assert _kinds(game) == ["EatSeed"]
-    assert state["amount"] == 0, "the amount is spent, not left standing"
-
-
 # --- the roll -----------------------------------------------------------------
 
 def test_the_roll_allocates_to_the_chosen_group() -> None:

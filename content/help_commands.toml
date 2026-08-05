@@ -193,17 +193,6 @@ keys = []
 verbs = ["INSPECT_LEDGER"]
 
 [[command]]
-id = "eat_seed"
-category = "orders"
-title = "Open seed grain for food"
-syntax = "eat <qa> of seed"
-answer = "Tell Counsel how much seed grain to open for food. It moves that amount into the granary now, leaving less to sow."
-examples = ["eat 5000 qa of seed", "Use 5000 seed grain."]
-keywords = ["eat", "seed", "food", "grain", "granary", "famine", "open"]
-keys = []
-verbs = ["EAT_SEED"]
-
-[[command]]
 id = "gift"
 category = "orders"
 title = "Send a foreign gift"

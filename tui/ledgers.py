@@ -154,10 +154,6 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
     if ledger:
         controls.append(affordable(
             Control("inspect_ledger", key_for("inspect_ledger")), hours))
-    if selected == "seed_grain" and amount > 0:
-        controls.append(Control(
-            "eat_seed", key_for("eat_seed"),
-            label=f"open {amount:,} qa for food"))
     note = ("Tab view   ↑↓ choose   Enter record   [ ] amount" if room
             else "↑↓ choose   Enter record   [ ] amount")
     return compose(

@@ -337,8 +337,26 @@ def _name(actor: str, b: dict) -> str:
     return render.actor_name(actor, b.get("house"))
 
 
+def _where(place: str) -> str:
+    return place.split(":", 1)[-1].replace("_", " ") or "the road"
+
+
+def petitioners(b: dict) -> list[dict]:
+    """Bands of displaced people waiting at the gate for an answer."""
+    return [c for c in b.get("cohorts", ())
+            if c.get("status") == "petitioning"]
+
+
 def _court(b: dict) -> list[workbench.Row]:
     rows = []
+    for band in petitioners(b):
+        rows.append(workbench.Row(
+            band["id"],
+            (("reception", "bone"),
+             (f"{band['people']:,} from {_where(band.get('origin', ''))}", "clay"),
+             (f"hunger {band.get('hunger', 0)}", "dim"),
+             ("at the gate", "flame")),
+            mark="!"))
     for item in b.get("justice", {}).get("petitions", []):
         parties = f"{_name(item['petitioner'], b)} v {_name(item['against'], b)}"
         rows.append(workbench.Row(
@@ -382,6 +400,20 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
 
 def _court_detail(b: dict, chosen: str,
                   width: int = 44) -> list[tuple[str, str]]:
+    band = next((c for c in petitioners(b) if c["id"] == chosen), None)
+    if band is not None:
+        eats = band["people"] * band.get("ration_per_head", 10)
+        return [
+            (f"{band['people']:,} people from {_where(band.get('origin', ''))}",
+             "bone"),
+            (f"hungry {band.get('hunger', 0)} fortnights · "
+             f"grievance {band.get('grievance', 0)}", "clay"),
+            (f"they would eat {eats:,} qa a fortnight", "clay"),
+            ("", "clay"),
+            ("Take them in and they are yours to feed. Turn them away and "
+             "they go hungry to the next gate, or take what they need at "
+             "this one.", "ash"),
+        ]
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
     if item is None:
@@ -430,11 +462,22 @@ def _wrapped(text: str, rows: int, width: int = 44) -> list[tuple[str, str]]:
             for line in textwrap.wrap(text or "—", width)[:rows]]
 
 
+RECEPTIONS = (("t", "settle", "take them in"),
+              ("y", "refuse", "turn them away"))
+
+
 def _court_controls(b: dict, chosen: str, hours: int) -> list[workbench.Control]:
+    band = next((c for c in petitioners(b) if c["id"] == chosen), None)
+    controls = [workbench.affordable(workbench.Control(
+        "receive_cohort", key, label=label, enabled=band is not None,
+        why="nobody waits at the gate", command=f"receive:{decision}"), hours)
+        for key, decision, label in RECEPTIONS]
+    if band is not None:
+        return controls
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
     heard = bool(item and item["heard"])
-    controls = [workbench.affordable(workbench.Control(
+    controls += [workbench.affordable(workbench.Control(
         "hear_petition", registry.BY_ID["hear_petition"].mnemonic,
         enabled=bool(item) and not heard,
         why="already heard" if heard else "nobody waits"), hours)]

@@ -17,7 +17,7 @@ from tools import inventory
 # should make them come and change the specification's number too, rather than
 # letting the two drift the way the GUI and the parser already did once.
 REQUIRED_ATTENTION = {
-    "end_fortnight": 0, "allocate": 0, "set_priority": 0, "eat_seed": 0,
+    "end_fortnight": 0, "allocate": 0, "set_priority": 0,
     "read_letter": 2, "file_letter": 0, "delegate_letter": 1,
     "dictate_reply": 2, "dispatch_letter": 2,
     "inspect_ledger": 1, "send_gift": 1,

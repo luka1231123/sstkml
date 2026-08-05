@@ -39,12 +39,13 @@ def _counts(b: dict) -> dict[str, int]:
         "stack": sum(not item.get("read") for item in b.get("stack", ())),
         "alu": len(b.get("projects", ())) + sum(
             not item.get("head") for item in b.get("institutions", ())) + sum(
-            c.get("status") in {"displaced", "petitioning"}
-            for c in b.get("cohorts", ())),
+            c.get("status") == "displaced" for c in b.get("cohorts", ())),
         "trade": sum(bool(x) for x in b.get("trade", {}).get("movements", ())),
         "stores": sum(bool(g.get("arrears_weeks")) for g in b.get("groups", ())),
         "muster": len(b.get("troops", {}).get("summons", ())),
-        "palace": len(b.get("justice", {}).get("petitions", ())),
+        # A band at the gate waits in the same queue as a lawsuit.
+        "palace": len(b.get("justice", {}).get("petitions", ())) + sum(
+            c.get("status") == "petitioning" for c in b.get("cohorts", ())),
         "altar": sum(bool(o.get("lapsed")) for o in b.get("oaths", ())),
         "world": int(bool(plague.get("sickness_at_seat"))),
     }

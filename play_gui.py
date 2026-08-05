@@ -2450,15 +2450,6 @@ class Game:
         elif (char == _key("inspect_ledger") or wanted == "inspect_ledger") \
                 and ledger:
             self.do(A.InspectLedger(ledger), window=window)
-        elif char == _key("eat_seed") or wanted == "eat_seed":
-            if state["pick"] != "seed_grain" or state["amount"] <= 0:
-                self.notify(
-                    "choose the seed grain and an amount to open.",
-                    registry.REFUSAL, window=window)
-                self.repaint()
-                return
-            if self.do(A.EatSeed(state["amount"]), window=window):
-                state["amount"] = 0
 
     def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
@@ -2905,8 +2896,6 @@ class Game:
             return f"{group} will be allocated {render.fmt_good('grain', action.qa)}"
         if isinstance(action, A.SetPriority):
             return "the pay-down order has been changed"
-        if isinstance(action, A.EatSeed):
-            return f"{render.fmt_good('grain', action.qa)} of seed has been opened for food"
         if isinstance(action, A.ReadLetter):
             return f"tablet {action.letter_id} has been read and placed in the Inbox"
         if isinstance(action, A.ArchiveLetter):
@@ -3792,6 +3781,16 @@ class Game:
         petition = self.palace_pick(listing)
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         if not petition:
+            return
+        # A band of displaced people stands in the same queue as a lawsuit,
+        # because to the king it is the same queue.
+        if any(c["id"] == petition for c in palace.petitioners(self.belief)):
+            decision = (command.split(":", 1)[1] if command.startswith("receive:")
+                        else next((d for key, d, _ in palace.RECEPTIONS
+                                   if key == char), ""))
+            if decision and self.do(A.ReceiveCohort(petition, decision),
+                                    window="palace"):
+                self.palace_state["pick"].pop(listing, None)
             return
         heard = next((p["heard"] for p in
                       self.belief.get("justice", {}).get("petitions", [])

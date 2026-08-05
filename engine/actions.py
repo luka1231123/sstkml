@@ -28,11 +28,6 @@ class SetPriority:
 
 
 @dataclasses.dataclass(frozen=True)
-class EatSeed:
-    qa: int          # move seed_grain into the granary now, ruin the sowing later
-
-
-@dataclasses.dataclass(frozen=True)
 class ReadLetter:
     letter_id: str   # reveal a Stack item's body; costs attention
 
@@ -413,11 +408,6 @@ class Grumbling:
     group_id: str
     member_name: str
     debt_weeks: int
-
-
-@dataclasses.dataclass(frozen=True)
-class SeedEaten:
-    amount: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1041,7 +1031,7 @@ class OfferingConsumed:
 
 _TYPES = {
     c.__name__: c for c in (
-        EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, ArchiveLetter,
+        EndTurn, Allocate, SetPriority, ReadLetter, ArchiveLetter,
         DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
         RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, LevyCohort,
@@ -1075,7 +1065,7 @@ _TYPES = {
         HeirNamed,
         TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,
         DependentsDied, GroupRevoltChanged, RitePerformed,
-        RiteSkipped, UnrestChanged, Grumbling, SeedEaten, AllocationSet,
+        RiteSkipped, UnrestChanged, Grumbling, AllocationSet,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,
         LetterIntercepted, LetterRead, LetterArchived, LetterDelegated,
         LedgerInspected, GiftSent, GiftArrived,

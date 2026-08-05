@@ -33,17 +33,6 @@ def apply(world: World, action) -> tuple[World, list]:
         world = seat.rank(world, tuple(action.order))
         return world, [A.PrioritySet(tuple(action.order))]
 
-    if isinstance(action, A.EatSeed):
-        stores = seat.held(world)
-        moved = min(max(0, action.qa), stores.get("seed_grain", 0))
-        stores["seed_grain"] = stores.get("seed_grain", 0) - moved
-        stores["grain"] = stores.get("grain", 0) + moved
-        # Seed becomes food. Nothing enters or leaves the world -- the same
-        # grain answers to a different name -- so the crossing nets to a lot
-        # spent and a lot minted, which is the shape until the Book learns to
-        # rename a good in place.
-        return seat.put(world, stores), [A.SeedEaten(moved)]
-
     if isinstance(action, A.RecordReplyText):
         # A reading is kept against the case that produced the answer, because
         # the case is what the archive explains the answer from. Silent where
