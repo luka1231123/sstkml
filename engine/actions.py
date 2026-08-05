@@ -651,6 +651,16 @@ class SeatDefended:
 
 
 @dataclasses.dataclass(frozen=True)
+class SeatTaken:
+    """The gate went. The granary is emptied and people are killed; whether the
+    reign ends is the ordinary population and unrest rule's to say (spec 6.4)."""
+    attackers: int
+    defenders: int
+    grain: int
+    dead: int
+
+
+@dataclasses.dataclass(frozen=True)
 class SeatFell:
     attackers: int
     defenders: int
@@ -1044,7 +1054,7 @@ _TYPES = {
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
         CohortDetached, CohortReturned, CohortDisplaced, CohortReceived,
         TradeFinanced, TradeRequisitioned,
-        SeatDefended, SeatFell, AluFell, CanalDredged,
+        SeatDefended, SeatTaken, SeatFell, AluFell, CanalDredged,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,
         BronzeMelted, WorkshopDemandMet,
         InstitutionDecayed, InstitutionUpkeepConsumed,
