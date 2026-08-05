@@ -190,8 +190,9 @@ def test_a_settings_file_cannot_smuggle_in_an_unsupported_font_size():
 def test_recalled_geometry_is_never_below_the_class_minimum():
     prefs = desktop.Preferences()
     prefs.remember("hall", 0, 0, 10, 10)
+    least = desktop.minimum_size("hall")
     assert prefs.recall("hall") == {
-        "x": 0, "y": 0, "columns": 84, "rows": 26}
+        "x": 0, "y": 0, "columns": least[0], "rows": least[1]}
 
 
 def test_recalling_a_window_that_was_never_saved_is_none():

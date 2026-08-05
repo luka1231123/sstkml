@@ -28,7 +28,7 @@ case "${1:-}" in
     --check) exec "$PY" play_gui.py --check ;;
     --probe) exec "$PY" tools/tkprobe.py ;;
     --screens) shift; exec "$PY" tools/screens.py "$@" ;;
-    --cli)   shift; exec "$PY" play_cli.py "${@:-ugarit}" ;;
+    --cli)   shift; exec "$PY" play_cli.py "${@:-seat}" ;;
     --test)  shift; exec "$PY" tools/run_tests.py "$@" ;;
     *)       exec "$PY" play_gui.py "$@" ;;
 esac

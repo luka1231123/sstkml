@@ -666,6 +666,6 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    sc = argv[0] if argv else "ugarit"
+    sc = argv[0] if argv else "seat"
     sd = int(argv[1]) if len(argv) > 1 else None
     run(sc, sd)

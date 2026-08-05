@@ -105,6 +105,11 @@ correct them.
 No screen may read World directly. A quantity the court has not measured is
 shown as an estimate or a range, or not shown.
 
+Every fact the court does know must be reachable in the interface. A fact may
+be absent only because the court has no evidence for it; in that case the
+relevant dossier says that it is unknown, why, and what report, inspection, or
+event could reveal it. Uncertainty limits precision, not access.
+
 ### 2.5 Orders act through people and institutions
 
 An order names its subject, its authority, and the person or institution that

@@ -418,6 +418,8 @@ def _draw_terms(surface: Surface, x: int, y: int, width: int,
     heading = f"TERMS · {len(terms)} IMPRESSED"
     if terms:
         heading += " · " + terms_summary(terms)
+    else:
+        heading += " · CANDIDATE BELOW"
     surface.text(x + 2, y, _short(heading, width - 2),
                  C["bone"], C["ink"])
     surface.link(x, y, width, 3, "block:terms")

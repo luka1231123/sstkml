@@ -32,9 +32,9 @@ id = "hall"
 category = "interface"
 title = "Hall and navigation"
 syntax = "[s] Scribes [y] Alu [x] Trade [t] Storehouse [m] Muster [j] Court [v] Shrine [w] World [:] Command"
-answer = "The Hall is home. Its eight letter keys open the working rooms. Tab and Shift-Tab cycle room tabs, arrows select, Enter opens or confirms, Space toggles, and Escape cancels or closes. In Hall, Space previews ending the fortnight and Enter confirms it. Ctrl-H raises Hall, Ctrl-G opens the switcher, Ctrl-Tab cycles windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S saves, Ctrl-O reloads, Ctrl-+/Ctrl--/Ctrl-0 resize type, : opens Command, and ? opens Help. Printed controls can also be clicked."
+answer = "The Hall is home. Its eight letter keys open the working rooms. Tab and Shift-Tab cycle room tabs, arrows select, Enter opens or confirms, Space toggles, and Escape cancels or closes. In Hall, Space previews ending the fortnight and Enter confirms it. Ctrl-H raises Hall, Ctrl-G opens the switcher, Ctrl-Tab cycles windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-Shift-R puts every window back to its default size and forgets the one you dragged, Ctrl-S saves, Ctrl-O reloads, Ctrl-+/Ctrl--/Ctrl-0 resize type, : opens Command, and ? opens Help. Printed controls can also be clicked."
 examples = ["Press j for the Court, then c for Counsel.", "Click a numbered concern to follow it."]
-keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit"]
+keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit", "window", "windows", "size", "resize", "reset", "default", "tile", "cascade", "too", "big", "small"]
 keys = ["s", "y", "x", "t", "m", "j", "v", "w", "space", ":", "?", "q"]
 verbs = []
 
@@ -449,4 +449,53 @@ answer = "Delegating hands the matter a tablet raises to a courtier who is at th
 examples = ["delegate the harbour complaint to Ehli-Nikkalu", "who has this matter?"]
 keywords = ["delegate", "hand", "give", "courtier", "assign", "someone", "else", "answerable", "tablet"]
 keys = ["g"]
+verbs = []
+
+# The farming year and what it costs in hands. These are concepts rather than
+# orders: they explain the numbers the Land ledger prints, which no descriptor
+# can derive and which the player could previously learn only by losing a
+# harvest.
+
+[[command]]
+id = "grain_year"
+category = "land"
+title = "The grain year"
+syntax = "The Hall's left column and the band across the Land ledger"
+answer = "The year is twenty-four fortnights and the fields want work in only four spans of it. Sowing is fortnights 19 to 22, growing 23 to 7, harvest 8 to 11, threshing 12 to 13, and low water 14 to 18. The wheel drawn in the Hall and on the Land ledger shows one cell per fortnight, coloured by season, with this fortnight in flame. Two deadlines matter and neither is forgiving: a crop still standing after the last harvest fortnight is lost where it stands, and seed is set aside only during threshing. Outside the four spans the fields ask for nothing and the hands stand idle."
+examples = ["Which fortnight does the harvest close?", "How long until sowing?"]
+keywords = ["year", "season", "calendar", "fortnight", "sowing", "growing", "harvest", "threshing", "low", "water", "wheel", "deadline", "when", "time"]
+keys = []
+verbs = []
+
+[[command]]
+id = "person_days"
+category = "land"
+title = "Hands and person-days"
+syntax = "THE HANDS band on the Land ledger; labour on every cohort dossier"
+answer = "Labour is counted in person-days. One person supplies ten to twelve person-days a fortnight, less when hungry, and a place spends them from one pool that every task draws on. Each field task has its own rate: one person-day sows 3 qa of seed, watches 200 qa of standing crop, cuts 12 qa, or threshes 22 qa. Cutting is the slowest rate and the harvest is therefore the moment the hands run out. The bar shows what the season asks, what the corvee already holds, and what stands idle; when the asking exceeds the pool the bar fills and marks itself, which means work will not finish this fortnight."
+examples = ["How many days does the harvest need?", "Why did the reaping not finish?"]
+keywords = ["labour", "hands", "person-days", "days", "work", "corvee", "idle", "pool", "rate", "sow", "reap", "thresh", "tend", "bottleneck"]
+keys = []
+verbs = []
+
+[[command]]
+id = "river_gauge"
+category = "land"
+title = "The river gauge and the weather"
+syntax = "The first line of the Land ledger's detail"
+answer = "The gauge is a mark on the river wall copied by a scribe, not the weather itself. An ordinary year reads 30; below 27 the river is low and below 21 it is failing. The reading is reported, not counted, so a tired hand may miscopy it and the ledger says so. What the weather actually does happens to the standing crop during the growing season: a dry year thins it every fortnight, and past a break in the dryness each further step costs a multiple rather than an addition. The true index is never shown, because nobody at court can see it."
+examples = ["Is this a dry year?", "Can I trust the gauge?"]
+keywords = ["gauge", "river", "weather", "climate", "rain", "drought", "dry", "flood", "reading", "scribe", "reported", "wither"]
+keys = []
+verbs = []
+
+[[command]]
+id = "units"
+category = "land"
+title = "Units of the kingdom"
+syntax = "Every quantity is printed with its unit"
+answer = "Grain, seed, standing crop, sheaves and fodder are all counted in qa. Metal is counted in shekels, and sixty shekels of copper stow like one qa of grain. People are heads, and households where the roll records them. Labour is person-days, ten to twelve per head per fortnight. A ration is ten to eleven qa per head per fortnight. An estate's extent is the qa of seed the ground takes in a year, and its capacity is the qa returned per thousand qa sown, so 7500 is a sevenfold return. Every rate and share is per thousand: 940 per thousand is ninety-four in the hundred. Condition, grievance, loyalty and legitimacy are all out of a thousand."
+examples = ["What is a qa?", "What does capacity 7500 mean?"]
+keywords = ["unit", "units", "qa", "shekel", "parisu", "talent", "head", "heads", "household", "person-day", "extent", "capacity", "per", "thousand", "measure", "glossary"]
+keys = []
 verbs = []

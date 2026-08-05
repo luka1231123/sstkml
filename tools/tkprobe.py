@@ -102,7 +102,7 @@ def perform(upto: int) -> None:
 
     if upto >= 12:                                          # 12
         import play_gui
-        game = play_gui.Game("ugarit", 8814402919)
+        game = play_gui.Game("seat", 8814402919)
         for _ in range(3):
             game.end_fortnight()
         game.on_key(type("K", (), {"char": "s", "keysym": "s"})())
@@ -117,7 +117,7 @@ def perform(upto: int) -> None:
         import play_gui
         from tui.backend_tk import available
         assert available()
-        game = play_gui.Game("ugarit", 8814402919)
+        game = play_gui.Game("seat", 8814402919)
         game.app.tk.after(500, game.app.stop)
         game.run()
 

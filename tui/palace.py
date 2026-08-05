@@ -35,8 +35,8 @@ from tui.grid import INDEX, InteractiveScreen, Surface
 C = INDEX
 
 VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
-         ("household", "HOUSEHOLD"), ("audience", "AUDIENCE"),
-         ("justice", "JUSTICE"), ("advisers", "ADVISERS"))
+         ("household", "HOUSE"), ("audience", "AUDIENCE"),
+         ("justice", "JUSTICE"), ("advisers", "ADVICE"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -759,6 +759,9 @@ def compose(b: dict, view: str = "court", selected: str = "",
 
     band = scene_rows(height)
     queue = rows
+    scene_listing = {"people": "house", "household": "house",
+                     "advisers": "house", "audience": "court",
+                     "justice": "court", "offices": "post"}.get(listing, listing)
 
     title = "THE COURT — RELATIONS" if view == "relations" else "THE COURT"
     note = "↑↓ choose   Enter open   Tab view   [c] counsel"
@@ -792,7 +795,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
 
     def draw(surface, x, y, room, rows_available):
         _draw_scene(surface, x, y, room, rows_available, view, queue, chosen,
-                    b=b, listing=listing)
+                    b=b, listing=scene_listing)
 
     return workbench.compose(
         title, headers, widths, rows, chosen, detail, controls, hours,

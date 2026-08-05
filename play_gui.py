@@ -181,6 +181,7 @@ class Game:
         self._model_jobs = 0
         self.open_letters: dict[str, dict] = {}
         self.focused_objects: dict[str, dict] = {}
+        self.focus_scroll: dict[str, int] = {}
         self.events: list[str] = []
         # The windows that hold a conversation rather than a record. All of it
         # is session state: none of it is a fact about the kingdom, so none of
@@ -819,7 +820,8 @@ class Game:
         if key.startswith("focus:"):
             item = self.focused_objects.get(key)
             kind = key.split(":", 2)[1]
-            return object_page.compose(item, width, height, kind) if item else None
+            return object_page.compose(
+                item, width, height, kind, self.focus_scroll.get(key, 0)) if item else None
         if key == "counsel":
             suggestions = [
                 concern.order_prompt or concern.suggestion
@@ -939,6 +941,12 @@ class Game:
             bindings[f"<{modifier}-o>"] = bind(self.request_load)
             bindings[f"<{modifier}-Shift-t>"] = bind(self.tile_windows)
             bindings[f"<{modifier}-Shift-c>"] = bind(self.cascade_windows)
+            # Shift makes the keysym uppercase, so the lowercase spelling of a
+            # shifted letter never matches on some Tk builds. Bind both, plus
+            # the plain Control-R that most players will try first.
+            for sequence in (f"<{modifier}-Shift-R>", f"<{modifier}-Shift-r>",
+                             f"<{modifier}-R>", f"<{modifier}-r>"):
+                bindings[sequence] = bind(self.reset_window_sizes)
             bindings[f"<{modifier}-plus>"] = bind(lambda: self.zoom(1))
             # The unshifted key on most layouts is `=`, and a player pressing
             # it means "bigger" whatever the keycap says.
@@ -991,6 +999,19 @@ class Game:
     def cascade_windows(self) -> None:
         self.app.cascade()
         self.session_notice = "Windows cascaded."
+        self.repaint()
+
+    def reset_window_sizes(self) -> None:
+        """Every open window back to the size its screen was designed for.
+
+        It forgets the remembered size as well as undoing it, so a window the
+        player once dragged small does not come back small on the next run.
+        """
+        moved = self.app.reset_sizes()
+        self.session_notice = (
+            f"{moved} window{'s' if moved != 1 else ''} back to default size."
+            if moved else "Nothing open to resize.")
+        self.save_settings()
         self.repaint()
 
     def cycle_windows(self, backwards: bool = False) -> None:
@@ -1158,12 +1179,22 @@ class Game:
         ref = str(item.get("id") or item.get("name") or len(self.focused_objects))
         key = f"focus:{kind}:{ref}"
         self.focused_objects[key] = dict(item)
+        self.focus_scroll[key] = 0
         window = self.app.window(
-            key, f"{kind.title()} — {item.get('name', ref)}", 58, 22,
-            on_key=lambda e, k=key: self.app.close(k) if e.keysym == "Escape" else None,
+            key, f"{kind.title()} — {item.get('name', ref)}", 72, 30,
+            on_key=lambda e, k=key: self.on_focus_key(e, k),
             on_close=lambda k=key: self.app.close(k))
         self.repaint()
         window.focus()
+
+    def on_focus_key(self, event, key: str) -> None:
+        if event.keysym == "Escape":
+            self.app.close(key)
+            return
+        step = {"Up": -1, "Down": 1, "Prior": -8, "Next": 8}.get(event.keysym)
+        if step:
+            self.focus_scroll[key] = max(0, self.focus_scroll.get(key, 0) + step)
+            self.repaint()
 
     def open_letter(self, item: dict) -> None:
         key = f"letter:{item['id']}"
@@ -2103,9 +2134,12 @@ class Game:
         rows = self.window_rows("orders")
         if event.keysym in ("Up", "Down"):
             if rows:
-                here = rows.index(state["pick"]) if state["pick"] in rows else 0
-                state["pick"] = rows[collection.step(
-                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+                if state["pick"] not in rows:
+                    state["pick"] = rows[0 if event.keysym == "Down" else -1]
+                else:
+                    here = rows.index(state["pick"])
+                    state["pick"] = rows[collection.step(
+                        len(rows), here, 1 if event.keysym == "Down" else -1)]
             self.repaint()
             return
         if event.keysym in ("Prior", "Next", "Home", "End"):
@@ -2392,8 +2426,28 @@ class Game:
         char = (event.char or "").lower()
         command = getattr(event, "command", "")
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
+        if event.keysym == "Return" and not state["pick"]:
+            goods = sorted(self.belief.get("stores", {}))
+            state["pick"] = goods[0] if goods else ""
         ledger = ledger_page.LEDGER_OF.get(state["pick"], "")
-        if (char == _key("inspect_ledger") or wanted == "inspect_ledger") \
+        if event.keysym == "Return" and state["pick"]:
+            good = state["pick"]
+            if good in self.belief.get("stores", {}):
+                history = self.belief.get("store_history", {}).get(good, ())
+                held = self.belief["stores"][good]
+                ration = sum(c.get("ration", 0) for c in self.belief.get("cohorts", ()))
+                self.open_focus("good", {
+                    "id": good, "name": good, "quantity": held,
+                    "quantity_reading": render.fmt_good(good, held),
+                    "ration_need": ration if good == "grain" else None,
+                    "coverage_fortnights": held // ration if good == "grain" and ration else None,
+                    "history": list(history), "change": (
+                        history[-1] - history[-2] if len(history) > 1 else 0),
+                    "source": "inspected ledger" if ledger in self.belief.get("inspected", ())
+                    else "keeper's count", "as_of_turn": self.belief.get("turn"),
+                    "certainty": "counted" if ledger in self.belief.get("inspected", ())
+                    else "reported"})
+        elif (char == _key("inspect_ledger") or wanted == "inspect_ledger") \
                 and ledger:
             self.do(A.InspectLedger(ledger), window=window)
         elif char == _key("eat_seed") or wanted == "eat_seed":
@@ -2431,9 +2485,10 @@ class Game:
             self.repaint()
         elif event.keysym == "Return":
             if not state["priority"]:
-                self.notify("mark the groups to be paid first, then enter.",
-                            registry.REFUSAL, window=window)
-                self.repaint()
+                item = next((g for g in self.belief.get("groups", ())
+                             if g["id"] == pick), None)
+                if item:
+                    self.open_focus("cohort", item)
                 return
             if self.do(A.SetPriority(tuple(state["priority"])), window=window):
                 state["priority"] = []
@@ -2502,6 +2557,7 @@ class Game:
     def on_muster_key(self, event) -> None:
         state = self.ledger_state["muster"]
         command = getattr(event, "command", "")
+        char = (event.char or "").lower()
         views = tuple(key for key, _label in ledger_page.MUSTER_VIEWS)
         view = getattr(self, "muster_view", views[0])
         if command.startswith("tab:"):
@@ -2513,10 +2569,13 @@ class Game:
             self.muster_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
+        if char.isdigit() and 1 <= int(char) <= len(views):
+            self.muster_view = views[int(char) - 1]
+            self.repaint()
+            return
         if self.ledger_key(
                 "muster", event, ledger_page.STEPS["corvee"]):
             return
-        char = (event.char or "").lower()
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         b = self.belief
         if event.keysym == "Return" and state["pick"]:
@@ -3166,8 +3225,13 @@ class Game:
         views = altar.VIEWS
         view = getattr(self, "shrine_view", "rites")
         command = getattr(event, "command", "")
+        char = (event.char or "").lower()
         if command.startswith("tab:"):
             self.shrine_view = command.split(":", 1)[1]
+            self.repaint()
+            return
+        if char.isdigit() and 1 <= int(char) <= len(views):
+            self.shrine_view = views[int(char) - 1]
             self.repaint()
             return
         if event.keysym in {"Tab", "ISO_Left_Tab"}:
@@ -3176,12 +3240,18 @@ class Game:
             self.repaint()
             return
         if view in {"oaths", "obligations"}:
+            if view == "obligations" and event.keysym == "Return":
+                selected = self.ledger_state["oaths"]["pick"]
+                item = next((record for record in self.belief.get("obligations", ())
+                             if record["id"] == selected), None)
+                if item:
+                    self.open_focus("obligation", item)
+                    return
             self.on_oaths_key(event, window="altar")
             return
         if event.keysym == "Escape":
             self.app.close("altar")
             return
-        char = (event.char or "").lower()
         if view == "offerings":
             for key, good, quantity in altar.OFFERINGS:
                 if char == key:
@@ -3381,12 +3451,21 @@ class Game:
                                  if item["id"] == ref), None)
             item = item or next((item for item in alu.sites(self.belief)
                                  if item["id"] == ref), None)
+            item = item or next((item for item in self.belief.get("projects", ())
+                                 if item["id"] == ref), None)
             if item:
-                self.open_focus("cohort" if ref.startswith("cohort:") else "site", item)
+                kind = ("cohort" if item in self.belief.get("cohorts", ()) else
+                        "institution" if item in self.belief.get("institutions", ()) else
+                        "project" if item in self.belief.get("projects", ()) else "site")
+                self.open_focus(kind, item)
             return
         if event.keysym in {"Tab", "ISO_Left_Tab"}:
             step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
             self.alu_view = views[(views.index(view) + step) % len(views)]
+            self.repaint()
+            return
+        if char.isdigit() and 1 <= int(char) <= len(views):
+            self.alu_view = views[int(char) - 1]
             self.repaint()
             return
         if char.lower() == "n":
@@ -3405,7 +3484,12 @@ class Game:
             return
         if view == "works":
             if event.keysym == "Return":
-                self.open_works()
+                projects = self.belief.get("projects", ())
+                item = next((p for p in projects
+                             if p["id"] == getattr(self, "alu_pick", "")),
+                            projects[0] if projects else None)
+                if item:
+                    self.open_focus("project", item)
             return
         if view in {"cohorts", "sites"} and (
                 event.keysym in {"Up", "Down"} or command == "alu:next"):
@@ -3413,12 +3497,20 @@ class Game:
                       else alu.sites(self.belief))
             ids = [item["id"] for item in source]
             if ids:
-                here = ids.index(getattr(self, "alu_pick", "")) if getattr(self, "alu_pick", "") in ids else 0
-                self.alu_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+                picked = getattr(self, "alu_pick", "")
+                if picked not in ids:
+                    self.alu_pick = ids[0 if event.keysym == "Down" else -1]
+                else:
+                    here = ids.index(picked)
+                    self.alu_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
                 self.repaint()
             return
         if view in {"cohorts", "sites"} and event.keysym == "Return":
             ref = getattr(self, "alu_pick", "")
+            source = (self.belief.get("cohorts", ()) if view == "cohorts"
+                      else alu.sites(self.belief))
+            if not ref and source:
+                ref = source[0]["id"]
             item = next((item for item in self.belief.get("cohorts", ())
                          if item["id"] == ref), None)
             item = item or next((item for item in alu.sites(self.belief)
@@ -3878,27 +3970,12 @@ class Game:
             self.world_all_routes = not all_routes
             self.world_route_scroll = 0
         elif command.startswith("world:route:"):
-            # Clicking a road selects the far end of it, which is what a
-            # player pointing at a line is asking about. A faint onward leg
-            # does not touch the current place, so choose the end beyond its
-            # directly connected neighbour rather than whichever endpoint
-            # happened to be authored first.
             _prefix, _kind, a, z = command.split(":", 3)
-            if a == self.world_place_pick:
-                self.world_place_pick = z
-            elif z == self.world_place_pick:
-                self.world_place_pick = a
-            else:
-                neighbours = {
-                    endpoint
-                    for route in worldmap.routes_from(
-                        self.belief, self.world_place_pick)
-                    for endpoint in (
-                        str(route.get("a", "")), str(route.get("b", "")))
-                }
-                self.world_place_pick = (
-                    z if a in neighbours
-                    else a)
+            item = next((route for route in routes
+                         if {str(route.get("a")), str(route.get("b"))} == {a, z}), None)
+            if item:
+                self.open_focus("route", item)
+                return
         elif command.startswith("world:place:"):
             picked = command.split(":", 2)[2]
             if picked == "next" or picked == "previous":
@@ -4023,14 +4100,22 @@ class Game:
             self.trade_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
+        if char.isdigit() and 1 <= int(char) <= len(views):
+            self.trade_view = views[int(char) - 1]
+            self.repaint()
+            return
         source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
                   "movements": self.belief.get("trade", {}).get("movements", ()),
                   "routes": self.belief.get("trade", {}).get("routes", ())}.get(view, ())
         ids = [str(item.get("id") or f"{view}:{index}")
                for index, item in enumerate(source)]
         if (event.keysym in {"Up", "Down"} or command == "trade:next") and ids:
-            here = ids.index(getattr(self, "trade_pick", "")) if getattr(self, "trade_pick", "") in ids else 0
-            self.trade_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+            picked = getattr(self, "trade_pick", "")
+            if picked not in ids:
+                self.trade_pick = ids[0 if event.keysym == "Down" else -1]
+            else:
+                here = ids.index(picked)
+                self.trade_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
             self.repaint()
             return
         if event.keysym == "Return" and ids:
@@ -4432,9 +4517,14 @@ class Game:
             self.request_load()
         elif event.keysym == "space":
             self.pending_end_fortnight = True
-            self.notify("End this fortnight — no hours. Enter confirms; Escape cancels.",
+            unread = sum(not item.get("read") for item in self.belief.get("stack", ()))
+            waiting = len(hall.waiting(self.belief))
+            self.notify(f"End this fortnight — {unread} unread, {waiting} waiting. "
+                        "Enter confirms; Escape cancels.",
                         registry.PREVIEW, window="hall")
             self.repaint()
+        elif getattr(event, "command", "").startswith("concern:"):
+            self.activate_concern(int(event.command.split(":", 1)[1]))
         elif char.isdigit() and char != "0":
             self.activate_concern(int(char) - 1)
         elif char == "?":

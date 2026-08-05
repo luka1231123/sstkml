@@ -51,10 +51,10 @@ Model supply language, not simulation truth. It may correct player's one- or two
 ./run.sh --test
 .venv/bin/python tools/inventory.py
 .venv/bin/python tools/corpus_lint.py
-.venv/bin/python tools/m13_audit.py
 .venv/bin/python tools/m13_benchmark.py
 .venv/bin/python tools/balance.py austerity 96
 .venv/bin/python tools/gameplay_probe.py 4 180
+.venv/bin/python tools/information_audit.py
 .venv/bin/python tools/kernel_inspect.py where grain
 ```
 

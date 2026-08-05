@@ -21,6 +21,7 @@ MASK64 = (1 << 64) - 1
 # Every draw names a domain. Typos must fail loudly, not spawn a silent stream.
 DOMAINS: frozenset[str] = frozenset({
     "climate",
+    "climate.drought",
     "names",
     "scribe.error",
     "letters.interception",

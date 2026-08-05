@@ -12,6 +12,8 @@ from engine.kernel.intent import Intent
 
 GRAIN = F.GRAIN
 COPPER = "copper"
+TIN = "tin"
+BRONZE = "bronze"
 
 # --- price (spec 6.6) ---------------------------------------------------------
 
@@ -36,7 +38,7 @@ LINE_CARGO = 4000
 LOAD_PER_DAY = 25
 
 # How much hold a unit of a good takes, relative to a qa of grain.
-BULK = {COPPER: 60}
+BULK = {COPPER: 60, TIN: 60, BRONZE: 60}
 
 # Ordinal blocks for lots minted here, clear of `farm`'s (200-1100) and the settlement phase's.
 BLOCKS = {"sale": 3000, "pay": 3400, "land": 3800}
@@ -415,7 +417,13 @@ def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
             take = min(wanted - aboard, lot.free)
             if take < lot.quantity:
                 # Part of a lot sails and the rest stays on the quay: the two are in different.
-                part = mint(origin, turn, "lot", BLOCKS["land"] + len(cargo))
+                # The ordinal walks until it is free, because two houses loading
+                # at the same quay on the same turn would otherwise mint the
+                # same id. Unreachable while every route carried nothing.
+                ordinal = BLOCKS["land"] + len(cargo)
+                while mint(origin, turn, "lot", ordinal) in book.lots:
+                    ordinal += 1
+                part = mint(origin, turn, "lot", ordinal)
                 book = book.split(lot.id, take, part)
                 lot_id = part
             else:

@@ -106,6 +106,21 @@ def tabs(surface: Surface, x: int, y: int, width: int,
         x += len(text) + 1
 
 
+def detail_room(widths: tuple[int, ...], width: int,
+                detail_min: int = 18) -> int:
+    """How many columns the detail pane will get, before it is composed.
+
+    A screen that wants to lay its facts out in two columns has to know this
+    before it builds them, and guessing it wrong is how a value ends in an
+    ellipsis. Kept beside `compose`, which is the only place the arithmetic
+    may live, so the two cannot drift apart.
+    """
+    natural = sum(abs(spec) for spec in widths) + 2 * len(widths) + 2
+    if width < 68 or natural > width - detail_min - 6:
+        return width - 5            # stacked: the pane owns the whole column
+    return width - (max(30, min(natural, width - detail_min - 6)) + 4) - 2
+
+
 def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             rows: list[Row], selected: str, detail: list[tuple[str, str]],
             controls: list[Control], hours: int,

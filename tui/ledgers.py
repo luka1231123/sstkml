@@ -18,9 +18,11 @@ the player who knows the exact number he wants.
 from __future__ import annotations
 
 import registry
+from belief import project
 from tui import render, style
+from tui.grid import INDEX as C
 from tui.grid import InteractiveScreen, sparkline
-from tui.workbench import Control, Row, affordable, compose
+from tui.workbench import Control, Row, affordable, compose, detail_room
 
 # What `[` and `]` move by on each screen. Coarse enough to reach a useful
 # figure in a few presses, and never so fine that stepping is a chore.
@@ -51,21 +53,6 @@ def key_for(action_id: str) -> str:
 
 def _spoken(value: str) -> str:
     return str(value).replace("_", " ")
-
-
-def _compact_good(good: str, amount: int) -> str:
-    """A complete quantity that fits a workbench detail column."""
-    shown = (render.fmt_good(good, amount)
-             .replace(" parisu ", "p ")
-             .replace(" talent ", "tal ")
-             .replace(" shekel", "sh")
-             .replace(" jar ", "jr ")
-             .replace(" qa", "qa")
-             .replace(" log", "log"))
-    for empty_remainder in (" 0qa", " 0sh", " 0log"):
-        if shown.endswith(empty_remainder):
-            shown = shown[:-len(empty_remainder)]
-    return shown
 
 
 # --- the stores ---------------------------------------------------------------
@@ -104,14 +91,19 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
         ("taken back", "dim"))))
 
     if not any(row.id == selected for row in rows):
-        selected = rows[0].id if rows else ""
+        # Land on grain, not on whatever sorts first. Opening the Storehouse on
+        # an empty bronze row taught the player nothing on the turn he most
+        # wanted to know how the granary stood.
+        stocked = [row.id for row in rows if dict(goods).get(row.id)]
+        selected = ("grain" if "grain" in stocked else
+                    stocked[0] if stocked else rows[0].id if rows else "")
     held = dict(goods).get(selected)
     ledger = LEDGER_OF.get(selected, "")
     inspected = set(b.get("inspected", []))
 
     detail: list[tuple[str, str]] = [(_spoken(selected).upper(), "gold"), ("", "ink")]
     if held is not None:
-        detail.append((f"counted  {_compact_good(selected, held)}", "clay"))
+        detail.append((f"counted  {render.fmt_good(selected, held)}", "clay"))
         detail.append(
             ("your inspected count" if ledger in inspected
              else "keeper's count", "dim"))
@@ -125,14 +117,11 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
             if len(history) > 1:
                 change = history[-1] - history[0]
                 detail.append((
-                    f"{change:+,} base units",
+                    ("+" if change >= 0 else "−")
+                    + render.fmt_good(selected, abs(change)),
                     "barley" if change >= 0 else "blood"))
     if ledger:
-        detail += [
-            ("", "ink"),
-            (f"[i] have the {ledger} counted, and see", "sand"),
-            ("    what is really on the floor", "sand"),
-        ]
+        detail += [("", "ink"), (f"[i] count the {ledger} yourself", "sand")]
     if selected == "seed_grain":
         detail += [
             ("", "ink"),
@@ -145,11 +134,21 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
         detail += [
             ("", "ink"),
             ("METAL ACCOUNT", "gold"),
-            ("in service  " + _compact_good(
+            ("in service  " + render.fmt_good(
                 "bronze", metal.get("bronze_in_circulation", 0)), "clay"),
-            ("melted      " + _compact_good(
+            ("melted      " + render.fmt_good(
                 "bronze", metal.get("melt_ledger", 0)), "blood"),
         ]
+        # Why the forge is idle, said plainly. Bronze is nine parts copper to
+        # one of tin, so a full copper yard and an empty tin chest is a stopped
+        # forge -- and the melt ledger going up while nothing is smelted is the
+        # army being taken apart. The player should not have to infer that.
+        stores = b.get("stores", {})
+        if not stores.get("tin") and stores.get("copper"):
+            detail += [
+                ("no tin: the forge cannot make bronze,", "flame"),
+                ("and what is in service is being melted", "flame"),
+            ]
 
     controls = []
     if ledger:
@@ -159,10 +158,14 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
         controls.append(Control(
             "eat_seed", key_for("eat_seed"),
             label=f"open {amount:,} qa for food"))
-    note = "Tab view   ↑↓ choose   [ ] amount" if room else "↑↓ choose   [ ] amount"
+    note = ("Tab view   ↑↓ choose   Enter record   [ ] amount" if room
+            else "↑↓ choose   Enter record   [ ] amount")
     return compose(
         "THE STOREHOUSE" if room else "THE STORES",
-        ("good", "counted", "recent"), (18, -22, 12),
+        # One unit to a quantity means the counted column no longer has to
+        # hold "1,204 parisu 18 qa", and the four columns it gives back go to
+        # the detail pane, which was the one that could not fit its sentence.
+        ("good", "counted", "recent"), (18, -18, 12),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="the storehouse is empty.",
         note=note,
@@ -245,62 +248,140 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
 
 # --- the land -----------------------------------------------------------------
 
+def _year_band(surface, x: int, y: int, room: int, b: dict) -> None:
+    """The grain year and this fortnight's hands, drawn across the top.
+
+    Three rows and no prose: the wheel says how long each season is and where
+    the king stands in it, the bar says how much of the labour the season has
+    actually asked for. Both were already in Belief and neither was drawn.
+    """
+    calendar = b.get("calendar") or {}
+    data = b.get("land") or {}
+    if not calendar:
+        return
+    cells = render.year_wheel(calendar)
+    surface.text(x, y, "THE GRAIN YEAR", C["gold"], C["ink"])
+    for index, (glyph, colour, now) in enumerate(cells):
+        if 16 + index >= room:
+            break
+        surface.put(x + 16 + index, y, glyph,
+                    C["flame"] if now else C[colour], C["ink"])
+    mark = f"fortnight {calendar.get('fortnight', 0)} of 24"
+    if 16 + len(cells) + 2 + len(mark) <= room:
+        surface.text(x + 16 + len(cells) + 2, y, mark, C["bone"], C["ink"])
+
+    stage = calendar.get("stage", "low_water")
+    surface.text(x, y + 1, render.year_says(calendar, room),
+                 C[render.STAGE_COLOUR.get(stage, "clay")], C["ink"])
+    # What the season means, and the river beside it -- the gauge rides here
+    # as well as in the detail pane, which the smallest window truncates away.
+    says = render.STAGE_SAYS.get(stage, "")
+    river = data.get("gauge_says", "")
+    surface.text(x, y + 2, f"{says} · {river}"[:room] if river else says[:room],
+                 C["ash"], C["ink"])
+
+    have = data.get("labour_days_this_turn", 0)
+    asks = data.get("labour_days_needed", 0)
+    idle = data.get("labour_days_idle", 0)
+    bar = render.labour_bar(have, asks, data.get("labour_days_committed", 0))
+    surface.text(x, y + 3, "THE HANDS", C["gold"], C["ink"])
+    surface.text(x + 16, y + 3, bar, C["barley"], C["ink"])
+    said = (f"{have:,} person-days · asks {asks:,} · {idle:,} idle")
+    column = x + 16 + len(bar) + 2
+    surface.text(column, y + 3, said[:max(0, room - 16 - len(bar) - 2)],
+                 C["clay"] if idle else C["flame"], C["ink"])
+
+    # What is queued behind the season. An ask of nothing means one thing with
+    # the barns empty and another with the sheaves stacked to the roof. It
+    # rides beside the bar where there is width for it and drops to its own
+    # row where there is not, so a narrow window loses a line and not a fact.
+    coming = (data.get("labour_days_by_season") or {}).get(
+        calendar.get("next", ""), 0)
+    if not coming:
+        return
+    queued = (f"then {calendar.get('next', '').replace('_', ' ')} asks "
+              f"{coming:,} in {calendar.get('next_in', 0)}")
+    beside = column - x + len(said) + 2
+    if beside + len(queued) <= room:
+        surface.text(x + beside, y + 3, queued, C["sand"], C["ink"])
+    else:
+        surface.text(x + 16, y + 4, queued[:max(0, room - 16)],
+                     C["sand"], C["ink"])
+
+
 def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
          scroll: int = 0, days: int = 0, notice: str = "",
          hours: int = 0, group: str = "",
          room: bool = False) -> InteractiveScreen:
     data = b.get("land") or {}
     estates = list(data.get("estates", []))
-    rows = []
-    for estate in estates:
-        canal = estate.get("canal_condition")
-        water = (f"canal {canal}" if estate.get("irrigated")
-                 and canal is not None else "rain-fed")
-        rows.append(Row(estate["id"], (
-            (estate["name"], "sand"),
-            (_spoken(estate["place"]), "dim"),
-            (water, "sky" if estate.get("irrigated") else "ash"),
-            (f"{estate['hands']} hands", "clay"),
-        )))
+    # The list is a chooser, not a record. Place and water are facts about the
+    # estate the player has already picked, so they belong in the pane that
+    # describes it -- and taking them out of the table gives the pane twenty
+    # columns it did not have, which is the difference between a figure that
+    # fits and one that ends in an ellipsis.
+    rows = [Row(estate["id"], ((estate["name"], "sand"),
+                               (f"{estate['hands']}", "clay")))
+            for estate in estates]
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
     estate = next((e for e in estates if e["id"] == selected), None)
 
+    # The pane is built to the width it will actually get. Two facts to a row
+    # where there is room for two, one where there is not -- which halves the
+    # height of the dossier without dropping a single figure from it.
+    pane = detail_room((22, -6), width)
+    half = pane // 2
+
+    def paired(left: str, right: str, tone: str) -> list[tuple[str, str]]:
+        if not right:
+            return [(left[:pane], tone)]
+        if len(left) + 2 + len(right) <= pane and len(left) < half:
+            return [(f"{left:<{half}}{right}", tone)]
+        return [(left[:pane], tone), (right[:pane], tone)]
+
+    # Every figure in these two sections is qa, so the unit is named once in
+    # the heading and never again. Repeating it on twelve rows is the same
+    # noise the parisu remainder was, spelt differently.
+    def qa(amount: int) -> str:
+        return f"{amount:,}"
+
     rate = data.get("land_due_rate", 0)
-    detail: list[tuple[str, str]] = [
-        (f"the river gauge stands at {data.get('gauge', 0)} · "
-         f"the fields are in {data.get('stage', 'low water')}", "sky"),
-        (f"last year the land gave the crown "
-         f"{_compact_good('grain', data.get('last_land_due', 0))}", "barley"),
-        (f"land due ordered   {rate}/1000", "gold"),
-        (f"seed in store      "
-         f"{_compact_good('grain', data.get('seed_in_store', 0))}", "sand"),
-        (f"seed in the ground "
-         f"{_compact_good('grain', data.get('seed_in_ground', 0))}", "sand"),
-        (f"the ground can take "
-         f"{_compact_good('grain', data.get('seed_recommended', 0))}", "dim"),
-        (f"hands {data.get('labour_days_this_turn', 0):,}d available · "
-         f"work asks {data.get('labour_days_needed', 0):,}d · "
-         f"corvée {data.get('corvee_days', 0):,}d", "clay"),
-    ]
+    detail: list[tuple[str, str]] = [("THE CROP · qa", "gold")]
+    detail += paired(f"seed {qa(data.get('seed_in_store', 0))} stored",
+                     f"standing {qa(data.get('standing', 0))}", "sand")
+    detail += paired(f"sown {qa(data.get('seed_in_ground', 0))}",
+                     f"sheaves {qa(data.get('sheaves', 0))}", "sand")
+    detail += [(f"open ground takes "
+                f"{qa(data.get('seed_recommended', 0))}"[:pane], "dim"),
+               ("THE RIVER", "gold"),
+               (f"gauge {data.get('gauge', 0)} · ordinary "
+                f"{project.GAUGE_ORDINARY} · the scribe's copy"[:pane], "sky"),
+               ("THE DUE", "gold")]
+    detail += paired(f"ordered {rate}/1000",
+                     f"took {qa(data.get('last_land_due', 0))} qa last year",
+                     "gold")
     if estate is not None:
-        detail += [
-            ("THE ESTATE", "gold"),
-            (f"ground {estate['extent']:,} qa · capacity "
-             f"{estate['capacity']:,} · {estate['hands']} hands", "sand"),
-            (f"sown {estate['under_crop']:,} qa · "
-             f"open {max(0, estate['extent'] - estate['under_crop']):,} qa",
-             "verdigris" if estate['under_crop'] else "ash"),
-            (f"the palace holds "
-             f"{_compact_good('grain', estate['seed'])} seed · "
-             f"{_compact_good('grain', estate['sheaves'])} sheaves · "
-             f"{_compact_good('grain', estate['grain'])} grain", "dim"),
-        ]
-    detail += [
-        (f"{days} days in hand" if days else "[ ] choose work days",
-         "flame" if days else "dim"),
-        ("[< >] land due ±25", "dim"),
-    ]
+        canal = estate.get("canal_condition")
+        water = (f"canal {canal}" if estate.get("irrigated")
+                 and canal is not None else "rain-fed")
+        open_ground = max(0, estate["extent"] - estate["under_crop"])
+        detail.append(("THE ESTATE · qa", "gold"))
+        detail += paired(f"at {_spoken(estate['place'])} · {water}",
+                         f"{estate['hands']} hands", "dim")
+        detail += paired(f"ground {qa(estate['extent'])}",
+                         f"returns {estate['capacity']:,}/1000", "sand")
+        detail += paired(f"sown {qa(estate['under_crop'])}",
+                         f"open {qa(open_ground)}",
+                         "verdigris" if estate["under_crop"] else "ash")
+        detail += paired(f"holds {qa(estate['seed'])} seed",
+                         f"{qa(estate['sheaves'])} sheaves", "dim")
+        detail += paired(f"      {qa(estate['grain'])} grain", "", "dim")
+    # The note row under the list already prints [ ] days and [< >] due, and
+    # the footer prints the due itself. Only the chosen figure is state rather
+    # than a repeated hint, so only the chosen figure is kept here.
+    if days:
+        detail += [("", "ink"), (f"{days} days in hand", "flame")]
 
     # Hands come from the Roll, but the decision to send them belongs here,
     # where the gauge and the sowing are on the same screen. The group is
@@ -328,14 +409,22 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         controls.append(affordable(Control(
             "send_to_harvest", key_for("send_to_harvest"),
             label="send " + chosen_group["name"][:18]), hours))
+    # The band takes four rows and is worth them only on a screen tall enough
+    # to keep a list under it.
+    band = 6 if (b.get("calendar") and height >= 24) else 0
+
+    def draw(surface, x, y, room, _rows):
+        _year_band(surface, x + 2, y, room - 4, b)
+
     return compose(
         "THE STOREHOUSE — ESTATES AND HARVEST" if room else "THE LAND",
-        ("estate", "place", "water", "hands"),
-        (22, -10, 10, -8),
+        ("estate", "hands"),
+        (22, -6),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="this house holds no estates.",
         note="Tab view   ↑↓ choose   [ ] days   [< >] due   [g] hands",
-        views=STOREHOUSE_VIEWS if room else (), view="land")
+        views=STOREHOUSE_VIEWS if room else (), view="land",
+        scene=draw, scene_rows=band)
 
 
 def storehouse_account(b: dict, view: str, selected: str = "",
@@ -550,6 +639,13 @@ def obligations(b: dict, selected: str = "", width: int = 78,
                 notice: str = "", hours: int = 0) -> InteractiveScreen:
     rows = []
     records = {}
+    for record in b.get("obligations", []):
+        key = record["id"]
+        records[key] = record
+        due = record.get("due_turn", 0)
+        rows.append(Row(key, ((record.get("kind", "obligation"), "bone"),
+                              (record.get("status", ""), "clay"),
+                              (f"due {due}" if due else "no date", "dim"))))
     for oath in b.get("oaths", []):
         for index, clause in enumerate(oath.get("clauses", [])):
             key = f"{oath['id']}:{index}"
@@ -562,13 +658,20 @@ def obligations(b: dict, selected: str = "", width: int = 78,
         selected = rows[0].id if rows else ""
     detail = []
     if selected in records:
-        oath, clause = records[selected]
-        detail = [("OBLIGATION", "gold"), ("", "ink"),
-                  (_clause(clause), "bone"),
-                  ("tablet " + _spoken(oath["id"]), "dim"),
-                  ("sworn turn " + str(oath["sworn_turn"]), "sky"),
-                  ("parties " + ", ".join(render.actor_name(
-                      party, b.get("house")) for party in oath["parties"]), "clay")]
+        record = records[selected]
+        if isinstance(record, tuple):
+            oath, clause = record
+            detail = [("OBLIGATION", "gold"), ("", "ink"),
+                      (_clause(clause), "bone"),
+                      ("tablet " + _spoken(oath["id"]), "dim"),
+                      ("sworn turn " + str(oath["sworn_turn"]), "sky"),
+                      ("parties " + ", ".join(render.actor_name(
+                          party, b.get("house")) for party in oath["parties"]), "clay")]
+        else:
+            detail = [("CORRESPONDENCE OBLIGATION", "gold")]
+            detail += [(f"{key.replace('_', ' ')}  {value}", "clay")
+                       for key, value in record.items()
+                       if key not in {"source", "certainty", "history"}]
     return compose(
         "THE SHRINE — OBLIGATIONS", ("clause", "tablet", "standing"),
         (31, 22, 10), rows, selected, detail, [], hours, width, height,

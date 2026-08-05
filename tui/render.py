@@ -47,26 +47,140 @@ def letter_body(sender: str, topic: str, facts: dict) -> str:
 
 # Display units, authored in content/goods.toml since M8 (spec 6.2).
 _GOODS = tomllib.loads((_CONTENT / "goods.toml").read_text())
-_DISPLAY = {
-    good: (spec["display_unit"], int(spec.get("per_display", 1)))
-    for good, spec in _GOODS.items()
-}
+_UNIT = {good: spec["unit"] for good, spec in _GOODS.items()}
 
 
 def fmt_good(good: str, amount: int) -> str:
-    """The large unit with a remainder, the way the tablets do it: bronze is
-    counted in talents and shekels, grain in parisu and qa (spec 6.2)."""
-    unit = _DISPLAY.get(good)
-    if unit is None or unit[1] <= 1:
-        return f"{amount:,}"
-    name, per = unit
-    base = _GOODS.get(good, {}).get("unit", "qa")
-    return f"{amount // per:,} {name} {amount % per} {base}"
+    """One quantity, one unit.
+
+    This used to print the large unit with a remainder the way the tablets do
+    it -- "2,666 parisu 40 qa", "10 talent 0 shekel". It was authentic and it
+    was unreadable: two numbers to compare instead of one, a remainder that is
+    noise at every size that matters, and a unit the player has to convert
+    before it can be set beside a rate, because every rate in the game is in
+    the base unit already. The base unit is now the only unit.
+    """
+    unit = _UNIT.get(good)
+    return f"{amount:,} {unit}" if unit else f"{amount:,}"
+
+
+def fortnights_fed(b: dict) -> int | None:
+    """How long the granary feeds the payroll -- the only grain figure a king
+    can act on. Parisu and qa say how much is there and nothing about whether
+    it is enough."""
+    owed = sum(g.get("size", 0) * g.get("entitlement", 0)
+               for g in b.get("groups", ()))
+    if owed <= 0:
+        return None
+    return b.get("stores", {}).get("grain", 0) // owed
+
+
+def granary_line(b: dict) -> str:
+    """How long the grain lasts, and whether that number is getting better.
+
+    A level tells the king where he stands; the direction tells him whether he
+    must act this fortnight or may spend it on something else. Both, or the
+    room has told him nothing he can use.
+    """
+    kept = fortnights_fed(b)
+    if kept is None:
+        return ""
+    said = "one fortnight" if kept == 1 else f"{kept} fortnights"
+    series = b.get("store_history", {}).get("grain", ())
+    if len(series) < 2 or series[-1] == series[-2]:
+        return f"{said} fed"
+    return f"{said} fed, {'rising' if series[-1] > series[-2] else 'falling'}"
+
+
+def temper(unrest: int) -> str:
+    """Unrest as the court would say it. 0..1000 is not a sentence."""
+    return ("quiet" if unrest < 150 else "grumbling" if unrest < 350
+            else "angry" if unrest < 600 else "near revolt")
+
+
+def standing(legitimacy: int) -> str:
+    return ("despised" if legitimacy < 250 else "doubted" if legitimacy < 500
+            else "accepted" if legitimacy < 750 else "honoured")
 
 
 def _bar(value: int, total: int, width: int = 10) -> str:
     filled = 0 if total <= 0 else min(width, value * width // total)
     return "▓" * filled + "░" * (width - filled)
+
+
+# The grain year as one glyph per fortnight. The shape is the lesson: the
+# harvest is four cells wide and the fallow is five, so the ruler can see that
+# the work stops before he has to be told that it does.
+STAGE_GLYPH = {"sowing": "▁", "growing": "▄", "harvest": "█",
+               "threshing": "▓", "low_water": "·"}
+STAGE_COLOUR = {"sowing": "sand", "growing": "verdigris", "harvest": "barley",
+                "threshing": "gold", "low_water": "faint"}
+STAGE_SHORT = {"sowing": "sow", "growing": "grow", "harvest": "reap",
+               "threshing": "thresh", "low_water": "fallow", "": "—"}
+STAGE_SAYS = {
+    "sowing": "seed goes into the ground",
+    "growing": "the crop stands; hands only watch it",
+    "harvest": "cut it or lose it where it stands",
+    "threshing": "sheaves become grain, and seed is set aside",
+    "low_water": "the fields ask for nothing",
+}
+
+
+def labour_bar(available: int, asked: int, committed: int,
+               width: int = 12) -> str:
+    """Hands as a bar: asked for, committed elsewhere, and standing idle.
+
+    Overflow is its own glyph. A season that asks for more days than the place
+    has is the single most useful thing the Land ledger can say, and a bar that
+    simply fills to the end says the opposite.
+    """
+    if available <= 0:
+        return "░" * width
+    if asked + committed > available:
+        return "█" * width + "!"
+    work = min(width, asked * width // available)
+    held = min(width - work, committed * width // available)
+    return "█" * work + "▓" * held + "░" * (width - work - held)
+
+
+def year_wheel(calendar: dict) -> list[tuple[str, str, bool]]:
+    """One cell per fortnight: glyph, colour name, and whether it is now."""
+    now = calendar.get("fortnight", 0)
+    return [(STAGE_GLYPH.get(stage, "·"), STAGE_COLOUR.get(stage, "faint"),
+             index == now)
+            for index, stage in enumerate(calendar.get("wheel", ()), 1)]
+
+
+def year_line(calendar: dict) -> str:
+    """The same wheel where only text is possible; now is bracketed."""
+    cells = year_wheel(calendar)
+    return "".join(glyph for glyph, _colour, _now in cells)
+
+
+def year_says(calendar: dict, room: int = 999) -> str:
+    """Where the year stands: season, position, what comes next.
+
+    Three lengths, longest first, and the caller says how much room it has.
+    A screen that shrinks should lose words, not the fact -- the alternative
+    is every window keeping its own hand-cut variant of the same sentence.
+    """
+    stage = calendar.get("stage", "")
+    if not stage:
+        return "the year has not turned"
+    index, length = calendar.get("index", 1), calendar.get("length", 1)
+    left = calendar.get("left", 0)
+    ahead = calendar.get("next_in", 0)
+    name, following = stage.replace("_", " "), calendar.get("next", "")
+    said = following.replace("_", " ")
+    tail = (f"{left} fortnight{'s' if left != 1 else ''} left"
+            if left > 1 else "the last fortnight of it")
+    for line in (f"{name} · {index} of {length} · {tail} · then {said} in {ahead}",
+                 f"{name} {index}/{length} · {left} left · then {said} in {ahead}",
+                 f"{STAGE_SHORT.get(stage, name)} {index}/{length} · "
+                 f"{STAGE_SHORT.get(following, '?')} in {ahead}"):
+        if len(line) <= room:
+            return line
+    return f"{STAGE_SHORT.get(stage, name)} {index}/{length}"
 
 
 _ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
@@ -83,7 +197,7 @@ def header(b: dict) -> str:
     return (f"  {title} · {b['date']} · sea: {sea}\n"
             f"  audience  {_bar(b['attention'], b['attention_base'])}  "
             f"{b['attention']} / {b['attention_base']}     "
-            f"unrest {b['unrest']}   legitimacy {b['legitimacy']}")
+            f"city {temper(b['unrest'])}   king {standing(b['legitimacy'])}")
 
 
 def stack_screen(b: dict) -> str:
@@ -244,7 +358,17 @@ def land_screen(b: dict) -> str:
     if not land:
         return "  THE LAND — (this house holds no estates.)"
     lines = ["  THE LAND — the gauge, last year's floor, and your standing orders", ""]
-    lines.append(f"    the river gauge stands at {land['gauge']}")
+    calendar = b.get("calendar")
+    if calendar:
+        marker = " " * (calendar.get("fortnight", 1) - 1) + "▲"
+        lines.append("    the grain year   " + year_line(calendar))
+        lines.append("                     " + marker)
+        lines.append(f"    {year_says(calendar)}")
+        lines.append(f"    {STAGE_SAYS.get(calendar.get('stage', ''), '')}")
+        lines.append("")
+    lines.append(f"    the river gauge stands at {land['gauge']} "
+                 f"(ordinary is 30) — {land.get('gauge_says', '')}")
+    lines.append("    the scribe read the mark; it may be miscopied")
     lines.append(f"    the fields are in {land['stage']}")
     lines.append(f"    last year the land gave the crown   "
                  f"{fmt_good('grain', land['last_land_due']):>28}")
@@ -264,10 +388,24 @@ def land_screen(b: dict) -> str:
                  f"{fmt_good('grain', ground):>28}")
     lines.append(f"    the sowing asks for            "
                  f"{fmt_good('grain', want):>28}")
+    lines.append(f"    standing crop                 "
+                 f"{fmt_good('grain', land.get('standing', 0)):>28}")
+    lines.append(f"    sheaves stacked               "
+                 f"{fmt_good('grain', land.get('sheaves', 0)):>28}")
     lines.append("")
     supplied, needed = land["labour_days_this_turn"], land["labour_days_needed"]
-    lines.append(f"    hands on the land this fortnight  {supplied:,} days "
-                 f"against {needed:,} the season asks")
+    lines.append(f"    hands  {labour_bar(supplied, needed, land.get('labour_days_committed', 0))}"
+                 f"  {supplied:,} person-days in the place")
+    lines.append(f"    the season asks {needed:,} · "
+                 f"corvée holds {land.get('labour_days_committed', 0):,} · "
+                 f"{land.get('labour_days_idle', 0):,} stand idle")
+    if calendar:
+        coming = (land.get("labour_days_by_season") or {}).get(
+            calendar.get("next", ""), 0)
+        if coming:
+            lines.append(
+                f"    {calendar['next'].replace('_', ' ')} will ask "
+                f"{coming:,} days, in {calendar['next_in']} fortnights")
     if land["hands_to_the_fields"]:
         who = ", ".join(land["hands_to_the_fields"])
         lines.append(f"    ordered to the fields: {who}")

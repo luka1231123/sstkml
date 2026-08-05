@@ -28,7 +28,7 @@ first. The player reads the shapes and decides (D19).
 """
 from __future__ import annotations
 
-from tui import art, collection, document, style, workbench
+from tui import art, collection, document, render, style, workbench
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -37,11 +37,48 @@ VIEWS = ("overview", "cohorts", "institutions", "sites", "works")
 
 def sites(b: dict) -> list[dict]:
     seat = b.get("seat", "seat")
-    return [dict(site, id=f"site:{index}", place=seat,
+    return [dict(site, id=site.get("id", f"site:{index}"), place=seat,
                  name=site.get("name") or f"{site.get('kind', 'site')} {index + 1}")
             for index, site in enumerate(
                 b.get("world_graph", {}).get("sites", ()))
             if site.get("alu") == seat]
+
+
+def _overview(b: dict, room: int = 999) -> list[tuple[str, str]]:
+    """What the Alu is doing, not how many records it has. A count of cohorts
+    tells a king nothing he can act on; who is hungry and who is unpaid does."""
+    cohorts = b.get("cohorts", ())
+    groups = b.get("groups", ())
+    institutions = b.get("institutions", ())
+    projects = b.get("projects", ())
+    heads = sum(c.get("size", 0) for c in cohorts)
+    hungry = sum(c.get("size", 0) for c in cohorts if c.get("hunger"))
+    behind = [g for g in groups if g.get("arrears_weeks")]
+    worst = max((g["arrears_weeks"] for g in behind), default=0)
+    waiting = sum(c.get("status") in {"displaced", "petitioning"} for c in cohorts)
+    headless = [i for i in institutions if not i.get("head")]
+    days = sum(max(0, p.get("days_needed", 0) - p.get("days_done", 0))
+               for p in projects)
+    land = b.get("land") or {}
+    calendar = b.get("calendar") or {}
+    hands = sum(c.get("labour", 0) for c in cohorts)
+    return [
+        ("people", f"{heads:,} heads"
+                   + (f", {hungry:,} going hungry" if hungry else ", none hungry")),
+        ("hands", f"{hands:,} a fortnight · the fields ask "
+                  f"{land.get('labour_days_needed', 0):,}"),
+        ("the year", render.year_says(calendar, room) if calendar else "unknown"),
+        ("temper", f"{render.temper(b.get('alu_unrest', 0))}"
+                   f" · unrest {b.get('alu_unrest', 0)} of 1000, from unpaid rations"),
+        ("rations", f"{len(behind)} of {len(groups)} unpaid, worst {worst} fortnights"
+                    if behind else f"all {len(groups)} paid"),
+        ("at the gate", f"{waiting} cohorts wait to be received"
+                        if waiting else "nobody waits"),
+        ("institutions", f"{len(institutions)} standing"
+                         + (f", {len(headless)} with no head" if headless else "")),
+        ("works", f"{len(projects)} running, {days:,} days left"
+                  if projects else "nothing being built"),
+    ]
 
 
 def _plain(b: dict, view: str, width: int, height: int, notice: str,
@@ -52,15 +89,15 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
                    tuple((name, name.title()) for name in VIEWS), view)
     rows = []
     if view == "overview":
-        rows = [("people", sum(c.get("size", 0) for c in b.get("cohorts", ()))),
-                ("unrest", f"{b.get('alu_unrest', 0)} / 1000"),
-                ("cohorts", len(b.get("cohorts", ()))),
-                ("awaiting reception", sum(c.get("status") in {"displaced", "petitioning"}
-                                           for c in b.get("cohorts", ()))),
-                ("institutions", len(b.get("institutions", ()))),
-                ("works", len(b.get("projects", ())))]
+        # The widest label the overview uses is "institutions", so the reading
+        # beside it gets everything past that plus the two margins.
+        rows = _overview(b, width - 22)
     elif view == "cohorts":
-        rows = [(c.get("name", c["id"]), f"{c.get('size', 0):,} · {c.get('place', '')}")
+        # Heads, then the days those heads are worth. Labour is what the
+        # seasons actually spend and it was reachable only in the dossier.
+        rows = [(c.get("name", c["id"]),
+                 f"{c.get('size', 0):,} heads · {c.get('labour', 0):,}d · "
+                 f"{c.get('place', '')}")
                 for c in b.get("cohorts", ())]
     elif view == "sites":
         rows = [(i["name"], i.get("capacity") or i.get("role", ""))
@@ -69,26 +106,37 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
         rows = [(p.get("what", p.get("id", "work")),
                  f"{p.get('days_done', 0):,}/{p.get('days_needed', 0):,} days")
                 for p in b.get("projects", ())]
+    # The label needs sixteen columns and the reading needs everything else.
+    # Splitting the window down the middle gave a one-word label half a screen
+    # and cut the figure beside it, which is the wrong half to lose.
+    keys = min(18, max(12, max((len(str(n)) for n, _ in rows), default=12) + 2))
     for y, (name, value) in enumerate(rows[:max(0, height - 8)], 5):
-        surface.text(3, y, str(name)[:max(8, width // 2 - 4)], C["clay"], C["ink"])
-        surface.text(width // 2, y, str(value)[:max(0, width // 2 - 3)], C["dim"], C["ink"])
+        surface.text(3, y, str(name)[:keys], C["clay"], C["ink"])
+        surface.text(3 + keys + 1, y, str(value)[:max(0, width - keys - 7)],
+                     C["dim"], C["ink"])
         source = (b.get("cohorts", ()) if view == "cohorts" else
-                  sites(b) if view == "sites" else ())
+                  sites(b) if view == "sites" else
+                  b.get("projects", ()) if view == "works" else ())
         item = next((item for item in source if item.get("name", item.get("id")) == name), None)
+        if view == "works":
+            item = next((item for item in source
+                         if item.get("what", item.get("id")) == name), None)
         if item:
             surface.text(2, y, ">" if item["id"] == selected else " ",
                          C["flame"], C["ink"])
             surface.link(2, y, width - 4, 1, f"alu:open:{item['id']}")
     style.notice(surface, 3, height - 4, width - 6, notice)
     nav = [style.FooterAction("Tab", "view")]
-    if view in {"cohorts", "sites"}:
+    if view in {"cohorts", "sites", "works"}:
         nav += [style.FooterAction("↑↓", "choose", command="alu:next"),
                 style.FooterAction("Enter", "open")]
     if view == "works":
         nav.append(style.FooterAction("Enter", "manage works"))
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions = []
-    if view in {"overview", "cohorts"}:
+    if view in {"overview", "cohorts"} and any(
+            c.get("status") in {"displaced", "petitioning"}
+            for c in b.get("cohorts", ())):
         actions += [style.FooterAction("a", "accept"),
                     style.FooterAction("z", "settle"),
                     style.FooterAction("d", "redirect"),

@@ -38,7 +38,7 @@ sys.path.insert(0, str(ROOT))
 from engine.kernel.world import Kernel, advance_logged  # noqa: E402
 from load import load_campaign                          # noqa: E402
 
-SCENARIO, SEED = "ugarit", 1
+SCENARIO, SEED = "seat", 1
 
 
 def opening() -> Kernel:
