@@ -270,7 +270,6 @@ class Game:
         self.command_history: list[str] = []
         self.command_recall = 0
         self.pending_action: tuple[object, int, str] | None = None
-        self.pending_end_fortnight = False
         self.app.desktop_bindings = self._desktop_bindings()
 
         hall_width, hall_height = desktop.default_size("hall")
@@ -541,10 +540,6 @@ class Game:
         return result
 
     def confirm_pending(self) -> bool:
-        if getattr(self, "pending_end_fortnight", False):
-            self.pending_end_fortnight = False
-            self.end_fortnight()
-            return True
         pending = getattr(self, "pending_action", None)
         if pending is None:
             return False
@@ -561,12 +556,6 @@ class Game:
         return True
 
     def cancel_pending(self) -> bool:
-        if getattr(self, "pending_end_fortnight", False):
-            self.pending_end_fortnight = False
-            self.notify("The fortnight continues.", registry.PREVIEW,
-                        window="hall")
-            self.repaint()
-            return True
         pending = getattr(self, "pending_action", None)
         if pending is None:
             return False
@@ -4515,13 +4504,7 @@ class Game:
         elif control and event.keysym.lower() == "o":
             self.request_load()
         elif event.keysym == "space":
-            self.pending_end_fortnight = True
-            unread = sum(not item.get("read") for item in self.belief.get("stack", ()))
-            waiting = len(hall.waiting(self.belief))
-            self.notify(f"End this fortnight — {unread} unread, {waiting} waiting. "
-                        "Enter confirms; Escape cancels.",
-                        registry.PREVIEW, window="hall")
-            self.repaint()
+            self.end_fortnight()
         elif getattr(event, "command", "").startswith("concern:"):
             self.activate_concern(int(event.command.split(":", 1)[1]))
         elif char.isdigit() and char != "0":

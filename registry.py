@@ -120,8 +120,7 @@ def _d(*args, **kwargs) -> ActionDescriptor:
 # the product contract: it is the attention the action costs on *every* path.
 DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     _d("end_fortnight", A.EndTurn, "End fortnight", "End", ("hall",),
-       ("end fortnight",), 0, mnemonic="space", help_topic="end_turn",
-       confirm=True),
+       ("end fortnight",), 0, mnemonic="space", help_topic="end_turn"),
     _d("allocate", A.Allocate, "Allocation", "Allocate", ("roll",),
        ("allocate <amount> to <group>",), 0,
        (Field("amount", "quantity"), Field("group", "group")),

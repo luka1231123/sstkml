@@ -354,7 +354,7 @@ Prose belongs in tablets, where a person wrote it and a scribe read it out.
 
 The same action uses the same key everywhere. Tab and Shift-Tab cycle room
 tabs; arrows select; Enter opens or confirms a displayed preview; Space
-toggles, except in Hall where it previews ending the fortnight; Escape cancels
+toggles, except in Hall where it ends the fortnight; Escape cancels
 the active mode and otherwise closes; `:` opens Command and `?` opens Help.
 Ctrl-H raises Hall, Ctrl-G opens the window switcher, Ctrl-Tab and
 Ctrl-Shift-Tab cycle windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S
