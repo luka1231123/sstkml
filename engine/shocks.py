@@ -176,10 +176,12 @@ def step(world: World) -> tuple[World, list]:
     world, events = _recover(world)
     if world.date.absolute < world.pressure_turn:
         return world, events
-    # The age gets worse. Every eight years the world is likelier to be struck
+    # The age gets worse. Every four years the world is likelier to be struck
     # and strikes harder, so a reign that was survivable in its first decade is
-    # not the same reign in its third. Nothing here picks a victim.
-    age = (world.date.absolute - world.pressure_turn) // 192
+    # not the same reign in its third. Nothing here picks a victim. At the old
+    # eight-year step the escalation was unreachable: the rate ceiling stood at
+    # turn 790 and no campaign lasts that long, so the age never turned.
+    age = (world.date.absolute - world.pressure_turn) // 96
     # Every Alu faces its own weather. One roll for the whole map meant fifty-
     # five places shared a single misfortune between them and the seat was
     # struck about twice in thirty years, which is not the Late Bronze Age.
@@ -187,10 +189,16 @@ def step(world: World) -> tuple[World, list]:
                     if not world.kernel.registry.settlements[s].fallen)
     for target in targets:
         rng = stream(world.seed, world.date.absolute, "world.shock", target)
-        if not rng.chance(min(30, 10 + 4 * age), 1000):
+        if not rng.chance(min(6, 2 + age), 1000):
             continue
+        # Rare and ruinous, rather than constant and survivable. At one roll in
+        # five hundred a place is struck about once in twenty years, and three
+        # times as often once the age has turned; when it is struck it loses
+        # half to nine tenths of whatever the shock touches --
+        # the standing crop, the granary, the road, the capacity of the ground.
+        # Recovery restores half the difference, so a bad one is felt for years.
         world, landed = land(
             world, rng.pick(KINDS), target,
-            min(900, 200 + 60 * age + rng.int(401)), 3 + rng.int(13))
+            min(900, 500 + 60 * age + rng.int(401)), 4 + rng.int(17))
         events += landed
     return world, events
