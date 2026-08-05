@@ -40,9 +40,10 @@ priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_
 competence = 800
 fatigue = 500
 
-# Opening stores. Grain is roughly ten fortnights of full entitlement, so the
-# granary is visibly falling from turn one and the inherited harvest at
-# fortnight 12 is a genuine relief rather than a formality.
+# Opening stores. Grain is roughly ten fortnights of what the granary owes: the
+# named roll and the nine thousand of the palace sector, who eat from the store
+# and not off the land. So the granary is visibly falling from turn one and the
+# inherited harvest at fortnight 12 is a genuine relief rather than a formality.
 #
 # seed_grain opens at NOUGHT, and that is not an oversight: the game begins at
 # fortnight 1, mid-growing-season, so the predecessor's seed is already in the
@@ -51,7 +52,7 @@ fatigue = 500
 # six fortnights, f13 to f18 -- in which seed grain is a thing you could eat.
 # Doing so is free that turn and ruinous at the next threshing (spec 6.2).
 [stores]
-grain = 820000
+grain = 1070000
 seed_grain = 0
 oil = 4000
 wine = 3000
@@ -79,7 +80,7 @@ quantity = 1200
 id = "household"
 name = "the king's household"
 size = 120
-entitlement = 100
+entitlement = 16
 function = "household"
 place = "seat"
 
@@ -87,7 +88,7 @@ place = "seat"
 id = "garrison_mahadu"
 name = "garrison at Ma'hadu"
 size = 60
-entitlement = 90
+entitlement = 14
 function = "garrison"
 place = "ma_hadu"
 
@@ -95,7 +96,7 @@ place = "ma_hadu"
 id = "cult_baal"
 name = "servants of the temple of Baal"
 size = 80
-entitlement = 80
+entitlement = 13
 function = "cult"
 place = "seat"
 
@@ -103,7 +104,7 @@ place = "seat"
 id = "smiths_palace"
 name = "smiths of the palace quarter"
 size = 140
-entitlement = 70
+entitlement = 12
 function = "bronze_working"
 place = "seat"
 
@@ -111,7 +112,7 @@ place = "seat"
 id = "weavers"
 name = "weavers of the queen's house"
 size = 210
-entitlement = 60
+entitlement = 11
 function = "weaving"
 place = "seat"
 
@@ -121,7 +122,7 @@ place = "seat"
 id = "field_hands"
 name = "field hands of the crown estates"
 size = 400
-entitlement = 40
+entitlement = 10
 function = "field_labour"
 place = "seat"
 

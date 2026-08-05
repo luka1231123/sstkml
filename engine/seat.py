@@ -154,7 +154,7 @@ def harvest(world: World, events: list) -> tuple[World, list]:
         return world, []
     seat_id = SP.SEAT
     out: list = []
-    grain = straw = held_back = 0
+    grain = straw = held_back = shared = 0
     for event in events:
         if not isinstance(event, tuple) or len(event) < 2:
             continue
@@ -165,6 +165,9 @@ def harvest(world: World, events: list) -> tuple[World, list]:
             straw += event[4]
         elif event[0] == "set_aside" and _at_seat(kernel, event[1]):
             held_back += event[2]
+        elif (event[0] == "shared_out" and event[2] == seat_id
+              and event[3] == "grain"):
+            shared += event[4]
     if not grain and not held_back:
         return world, out
     out.append(A.Threshed(grain, held_back))
@@ -173,7 +176,10 @@ def harvest(world: World, events: list) -> tuple[World, list]:
         # movement the ledger must account for, but it is not a harvest:
         # the year's figure keeps the last threshing's.
         return world, out
-    court = dataclasses.replace(world.court, last_land_due=grain)
+    # The due is what the crown kept, not what the floor made: the villages took
+    # their share and next year's seed came off the top before either.
+    took = max(0, grain - shared - held_back)
+    court = dataclasses.replace(world.court, last_land_due=took)
     return dataclasses.replace(world, court=court), out
 
 

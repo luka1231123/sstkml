@@ -41,6 +41,13 @@ class Kernel:
         default_factory=dict)
     # Per good, per fortnight, scaled 1000.
     spoilage: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # What the crown takes off its own villages' threshing floor, per 1000. The
+    # court owns the figure; `engine.tick` pushes it in each turn.
+    land_due_per_1000: int = 1000 - F.HOUSEHOLD_SHARE_PER_1000
+    # What the crown's granary can hold, in qa. The floor renders no more than
+    # it: grain the crown cannot roof stays with the villages that grew it. Zero
+    # means no ceiling, which is every settlement but the seat.
+    granary_capacity: int = 0
     # Which lots at the seat are the court's stores, and which goods it counts (Task 2 C2).
     seat_goods: "SG.SeatGoods | None" = None
     # Cargo at sea.
@@ -411,15 +418,40 @@ def _within_reach(kernel: Kernel, book: W.Book,
     return tuple(lots)
 
 
+def _threshed(captured: dict) -> dict[EntityId, int]:
+    """What each floor made this turn, less the seed it then set aside."""
+    made: dict[EntityId, int] = {}
+    for event in captured.get("production", ()):
+        if not isinstance(event, tuple) or len(event) < 3:
+            continue
+        if event[0] == "threshed":
+            made[event[1]] = made.get(event[1], 0) + event[3]
+        elif event[0] == "set_aside":
+            made[event[1]] = made.get(event[1], 0) - event[2]
+    return made
+
+
 def _mouths(kernel: Kernel) -> tuple[Cohort, ...]:
-    """Whose meal this phase is answerable for, in a stable order (spec 2.6)."""
-    seen: set[EntityId] = set()
+    """Whose meal this phase is answerable for, in a stable order (spec 2.6).
+
+    Every settlement, the seat included. The seat's villages hold their own
+    crop and eat it; the crown's roll is redistributive and is served
+    separately by `engine.seat.feed` out of the store.
+    """
     out: list[Cohort] = []
     for settlement in kernel.autonomous():
         for cohort in kernel.cohorts_of(settlement):
+            if not cohort.in_transit:
+                out.append(cohort)
+    for settlement in sorted(kernel.registry.settlements):
+        place = kernel.registry.settlements[settlement]
+        if place.fallen or place.autonomous:
+            continue
+        for cohort in kernel.cohorts_of(settlement):
             if cohort.in_transit:
                 continue
-            seen.add(cohort.id)
+            if kernel.tenure_of(cohort) in ("redistributive", "prebendal"):
+                continue
             out.append(cohort)
     return tuple(out)
 
@@ -658,7 +690,9 @@ def advance_logged(kernel: Kernel, extra_steps: tuple[T.Step, ...] = (),
         T.Step("production", "harvest", lambda k: F.reap(k, intents, allocation)),
         T.Step("production", "threshing", lambda k: F.thresh(k, intents, allocation)),
         T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
-        T.Step("production", "the share", F.share_out),
+        T.Step("production", "the mines", F.mine),
+        T.Step("production", "the share",
+               lambda k: F.share_out(k, _threshed(captured))),
         T.Step("production", "the stack", F.keep),
         T.Step("consumption", "rations", _consume),
         T.Step("market", "bargains", market),

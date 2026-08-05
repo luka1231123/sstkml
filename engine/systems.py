@@ -22,6 +22,29 @@ def _clamp(x: int, lo: int = 0, hi: int = 1000) -> int:
 # --- A8: spoilage -------------------------------------------------------------
 _SPOILAGE_PER_1000 = {"grain": 4, "seed_grain": 4, "oil": 6, "wine": 3}
 
+# What the granary holds, in fortnights of the ration it owes, at a sound roof.
+# At the opening condition that is about one year, so the store fills at the
+# threshing floor and is thin again before the next one. The threshing floor
+# renders no more than this (`farm.divide`), so a raised due needs a repaired or
+# a bigger granary to be worth anything -- which is the point of both.
+# Grain past the line is in sacks in the yard and goes at the overflow rate.
+_GRANARY_FORTNIGHTS = 60
+_OVERFLOW_PER_1000 = 100
+
+
+def granary_capacity(world: World, condition: int = -1) -> int:
+    """What the roofed store holds: a year of the ration it owes, at condition."""
+    from engine import institution, seat
+    from engine.kernel import world as K
+
+    if condition < 0:
+        condition = institution.factor(world, "granary")
+    owed = sum(g.size * g.entitlement for g in seat.groups(world).values())
+    kernel = getattr(world, "kernel", None)
+    if kernel is not None:
+        owed += sum(c.ration() for c in K.kept_mouths(kernel))
+    return owed * _GRANARY_FORTNIGHTS * max(1, condition) // 1000
+
 
 def spoilage(world: World) -> tuple[World, list]:
     """A8. What sits through the fortnight and does not keep.
@@ -39,11 +62,14 @@ def spoilage(world: World) -> tuple[World, list]:
     events: list = []
     stores = seat.held(world)
     granary = institution.factor(world, "granary")
+    capacity = granary_capacity(world, granary)
     for good, rate in _SPOILAGE_PER_1000.items():
         if good in ("grain", "seed_grain"):
             rate = rate * (1500 - granary // 2) // 1000
         stock = stores.get(good, 0)
         loss = stock * rate // 1000     # floor: small stocks never spoil, and that's true
+        if good == "grain" and stock > capacity:
+            loss += (stock - capacity) * _OVERFLOW_PER_1000 // 1000
         if loss:
             stores[good] = stock - loss
             events.append(A.Spoiled(good, loss))
@@ -109,8 +135,41 @@ def recompute_unrest(world: World) -> tuple[World, list]:
     unrest = _clamp(unrest)
     delta = unrest - court.unrest
     events = [A.UnrestChanged(delta, "arrears")] if delta else []
+    world = dataclasses.replace(
+        world, court=dataclasses.replace(court, unrest=unrest))
+    return _resent(world, unrest), events
+
+
+_RESENTMENT_FLOOR = 600           # below this the court is merely disliked
+
+
+def _resent(world: World, unrest: int) -> World:
+    """Court unrest is the people's, so the seat's cohorts follow it -- up while
+    the court is hated, and back down once it pays again.
+
+    Without this the arrears unrest only taxed attention and the fall rule in
+    engine/fall.py -- which reads cohort grievance -- could never fire from
+    unpaid rations alone. Without the decay it was a ratchet: grievance only
+    ever climbed, so every campaign reached the fall threshold on the same
+    schedule and a court that recovered its granary was still doomed by a
+    famine ten years behind it. Anger at a king who feeds you again fades.
+    """
+    sid = f"settlement:{world.chosen_alu}"
+    if unrest > _RESENTMENT_FLOOR:
+        step, target = (unrest - _RESENTMENT_FLOOR) // 100, unrest
+    else:
+        step, target = -(_RESENTMENT_FLOOR - unrest) // 200, unrest
+    if not step:
+        return world
+    cohorts = dict(world.kernel.registry.cohorts)
+    for cohort in world.kernel.cohorts_of(sid):
+        moved = (min(target, cohort.grievance + step) if step > 0
+                 else max(target, cohort.grievance + step))
+        if moved != cohort.grievance:
+            cohorts[cohort.id] = dataclasses.replace(cohort, grievance=moved)
+    registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
-        world, court=dataclasses.replace(court, unrest=unrest)), events
+        world, kernel=dataclasses.replace(world.kernel, registry=registry))
 
 
 # --- 6.1: the attention budget ------------------------------------------------

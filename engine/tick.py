@@ -61,7 +61,12 @@ def advance(world: World) -> tuple[World, list]:
 def _calendar(world: World) -> tuple[World, list]:
     world = dataclasses.replace(
         world, court=dataclasses.replace(
-            world.court, inspected=(), searched=()))
+            world.court, inspected=(), searched=()),
+        # The due the court set, and the room it has to put it in, are what its
+        # own threshing floor renders.
+        kernel=dataclasses.replace(
+            world.kernel, land_due_per_1000=world.court.land_due_rate,
+            granary_capacity=systems.granary_capacity(world)))
     return world, [_turn_advanced(world)]
 
 

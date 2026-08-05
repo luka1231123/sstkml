@@ -358,6 +358,9 @@ default = "pooled"
 [tenure.polities]
 "polity:egypt" = "redistributive"
 "polity:assur" = "redistributive"
+# The seat's villages hold their own crop and render a due. The crown's roll is
+# authored redistributive per cohort and keeps eating from the store.
+"polity:seat" = "subsistence"
 
 [[regions]]
 id = "north_levant"

@@ -327,8 +327,11 @@ class Court:
     # intentionally not advice and does not say which side was truthful.
     faction_mood: Mapping[str, int] = dataclasses.field(default_factory=dict)
     # --- M12: revenue and placement (6.20, 6.22) ---
-    land_due_rate: int = 300
-    land_due_base: int = 300
+    # The share of its own villages' threshing floor the crown takes, per 1000.
+    # Customary is what the granary needs in an ordinary year; above it the
+    # villages are short and say so (`revenue.pressure`).
+    land_due_rate: int = 100
+    land_due_base: int = 100
     last_land_due: int = 0
     harbour_due_rate: int = 100
     harbour_due_customary: int = 100
@@ -754,9 +757,6 @@ class World:
     # agriculture. Indexed by absolute turn, 0..200 with 100 normal. Never
     # projected into Belief or read ahead by divination.
     climate: tuple[int, ...] = ()
-    # Response tables (spec 6.4), authored in content/land.toml.
-    land_tables: Mapping[str, tuple[tuple[int, int], ...]] = dataclasses.field(
-        default_factory=dict)
     land_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
     house_tables: Mapping[str, tuple[tuple[int, int], ...]] = dataclasses.field(
         default_factory=dict)

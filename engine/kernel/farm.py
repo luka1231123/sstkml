@@ -26,7 +26,13 @@ THRESH_PER_DAY = 22    # threshing floor and winnowing
 
 # What a fortnight of the growing season takes off a standing crop.
 NEGLECT_PER_1000 = 60
-DROUGHT_PER_1000 = 150
+DROUGHT_PER_1000 = 200
+
+# A dry year and a failed year are not the same thing by twice. Past this much
+# shortfall in the climate reading the crop is not merely thinner, it is dying
+# where it stands, and each further step of dryness costs the multiple.
+DROUGHT_BREAK = 25
+DROUGHT_BITE = 1
 
 # The threshing floor.
 GRAIN_PER_1000 = 940
@@ -55,6 +61,7 @@ def code_for(seasons, fortnight: int) -> int:
 
 # Ordinal blocks, so that two steps minting lots at the same parent on the same turn cannot collide.
 BLOCKS = {"sow": 200, "reap": 400, "thresh": 600, "fodder": 800, "seed": 1000,
+          "mine": 1400,
           "share": 1200}
 
 # What a household keeps of the crop it worked, where the land is held that way (`entity.TENURES`.
@@ -235,7 +242,9 @@ def tend(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
         # The weather is the region's, not the world's.
         region = kernel.region_of(_settlement_of(kernel, actor))
         climate = kernel.climate_at(kernel.date.absolute, region)
-        weather = max(0, 100 - climate) * DROUGHT_PER_1000
+        dry = max(0, 100 - climate)
+        weather = (dry + max(0, dry - DROUGHT_BREAK) * DROUGHT_BITE) \
+            * DROUGHT_PER_1000
 
         wanted = days_for(standing, TEND_PER_DAY)
         got = min(days.get((actor, "tend"), 0), wanted)
@@ -368,33 +377,133 @@ def store_seed(kernel, intents: tuple[Intent, ...]):
     return dataclasses.replace(kernel, book=book), events
 
 
-def share_out(kernel):
-    """The households take their own crop, where the land is held that way."""
-    if not closing(kernel.seasons, kernel.date.fortnight, "threshing"):
+# What a working mine yields in a fortnight, per thousand of its authored
+# capacity. The sites, their capacities and their metals were all authored and
+# nothing ever dug them: world tin fell from 2,600 to 800 in four years, copper
+# from 102,000 to 36,612, and the bronze chain could only ever run down. Metal
+# is meant to be scarce and far away, not finite.
+MINE_PER_1000 = 120
+METALS = ("copper", "tin", "gold", "silver")
+
+
+def mine(kernel):
+    """Phase: the ore comes up, and belongs to whoever holds the ground."""
+    events: list = []
+    book = kernel.book.at_phase(kernel.date.absolute, "production")
+    turn = kernel.date.absolute
+    for i, site_id in enumerate(sorted(kernel.registry.sites)):
+        site = kernel.registry.sites[site_id]
+        if site.function not in METALS or site.capacity <= 0:
+            continue
+        owner = kernel.controller(site.settlement)
+        if not owner:
+            continue
+        got = site.capacity * MINE_PER_1000 // 1000
+        if got <= 0:
+            continue
+        book = book.create(_mint(site.settlement, turn, "mine", i),
+                           site.function, got, owner=owner, holder=owner,
+                           location=site.settlement, reason="produced")
+        events.append(("mined", site_id, site.function, got))
+    return dataclasses.replace(kernel, book=book), events
+
+
+def sown_extent(kernel, settlement: EntityId) -> int:
+    """Qa of seed the settlement's food ground takes in a year."""
+    return sum(site.extent for site in kernel.registry.sites.values()
+               if site.settlement == settlement and site.function == "food")
+
+
+def share_out(kernel, crop=None):
+    """The households take their own crop, where the land is held that way.
+
+    `crop` is what the floor made this year, by actor. Without it the whole
+    stock is divided, which is the same thing anywhere the council's granary is
+    the harvest pile -- and is wrong at the seat, where the crown's store stands
+    beside it and is not the villages' to take.
+    """
+    # Every threshing fortnight, not only the last: the floor works for more
+    # than one, and a share taken off the closing turn alone loses the rest.
+    if crop is None:
+        if not closing(kernel.seasons, kernel.date.fortnight, "threshing"):
+            return kernel, []
+    elif not season(kernel.seasons, kernel.date.fortnight, "threshing"):
         return kernel, []
     return divide(kernel, kernel.book.at_phase(kernel.date.absolute,
-                                               "production"))
+                                               "production"), crop)
 
 
-def divide(kernel, book=None):
+def divide(kernel, book=None, crop=None):
     """The division itself, without the calendar."""
     events: list = []
     book = kernel.book if book is None else book
     turn = kernel.date.absolute
     index = 0
-    for settlement in kernel.autonomous():
+    # Every settlement, the seat included: the crown's villages hold their crop
+    # the same way anyone else's do, and the crown keeps the due.
+    for settlement in sorted(kernel.registry.settlements):
+        if kernel.registry.settlements[settlement].fallen:
+            continue
         holders = [c for c in kernel.cohorts_of(settlement)
                    if kernel.tenure_of(c) == "subsistence" and c.people > 0]
         if not holders:
             continue
         council = kernel.controller(settlement)
         people = sum(c.people for c in holders)
+        # The crown's own villages render what the court set; everybody else's
+        # render the customary share.
+        crown = getattr(kernel.seat_goods, "seat", "")
+        # The opening division (`crop is None`) shares out an authored heap. The
+        # crown's granary is not one: its villages are authored their own.
+        if crop is None and settlement == crown:
+            continue
+        keep_rate = (1000 - kernel.land_due_per_1000 if settlement == crown
+                     else HOUSEHOLD_SHARE_PER_1000)
+        # The crown renders no more grain than it can roof. What the granary
+        # cannot take stays with the villages, so a bigger due needs a bigger
+        # granary and the store fills to the same line every harvest.
+        room = -1
+        if settlement == crown and kernel.granary_capacity > 0 and crop:
+            # What stood in the granary before this floor's crop reached it.
+            prior = max(0, held(book, council, GRAIN, settlement)
+                        - crop.get(council, 0))
+            room = max(0, kernel.granary_capacity - prior)
+
+        # Next year's seed comes off the floor before anybody's share does, and
+        # is set aside there and then. The council decides its reserve on last
+        # fortnight's belief, which cannot see the crop threshed this one.
+        seed_first = 0
+        if crop is not None:
+            want = max(0, sown_extent(kernel, settlement)
+                       - held(book, council, SEED, settlement))
+            spare = min(crop.get(council, 0),
+                        held(book, council, GRAIN, settlement))
+            seed_first = min(want, max(0, spare))
+            if seed_first > 0:
+                book, taken, from_lots = _draw(
+                    book, _lots(book, council, GRAIN, settlement), seed_first,
+                    "expended", authority=council)
+                if taken > 0:
+                    book = book.create(
+                        _mint(settlement, turn, "seed", index), SEED, taken,
+                        owner=council, holder=council, location=settlement,
+                        reason="produced", from_lots=from_lots)
+                    index += 1
+                    events.append(("set_aside", council, taken))
+                seed_first = taken
 
         # Grain and seed both.
         for good in (GRAIN, SEED):
             stock = sum(lot.free for lot in _lots(book, council, good,
                                                   settlement))
-            share = stock * HOUSEHOLD_SHARE_PER_1000 // 1000
+            if crop is not None:
+                # The seed is already out of the book; the crop it came out of
+                # has to lose it too, or it is held back twice.
+                left = max(0, crop.get(council, 0) - seed_first)
+                stock = min(stock, left if good == GRAIN else 0)
+            share = stock * keep_rate // 1000
+            if good == GRAIN and room >= 0:
+                share = max(share, stock - room)
             if share <= 0:
                 continue
             # By heads, and the remainder stays with the council rather than going to whoever sorts.

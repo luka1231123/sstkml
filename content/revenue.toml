@@ -1,8 +1,11 @@
 # M12, 6.20. Rates are per thousand. The land due is a share of gross produce;
 # the harbour due is assessed only on finite, owned cargo present in World.
 [land]
-base_rate = 300
-initial_rate = 300
+# The share of its own villages' threshing floor the crown takes. Customary is
+# about what the granary needs in an ordinary year; above it the villages are
+# short and say so (`revenue.pressure`, `farm.divide`).
+base_rate = 150
+initial_rate = 150
 unrest_divisor = 4
 flight_per_100 = 20
 

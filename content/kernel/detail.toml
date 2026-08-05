@@ -1460,7 +1460,7 @@ settlement = "settlement:seat"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 84000
+extent = 7920000
 
 [[sites]]
 id = "site:seat_374_80"
@@ -2844,6 +2844,7 @@ settlement = "settlement:seat"
 kind = "palace"
 households = 1920
 people = 9600
+tenure = "redistributive"
 
 [[cohorts]]
 id = "cohort:shechem_field_labour"
@@ -3698,7 +3699,19 @@ quantity = 3000
 settlement = "settlement:seat"
 site = "site:seat_372_76"
 good = "standing_grain"
-quantity = 588000
+quantity = 55440000
+
+[[stores]]
+settlement = "settlement:seat"
+good = "grain"
+owner = "cohort:seat_field_labour"
+quantity = 10400000
+
+[[stores]]
+settlement = "settlement:seat"
+good = "grain"
+owner = "cohort:seat_craft"
+quantity = 3680000
 
 [[stores]]
 settlement = "settlement:seat"
