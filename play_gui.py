@@ -52,7 +52,7 @@ from tui import (altar, archive, atlas, alu, command as command_page,
                  help as help_page, render, style, switcher, worldmap)
 import manual
 import palette as command_palette
-from tui.grid import Screen
+from tui.grid import InteractiveScreen, Screen
 
 # Costs are the registry's, never this file's. These two names survive only
 # because both screens must quote the price *before* building the action --
@@ -611,6 +611,11 @@ class Game:
             return False
         else:
             self.hours = saved_hours
+        # Drafts and confirmations describe the world that was on screen, not
+        # the one just loaded. None may leak forward from the abandoned state.
+        self.__dict__.pop("_ledger_state", None)
+        self.pending_action = None
+        self.command_line = ""
         self.events = []
         self.desk = None
         self.desk_drafts.clear()
@@ -778,7 +783,9 @@ class Game:
         if key == "trade":
             return trade_page.compose(b, width, height, notice=notice,
                                       view=getattr(self, "trade_view", trade_page.VIEWS[0]),
-                                      selected=getattr(self, "trade_pick", ""))
+                                      selected=getattr(self, "trade_pick", ""),
+                                      due_draft=self.ledger_state["dues"]
+                                      .setdefault("rates", {}).get("harbour"))
         if key == "alu":
             return alu.compose(b, None, width, height, notice=notice,
                                 scroll=self.scroll_of("alu_scroll"),
@@ -2213,6 +2220,8 @@ class Game:
         screen = self.compose(key)
         if screen is None:
             return []
+        if isinstance(screen, InteractiveScreen) and screen.row_ids:
+            return list(screen.row_ids)
         rows: list[str] = []
         for hit in screen.hits:
             if not hit.command.startswith("pick:"):
@@ -2240,7 +2249,8 @@ class Game:
                     b, days=state["amount"],
                     group=state.get("group", ""), **common)
             if view in {"reserves", "dues"}:
-                return ledger_page.storehouse_account(b, view, **common)
+                return ledger_page.storehouse_account(
+                    b, view, drafts=state.setdefault("rates", {}), **common)
             return ledger_page.stores(
                 b, amount=state["amount"], **common)
         state = self.ledger_state[key]
@@ -2341,9 +2351,14 @@ class Game:
         rows = self.window_rows(window or key)
         if event.keysym in ("Up", "Down"):
             if rows:
-                here = rows.index(state["pick"]) if state["pick"] in rows else 0
-                state["pick"] = rows[collection.step(
-                    len(rows), here, 1 if event.keysym == "Down" else -1)]
+                if state["pick"] not in rows:
+                    state["pick"] = rows[
+                        0 if event.keysym == "Down" else -1]
+                else:
+                    here = rows.index(state["pick"])
+                    state["pick"] = rows[collection.step(
+                        len(rows), here,
+                        1 if event.keysym == "Down" else -1)]
                 self.repaint()
             return True
         if event.keysym in ("Prior", "Next", "Home", "End"):
@@ -2396,16 +2411,37 @@ class Game:
         state = self.ledger_state[view]
         if self.ledger_key(view, event, 0, "stores"):
             return
-        if view != "dues" or (event.char or "") not in {"<", ">"}:
+        if view != "dues":
             return
-        step = -25 if event.char == "<" else 25
+        char = event.char or ""
+        command = getattr(event, "command", "")
         target = state["pick"] or "land"
-        if target == "land":
-            rate = self.belief.get("land", {}).get("land_due_rate", 0)
-            self.do(A.SetLandDue(max(0, min(1000, rate + step))), window="stores")
-        elif target == "harbour":
-            rate = self.belief.get("revenue", {}).get("harbour_rate", 0)
-            self.do(A.SetHarbourDue(max(0, min(1000, rate + step))), window="stores")
+        if char in {"<", ">"}:
+            self._draft_due(target, -25 if char == "<" else 25)
+            return
+        if event.keysym == "Return" or command == "due:commit":
+            self._commit_due(target, "stores")
+
+    def _draft_due(self, target: str, by: int) -> None:
+        drafts = self.ledger_state["dues"].setdefault("rates", {})
+        current = (self.belief.get("land", {}).get("land_due_rate", 0)
+                   if target == "land" else
+                   self.belief.get("revenue", {}).get("harbour_rate", 0))
+        drafted = max(0, min(1000, drafts.get(target, current) + by))
+        if drafted == current:
+            drafts.pop(target, None)
+        else:
+            drafts[target] = drafted
+        self.repaint()
+
+    def _commit_due(self, target: str, window: str) -> None:
+        drafts = self.ledger_state["dues"].setdefault("rates", {})
+        if target not in drafts:
+            return
+        action = (A.SetLandDue(drafts[target]) if target == "land"
+                  else A.SetHarbourDue(drafts[target]))
+        if self.do(action, window=window):
+            drafts.pop(target, None)
 
     def on_stores_key(self, event, window: str = "stores") -> None:
         state = self.ledger_state["stores"]
@@ -2442,28 +2478,49 @@ class Game:
 
     def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
-        if self.ledger_key("roll", event, ledger_page.STEPS["roll"], window):
+        before_pick = state["pick"]
+        active = list(self.belief.get("priority", ()))
+        pick = before_pick or (active[0] if active else "")
+        group = next((item for item in self.belief.get("groups", ())
+                      if item["id"] == pick), None)
+        # Four presses span an ordinary ration even for the palace populace;
+        # exact figures remain available through the command line.
+        ration_step = max(
+            ledger_page.STEPS["roll"],
+            (group["size"] * group["entitlement"] // 4) if group else 0)
+        if self.ledger_key("roll", event, ration_step, window):
+            if state["pick"] != before_pick:
+                state["amount"] = 0
+                self.repaint()
             return
         char = (event.char or "").lower()
         command = getattr(event, "command", "")
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
-        pick = state["pick"]
+        order = list(state["priority"] or active)
+        pick = state["pick"] or (order[0] if order else "")
+        direction = (
+            -1 if (event.keysym == "Left" or command == "ration:earlier"
+                   or wanted == "set_priority")
+            else 1 if event.keysym == "Right" or command == "ration:later"
+            else -1 if char == _key("set_priority") else 0)
+        if direction and pick in order:
+            here = order.index(pick)
+            there = max(0, min(len(order) - 1, here + direction))
+            if there != here:
+                order[here], order[there] = order[there], order[here]
+                state["priority"] = order if order != active else []
+            state["pick"] = pick
+            self.repaint()
+            return
         if char == _key("allocate") or wanted == "allocate":
             if not pick or state["amount"] <= 0:
                 self.notify("choose a group and an amount.",
                             registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            self.do(A.Allocate(pick, state["amount"]), window=window)
-        elif char == _key("set_priority") or wanted == "set_priority":
-            # Marking is free and reversible; the order is given by Enter, so
-            # a priority list is composed before it costs anything.
-            if pick in state["priority"]:
-                state["priority"].remove(pick)
-            elif pick:
-                state["priority"].append(pick)
-            self.repaint()
-        elif event.keysym == "Return":
+            if self.do(A.Allocate(pick, state["amount"]), window=window):
+                state["amount"] = 0
+        elif event.keysym == "Return" or command == "ration:commit":
             if not state["priority"]:
                 item = next((g for g in self.belief.get("groups", ())
                              if g["id"] == pick), None)
@@ -2475,7 +2532,10 @@ class Game:
         elif char == _key("send_to_harvest") or wanted == "send_to_harvest":
             if not pick:
                 return
-            self.do(A.SendToHarvest(pick, True), window=window)
+            item = next((g for g in self.belief.get("groups", ())
+                         if g["id"] == pick), None)
+            self.do(A.SendToHarvest(
+                pick, not bool(item and item.get("at_fields"))), window=window)
 
     def on_land_key(self, event, window: str = "land") -> None:
         state = self.ledger_state["land"]
@@ -2487,10 +2547,11 @@ class Game:
         data = self.belief.get("land") or {}
         rate = data.get("land_due_rate", 0)
         step = ledger_page.STEPS["land_due"]
-        if char == "<":
-            self.do(A.SetLandDue(max(0, rate - step)), window=window)
-        elif char == ">":
-            self.do(A.SetLandDue(min(1000, rate + step)), window=window)
+        if char in {"<", ">"}:
+            self._draft_due("land", -step if char == "<" else step)
+            self.storehouse_view = "dues"
+            self.ledger_state["dues"]["pick"] = "land"
+            self.repaint()
         elif char.lower() == _key("levy_cohort") or wanted == "levy_cohort":
             self.command_line = "levy "
             if hasattr(self, "app"):
@@ -2526,12 +2587,18 @@ class Game:
                             registry.REFUSAL, window=window)
                 self.repaint()
                 return
-            self.do(A.SendToHarvest(state["group"], True), window=window)
+            item = next((g for g in self.belief.get("groups", ())
+                         if g["id"] == state["group"]), None)
+            self.do(A.SendToHarvest(
+                state["group"], not bool(item and item.get("at_fields"))),
+                window=window)
         elif char.lower() == _key("inspect_ledger") or wanted == "inspect_ledger":
             self.do(A.InspectLedger("seed"), window=window)
         elif char.lower() == _key("set_land_due") or wanted == "set_land_due":
-            self.notify(f"[<] and [>] move the land due, now {rate}/1000.",
-                        registry.PREVIEW, window=window)
+            self.storehouse_view = "dues"
+            self.ledger_state["dues"]["pick"] = "land"
+            self.notify("Draft the land due there; Enter gives one order.",
+                        registry.PREVIEW, window="stores")
             self.repaint()
 
     def on_muster_key(self, event) -> None:
@@ -4117,9 +4184,9 @@ class Game:
         elif view in {"exchange", "cargo"} and char == "e":
             self.do(A.ExemptTrade(), window="trade")
         elif view == "dues" and char in {"<", ">"}:
-            rate = self.belief.get("revenue", {}).get("harbour_rate", 0)
-            self.do(A.SetHarbourDue(max(0, min(1000, rate + (-25 if char == "<" else 25)))),
-                    window="trade")
+            self._draft_due("harbour", -25 if char == "<" else 25)
+        elif view == "dues" and event.keysym == "Return":
+            self._commit_due("harbour", "trade")
         elif view == "movements" and char == "g":
             self.command_line = "assign "
             self.open_palette()

@@ -35,18 +35,6 @@ unit = "qa"
 # A crop in the ground does not spoil at a rate. It is lost to want of tending
 # and to the weather, which engine/kernel/farm.py accounts for by name.
 
-[sheaves]
-unit = "qa"
-# Cut and stacked, still in the ear. Safer than standing and worse than
-# threshed: a stack takes the weather until someone has the hands to thresh it.
-spoilage_per_1000 = 12
-
-[fodder]
-unit = "qa"
-# The straw off the threshing floor. Not human food, which is the whole of its
-# interest: it feeds the oxen that plough and the donkeys that carry.
-spoilage_per_1000 = 8
-
 [copper]
 unit = "shekel"
 

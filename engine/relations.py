@@ -10,6 +10,11 @@ from engine.core import canonical_json, lerp_table, stream
 from engine.state import GiftRecord, Relation, Scheduled, World
 
 
+# How low an unanswered correspondent's esteem goes on silence alone. Below
+# this it takes an act, not a wait.
+SNUBBED_FLOOR = 300
+
+
 def _clamp(value: int, low: int = 0, high: int = 1000) -> int:
     return low if value < low else high if value > high else value
 
@@ -167,7 +172,13 @@ def update_unanswered(world: World) -> World:
             for letter in world.inbox
         )
         count = relation.unanswered_letters_from_them + 1 if pending else 0
-        esteem = relation.esteem - 30 if count >= 3 else relation.esteem
+        # Silence has a bottom. A man kept waiting thinks less of the king, and
+        # goes on thinking it; he does not think worse of him every fortnight
+        # until he thinks nothing at all. Without the floor a single unanswered
+        # letter took every relation in the world to zero in twenty fortnights,
+        # and with them the merchants who bring the oil.
+        esteem = (max(SNUBBED_FLOOR, relation.esteem - 30)
+                  if count >= 3 else relation.esteem)
         seeking = relation.seeking_patron
         if count >= 6 and relation.is_vassal and not seeking:
             seeking = True

@@ -62,11 +62,10 @@ def _calendar(world: World) -> tuple[World, list]:
     world = dataclasses.replace(
         world, court=dataclasses.replace(
             world.court, inspected=(), searched=()),
-        # The due the court set, and the room it has to put it in, are what its
-        # own threshing floor renders.
+        # The court's due is the share its own harvest renders.
         kernel=dataclasses.replace(
             world.kernel, land_due_per_1000=world.court.land_due_rate,
-            granary_capacity=systems.granary_capacity(world)))
+            baseline=world.baseline))
     return world, [_turn_advanced(world)]
 
 
@@ -76,8 +75,9 @@ def _arrivals(world: World) -> tuple[World, list]:
 
     events: list = []
     world = seat.arrive_detachments(world)
-    world, arrived = displacement.arrivals(world)
-    events += arrived
+    if not world.baseline:
+        world, arrived = displacement.arrivals(world)
+        events += arrived
     world, returned = seat.return_due(world)
     events += returned
     world, fired = drain_schedule(world)
@@ -106,6 +106,7 @@ def _production(world: World, kernel_events: list) -> tuple[World, list]:
     world = seat.close_year(world)
     world, produced = metal.step(world); events += produced
     world, produced = institution.step(world); events += produced
+    world, produced = revenue.land_cargo(world); events += produced
     world, produced = revenue.collect_harbour(world); events += produced
     world, produced = works.step(world); events += produced
     return world, events
@@ -116,8 +117,9 @@ def _consumption(world: World) -> tuple[World, list]:
     world, produced = systems.spoilage(world); events += produced
     world, produced = systems.do_rites(
         world, world.date.fortnight); events += produced
+    before = seat.groups(world)
     world = seat.feed(world)
-    world, produced = seat.settle_payroll(world); events += produced
+    world, produced = seat.settle_payroll(world, before); events += produced
     return world, events
 
 
@@ -125,8 +127,10 @@ def _health(world: World) -> tuple[World, list]:
     from engine import house, plague, shocks
 
     events: list = []
-    world, produced = shocks.step(world); events += produced
-    world, produced = plague.step(world); events += produced
+    if not world.baseline:
+        world, produced = shocks.step(world); events += produced
+        world, produced = plague.step(world); events += produced
+    # Births and deaths are the normal state of existence; always run.
     world, produced = house.step(world); events += produced
     return world, events
 
@@ -141,9 +145,10 @@ def _politics(world: World) -> tuple[World, list]:
     world, produced = justice.step(world); events += produced
     world, produced = relations.audit_oaths(world); events += produced
     world, produced = correspondence_policy.step(world); events += produced
-    world, produced = displacement.step(world); events += produced
-    world, produced = fall.step(world); events += produced
-    world, produced = defence.step(world); events += produced
+    if not world.baseline:
+        world, produced = displacement.step(world); events += produced
+        world, produced = fall.step(world); events += produced
+        world, produced = defence.step(world); events += produced
     return world, events
 
 

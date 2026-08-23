@@ -10,6 +10,7 @@ import dataclasses
 
 from engine import actions as A
 from engine import seat
+from engine.core import in_range
 from engine.state import World, replace_court
 
 
@@ -27,11 +28,15 @@ def apply(world: World, action) -> tuple[World, list]:
         return world, [A.AllocationSet(action.group_id, qa)]
 
     if isinstance(action, A.SetPriority):
+        if not action.order:
+            raise ValueError("the ration order is empty")
+        if len(set(action.order)) != len(action.order):
+            raise ValueError("a group appears twice in the ration order")
         for gid in action.order:
             if gid not in seat.groups(world):
                 raise ValueError(f"unknown group in priority: {gid}")
         world = seat.rank(world, tuple(action.order))
-        return world, [A.PrioritySet(tuple(action.order))]
+        return world, [A.PrioritySet(seat.order_of_payment(world))]
 
     if isinstance(action, A.RecordReplyText):
         # A reading is kept against the case that produced the answer, because
@@ -138,6 +143,12 @@ def apply(world: World, action) -> tuple[World, list]:
     if isinstance(action, A.SendToHarvest):
         if action.group_id not in seat.groups(world):
             raise ValueError(f"unknown group: {action.group_id}")
+        harvest = tuple(world.season.get("harvest") or ())
+        next_fortnight = world.date.advance().fortnight
+        if action.to_fields and not (
+                harvest and in_range(next_fortnight, harvest)):
+            raise ValueError(
+                "hands can only be sent just before or during harvest")
         world = seat.to_fields(world, action.group_id, action.to_fields)
         return world, [A.SentToHarvest(action.group_id, action.to_fields)]
 

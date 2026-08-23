@@ -375,7 +375,7 @@ def oaths(b: dict, width: int = 76, height: int = 28) -> Screen:
 
 
 def land(b: dict, width: int = 70, height: int = 24) -> Screen:
-    """The gauge, the floor, the seed, the hands. No yield and no forecast."""
+    """The gauge, last harvest, seed, and hands. No yield and no forecast."""
     data = b.get("land")
     if not data:
         return page("THE LAND", [(0, "this house holds no estates.", "ash")],

@@ -1,7 +1,7 @@
 """Land and harbour dues (spec 6.20).
 
-The two levers deliberately have different clocks. Land dues bite at the
-threshing floor and high rates drive hands away every fortnight. Harbour dues
+The two levers deliberately have different clocks. Land dues bite at harvest
+and high rates drive hands away every fortnight. Harbour dues
 are collected now, but merchants decide to shift their business only after a
 seeded three-to-six-turn delay.
 """
@@ -12,7 +12,7 @@ import dataclasses
 from engine import actions as A
 from engine import seat
 from engine.core import stream
-from engine.state import Scheduled, World, replace_court
+from engine.state import HarbourCargoLot, Scheduled, World, replace_court
 
 
 def set_land_due(world: World, rate: int) -> tuple[World, list]:
@@ -62,6 +62,48 @@ def set_harbour_due(world: World, rate: int) -> tuple[World, list]:
 def land_take(world: World, gross: int) -> int:
     """The crown's share of one gross harvest."""
     return max(0, gross) * world.court.land_due_rate // 1000
+
+
+def land_cargo(world: World) -> tuple[World, list]:
+    """The merchants come back. Once a season, with what traffic and esteem buy.
+
+    Without this the harbour is a drain: two authored cargoes, cleared once, and
+    then nothing lands at Ma'hadu ever again. The court's oil is spent on the
+    temple lamps and the harbour's own upkeep, so it runs out in about seven
+    years and every rite after that is skipped for want of it.
+
+    A merchant's cargo is his own decision, and he makes it on what the court is
+    worth to him: `harbour_traffic` for the port, his esteem for the man who
+    keeps it. Drive either down and the jars stop coming, which is the lever the
+    harbour due was always supposed to have.
+    """
+    rules = world.revenue_rules
+    if world.date.fortnight % rules.get("cargo_fortnights", 6):
+        return world, []
+    harbour = next((
+        inst for inst in sorted(
+            world.court.institutions.values(), key=lambda item: item.id)
+        if inst.kind == "harbour"), None)
+    if harbour is None:
+        return world, []
+    base = rules.get("cargo_per_merchant", 900)
+    cargo = dict(world.harbour_cargo)
+    events = []
+    good = world.revenue_good
+    for actor in sorted(world.revenue_merchants):
+        relation = world.relations.get(actor)
+        if relation is None:
+            continue
+        quantity = (base * world.court.harbour_traffic // 1000
+                    * relation.esteem // 1000)
+        if quantity <= 0:
+            continue
+        lot_id = f"{actor}_{good}_{world.date.absolute}"
+        cargo[lot_id] = HarbourCargoLot(
+            id=lot_id, owner=actor, place=harbour.place,
+            good=good, quantity=quantity)
+        events.append(A.HarbourCargoLanded(lot_id, actor, good, quantity))
+    return dataclasses.replace(world, harbour_cargo=cargo), events
 
 
 def collect_harbour(world: World) -> tuple[World, list]:

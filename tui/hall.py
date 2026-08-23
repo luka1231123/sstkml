@@ -40,7 +40,9 @@ def _counts(b: dict) -> dict[str, int]:
         "alu": len(b.get("projects", ())) + sum(
             not item.get("head") for item in b.get("institutions", ())) + sum(
             c.get("status") == "displaced" for c in b.get("cohorts", ())),
-        "trade": sum(bool(x) for x in b.get("trade", {}).get("movements", ())),
+        "trade": len(b.get("trade", {}).get("cargo", ())) + sum(
+            bool(move.get("cargo"))
+            for move in b.get("trade", {}).get("movements", ())),
         "stores": sum(bool(g.get("arrears_weeks")) for g in b.get("groups", ())),
         "muster": len(b.get("troops", {}).get("summons", ())),
         # A band at the gate waits in the same queue as a lawsuit.
@@ -125,11 +127,6 @@ def _header(surface: Surface, b: dict, hours: int) -> None:
         left += f" · {said}"
     surface.text(3, 3, left, C["barley"], C["ink"])
     right = width - 3
-    series = b.get("store_history", {}).get("grain", ())
-    if series and width > 82:
-        line = sparkline(series, min(14, width - 81))
-        surface.text(right - len(line), 3, line, C["barley"], C["ink"])
-        right -= len(line) + 2
     mood = (f"city {render.temper(b.get('unrest', 0))}"
             f" · king {render.standing(b.get('legitimacy', 0))}")
     # The mood is dropped only when it would actually run into the granary,
@@ -137,6 +134,12 @@ def _header(surface: Surface, b: dict, hours: int) -> None:
     # costing the row its third signal at sizes where all three fit.
     if right - len(mood) > 3 + len(left):
         surface.text(right - len(mood), 3, mood, C["clay"], C["ink"])
+        right -= len(mood) + 2
+    series = b.get("store_history", {}).get("grain", ())
+    if series and width > 82:
+        line = sparkline(series, min(14, width - 81))
+        if right - len(line) > 3 + len(left):
+            surface.text(right - len(line), 3, line, C["barley"], C["ink"])
 
 
 def _standing(surface: Surface, b: dict, x: int, width: int,

@@ -68,6 +68,7 @@ class InteractiveScreen(Sequence[tuple[Cell, ...]]):
 
     screen: Screen
     hits: tuple[HitRegion, ...] = ()
+    row_ids: tuple[str, ...] = ()
 
     def __len__(self) -> int:
         return len(self.screen)
@@ -268,9 +269,9 @@ class Surface:
     def freeze(self) -> Screen:
         return tuple(tuple(row) for row in self._rows)
 
-    def interactive(self) -> InteractiveScreen:
+    def interactive(self, row_ids: tuple[str, ...] = ()) -> InteractiveScreen:
         """Freeze both the glyph rectangle and its clickable sidecar."""
-        return InteractiveScreen(self.freeze(), tuple(self._hits))
+        return InteractiveScreen(self.freeze(), tuple(self._hits), row_ids)
 
 
 # --- whole-screen transforms -------------------------------------------------
@@ -296,7 +297,7 @@ def pure_ascii(screen: ScreenLike) -> ScreenLike:
         tuple((_ASCII_FOLD.get(glyph, glyph), fg, bg) for glyph, fg, bg in row)
         for row in cells(screen))
     if isinstance(screen, InteractiveScreen):
-        return InteractiveScreen(folded, screen.hits)
+        return InteractiveScreen(folded, screen.hits, screen.row_ids)
     return folded
 
 

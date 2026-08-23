@@ -95,40 +95,137 @@ def test_the_roll_allocates_to_the_chosen_group() -> None:
     assert game.log[0]["action"]["group_id"] == chosen
 
 
-def test_marking_for_priority_is_free_until_it_is_ordered() -> None:
+def test_reordering_rations_is_free_until_the_full_order_is_given() -> None:
     game = _game()
     state = game.ledger_state["roll"]
-    game.on_roll_key(_Key(keysym="Down"))
+    active = list(game.belief["priority"])
+    state["pick"] = active[0]
     before = game.hours
-    game.on_roll_key(_Key("p"))
-    assert state["priority"], "marking is remembered"
-    assert not game.log, "marking gives no order"
+    game.on_roll_key(_Key(keysym="Right"))
+    assert state["priority"][:2] == active[1::-1]
+    assert not game.log
     assert game.hours == before
 
     game.on_roll_key(_Key(keysym="Return"))
     assert _kinds(game) == ["SetPriority"]
-    assert not state["priority"], "the marks clear once ordered"
+    assert len(game.log[0]["action"]["order"]) == len(active)
+    assert not state["priority"]
 
 
-def test_the_roll_sends_hands_to_the_fields() -> None:
+def test_every_ration_group_is_reachable_at_the_storehouse_size() -> None:
     game = _game()
-    game.on_roll_key(_Key(keysym="Down"))
+    game.storehouse_view = "roll"
+    order = list(game.belief["priority"])
+    screen = game.compose("stores")
+    visible = {hit.command.split(":", 1)[1] for hit in screen.hits
+               if hit.command.startswith("pick:")}
+    assert set(order) <= visible
+
+    for _ in order:
+        game.on_storehouse_key(_Key(keysym="Down"))
+    assert game.ledger_state["roll"]["pick"] == order[-1]
+    assert order[-1] in {
+        hit.command.split(":", 1)[1]
+        for hit in game.compose("stores").hits
+        if hit.command.startswith("pick:")}
+
+
+def test_a_ration_draft_previews_then_clears_when_given() -> None:
+    game = _game()
+    group = next(item for item in game.belief["groups"]
+                 if item["id"] == "palace_dependents")
+    state = game.ledger_state["roll"]
+    state["pick"] = group["id"]
+    game.on_roll_key(_Key("]"))
+    expected = max(ledgers.STEPS["roll"],
+                   group["size"] * group["entitlement"] // 4)
+    assert state["amount"] == expected
+    text = plain_text(game.compose_ledger(
+        "roll", game.belief, 82, 28, ""))
+    assert f"allocate {expected:,} qa" in text and "DRAFT" in text
+
+    game.on_roll_key(_Key("a"))
+    assert _kinds(game) == ["Allocate"]
+    assert state["amount"] == 0
+
+
+def test_the_roll_toggles_hands_in_and_out_of_the_fields() -> None:
+    game = _game()
+    game.ledger_state["roll"]["pick"] = "palace_dependents"
     game.on_roll_key(_Key("h"))
     assert _kinds(game) == ["SendToHarvest"]
+    assert game.log[-1]["action"]["to_fields"] is True
+    assert "recall from fields" in plain_text(game.compose_ledger(
+        "roll", game.belief, 82, 28, ""))
+
+    game.on_roll_key(_Key("h"))
+    assert _kinds(game) == ["SendToHarvest", "SendToHarvest"]
+    assert game.log[-1]["action"]["to_fields"] is False
 
 
 # --- the land -----------------------------------------------------------------
 
-def test_the_land_raises_a_corvee_and_moves_the_due() -> None:
+def test_the_land_readies_a_corvee_and_drafts_the_due() -> None:
     game = _game()
     state = game.ledger_state["land"]
     game.on_land_key(_Key("]"))
     game.on_land_key(_Key("c"))
-    assert _kinds(game) == ["RaiseCorvee"]
-    assert state["amount"] == 0
+    assert not game.log
+    assert game.command_line == "levy "
+    assert state["amount"] == ledgers.STEPS["corvee"]
 
     game.on_land_key(_Key(">"))
-    assert _kinds(game)[-1] == "SetLandDue"
+    assert not game.log
+    assert game.storehouse_view == "dues"
+    assert game.ledger_state["dues"]["rates"]["land"] == (
+        game.belief["land"]["land_due_rate"] + ledgers.STEPS["land_due"])
+    game.on_storehouse_account_key(_Key(keysym="Return"))
+    assert _kinds(game) == ["SetLandDue"]
+
+
+def test_due_steps_make_one_draft_and_one_policy_order() -> None:
+    game = _game()
+    game.storehouse_view = "dues"
+    state = game.ledger_state["dues"]
+    state["pick"] = "harbour"
+    before_schedule = len(game.world.schedule)
+
+    for _ in range(4):
+        game.on_storehouse_key(_Key(">"))
+    assert not game.log
+    assert len(game.world.schedule) == before_schedule
+    assert state["rates"]["harbour"] == 200
+    assert "DRAFT" in plain_text(game.compose("stores"))
+
+    game.on_storehouse_key(_Key(keysym="Return"))
+    assert _kinds(game) == ["SetHarbourDue"]
+    assert game.log[0]["action"]["rate"] == 200
+    assert len(game.world.schedule) == before_schedule + 2
+    assert not state["rates"]
+
+
+def test_trade_due_uses_the_same_single_commit_draft() -> None:
+    game = _game()
+    game.trade_view = "dues"
+    game.on_trade_key(_Key(">"))
+    game.on_trade_key(_Key(">"))
+    assert not game.log
+    assert game.ledger_state["dues"]["rates"]["harbour"] == 150
+
+    game.on_trade_key(_Key(keysym="Return"))
+    assert _kinds(game) == ["SetHarbourDue"]
+    assert game.log[0]["action"]["rate"] == 150
+
+
+def test_stepping_a_due_back_to_the_live_rate_cancels_the_draft() -> None:
+    game = _game()
+    game.trade_view = "dues"
+    game.on_trade_key(_Key(">"))
+    game.on_trade_key(_Key("<"))
+    assert not game.ledger_state["dues"]["rates"]
+
+    game.on_trade_key(_Key(keysym="Return"))
+    assert not game.log
 
 
 def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
@@ -145,7 +242,7 @@ def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
 
 # --- the corvée and muster ----------------------------------------------------
 
-def test_the_corvee_window_holds_labour_and_military_evidence_together() -> None:
+def test_the_muster_keeps_formations_and_exact_levies_together() -> None:
     game = _game()
     formation = game.belief["troops"]["formations"][0]
     screen = ledgers.muster(
@@ -156,23 +253,20 @@ def test_the_corvee_window_holds_labour_and_military_evidence_together() -> None
     actions = {hit.command for hit in screen.hits if hit.enabled}
 
     assert "THE MUSTER — LEVY AND SPEAR" in text
-    assert "corvée called" in text
-    assert "hands ·" in text
+    assert "Cohorts" in text and "Detachments" in text and "Draft order" in text
     assert formation["name"] in text
     assert "SPEAR-BEARER OF THE LEVY" in text
     assert "════▷" in text
-    assert {"do:raise_corvee", "do:assign_troops"} <= actions
+    assert "do:assign_troops" in actions
 
 
-def test_the_corvee_window_can_call_person_days() -> None:
+def test_the_muster_can_ready_an_exact_cohort_levy() -> None:
     game = _game()
-    state = game.ledger_state["muster"]
-    game.on_muster_key(_Key("]"))
-    assert state["amount"] == ledgers.STEPS["corvee"]
+    game.muster_view = "draft"
     game.on_muster_key(_Key("c"))
-    assert _kinds(game) == ["RaiseCorvee"]
-    assert game.log[0]["action"]["days"] == ledgers.STEPS["corvee"]
-    assert state["amount"] == 0
+    assert not game.log
+    assert game.command_line == "levy "
+    assert game.notices["muster"].kind == registry.PREVIEW
 
 def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game = _game()
@@ -208,6 +302,8 @@ def test_an_oath_can_be_expiated_with_what_is_laid_down() -> None:
     state["pick"] = game.ledger_rows("oaths")[0]
     game.on_oaths_key(_Key("]"))
     game.on_oaths_key(_Key("x"))
+    assert not game.log and game.pending_action is not None
+    game.confirm_pending()
     assert _kinds(game) == ["Expiate"]
 
 

@@ -233,7 +233,7 @@ def test_a_shut_sea_blinds_a_port_and_it_does_not_know_it() -> None:
 def test_grain_reaches_the_island_from_the_ground_it_grew_in() -> None:
     kernel, events, logs = _run(_world(), turns=48)
     kinds = [e[0] for e in events]
-    assert "reaped" in kinds and "threshed" in kinds, "it grew somewhere"
+    assert "reaped" in kinds, "it grew somewhere"
 
 
 def test_the_merchant_carries_the_risk_and_can_lose_by_it() -> None:
@@ -265,4 +265,4 @@ def test_lots_are_folded_back_together_and_it_conserves() -> None:
 def test_the_farm_year_still_runs_underneath_all_of_it() -> None:
     kernel, events, _ = _run(_world(), turns=30)
     kinds = {e[0] for e in events}
-    assert {"reaped", "threshed", "set_aside", "sown"} <= kinds
+    assert {"reaped", "set_aside", "sown"} <= kinds

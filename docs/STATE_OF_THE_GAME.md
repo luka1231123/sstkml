@@ -30,7 +30,7 @@ answers about one and a half tablets a fortnight.
 ## 3. Mechanics present and working
 
 **Kernel world.** 55 settlements. Each farms, eats, trades, levies and decides
-from its own Belief. Sow, tend, reap, thresh, set seed aside, share out by
+from its own Belief. Sow, tend, reap, set seed aside, share out by
 tenure. Mining (new, uncommitted). Caravans, voyages, sea seasons, loss on road
 and at sea. Spoilage, hunger, displacement, plague, 11 shock kinds, fall.
 

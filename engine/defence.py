@@ -8,6 +8,12 @@ from engine import troops
 from engine.state import World
 
 
+# A sack is severe without deleting the next decision. Raiders carry off most
+# of the public store; what survives in sealed rooms and household hiding
+# places becomes the short ration the player must divide on the following turn.
+SACK_LOOT_PER_1000 = 700
+
+
 def step(world: World) -> tuple[World, list]:
     if world.ended:
         return world, []
@@ -32,7 +38,11 @@ def step(world: World) -> tuple[World, list]:
     defence += resident // 25
     stores = royal_store.held(world)
     need = max(1, (attack + defence) * 2)
-    grain = min(stores.get("grain", 0), need)
+    stock = stores.get("grain", 0)
+    # The wall may consume a great deal, but never the entire strategic store.
+    # If defeat and provisioning both zero the granary, the ration order cannot
+    # affect the aftermath. Holding half back leaves that decision to the king.
+    grain = min(need, stock // 2)
     # Rations decide how well the wall is held, not whether it is held at all.
     # Without the floor an emptied granary left the next band unopposed, so one
     # sack guaranteed the next.
@@ -63,15 +73,16 @@ def step(world: World) -> tuple[World, list]:
 
 def _sacked(world: World, seat: str, attack: int, defence: int,
             stores: dict) -> tuple[World, list]:
-    """The gate goes. The granary is emptied, people are killed, the city
+    """The gate goes. Most grain is taken, people are killed, the city
     remembers, and the raiders settle in it.
 
     This used to end the campaign outright, which made two thousand hungry
     farmers a terminal event and read as a scripted death. Spec 6.4 puts the
     fall in the ordinary population and unrest rules; a sack feeds them.
     """
-    taken = stores.get("grain", 0)
-    stores["grain"] = 0
+    grain = stores.get("grain", 0)
+    taken = grain * SACK_LOOT_PER_1000 // 1000
+    stores["grain"] = grain - taken
     world = royal_store.put(world, stores, reason_down="lost")
 
     killed = max(1, (attack - defence) // 2)

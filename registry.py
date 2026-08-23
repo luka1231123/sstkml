@@ -125,7 +125,7 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
        ("allocate <amount> to <group>",), 0,
        (Field("amount", "quantity"), Field("group", "group")),
        mnemonic="a", help_topic="allocate"),
-    _d("set_priority", A.SetPriority, "Priority", "Priority", ("roll",),
+    _d("set_priority", A.SetPriority, "Ration order", "Ration order", ("roll",),
        ("prioritize <groups>",), 0, (Field("groups", "group"),),
        mnemonic="p", help_topic="priority", batch=True),
     _d("read_letter", A.ReadLetter, "Read", "Read", ("stack", "letter"),

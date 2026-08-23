@@ -140,6 +140,17 @@ def _decay_for(court, inst, *, upkeep_met: bool) -> int:
     return decay
 
 
+def _tended(world, inst) -> int:
+    """The line routine minding holds the fabric at, 0..1000.
+
+    Decay is not a countdown. Hands, a head and the upkeep put back most of what
+    the weather takes, so a minded building settles where its care buys it and a
+    neglected one still goes to rubble. Repair (`works`) is what lifts it above
+    the line; nothing but care holds it there.
+    """
+    return _staff_factor(world, inst) * _head_factor(world.court, inst) // 1000
+
+
 def _upkeep_required(inst) -> dict[str, int]:
     required: dict[str, int] = {}
     for good, qty in inst.upkeep:
@@ -248,11 +259,11 @@ def step(world: World) -> tuple[World, list]:
                 A.InstitutionUpkeepConsumed(inst.id, good, qty)
                 for good, qty in sorted(_upkeep_required(inst).items())
             )
-        condition = max(0, min(
-            1000,
-            inst.condition - _decay_for(
-                court, inst, upkeep_met=upkeep_met),
-        ))
+        target = _tended(world, inst) if upkeep_met else 0
+        move = _decay_for(court, inst, upkeep_met=upkeep_met)
+        condition = (max(target, inst.condition - move) if inst.condition > target
+                     else min(target, inst.condition + move))
+        condition = max(0, min(1000, condition))
         if condition != inst.condition:
             events.append(A.InstitutionDecayed(inst.id, condition))
         inst = dataclasses.replace(inst, condition=condition)

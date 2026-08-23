@@ -178,7 +178,7 @@ supervisor, start date, and projected completion under the current allocation.
 - Labour lists every cohort's available, allocated, committed, performed, and
   lost person-days.
 - Land shows every estate and field: extent, capacity, planted area, crop
-  stage, seed in ground, standing crop, sheaves, grain, labour need, labour
+  stage, seed in ground, standing crop, grain harvested, labour need, labour
   assigned, due base, rate, last due, and known weather gauge.
 - Reserves and Dues must be real datasets, not alternative summaries of Stores
   and Land.

@@ -44,12 +44,12 @@ def test_a_conversion_names_what_it_was_made_out_of() -> None:
     grain = [lot for lot in seen.values()
              if lot.good == F.GRAIN and any(m.startswith("from:")
                                             for m in lot.provenance)]
-    assert grain, "grain was threshed out of something"
+    assert grain, "grain was harvested out of something"
 
     parents = I._parents(grain[0])
     assert parents, "and it says out of what"
-    assert any(seen[p].good == F.SHEAVES for p in parents if p in seen), \
-        "and what it says is sheaves"
+    assert any(seen[p].good == F.STANDING for p in parents if p in seen), \
+        "and what it says is the crop that stood"
 
 
 # --- complete: whole chain, end to end ---------------------------------------

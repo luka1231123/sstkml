@@ -61,7 +61,7 @@ OVERLORD_SEATS = {
 SITE_FUNCTIONS = frozenset({
     "palace_centre", "food", "copper", "tin", "gold", "silver",
     "cedar", "horses", "lapis", "estate", "mine", "forest", "quarry",
-    "pasture", "harbour",
+    "pasture", "harbour", "oil", "wine",
 })
 
 
@@ -889,7 +889,7 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     # under subsistence tenure the households' part of it is theirs already --
     # the world does not begin the fortnight before its first harvest. Without
     # this every village in a subsistence country would own nothing until the
-    # threshing floor came round and would starve on the calendar.
+    # harvest came round and would starve on the calendar.
     kernel, _ = farm.divide(kernel)
 
     world = World(

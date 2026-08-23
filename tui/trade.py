@@ -21,7 +21,8 @@ def _lots(count: int) -> str:
 
 def compose(b: dict, width: int = 72, height: int = 24,
             notice: str = "", view: str = "exchange",
-            selected: str = "") -> InteractiveScreen:
+            selected: str = "", due_draft: int | None = None
+            ) -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="TRADE", drop=False)
     workbench.tabs(surface, 2, 2, width,
@@ -58,7 +59,9 @@ def compose(b: dict, width: int = 72, height: int = 24,
                 for r in trade.get("routes", ())]
     else:
         rate = b.get("revenue", {}).get("harbour_rate", 0)
-        rows = [("harbour due", f"{rate}/1000"),
+        shown = rate if due_draft is None else due_draft
+        rows = [("harbour due", f"{shown}/1000"
+                 + (" · DRAFT" if due_draft is not None else "")),
                 ("finance / requisition", "crown cargo"),
                 ("authorize / offer / protect", "written tablet"),
                 ("escort / close", "formation / route")]
@@ -85,7 +88,6 @@ def compose(b: dict, width: int = 72, height: int = 24,
     if view in {"cargo", "movements", "routes"}:
         nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
                 style.FooterAction("Enter", "open")]
-    style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions = []
     if view in {"exchange", "cargo"}:
         actions += [style.FooterAction("f", "finance"),
@@ -97,11 +99,14 @@ def compose(b: dict, width: int = 72, height: int = 24,
     elif view == "routes":
         actions.append(style.FooterAction("c", "close route"))
     elif view == "dues":
-        actions += [style.FooterAction("<", "due−"),
-                    style.FooterAction(">", "due+"),
-                    style.FooterAction("a", "permit"),
+        nav += [style.FooterAction("<", "due−"),
+                style.FooterAction(">", "due+"),
+                    *([style.FooterAction("Enter", "give due")]
+                  if due_draft is not None else [])]
+        actions += [style.FooterAction("a", "permit"),
                     style.FooterAction("o", "offer"),
                     style.FooterAction("p", "guard")]
+    style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions.append(style.FooterAction("Esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()

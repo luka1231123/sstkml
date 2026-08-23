@@ -129,7 +129,7 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             note: str = "",
             views: tuple[tuple[str, str], ...] = (),
             view: str = "", scene=None, scene_rows: int = 0,
-            detail_min: int = 18) -> InteractiveScreen:
+            detail_min: int = 18, list_min: int = 5) -> InteractiveScreen:
     """The whole screen: list left, detail right, controls along the bottom.
 
     `scene` is a band across the top for a window that is a room rather than a
@@ -180,7 +180,8 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
         # row -- which is a list that has stopped being a list. The detail is
         # what gets cut, and it is cut at the end, where the least urgent lines
         # already are.
-        room = max(1, min(available - 4, max(available // 3, 5)))
+        room = max(1, min(
+            available - 4, max(available // 3, list_min)))
         detail = detail[:max(0, available - room - 1)]
     else:
         room = max(1, available)
@@ -224,7 +225,9 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
     if note:
         surface.text(3, height - 3 - footer_rows, note[:width - 6],
                      C["ash"], C["ink"])
-    return surface.interactive()
+    # Keyboard navigation needs the whole collection, not only the rows that
+    # fit on this page. Mouse targets remain limited to what is drawn.
+    return surface.interactive(tuple(row.id for row in rows))
 
 
 def _columns(surface: Surface, x: int, y: int, cells, widths, limit: int,

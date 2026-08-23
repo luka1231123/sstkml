@@ -281,8 +281,8 @@ def build():
             cohorts.append(row)
 
         # No opening seed: the crop is in the ground already, and next year's
-        # seed is what the threshing floor sets aside out of it. A settlement
-        # that eats its seed has made that decision itself.
+        # seed is what the harvest sets aside out of it and keeps apart from
+        # ordinary food.
         #
         # The seat is the exception, and it is not a special case so much as the
         # rule about who authors what. Every other settlement is described here

@@ -36,16 +36,7 @@ def put(world: World, stores: dict[GoodId, int], *,
 # --- the seat's people --------------------------------------------------------
 
 def enrol(world: World, groups) -> World:
-    """Put the court's dependent groups into the registry, once, at load.
-
-    After this the 1,010 heads on the crown's payroll are cohorts standing at
-    the seat like anybody else's people, marked `redistributive` because that is
-    what a body owed a ration and owning no grain is. They come out of the
-    seat's own cohorts rather than on top of them (`_make_room`): the crown's
-    people already lived in that town, and naming them is not the same as
-    arriving. What is left of the 80,000 still eats nothing here; their fields
-    are the court's until C4, and `kernel.world._mouths` says why at length.
-    """
+    """Put the court's ration groups into the registry, once, at load."""
     kernel = getattr(world, "kernel", None)
     if kernel is None:
         return world
@@ -56,8 +47,21 @@ def enrol(world: World, groups) -> World:
         group = groups.get(entry.group)
         if group is None:
             continue
+        existing = cohorts.get(entry.cohort)
         cohort = SP.as_cohort(group)
-        cohort = dataclasses.replace(cohort, shortfall=max(0, group.arrears))
+        if existing is not None:
+            cohort = dataclasses.replace(
+                existing, labour_per_head=cohort.labour_per_head,
+                ration_per_head=cohort.ration_per_head,
+                hunger=cohort.hunger, grievance=cohort.grievance,
+                tenure=cohort.tenure, roll_id=cohort.roll_id,
+                name=cohort.name, representative=cohort.representative,
+                roll_place=cohort.roll_place,
+                roll_function=cohort.roll_function,
+                shortfall=max(0, group.arrears))
+        else:
+            cohort = dataclasses.replace(
+                cohort, shortfall=max(0, group.arrears))
         if entry.settlement not in kernel.registry.settlements:
             # The map has no such place. `PLACEMENTS` names `settlement:mahadu`
             # and the scenario the live world is built from has one settlement
@@ -82,7 +86,9 @@ def enrol(world: World, groups) -> World:
             cohort, ethnicity=settlement.region, status="dependent",
             institution=crown, armed=group.function == "garrison")
         cohorts[cohort.id] = cohort
-        moved[cohort.settlement] = moved.get(cohort.settlement, 0) + cohort.people
+        if existing is None:
+            moved[cohort.settlement] = (
+                moved.get(cohort.settlement, 0) + cohort.people)
     cohorts = _make_room(kernel, cohorts, moved)
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
@@ -153,48 +159,52 @@ def harvest(world: World, events: list) -> tuple[World, list]:
     if kernel is None:
         return world, []
     seat_id = SP.SEAT
+    span = tuple(world.season.get("harvest") or (8, 11))
+    opening = world.date.fortnight == span[0]
+    closing = world.date.fortnight == span[-1]
+    running = 0 if opening else world.court.land_due_in_progress
     out: list = []
-    grain = straw = held_back = shared = 0
+    grain = held_back = shared = 0
     for event in events:
         if not isinstance(event, tuple) or len(event) < 2:
             continue
         if event[0] == "reaped" and event[2] == seat_id:
             out.append(A.Harvested(event[1], event[3]))
-        elif event[0] == "threshed" and event[2] == seat_id:
             grain += event[3]
-            straw += event[4]
         elif event[0] == "set_aside" and _at_seat(kernel, event[1]):
             held_back += event[2]
         elif (event[0] == "shared_out" and event[2] == seat_id
               and event[3] == "grain"):
             shared += event[4]
-    if not grain and not held_back:
+    if grain or held_back:
+        # Compatibility event: older saves and reports know this shape even
+        # though grain now comes straight in from reaping.
+        out.append(A.Threshed(grain, held_back))
+    if grain:
+        # The due is what the crown kept, not what the harvest made: the
+        # villages took their share and next year's seed came off the top.
+        running += max(0, grain - shared - held_back)
+    if not (opening or closing or grain):
         return world, out
-    out.append(A.Threshed(grain, held_back))
-    if not grain:
-        # Seed moved aside on a turn with no floor work. It is still a
-        # movement the ledger must account for, but it is not a harvest:
-        # the year's figure keeps the last threshing's.
-        return world, out
-    # The due is what the crown kept, not what the floor made: the villages took
-    # their share and next year's seed came off the top before either.
-    took = max(0, grain - shared - held_back)
-    court = dataclasses.replace(world.court, last_land_due=took)
+    court = dataclasses.replace(world.court, land_due_in_progress=running)
+    if closing:
+        court = dataclasses.replace(
+            court, last_land_due=running, land_due_in_progress=0)
     return dataclasses.replace(world, court=court), out
 
 
 def close_year(world: World) -> World:
-    """Close the court's labour season at the threshing fortnight (spec 6.4).
+    """Close the court's labour season after the harvest (spec 6.4).
 
     The seasonal reset used to live in the court's own land module, which C4
     retired when the harvest moved to the kernel. The crown's fields close on
     the kernel's calendar now, so the reset runs here, where `harvest` already
     stands. The corvée, the groups in the fields and `works_days` are all "this
-    season" figures; the first threshing fortnight is the new year. The first
-    two are the cohorts' now, so the reset reaches through to them.
+    season" figures; the last harvest fortnight closes them. The first two are
+    the cohorts' now, so the reset reaches through to them.
     """
-    span = world.season.get("threshing") or (12, 13)
-    if world.date.fortnight != span[0]:
+    span = world.season.get("harvest") or (8, 11)
+    if world.date.fortnight != span[-1]:
         return world
     world = close_season(world)
     if not world.court.works_days:
@@ -218,16 +228,17 @@ def groups(world: World) -> dict:
     return found
 
 
-def settle_payroll(world: World) -> tuple[World, list]:
+def settle_payroll(world: World, before=None) -> tuple[World, list]:
     """Apply payroll consequences and report them."""
     from engine import actions as A
+    before = before or groups(world)
     events: list = []
     for entry in SP.PLACEMENTS:
         cohort = world.kernel.registry.cohorts.get(entry.cohort)
         if cohort is None:
             continue
-        was = SP.as_group(cohort)
-        now = was
+        now = SP.as_group(cohort)
+        was = before.get(entry.group, now)
         owed = now.size * now.entitlement
         weeks = now.arrears // max(1, owed)
         _, loyalty_delta, _output, desertion, revolt = SP.band(weeks)
@@ -303,13 +314,21 @@ def allow(world: World, group: str, qa: int) -> World:
 
 def rank(world: World, order: tuple[str, ...]) -> World:
     """Who eats first when the store will not stretch. Highest served first."""
+    known = tuple(sorted(groups(world)))
+    current = order_of_payment(world)
+    ordered = tuple(dict.fromkeys(group for group in order if group in known))
+    full = ordered + tuple(group for group in current if group not in ordered)
+    full += tuple(group for group in known if group not in full)
     world_ = world
-    for place, group in enumerate(order):
-        try:
-            entry = SP.placement(group)
-        except SP.Unmapped:
-            continue
-        world_ = _amend(world_, entry.cohort, precedence=len(order) - place)
+    for group in known:
+        cohort = _cohort_of(world_, group)
+        if cohort is not None:
+            world_ = _amend(world_, cohort.id, precedence=0)
+    for place, group in enumerate(full):
+        cohort = _cohort_of(world_, group)
+        if cohort is not None:
+            world_ = _amend(
+                world_, cohort.id, precedence=len(full) - place)
     return world_
 
 
@@ -343,11 +362,11 @@ def allowances(world: World) -> dict:
 
 
 def order_of_payment(world: World) -> tuple[str, ...]:
-    """The pay-down order the player set. Highest precedence first."""
+    """The complete pay-down order. Highest precedence first."""
     ranked = []
     for group in sorted(groups(world)):
         cohort = _cohort_of(world, group)
-        if cohort is not None and cohort.precedence:
+        if cohort is not None:
             ranked.append((-cohort.precedence, group))
     return tuple(group for _rank, group in sorted(ranked))
 

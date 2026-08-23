@@ -23,27 +23,32 @@ def _clamp(x: int, lo: int = 0, hi: int = 1000) -> int:
 _SPOILAGE_PER_1000 = {"grain": 4, "seed_grain": 4, "oil": 6, "wine": 3}
 
 # What the granary holds, in fortnights of the ration it owes, at a sound roof.
-# At the opening condition that is about one year, so the store fills at the
-# threshing floor and is thin again before the next one. The threshing floor
-# renders no more than this (`farm.divide`), so a raised due needs a repaired or
-# a bigger granary to be worth anything -- which is the point of both.
-# Grain past the line is in sacks in the yard and goes at the overflow rate.
+# Grain past this soft line sits in sacks in the yard and goes at the overflow
+# rate. A raised due is useful immediately but wasteful until the crown repairs
+# or builds storage, instead of silently returning the whole increase.
 _GRANARY_FORTNIGHTS = 60
 _OVERFLOW_PER_1000 = 100
 
 
-def granary_capacity(world: World, condition: int = -1) -> int:
-    """What the roofed store holds: a year of the ration it owes, at condition."""
+def granary_capacity(world: World) -> int:
+    """What all working granaries can keep under roof."""
     from engine import institution, seat
     from engine.kernel import world as K
 
-    if condition < 0:
-        condition = institution.factor(world, "granary")
-    owed = sum(g.size * g.entitlement for g in seat.groups(world).values())
+    # Storage is physical and every completed granary adds room. The
+    # single-institution `factor(kind)` is right for a post, not a sum of
+    # buildings.
+    working = sum(
+        institution.effective(world, item)
+        for item in world.court.institutions.values()
+        if item.kind == "granary")
     kernel = getattr(world, "kernel", None)
     if kernel is not None:
-        owed += sum(c.ration() for c in K.kept_mouths(kernel))
-    return owed * _GRANARY_FORTNIGHTS * max(1, condition) // 1000
+        owed = sum(c.ration() for c in K.kept_mouths(kernel))
+    else:
+        owed = sum(g.size * g.entitlement
+                   for g in seat.groups(world).values())
+    return owed * _GRANARY_FORTNIGHTS * max(1, working) // 1000
 
 
 def spoilage(world: World) -> tuple[World, list]:
@@ -62,7 +67,7 @@ def spoilage(world: World) -> tuple[World, list]:
     events: list = []
     stores = seat.held(world)
     granary = institution.factor(world, "granary")
-    capacity = granary_capacity(world, granary)
+    capacity = granary_capacity(world)
     for good, rate in _SPOILAGE_PER_1000.items():
         if good in ("grain", "seed_grain"):
             rate = rate * (1500 - granary // 2) // 1000

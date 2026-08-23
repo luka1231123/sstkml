@@ -52,14 +52,14 @@ def test_hall_is_a_clickable_dashboard_with_advice() -> None:
     view = hall.compose(b)
     text = plain_text(view)
     assert "MATTERS BEFORE THE KING" in text
-    assert "INBOX" in text
+    assert "Scribes" in text
     # Advice appears in somebody's mouth or not at all (UI/UX spec 20). The
     # old unattributed `Do: ...` imperative made the palace sound omniscient.
     assert "Do:" not in text
     assert all(f"{item.speaker}:" in text or item.speaker not in text
                for item in matters)
     commands = {hit.command for hit in view.hits if hit.enabled}
-    assert {"1", "s", "y", "j", "space"} <= commands
+    assert {"concern:0", "s", "y", "j", "space"} <= commands
 
 
 def test_inbox_keeps_selection_and_tablet_in_one_view() -> None:
@@ -106,8 +106,7 @@ def test_preparser_covers_new_dashboard_orders() -> None:
         result = parser.preparse(words, b)
         assert result is not None and isinstance(result.actions[0], expected), words
     marriage = parser.preparse("marry pidray to hatti_king", b)
-    assert marriage is not None and not marriage.actions
-    assert "World" in marriage.question and "Desk" in marriage.question
+    assert marriage is None, "foreign marriage is written at the Desk"
 
 
 def test_counsel_can_recommend_a_specific_next_step_offline() -> None:

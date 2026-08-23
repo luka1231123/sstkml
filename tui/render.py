@@ -112,16 +112,15 @@ def _bar(value: int, total: int, width: int = 10) -> str:
 # harvest is four cells wide and the fallow is five, so the ruler can see that
 # the work stops before he has to be told that it does.
 STAGE_GLYPH = {"sowing": "▁", "growing": "▄", "harvest": "█",
-               "threshing": "▓", "low_water": "·"}
+               "low_water": "·"}
 STAGE_COLOUR = {"sowing": "sand", "growing": "verdigris", "harvest": "barley",
-                "threshing": "gold", "low_water": "faint"}
+                "low_water": "faint"}
 STAGE_SHORT = {"sowing": "sow", "growing": "grow", "harvest": "reap",
-               "threshing": "thresh", "low_water": "fallow", "": "—"}
+               "low_water": "fallow", "": "—"}
 STAGE_SAYS = {
     "sowing": "seed goes into the ground",
     "growing": "the crop stands; hands only watch it",
-    "harvest": "cut it or lose it where it stands",
-    "threshing": "sheaves become grain, and seed is set aside",
+    "harvest": "bring it in or lose it where it stands; seed is set aside",
     "low_water": "the fields ask for nothing",
 }
 
@@ -276,7 +275,7 @@ def lists_screen(b: dict) -> str:
     lines.append(f"    {'group':<28}{'heads':>6}{'ration':>7}{'allocated':>11}"
                  f"{'owed wk':>9}  loyalty")
     by_id = {g["id"]: g for g in b["groups"]}
-    order = b["priority"] + [g["id"] for g in b["groups"] if g["id"] not in b["priority"]]
+    order = b["priority"]
     for gid in order:
         g = by_id[gid]
         weeks = g["arrears_weeks"]
@@ -380,7 +379,7 @@ def land_screen(b: dict) -> str:
     # The store reads nought for most of the year because the seed is in the
     # ground, which is not a shortage. Only flag it when the fields are bare.
     # Flag a real shortfall, not the spoilage a full store loses between the
-    # threshing floor and the sowing.
+    # harvest and the sowing.
     short = "!" if not ground and seed * 20 < want * 19 else " "
     lines.append(f"  {short} seed in store                 "
                  f"{fmt_good('grain', seed):>28}")
@@ -390,8 +389,6 @@ def land_screen(b: dict) -> str:
                  f"{fmt_good('grain', want):>28}")
     lines.append(f"    standing crop                 "
                  f"{fmt_good('grain', land.get('standing', 0)):>28}")
-    lines.append(f"    sheaves stacked               "
-                 f"{fmt_good('grain', land.get('sheaves', 0)):>28}")
     lines.append("")
     supplied, needed = land["labour_days_this_turn"], land["labour_days_needed"]
     lines.append(f"    hands  {labour_bar(supplied, needed, land.get('labour_days_committed', 0))}"
@@ -709,7 +706,7 @@ def events_lines(events, court) -> list[str]:
                    if short > 0 else ""))
         elif isinstance(e, A.Threshed):
             out.append(
-                f"  The threshing floor is counted: {fmt_good('grain', e.qa)}.")
+                f"  The harvest comes in: {fmt_good('grain', e.qa)}.")
         elif isinstance(e, A.LandDueTaken):
             out.append(
                 f"  At {e.rate} in a thousand, the due brings "

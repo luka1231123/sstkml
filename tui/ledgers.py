@@ -55,11 +55,22 @@ def _spoken(value: str) -> str:
     return str(value).replace("_", " ")
 
 
+RATION_STAKES = {
+    "field_labour": "next harvest",
+    "garrison": "harbour",
+    "household": "granary",
+    "cult": "temple",
+    "bronze_working": "bronze",
+    "weaving": "unrest",
+    "populace": "unrest",
+}
+
+
 # --- the stores ---------------------------------------------------------------
 
 STOREHOUSE_VIEWS = (
     ("stores", "STORES"),
-    ("roll", "LABOUR"),
+    ("roll", "RATIONS"),
     ("land", "LAND"),
     ("reserves", "RESERVES"),
     ("dues", "DUES"),
@@ -175,71 +186,104 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
          notice: str = "", hours: int = 0,
          room: bool = False) -> InteractiveScreen:
     groups = list(b.get("groups", []))
+    active = tuple(b.get("priority", ()))
+    order = priority or active
+    order += tuple(group["id"] for group in groups
+                   if group["id"] not in order)
+    by_id = {group["id"]: dict(group) for group in groups}
+    if selected not in by_id:
+        selected = order[0] if order else ""
+    if amount > 0 and selected in by_id:
+        # Preview the proposed ration in the queue before the order is given.
+        by_id[selected]["allocated"] = amount
+    grain = b.get("stores", {}).get("grain", 0)
+    for rank, gid in enumerate(order, 1):
+        group = by_id[gid]
+        paid = min(grain, group["allocated"])
+        grain -= paid
+        owed = group["size"] * group["entitlement"]
+        group["priority"] = rank
+        group["next_paid"] = paid
+        group["next_short"] = max(0, owed - paid)
+        group["next_status"] = (
+            "full" if paid >= owed else "none" if paid <= 0 else "short")
+    groups = [by_id[gid] for gid in order]
     rows = []
     for group in groups:
-        weeks = group["arrears_weeks"]
+        status = group["next_status"]
         rows.append(Row(group["id"], (
             (group["name"], "clay"),
-            (str(group["size"]), "dim"),
             (f"{group['allocated']:,}", "dim"),
-            (f"{weeks}" if weeks else "—",
-             "blood" if weeks >= 4 else ("flame" if weeks else "ash")),
-            (group["loyalty"], "blood" if weeks >= 4 else "dim"),
-        ), mark="!" if group["id"] in priority else ""))
-    if not any(row.id == selected for row in rows):
-        selected = rows[0].id if rows else ""
+            (status, "blood" if status == "none" else
+             "flame" if status == "short" else "barley"),
+            (RATION_STAKES.get(group.get("function", ""), "unrest"), "dim"),
+        ), mark=str(group["priority"])))
     group = next((g for g in groups if g["id"] == selected), None)
 
     detail: list[tuple[str, str]] = []
     if group is not None:
         weeks = group["arrears_weeks"]
+        owed = group["size"] * group["entitlement"]
+        repayment = min(group.get("arrears_qa", 0),
+                        max(0, group["next_paid"] - owed))
         detail = [
-            (group["name"][:34], "gold"), ("", "ink"),
-            (f"{group['size']} heads", "clay"),
-            (f"allocated {group['allocated']:,} qa", "clay"),
-            (f"unpaid {weeks} fortnight{'s' if weeks != 1 else ''}"
-             if weeks else "paid in full",
+            (group["name"], "gold"),
+            (f"queue {group['priority']} · "
+             f"{RATION_STAKES.get(group.get('function', ''), 'unrest')} at stake",
+             "sand"),
+            ((f"gets {owed:,} current + {repayment:,} arrears"
+              if repayment else
+              f"gets {group['next_paid']:,} of {owed:,} qa"), "clay"),
+            (f"{group['next_status']} with the grain now",
+             "blood" if group["next_status"] == "none" else
+             "flame" if group["next_status"] == "short" else "barley"),
+            (f"already unpaid {weeks} fortnight{'s' if weeks != 1 else ''}"
+             if weeks else "no old arrears",
              "blood" if weeks >= 4 else ("flame" if weeks else "dim")),
-            (f"they are {group['loyalty']}", "dim"),
-            ("", "ink"),
         ]
         if amount > 0:
             detail += [
                 (f"allocate {amount:,} qa", "flame"),
-                ("[a] enters this ration", "dim"),
+                ("DRAFT · [a] gives this ration", "flame"),
             ]
         else:
-            detail.append(("[ ] choose a ration amount", "dim"))
-        if group["id"] in priority:
-            detail += [("", "ink"), ("marked first in a short fortnight", "sand")]
-        if group.get("function"):
-            detail += [("", "ink"),
-                       (f"they are the {_spoken(group['function'])}", "sand")]
+            detail.append(("[ ] draft a different ration", "dim"))
+        detail.append(("QUEUE DRAFT · Enter gives the order" if priority
+                       else "QUEUE IN FORCE",
+                       "flame" if priority else "dim"))
 
-    marked = len(priority)
+    here = order.index(selected) if selected in order else -1
     controls = []
     if group is not None and amount > 0:
         controls.append(affordable(Control(
             "allocate", key_for("allocate"),
             label=f"allocate {amount:,} qa"), hours))
     controls += [
-        Control("set_priority", key_for("set_priority"),
-                label=(f"priority: {marked} marked, [enter] to order"
-                       if marked else "mark for priority"),
-                enabled=group is not None),
+        Control("set_priority", "←", label="feed earlier",
+                enabled=here > 0, why="already first"),
+        Control("set_priority", "→", label="feed later",
+                enabled=0 <= here < len(order) - 1, why="already last",
+                command="ration:later"),
         affordable(Control("send_to_harvest", key_for("send_to_harvest"),
-                           label="send to the fields",
+                           label=("recall from fields" if group is not None
+                                  and group.get("at_fields")
+                                  else "send to fields"),
                            enabled=group is not None), hours),
     ]
+    if priority:
+        controls.insert(-1, Control(
+            "set_priority", "Enter", label="give ration order",
+            command="ration:commit"))
     return compose(
         ("THE STOREHOUSE — LABOUR AND RATIONS" if room else
-         "THE ROLL — what is owed and what was paid"),
-        ("group", "heads", "allocated qa", "unpaid", "they are"),
-        (26, -5, -13, -6, 12),
+         "RATIONS — who eats first"),
+        ("group", "ration qa", "next", "at stake"),
+        (25, -10, -6, 12),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="nobody is on the roll.",
-        note="Tab view   ↑↓ choose   [ ] amount   Enter order",
-        views=STOREHOUSE_VIEWS if room else (), view="roll")
+        note=(f"grain now {b.get('stores', {}).get('grain', 0):,} qa · "
+              f"after this queue {grain:,} qa"),
+        views=STOREHOUSE_VIEWS if room else (), view="roll", list_min=7)
 
 
 # --- the land -----------------------------------------------------------------
@@ -288,7 +332,7 @@ def _year_band(surface, x: int, y: int, room: int, b: dict) -> None:
                  C["clay"] if idle else C["flame"], C["ink"])
 
     # What is queued behind the season. An ask of nothing means one thing with
-    # the barns empty and another with the sheaves stacked to the roof. It
+    # the fields bare and another with a crop still standing. It
     # rides beside the bar where there is width for it and drops to its own
     # row where there is not, so a narrow window loses a line and not a fact.
     coming = (data.get("labour_days_by_season") or {}).get(
@@ -346,8 +390,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     detail: list[tuple[str, str]] = [("THE CROP · qa", "gold")]
     detail += paired(f"seed {qa(data.get('seed_in_store', 0))} stored",
                      f"standing {qa(data.get('standing', 0))}", "sand")
-    detail += paired(f"sown {qa(data.get('seed_in_ground', 0))}",
-                     f"sheaves {qa(data.get('sheaves', 0))}", "sand")
+    detail += paired(f"sown {qa(data.get('seed_in_ground', 0))}", "", "sand")
     detail += [(f"open ground takes "
                 f"{qa(data.get('seed_recommended', 0))}"[:pane], "dim"),
                ("THE RIVER", "gold"),
@@ -370,8 +413,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         detail += paired(f"sown {qa(estate['under_crop'])}",
                          f"open {qa(open_ground)}",
                          "verdigris" if estate["under_crop"] else "ash")
-        detail += paired(f"holds {qa(estate['seed'])} seed",
-                         f"{qa(estate['sheaves'])} sheaves", "dim")
+        detail += paired(f"holds {qa(estate['seed'])} seed", "", "dim")
         detail += paired(f"      {qa(estate['grain'])} grain", "", "dim")
     # The note row under the list already prints [ ] days and [< >] due, and
     # the footer prints the due itself. Only the chosen figure is state rather
@@ -402,9 +444,10 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         Control("set_land_due", key_for("set_land_due"), label=f"land due {rate}/1000"),
     ]
     if chosen_group is not None:
+        verb = "recall " if chosen_group.get("at_fields") else "send "
         controls.append(affordable(Control(
             "send_to_harvest", key_for("send_to_harvest"),
-            label="send " + chosen_group["name"][:18]), hours))
+            label=verb + chosen_group["name"][:18]), hours))
     # The band takes four rows and is worth them only on a screen tall enough
     # to keep a list under it.
     band = 6 if (b.get("calendar") and height >= 24) else 0
@@ -426,8 +469,10 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
 def storehouse_account(b: dict, view: str, selected: str = "",
                        width: int = 80, height: int = 28, scroll: int = 0,
                        notice: str = "", hours: int = 0,
+                       drafts: dict[str, int] | None = None,
                        **_ignored) -> InteractiveScreen:
     dated = b.get("date", "this fortnight")
+    drafts = drafts or {}
     if view == "reserves":
         wanted = ("grain", "seed_grain", "bronze", "copper", "tin")
         rows = [Row(good, ((_spoken(good), "clay"),
@@ -436,12 +481,17 @@ def storehouse_account(b: dict, view: str, selected: str = "",
         headers, widths = ("reserve", "counted", "record"), (18, 24, 18)
     else:
         revenue, land_data = b.get("revenue", {}), b.get("land", {})
+        land_rate = drafts.get("land", land_data.get("land_due_rate", 0))
+        harbour_rate = drafts.get(
+            "harbour", revenue.get("harbour_rate", 0))
         rows = [Row("land", (("land due", "clay"),
-                              (f"{land_data.get('land_due_rate', 0)}/1000", "gold"),
-                              (f"last {land_data.get('last_land_due', 0):,} grain", "dim"))),
+                              (f"{land_rate}/1000", "flame" if "land" in drafts else "gold"),
+                              (f"last {land_data.get('last_land_due', 0):,} grain", "dim")),
+                         mark="*" if "land" in drafts else ""),
                 Row("harbour", (("harbour due", "clay"),
-                                 (f"{revenue.get('harbour_rate', 0)}/1000", "gold"),
-                                 (f"last {revenue.get('last_harbour_due', 0):,} {revenue.get('harbour_good', 'oil')}", "dim")))]
+                                 (f"{harbour_rate}/1000", "flame" if "harbour" in drafts else "gold"),
+                                 (f"last {revenue.get('last_harbour_due', 0):,} {revenue.get('harbour_good', 'oil')}", "dim")),
+                    mark="*" if "harbour" in drafts else "")]
         headers, widths = ("account", "rate", "last taken"), (18, 14, 28)
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
@@ -450,11 +500,36 @@ def storehouse_account(b: dict, view: str, selected: str = "",
     if chosen:
         detail += [("", "ink")] + list(chosen.cells)
     if view == "dues":
-        detail += [("", "ink"), ("[< >] changes the selected rate by 25", "dim")]
+        revenue, land_data = b.get("revenue", {}), b.get("land", {})
+        if selected == "land":
+            detail += [
+                (f"customary {land_data.get('land_due_base', 0)}/1000", "dim"),
+                ("above custom raises unrest each fortnight", "ash"),
+                ("more grain comes at harvest; unroofed grain spoils fast", "ash"),
+            ]
+        else:
+            low = revenue.get("response_min_turns", 3)
+            high = revenue.get("response_max_turns", 6)
+            detail += [
+                (f"customary {revenue.get('harbour_customary', 0)}/1000", "dim"),
+                (f"merchants answer a rise in {low}–{high} fortnights", "ash"),
+                ("the due is taken as cargo clears", "ash"),
+            ]
+        detail += [
+            ("", "ink"),
+            (("DRAFT · Enter gives one order" if selected in drafts
+              else "[< >] drafts the selected rate by 25"),
+             "flame" if selected in drafts else "dim"),
+        ]
+    controls = []
+    if view == "dues" and selected in drafts:
+        controls.append(Control(
+            "set_land_due" if selected == "land" else "set_harbour_due",
+            "Enter", label="give this due", command="due:commit"))
     return compose(
         f"THE STOREHOUSE — {view.upper()}", headers, widths, rows, selected,
-        detail, [], hours, width, height, scroll, notice,
-        note="Tab view   ↑↓ choose" + ("   [< >] rate" if view == "dues" else ""),
+        detail, controls, hours, width, height, scroll, notice,
+        note="Tab view   ↑↓ choose" + ("   [< >] draft   Enter give" if view == "dues" else ""),
         views=STOREHOUSE_VIEWS, view=view)
 
 

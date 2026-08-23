@@ -184,10 +184,10 @@ def authority(kernel: Kernel, logs: list, wanted: str) -> None:
 def _parents(lot) -> tuple[str, ...]:
     """The lots this one came out of, newest link first.
 
-    Three kinds of link and one meaning. `from:` is a conversion -- sheaves
-    drawn down, grain created. `split:` is the same goods in two lots, because
-    part of a store was sold or sailed. `merged:` is the reverse: another lot
-    folded into this one, which is how a cargo becomes part of a granary. All
+    Three kinds of link and one meaning. `from:` is a conversion -- standing
+    crop drawn down, grain created. `split:` is the same goods in two lots,
+    because part of a store was sold or sailed. `merged:` is the reverse:
+    another lot folded into this one, which is how cargo joins a granary. All
     three say "to explain this, go and look at that".
 
     Conversions and handovers are interleaved rather than listed in turn, and
@@ -311,8 +311,9 @@ def chain(kernel: Kernel, logs: list, seen: dict, target: str,
         lot = seen.get(lot_id)
         if lot is None:
             # Created and emptied inside one turn, so it never appears in a
-            # between-turn snapshot: a sheaf lot threshed the fortnight it was
-            # cut, most often. Its ledger survives; its ancestry is reachable
+            # between-turn snapshot: an intermediate lot consumed the turn it
+            # was made, most often. Its ledger survives; its ancestry is
+            # reachable
             # down the branch that outlived it.
             print(f"  {pad}{lot_id}: emptied within a turn, ledger only")
             ledger(lot_id, pad)

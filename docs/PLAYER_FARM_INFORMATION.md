@@ -8,8 +8,11 @@ against today.
 Classification follows the same four kinds: court record, observation,
 derivation, unobserved truth.
 
+The field loop has three tasks: sow, tend, reap. Reaping turns standing crop
+straight into grain; seed for the next year is held back from that harvest.
+
 Done so far: the calendar (section 1), the labour figures (section 3), the
-standing crop and sheaves (section 4), the gauge in words with its provenance
+standing crop and harvest (section 4), the gauge in words with its provenance
 (section 5), and the next season's ask (section 7). All five are drawn in the
 Hall, the Land ledger and the Alu, and explained in four Help topics:
 `grain_year`, `person_days`, `river_gauge`, `units`. What remains is the loss
@@ -25,7 +28,7 @@ standing in.
 - Fortnights remaining until the next season opens.
 - The harvest deadline, named as a deadline: crop still standing at the last
   harvest fortnight is destroyed.
-- The threshing deadline, and that seed is set aside only during threshing.
+- That grain comes in and seed is set aside during the harvest window.
 - The dead fortnights, marked as dead, so idle hands are a visible choice and
   not an oversight.
 
@@ -40,8 +43,7 @@ arithmetic shown.
 - Sow: qa of seed one person-day puts in the ground.
 - Tend: qa of standing crop one person-day watches for a fortnight.
 - Reap: qa of standing crop one person-day cuts.
-- Thresh: qa of sheaves one person-day threshes.
-- Yield: grain per thousand of sheaves, fodder per thousand of sheaves.
+- Harvest yield: grain returned per thousand of standing crop reaped.
 - Sowing multiplier: standing crop per qa of seed, from the site's capacity.
 - Neglect and drought loss per thousand, and the drought break past which each
   further step of dryness costs the multiple.
@@ -66,13 +68,12 @@ settlement; observation elsewhere.
 
 ## 4. The crop, at every stage
 
-The estate row shows sown, open, seed, sheaves, and grain. Standing crop is
-projected and then not rendered.
+The estate row shows sown, open, seed, and grain. The Land detail shows the
+standing crop.
 
 - Seed in store, seed in the ground.
 - Standing crop, per estate.
-- Sheaves cut but not threshed, with the fortnights left to thresh them.
-- Grain and fodder produced this threshing.
+- Grain brought in during each harvest fortnight, and seed held back from it.
 - What was lost, and to what: neglect, weather, unreaped, spoiled.
 - Each loss with its cause record and the fortnight it happened.
 
@@ -103,9 +104,9 @@ One derivation the player needs before he spends grain on anything else.
 - Seed the council intends to set aside, and the reserve it keeps back first.
 - Ration need per fortnight, and fortnights of grain in hand.
 - The fortnight the stores run out at the current rate.
-- Whether cohorts have begun eating the seed corn.
+- Whether stored seed is enough to sow the open ground.
 
-`ate_the_seed` is already an event and the player is never told.
+Seed corn is protected from ordinary consumption.
 
 ## 8. Where each belongs
 

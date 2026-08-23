@@ -327,12 +327,15 @@ class Court:
     # intentionally not advice and does not say which side was truthful.
     faction_mood: Mapping[str, int] = dataclasses.field(default_factory=dict)
     # --- M12: revenue and placement (6.20, 6.22) ---
-    # The share of its own villages' threshing floor the crown takes, per 1000.
+    # The share of its own villages' harvest the crown takes, per 1000.
     # Customary is what the granary needs in an ordinary year; above it the
     # villages are short and say so (`revenue.pressure`).
     land_due_rate: int = 100
     land_due_base: int = 100
     last_land_due: int = 0
+    # Harvest arrives over several fortnights. Keep the open year's running
+    # total separate so "last" continues to mean the completed harvest.
+    land_due_in_progress: int = 0
     harbour_due_rate: int = 100
     harbour_due_customary: int = 100
     harbour_traffic: int = 1000
@@ -785,6 +788,10 @@ class World:
     plague: PlagueState = dataclasses.field(default_factory=PlagueState)
     pressure_turn: int = 24
     shocks: tuple[Shock, ...] = ()
+    # Calm-state analysis mode: abnormal bronze-age-breaking policies (plague,
+    # displacement, siege, climatic shock) are frozen off so the equilibrium of
+    # the normal world can be measured. `look.py --baseline` and tests turn it on.
+    baseline: bool = False
     ended: bool = False
     end_reason: str = ""
     ended_turn: int = -1

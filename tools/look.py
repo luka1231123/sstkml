@@ -105,9 +105,11 @@ def actor_of(event) -> str:
     return ""
 
 
-def run(seed: int, turns: int):
+def run(seed: int, turns: int, baseline: bool = False):
     """The world, turn by turn, with the events each turn produced."""
     world = load_campaign("seat", seed)
+    if baseline:
+        world = dataclasses.replace(world, baseline=True)
     for _ in range(turns):
         world, events = advance(world)
         yield world, events
@@ -118,10 +120,11 @@ def run(seed: int, turns: int):
 # --- figures ------------------------------------------------------------------
 
 def figures(args) -> int:
-    print(f"seed {args.seed}, {args.turns} turns")
+    print(f"seed {args.seed}, {args.turns} turns"
+          + (" (baseline: abnormal policies frozen)" if args.baseline else ""))
     print("turn  date     seatpop  granary  cover  village  unrest  legit  "
           "hungry  events")
-    for world, events in run(args.seed, args.turns):
+    for world, events in run(args.seed, args.turns, args.baseline):
         turn = world.date.absolute
         if turn % args.every and turn != args.turns:
             continue
@@ -137,7 +140,7 @@ def figures(args) -> int:
                     if c.settlement == SP.SEAT
                     and kernel.tenure_of(c) == "redistributive")
         hungry = sum(1 for e in events
-                     if kind_of(e) == "hungry" and SP.SEAT in str(e[1:2]))
+                     if kind_of(e) == "hungry" and e[1] in theirs)
         print(f"{turn:5d} y{world.date.year}f{world.date.fortnight:<3d} "
               f"{sum(c.people for c in cohorts):8,} {granary:8,} "
               f"{granary // max(1, owed):5d}  {village:8,} "
@@ -187,7 +190,7 @@ def _print_tally(tally: dict, indent: str = "") -> None:
 def events(args) -> int:
     _FILTER["kind"], _FILTER["who"] = args.kind, args.who
     whole: dict = {}
-    for world, produced in run(args.seed, args.turns):
+    for world, produced in run(args.seed, args.turns, args.baseline):
         if args.each:
             turn_tally: dict = {}
             _tally(produced, turn_tally)
@@ -251,6 +254,8 @@ def _flat(value, path: str = "") -> dict:
 
 def belief(args) -> int:
     world = load_campaign("seat", args.seed)
+    if args.baseline:
+        world = dataclasses.replace(world, baseline=True)
     before = {}
     for _ in range(args.turns):
         before = project(world) if args.diff else before
@@ -279,6 +284,8 @@ def main(argv: list[str]) -> int:
     def common(child):
         child.add_argument("--seed", type=int, default=42)
         child.add_argument("--turns", type=int, default=24)
+        child.add_argument("--baseline", action="store_true",
+                           help="freeze shocks, plague, displacement, siege")
         return child
 
     table = common(sub.add_parser("figures", help="the numbers, one row a turn"))

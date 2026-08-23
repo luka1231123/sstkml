@@ -130,7 +130,7 @@ def test_the_others_produce_consume_decide_and_change_with_ugarit_idle() -> None
     kernel, events = _run(kernel, turns=48)
     kinds = {e[0] for e in events}
 
-    assert {"reaped", "threshed", "set_aside", "sown"} <= kinds, "they produce"
+    assert {"reaped", "set_aside", "sown"} <= kinds, "they produce"
     assert "hungry" in kinds or any(
         kernel.stores(s) != opening[s] for s in opening), "they consume"
     assert {"due", "rendered"} & kinds, "they decide what to render"

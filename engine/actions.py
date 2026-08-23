@@ -921,6 +921,14 @@ class HarbourDueTaken:
 
 
 @dataclasses.dataclass(frozen=True)
+class HarbourCargoLanded:
+    lot_id: str
+    owner: str
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
 class HarbourCargoWithdrawn:
     lot_id: str
     owner: str
@@ -1060,7 +1068,7 @@ _TYPES = {
         QuarantineSet, ArchiveSearched,
         PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
         LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,
-        HarbourCargoWithdrawn,
+        HarbourCargoLanded, HarbourCargoWithdrawn,
         MerchantResponseDue, MerchantWithdrew, PersonPlaced, PersonDismissed,
         HeirNamed,
         TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,

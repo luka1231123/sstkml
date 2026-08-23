@@ -275,7 +275,7 @@ def test_a_place_the_tablet_cannot_locate_is_named_rather_than_dropped() -> None
         hit.command for hit in screen.hits if hit.enabled}
 
 
-def test_world_communication_is_an_honest_inert_placeholder() -> None:
+def test_world_communication_only_offers_working_orders() -> None:
     places = [_place("home", "Home", col=3, row=3),
               _place("emar", "Emar", col=8, row=1)]
     belief = _belief(places, [_route("home", "emar")])
@@ -283,9 +283,9 @@ def test_world_communication_is_an_honest_inert_placeholder() -> None:
     text = plain_text(screen)
 
     assert "CORRESPONDENCE" in text
-    assert "Letter" in text and "Envoy" in text and "Gift" in text
+    assert "Letter" in text and "Gift" in text
     assert "Marriage" in text and "by letter" in text
-    assert "not yet wired" in text
+    assert "Envoy" not in text and "not yet wired" not in text
     assert not {
         hit.command for hit in screen.hits
         if hit.command.startswith(("do:", "world:open:"))

@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from belief.project import project
 from engine import actions as A, fall, seat
+from engine.core import in_range
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
@@ -58,7 +59,10 @@ def _act(policy: str, world) -> tuple:
     for action in _austerity_allocations(world, budget):
         world, got = apply(world, action)
         made += got
-    if thin:
+    harvest = tuple(world.season.get("harvest") or ())
+    may_send = bool(harvest) and in_range(
+        world.date.advance().fortnight, harvest)
+    if thin and may_send:
         for gid in ("weavers", "garrison_mahadu"):
             group = roll.get(gid)
             if group and not group.at_fields:

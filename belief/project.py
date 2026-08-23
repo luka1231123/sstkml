@@ -364,7 +364,7 @@ def _grain_stage(kernel, fortnight: int) -> str:
     """
     from engine.kernel.farm import season
 
-    for name in ("sowing", "growing", "harvest", "threshing", "low_water"):
+    for name in ("sowing", "growing", "harvest", "low_water"):
         if season(kernel.seasons, fortnight, name):
             return name
     return "low_water"
@@ -386,7 +386,7 @@ def gauge_word(reading: int) -> str:
 
 # The grain year, in the order it happens, with the task each moment asks for.
 STAGES = (("sowing", "sow"), ("growing", "tend"), ("harvest", "reap"),
-          ("threshing", "thresh"), ("low_water", ""))
+          ("low_water", ""))
 
 
 def _calendar(kernel, fortnight: int, turn: int) -> dict:
@@ -481,7 +481,6 @@ def _land(world, perr: int) -> dict:
             "under_crop": F.under_crop(kernel, site_id),
             "seed": F.held(kernel.book, controller, F.SEED, seat),
             "standing": F.held(kernel.book, controller, F.STANDING, site_id),
-            "sheaves": F.held(kernel.book, controller, F.SHEAVES, seat),
             "grain": F.held(kernel.book, controller, F.GRAIN, seat),
         })
 
@@ -489,20 +488,18 @@ def _land(world, perr: int) -> dict:
     sown = sum(e["under_crop"] for e in estates)
     open_ground = max(0, (site.extent if site is not None else 0) - sown)
     standing = sum(e["standing"] for e in estates)
-    sheaves = sum(e["sheaves"] for e in estates)
     stage = _grain_stage(kernel, kernel.date.fortnight)
 
     # What the fields ask in the fortnight that is, and what each other moment
     # of the year would ask of the stock standing here now. The ruler can count
     # the crop; the ask is the days that count needs on this estate. Keeping
-    # all five is the planning figure: an ask of nothing this fortnight while
-    # eight thousand parisu of sheaves wait for the threshing floor is not the
-    # same fact as an ask of nothing with the barns empty.
+    # all four is the planning figure: an ask of nothing this fortnight while
+    # eight thousand parisu stand uncut is not the same fact as an ask of
+    # nothing with the barns empty.
     asks = {
         "sowing": open_ground // F.SOW_PER_DAY,
         "growing": standing // F.TEND_PER_DAY,
         "harvest": standing // F.REAP_PER_DAY,
-        "threshing": sheaves // F.THRESH_PER_DAY,
         "low_water": 0,
     }
     ask = asks[stage]
@@ -525,7 +522,6 @@ def _land(world, perr: int) -> dict:
         "seed_in_ground": sown,
         "seed_recommended": open_ground,
         "standing": standing,
-        "sheaves": sheaves,
         "hands_to_the_fields": list(seat_door.at_harvest(world)),
         "corvee_days": committed,
         "works_days": court.works_days,
@@ -535,8 +531,8 @@ def _land(world, perr: int) -> dict:
         "labour_days_idle": max(0, hands - ask - committed),
         "labour_days_by_season": asks,
         "rates": {"sow": F.SOW_PER_DAY, "tend": F.TEND_PER_DAY,
-                  "reap": F.REAP_PER_DAY, "thresh": F.THRESH_PER_DAY,
-                  "grain_per_1000": F.GRAIN_PER_1000},
+                  "reap": F.REAP_PER_DAY,
+                  "grain_per_1000": F.HARVEST_PER_1000},
     }
 
 
@@ -1094,11 +1090,13 @@ def project(world) -> dict:
     for gid in sorted(roll):
         g = roll[gid]
         owed = g.size * g.entitlement
+        ordinary_claim = owed + min(g.arrears, owed)
         groups.append({
             "id": gid, "name": g.name, "size": g.size,
             "entitlement": g.entitlement, "function": g.function,
             "place": g.place,
-            "allocated": allowances.get(gid, owed),
+            "allocated": min(
+                allowances.get(gid, ordinary_claim), ordinary_claim),
             "arrears_qa": g.arrears,
             "arrears_weeks": g.arrears // max(1, owed),
             "loyalty": _loyalty_word(g.loyalty),
@@ -1214,6 +1212,21 @@ def project(world) -> dict:
                         certainty="counted")
             obligations.append(item)
     stores = _stores(world, perr)
+    priority = list(seat_door.order_of_payment(world))
+    by_group = {group["id"]: group for group in groups}
+    grain_left = stores.get("grain", 0)
+    for rank, gid in enumerate(priority, 1):
+        group = by_group[gid]
+        paid = min(grain_left, group["allocated"])
+        grain_left -= paid
+        owed = group["size"] * group["entitlement"]
+        group.update(
+            priority=rank,
+            next_paid=paid,
+            next_short=max(0, owed - paid),
+            next_status=("full" if paid >= owed else
+                         "none" if paid <= 0 else "short"),
+        )
     graph = _world_graph(world)
     by_place = {relation["place"]: relation for relation in relations}
     for place in graph["places"]:
@@ -1240,7 +1253,8 @@ def project(world) -> dict:
         "end_reason": world.end_reason,
         "legitimacy": c.legitimacy,
         "stores": stores,
-        "priority": list(seat_door.order_of_payment(world)),
+        "priority": priority,
+        "ration_grain_left": grain_left,
         "groups": groups,
         "cohorts": cohorts,
         "relations": relations,
@@ -1280,6 +1294,10 @@ def project(world) -> dict:
             "harbour_traffic": c.harbour_traffic,
             "last_harbour_due": c.last_harbour_due,
             "harbour_good": world.revenue_good,
+            "response_min_turns": world.revenue_rules.get(
+                "response_min_turns", 3),
+            "response_max_turns": world.revenue_rules.get(
+                "response_max_turns", 6),
         },
         "works_season": _works_season(world),
         "works_materials": dict(world.works_materials),
