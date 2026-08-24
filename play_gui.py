@@ -784,6 +784,7 @@ class Game:
             return trade_page.compose(b, width, height, notice=notice,
                                       view=getattr(self, "trade_view", trade_page.VIEWS[0]),
                                       selected=getattr(self, "trade_pick", ""),
+                                      scroll=getattr(self, "trade_scroll", 0),
                                       due_draft=self.ledger_state["dues"]
                                       .setdefault("rates", {}).get("harbour"))
         if key == "alu":
@@ -1628,9 +1629,9 @@ class Game:
 
         def remove_block() -> None:
             block = desk.get("block_focus", "matter")
-            if block in ("matter", "address"):
+            if block in composer.REQUIRED_BLOCKS:
                 self.notify(
-                    "the address and the matter stay on the tablet.",
+                    "that piece is required for a sealed order.",
                     registry.REFUSAL, window="stack")
                 return
             recipient = item_for_desk()["sender"]
@@ -2349,20 +2350,50 @@ class Game:
             self.repaint()
             return True
         rows = self.window_rows(window or key)
+        # The composers visibly land on a first row. Keep the controller on
+        # that same row before interpreting a key, so the first arrow or
+        # action never targets an invisible empty selection.
+        if rows and state["pick"] not in rows:
+            state["pick"] = rows[0]
         if event.keysym in ("Up", "Down"):
             if rows:
-                if state["pick"] not in rows:
-                    state["pick"] = rows[
-                        0 if event.keysym == "Down" else -1]
-                else:
-                    here = rows.index(state["pick"])
-                    state["pick"] = rows[collection.step(
-                        len(rows), here,
-                        1 if event.keysym == "Down" else -1)]
+                here = rows.index(state["pick"])
+                state["pick"] = rows[collection.step(
+                    len(rows), here,
+                    1 if event.keysym == "Down" else -1)]
                 self.repaint()
             return True
         if event.keysym in ("Prior", "Next", "Home", "End"):
-            self.scrolled_ledger(key, len(rows), self.STEPS[event.keysym])
+            if rows:
+                screen = self.compose(window or key)
+                visible: list[str] = []
+                if screen is not None:
+                    for hit in screen.hits:
+                        if not hit.command.startswith("pick:"):
+                            continue
+                        row = hit.command.split(":", 1)[1]
+                        if row not in visible:
+                            visible.append(row)
+                page_size = max(1, len(visible))
+                here = rows.index(state["pick"])
+                if event.keysym == "Home":
+                    target = 0
+                elif event.keysym == "End":
+                    target = len(rows) - 1
+                else:
+                    by = page_size if event.keysym == "Next" else -page_size
+                    target = max(0, min(len(rows) - 1, here + by))
+                state["pick"] = rows[target]
+                max_start = max(0, len(rows) - page_size)
+                if event.keysym == "Home":
+                    state["scroll"] = 0
+                elif event.keysym == "End":
+                    state["scroll"] = max_start
+                else:
+                    state["scroll"] = max(
+                        0, min(max_start, state["scroll"] + (
+                            page_size if event.keysym == "Next"
+                            else -page_size)))
             self.repaint()
             return True
         char = event.char or ""
@@ -2374,10 +2405,6 @@ class Game:
             self.repaint()
             return True
         return False
-
-    def scrolled_ledger(self, key: str, total: int, by: int) -> None:
-        state = self.ledger_state[key]
-        state["scroll"] = max(0, min(state["scroll"] + by, max(0, total - 1)))
 
     def on_storehouse_key(self, event) -> None:
         """Move among the connected goods, labour, and estate stations."""
@@ -2445,6 +2472,12 @@ class Game:
 
     def on_stores_key(self, event, window: str = "stores") -> None:
         state = self.ledger_state["stores"]
+        if not state["pick"]:
+            goods = sorted(self.belief.get("stores", {}).items())
+            stocked = [good for good, held in goods if held]
+            state["pick"] = ("grain" if "grain" in stocked else
+                             stocked[0] if stocked else
+                             goods[0][0] if goods else "")
         if self.ledger_key(
                 "stores", event, ledger_page.STEPS["stores"], window):
             return
@@ -2478,9 +2511,11 @@ class Game:
 
     def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
-        before_pick = state["pick"]
         active = list(self.belief.get("priority", ()))
-        pick = before_pick or (active[0] if active else "")
+        if state["pick"] not in active:
+            state["pick"] = active[0] if active else ""
+        before_pick = state["pick"]
+        pick = before_pick
         group = next((item for item in self.belief.get("groups", ())
                       if item["id"] == pick), None)
         # Four presses span an ordinary ration even for the palace populace;
@@ -2488,6 +2523,13 @@ class Game:
         ration_step = max(
             ledger_page.STEPS["roll"],
             (group["size"] * group["entitlement"] // 4) if group else 0)
+        if (event.char or "") in {"[", "]"} and not state["amount"] \
+                and group is not None:
+            # Brackets adjust the ration shown on the row. Starting at zero
+            # made the first decrease a no-op and several increases necessary
+            # just to reach today's ration.
+            state["pick"] = pick
+            state["amount"] = group["allocated"]
         if self.ledger_key("roll", event, ration_step, window):
             if state["pick"] != before_pick:
                 state["amount"] = 0
@@ -3509,7 +3551,8 @@ class Game:
             self.alu_view = views[(views.index(view) + step) % len(views)]
             self.repaint()
             return
-        if char.isdigit() and 1 <= int(char) <= len(views):
+        if (view != "institutions" and char.isdigit()
+                and 1 <= int(char) <= len(views)):
             self.alu_view = views[int(char) - 1]
             self.repaint()
             return
@@ -3723,7 +3766,17 @@ class Game:
 
     def palace_pick(self, listing: str = "") -> str:
         state = self.palace_state
-        return state["pick"].get(listing or self.palace_listing(), "")
+        listing = listing or self.palace_listing()
+        chosen = state["pick"].get(listing, "")
+        rows = palace.listing_rows(self.belief, listing)
+        if chosen and any(row.id == chosen for row in rows):
+            return chosen
+        if not rows:
+            state["pick"].pop(listing, None)
+            return ""
+        chosen = rows[0].id
+        state["pick"][listing] = chosen
+        return chosen
 
     def palace_listing(self) -> str:
         state = self.palace_state
@@ -4148,15 +4201,21 @@ class Game:
             return
         if command.startswith("tab:"):
             self.trade_view = command.split(":", 1)[1]
+            self.trade_pick = ""
+            self.trade_scroll = 0
             self.repaint()
             return
         if event.keysym in {"Tab", "ISO_Left_Tab"}:
             step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
             self.trade_view = views[(views.index(view) + step) % len(views)]
+            self.trade_pick = ""
+            self.trade_scroll = 0
             self.repaint()
             return
         if char.isdigit() and 1 <= int(char) <= len(views):
             self.trade_view = views[int(char) - 1]
+            self.trade_pick = ""
+            self.trade_scroll = 0
             self.repaint()
             return
         source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
@@ -4164,17 +4223,31 @@ class Game:
                   "routes": self.belief.get("trade", {}).get("routes", ())}.get(view, ())
         ids = [str(item.get("id") or f"{view}:{index}")
                for index, item in enumerate(source)]
+        if ids:
+            if getattr(self, "trade_pick", "") not in ids:
+                self.trade_pick = ids[0]
+            page_size = max(1, self._size("trade")[1] - 10)
+            self.trade_scroll = max(0, min(
+                getattr(self, "trade_scroll", 0),
+                max(0, len(ids) - page_size)))
+        else:
+            self.trade_pick = ""
+            self.trade_scroll = 0
         if (event.keysym in {"Up", "Down"} or command == "trade:next") and ids:
-            picked = getattr(self, "trade_pick", "")
-            if picked not in ids:
-                self.trade_pick = ids[0 if event.keysym == "Down" else -1]
-            else:
-                here = ids.index(picked)
-                self.trade_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+            forward = event.keysym != "Up"
+            here = ids.index(self.trade_pick)
+            step = 1 if forward else -1
+            index = collection.step(len(ids), here, step)
+            self.trade_pick = ids[index]
+            if index < self.trade_scroll:
+                self.trade_scroll = index
+            elif index >= self.trade_scroll + page_size:
+                self.trade_scroll = index - page_size + 1
             self.repaint()
             return
         if event.keysym == "Return" and ids:
-            here = ids.index(getattr(self, "trade_pick", "")) if getattr(self, "trade_pick", "") in ids else 0
+            picked = getattr(self, "trade_pick", "")
+            here = ids.index(picked) if picked in ids else 0
             self.open_focus(view.rstrip("s"), source[here])
             return
         if view in {"exchange", "cargo"} and char in {"f", "r"}:
@@ -4621,6 +4694,10 @@ class Game:
             self.app.close(key)
             self.hall_window.focus()
             return
+        if event.keysym == "space":
+            # Only the Hall owns the turn. A space typed while reading a
+            # pinned tablet must never advance and autosave the kingdom.
+            return
         if key.startswith("archive:") and event.keysym in {
                 "Up", "Down", "Prior", "Next"}:
             step = {
@@ -4636,6 +4713,23 @@ class Game:
             # so the claim being answered stays on screen while it is answered.
             self.open_desk(key.split(":", 1)[1])
             return
+        opens_next = (
+            char in TABLETS or char in LEDGERS or char in ROOMS
+            or char in {"r", "l", "a", "?"})
+        if char == "d":
+            opens_next = any(
+                item["read"] and item.get("answered_turn") is None
+                for item in self.belief["stack"])
+        concern = getattr(event, "command", "")
+        if concern.startswith("concern:"):
+            index = int(concern.split(":", 1)[1])
+            opens_next = 0 <= index < len(advice.concerns(self.belief))
+        elif char.isdigit() and char != "0":
+            opens_next = int(char) <= len(advice.concerns(self.belief))
+        if key == "fortnight" and opens_next:
+            # Opening the next station is acknowledgement enough. Keep the
+            # report available until then, without demanding a dismissal key.
+            self.app.close("fortnight")
         self.on_key(event)
 
     def quit(self) -> None:

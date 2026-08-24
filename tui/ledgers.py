@@ -32,7 +32,7 @@ STEPS = {"roll": 50, "stores": 50, "corvee": 5, "dredge": 5,
 
 TASKS = ("garrison", "watch", "harvest", "campaign")
 MUSTER_VIEWS = (("formations", "Formations"), ("cohorts", "Cohorts"),
-                ("detachments", "Detachments"), ("draft", "Draft order"))
+                ("detachments", "Detachments"))
 
 # Which store rows are a ledger the king can have counted. `inspect_ledger`
 # takes `granary` or `seed` and nothing else, so the control is offered on
@@ -73,7 +73,6 @@ STOREHOUSE_VIEWS = (
     ("stores", "STORES"),
     ("roll", "RATIONS"),
     ("land", "LAND"),
-    ("reserves", "RESERVES"),
     ("dues", "DUES"),
 )
 
@@ -563,11 +562,6 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
                               (_spoken(c.get("task", "at home")), "sand"),
                               (_spoken(c.get("place", "")), "dim")))
                 for c in cohorts]
-    elif view == "draft":
-        rows = [Row("draft", (("levy heads from cohort", "gold"),
-                              ("exact", "flame"), ("typed", "clay"),
-                              ("[c]", "dim")))]
-
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
     formation = next((f for f in formations if f["id"] == selected), None)
@@ -598,7 +592,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
                   ("choose a formation above, then send it", "dim")]
 
     controls = []
-    if view in {"cohorts", "draft"}:
+    if view == "cohorts":
         controls.append(affordable(Control(
             "levy_cohort", key_for("levy_cohort"), label="write exact levy"), hours))
     elif view == "detachments":

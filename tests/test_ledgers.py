@@ -76,9 +76,9 @@ def test_each_workbench_offers_every_action_its_context_claims() -> None:
 
 def test_the_stores_can_have_a_ledger_counted() -> None:
     game = _game()
-    game.ledger_state["stores"]["pick"] = "grain"
     game.on_stores_key(_Key("i"))
     assert _kinds(game) == ["InspectLedger"]
+    assert game.ledger_state["stores"]["pick"] == "grain"
     assert game.notices["stores"].kind == registry.SUCCESS
 
 
@@ -137,9 +137,10 @@ def test_a_ration_draft_previews_then_clears_when_given() -> None:
                  if item["id"] == "palace_dependents")
     state = game.ledger_state["roll"]
     state["pick"] = group["id"]
-    game.on_roll_key(_Key("]"))
-    expected = max(ledgers.STEPS["roll"],
-                   group["size"] * group["entitlement"] // 4)
+    game.on_roll_key(_Key("["))
+    step = max(ledgers.STEPS["roll"],
+               group["size"] * group["entitlement"] // 4)
+    expected = max(0, group["allocated"] - step)
     assert state["amount"] == expected
     text = plain_text(game.compose_ledger(
         "roll", game.belief, 82, 28, ""))
@@ -148,6 +149,21 @@ def test_a_ration_draft_previews_then_clears_when_given() -> None:
     game.on_roll_key(_Key("a"))
     assert _kinds(game) == ["Allocate"]
     assert state["amount"] == 0
+
+
+def test_first_ration_bracket_adjusts_the_visible_ration() -> None:
+    game = _game()
+    state = game.ledger_state["roll"]
+    group_id = game.belief["priority"][0]
+    group = next(item for item in game.belief["groups"]
+                 if item["id"] == group_id)
+    step = max(ledgers.STEPS["roll"],
+               group["size"] * group["entitlement"] // 4)
+
+    game.on_roll_key(_Key("["))
+
+    assert state["pick"] == group_id
+    assert state["amount"] == max(0, group["allocated"] - step)
 
 
 def test_the_roll_toggles_hands_in_and_out_of_the_fields() -> None:
@@ -273,6 +289,16 @@ def test_storehouse_only_offers_enter_when_a_due_is_drafted() -> None:
     assert "Enter give" in drafted and "Enter gives one order" in drafted
 
 
+def test_storehouse_skips_the_duplicate_reserves_tab() -> None:
+    belief = project(_world())
+    text = plain_text(ledgers.stores(
+        belief, width=84, height=29, room=True))
+    assert tuple(key for key, _label in ledgers.STOREHOUSE_VIEWS) == (
+        "stores", "roll", "land", "dues")
+    assert "RESERVES" not in text
+    assert "grain" in text
+
+
 def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
     game = _game()
     game.on_land_key(_Key("h"))
@@ -298,7 +324,8 @@ def test_the_muster_keeps_formations_and_exact_levies_together() -> None:
     actions = {hit.command for hit in screen.hits if hit.enabled}
 
     assert "THE MUSTER — LEVY AND SPEAR" in text
-    assert "Cohorts" in text and "Detachments" in text and "Draft order" in text
+    assert "Cohorts" in text and "Detachments" in text
+    assert "Draft order" not in text
     assert formation["name"] in text
     assert "SPEAR-BEARER OF THE LEVY" in text
     assert "════▷" in text
@@ -307,7 +334,7 @@ def test_the_muster_keeps_formations_and_exact_levies_together() -> None:
 
 def test_the_muster_can_ready_an_exact_cohort_levy() -> None:
     game = _game()
-    game.muster_view = "draft"
+    game.muster_view = "cohorts"
     game.on_muster_key(_Key("c"))
     assert not game.log
     assert game.command_line == "levy "
@@ -317,9 +344,9 @@ def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game = _game()
     state = game.ledger_state["muster"]
     formation = game.belief["troops"]["formations"][0]
-    state["pick"] = formation["id"]
     game.on_muster_key(_Key("a"))
     assert not game.log, "no place is chosen yet"
+    assert state["pick"] == formation["id"]
     assert game.notices["muster"].kind == registry.REFUSAL
 
     game.on_muster_key(_Key("t"))
@@ -328,6 +355,30 @@ def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game.on_muster_key(_Key("a"))
     assert _kinds(game) == ["AssignTroops"]
     assert game.log[0]["action"]["task"] == state["task"]
+
+
+def test_muster_page_keys_move_the_selection_instead_of_snapping_back() -> None:
+    game = _game()
+    game.muster_view = "cohorts"
+    game._size = lambda _key: (60, 20)
+    rows = game.window_rows("muster")
+    screen = game.compose("muster")
+    visible = [
+        hit.command.split(":", 1)[1] for hit in screen.hits
+        if hit.command.startswith("pick:")]
+    assert len(rows) > len(visible)
+
+    game.on_muster_key(_Key(keysym="Next"))
+    assert game.ledger_state["muster"]["pick"] == rows[len(visible)]
+    assert game.ledger_state["muster"]["pick"] in {
+        hit.command.split(":", 1)[1]
+        for hit in game.compose("muster").hits
+        if hit.command.startswith("pick:")}
+
+    game.on_muster_key(_Key(keysym="End"))
+    assert game.ledger_state["muster"]["pick"] == rows[-1]
+    game.on_muster_key(_Key(keysym="Home"))
+    assert game.ledger_state["muster"]["pick"] == rows[0]
 
 
 # --- the oaths ----------------------------------------------------------------

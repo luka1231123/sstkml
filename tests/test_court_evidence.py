@@ -13,7 +13,7 @@ from tui.grid import plain_text
 
 
 SEED = 8814402919
-SIZES = ((92, 30), (68, 24))
+SIZES = ((92, 30), (74, 25), (68, 24))
 
 
 def _heard_case() -> tuple[dict, dict]:
@@ -52,6 +52,8 @@ def test_supported_court_sizes_show_both_sides_before_enabling_verdicts() -> Non
         assert petition["claim_text"] in text
         assert petition["counter_text"] in text
         assert "CLAIM ·" in text and "ANSWER ·" in text
+        assert text.index(petition["counter_text"]) < text.index(
+            "[f] for the petitioner")
         verdicts = _verdict_hits(screen)
         assert len(verdicts) == len(palace.VERDICTS)
         assert all(hit.enabled for hit in verdicts)
@@ -64,6 +66,39 @@ def test_heard_testimony_displaces_room_art_before_it_displaces_evidence() -> No
         width=68, height=24))
     assert "AUDIENCE ·" not in compact
     assert "CLAIM ·" in compact and "ANSWER ·" in compact
+
+
+def test_court_only_shows_the_controls_for_the_current_step() -> None:
+    belief, petition = _heard_case()
+    heard = palace.compose(
+        belief, view="court", selected=petition["id"], hours=8,
+        width=68, height=24)
+    text = plain_text(heard)
+    commands = {hit.command for hit in heard.hits}
+
+    assert "take them in" not in text and "turn them away" not in text
+    assert "already heard" not in text and "[h] Hear" not in text
+    assert {f"verdict:{verdict}" for _key, verdict, _label in palace.VERDICTS} \
+        <= commands
+
+
+def test_verdict_controls_wait_until_both_sides_are_heard() -> None:
+    belief, petition = _heard_case()
+    unheard = copy.deepcopy(belief)
+    selected = next(
+        item for item in unheard["justice"]["petitions"]
+        if item["id"] == petition["id"])
+    selected["heard"] = False
+    selected["claim_text"] = ""
+    selected["counter_text"] = ""
+
+    screen = palace.compose(
+        unheard, view="court", selected=petition["id"], hours=8,
+        width=68, height=24)
+    text = plain_text(screen)
+    assert "[h] Hear" in text
+    assert not _verdict_hits(screen)
+    assert "take them in" not in text and "turn them away" not in text
 
 
 def test_exceptionally_long_hidden_evidence_disables_every_verdict() -> None:

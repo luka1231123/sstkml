@@ -49,6 +49,7 @@ BLOCK_LABELS = {
 }
 # Blocks the desk puts on a new tablet before the player touches it.
 OPENING_BLOCKS = ("address", "marker", "recognition", "matter", "terms", "seal")
+REQUIRED_BLOCKS = frozenset({"address", "marker", "matter", "terms", "seal"})
 TERM_KINDS = (
     "gift", "request_good", "promise_good", "service",
     "marriage_proposal",
@@ -207,7 +208,7 @@ def normalise_order(order, recipient: str) -> tuple[str, ...]:
     aliases = {"quotation": "precedent", "instruction": "warning"}
     kept = [aliases.get(name, name) for name in (order or ())]
     kept = [name for name in kept if name in allowed]
-    for required in ("address", "marker", "matter", "terms", "seal"):
+    for required in REQUIRED_BLOCKS:
         if required not in kept:
             kept.append(required)
     return tuple(name for name in BLOCK_ORDER if name in kept)
@@ -477,6 +478,314 @@ def _draw_terms(surface: Surface, x: int, y: int, width: int,
     return y + 3
 
 
+_COMPACT_LABELS = {
+    "address": "ADDRESS",
+    "marker": "MARKER",
+    "prostration": "BOW",
+    "wellbeing": "WELL-BEING",
+    "recognition": "RECOGNITION",
+    "matter": "MATTER",
+    "terms": "TERMS",
+    "precedent": "PRECEDENT",
+    "warning": "WARNING",
+    "seal": "SEAL",
+}
+
+
+def _failed_forms(draft: Draft) -> tuple[str, ...]:
+    return tuple(
+        name for name, ok in (
+            ("address", draft.score.address_ok),
+            ("prostration", draft.score.prostration_ok),
+            ("self-designation", draft.score.self_designation_ok),
+            ("one matter", draft.score.topic_count <= 1),
+        ) if not ok)
+
+
+def _compact_reading(draft: Draft, intent: str, matter: str,
+                     composing: bool, advisor_undo: bool,
+                     failed: tuple[str, ...],
+                     width: int) -> list[tuple[str, str]]:
+    """The reading that must survive the Scribes' real 26-row floor."""
+    title = (
+        "YABNINU'S READING · WORDS SMOOTHED"
+        if advisor_undo else "YABNINU'S READING · HE EXPECTS")
+    rows = [(title, "bone")]
+    if matter.strip() and failed:
+        short_failures = (
+            {name: name for name in failed}
+            if width >= 52 else {
+                "address": "address",
+                "prostration": "bow",
+                "self-designation": "rank",
+                "one matter": "topics",
+            })
+        rows.append((
+            "FORM BREAK · "
+            + " · ".join(short_failures[name] for name in failed),
+            "blood"))
+    if composing:
+        rows.append(("He is tightening your words; meaning stays.", "clay"))
+        return rows
+    if not matter.strip():
+        rows.append(("Next · write your matter.", "clay"))
+        return rows
+    if failed:
+        reading = scribe_expects(draft, intent)
+        if len(reading) > 1:
+            rows.append((reading[1], "clay"))
+        fixes: list[str] = []
+        if "address" in failed or "self-designation" in failed:
+            fixes.append("court form")
+        if "prostration" in failed:
+            fixes.append("bow")
+        if "one matter" in failed:
+            fixes.append("one matter")
+        rows.append(("Fix · " + " · ".join(fixes), "clay"))
+        return rows
+    reading = scribe_expects(draft, intent)
+    if reading and width >= 52:
+        rows.append((reading[0], "clay"))
+    if len(reading) > 1:
+        rows.append((reading[1], "clay"))
+    rows.append(("Next · review terms, then seal.", "clay"))
+    return rows
+
+
+def _compact_term_controls(surface: Surface, x: int, y: int,
+                           width: int, has_terms: bool) -> None:
+    column = x + 2
+    limit = x + width
+    controls = (
+        ("←", "", "desk:term:value:previous", True),
+        ("→", "", "desk:term:value:next", True),
+        ("t", "field", "desk:term:field:next", True),
+        ("+", "add", "desk:term:add", True),
+        ("-", "del", "desk:term:remove", has_terms),
+    )
+    for key, label, command, enabled in controls:
+        needed = len(key) + len(label) + 3
+        if column + needed >= limit:
+            break
+        column += style.keycap(
+            surface, column, y, key, label,
+            enabled=enabled, command=command) + 1
+
+
+def _draw_compact_tablet(
+        surface: Surface, right: int, width: int, height: int,
+        draft: Draft, intent: str, matter: str,
+        picked: dict[str, BlockChoice], laid: tuple[str, ...],
+        terms: tuple[object, ...], term_builder: dict, term_focus: str,
+        block_focus: str, bound: tuple[str, ...], seal_data: dict,
+        composing: bool, advisor_undo: bool, dictating: bool,
+        cursor: bool, cursor_index: int | None) -> None:
+    """Fit the complete workbench and its warning into 78x26.
+
+    The large desk can afford to print every formula in full.  The real window
+    cannot.  Here every laid piece keeps one selectable row, the king's matter
+    keeps its own reading, and formula text yields to the scribe's consequence
+    and next move.
+    """
+    bottom = height - 5
+    room = max(0, bottom - 4)
+    failed = _failed_forms(draft)
+    reading = _compact_reading(
+        draft, intent, matter, composing, advisor_undo, failed, width)
+    reading_rows = len(reading) + 1       # its separating rule
+    term_controls = int(block_focus == "terms")
+    seal_detail = int(bool(seal_data))
+    # One line of the king's words is non-negotiable.  A spare row gives the
+    # likely two-sentence matter its second line before any decoration grows.
+    fixed = (
+        len(laid) + 1 + term_controls + seal_detail
+        + reading_rows + 1)               # review + first matter line
+    matter_rows = 1 + min(1, max(0, room - fixed))
+
+    y = 4
+    for name in laid:
+        focused = block_focus == name
+        pointer = ">" if focused else " "
+        label = _COMPACT_LABELS.get(name, name.upper())
+        if name == "matter":
+            value = (
+                f"{sentence_count(matter)} sentence"
+                f"{'' if sentence_count(matter) == 1 else 's'}")
+        elif name == "terms":
+            if focused:
+                fields = term_fields(term_builder)
+                field = term_focus if term_focus in fields else fields[0]
+                raw = term_builder.get(field, "")
+                if field == "kind":
+                    raw = TERM_LABELS.get(str(raw), str(raw))
+                elif field == "due_turn":
+                    raw = "—" if not raw else f"t{raw}"
+                elif field == "quantity":
+                    raw = f"{int(raw or 0):,}"
+                else:
+                    raw = str(raw).replace("_", " ") or "—"
+                value = f"{len(terms)} set · {field}:{raw}"
+            else:
+                value = (
+                    terms_summary(terms) if terms
+                    else TERM_LABELS.get(
+                        str(term_builder.get("kind", TERM_KINDS[0])), "term")
+                        + " candidate")
+        else:
+            value = picked.get(name, BlockChoice("", "")).label
+        line = f"{pointer} {label} · {value}"
+        surface.text(
+            right, y, _short(line, width),
+            C["bone"] if focused else C["clay"], C["ink"])
+        surface.link(right, y, width, 1, f"block:{name}")
+        y += 1
+
+        if name == "matter":
+            shown = matter
+            if dictating and cursor:
+                position = len(shown) if cursor_index is None else max(
+                    0, min(cursor_index, len(shown)))
+                shown = shown[:position] + "█" + shown[position:]
+            if not shown.strip():
+                shown = "Write what you want said, in your own words."
+            # Leave room for head/tail ellipses while dictating. Otherwise a
+            # cursor on the last cell of a wrapped line can be the one glyph
+            # `_short` removes.
+            wrap_room = width - (6 if dictating and cursor else 4)
+            lines = _wrapped(shown, max(8, wrap_room))
+            start = 0
+            if dictating and cursor and lines:
+                cursor_row = next(
+                    (index for index, line in enumerate(lines) if "█" in line),
+                    0)
+                start = max(0, min(
+                    cursor_row - matter_rows // 2,
+                    max(0, len(lines) - matter_rows)))
+            visible = lines[start:start + matter_rows]
+            for offset, line_text in enumerate(visible):
+                if not matter.strip():
+                    tone = C["ash"]
+                else:
+                    tone = C["clay"]
+                prefix = "…" if offset == 0 and start > 0 else ""
+                suffix = "…" if (
+                    offset == len(visible) - 1
+                    and start + len(visible) < len(lines)) else ""
+                surface.text(
+                    right + 3, y,
+                    _short(prefix + line_text + suffix, width - 4),
+                    tone, C["ink"])
+                y += 1
+        elif name == "terms" and term_controls:
+            _compact_term_controls(surface, right, y, width, bool(terms))
+            y += 1
+        elif name == "seal" and seal_data:
+            scribe = str(seal_data.get("scribe") or "unknown scribe")
+            courier = str(seal_data.get("courier") or "no courier")
+            route = str(seal_data.get("route") or "no route")
+            travel = seal_data.get("travel_time")
+            handling = f"{scribe} · {courier}"
+            if type(travel) is int and travel:
+                handling += f" · {travel}f"
+            handling += " · " + route
+            surface.text(right + 3, y, _short(handling, width - 4),
+                         C["sky"], C["ink"])
+            y += 1
+
+    reading_top = bottom - reading_rows
+    detail_room = max(0, reading_top - y - 1)
+    review = (
+        "FINAL REVIEW · " + bound[0]
+        if bound and not detail_room else
+        "FINAL REVIEW" if bound else
+        "FINAL REVIEW · NO ORDER PARSED")
+    surface.text(right, y, _short(review, width), C["gold"], C["ink"])
+    y += 1
+    for line in (() if bound and not detail_room else bound):
+        if y >= reading_top:
+            break
+        surface.text(right + 2, y, _short("· " + line, width - 2),
+                     C["gold"], C["ink"])
+        y += 1
+
+    style.rule(surface, right, reading_top, width)
+    for offset, (line, tone) in enumerate(reading, 1):
+        surface.text(right, reading_top + offset, _short(line, width),
+                     C[tone], C["ink"])
+
+
+def _draw_footer(surface: Surface, recipient: str,
+                 blocks: dict[str, int] | None, matter: str,
+                 dictating: bool, composing: bool, advisor_undo: bool,
+                 block_focus: str, laid: tuple[str, ...], seal_data: dict,
+                 width: int,
+                 height: int) -> None:
+    if dictating:
+        style.footer(surface, [
+            style.FooterAction("arrows", "move stylus", command="Right"),
+            style.FooterAction("ctrl-z", "undo"),
+            style.FooterAction("ctrl-y", "redo"),
+        ], y=height - 3, x=2, width=width - 4)
+        style.footer(surface, [
+            style.FooterAction("ctrl-d", "keep matter"),
+            style.FooterAction("esc", "cancel changes"),
+        ], y=height - 2, x=2, width=width - 4)
+        return
+
+    compact = width < 90
+    choice_label = "value" if block_focus == "terms" else "choice"
+    advisor_action = (
+        style.FooterAction(
+            "u", "restore" if compact else "restore my words",
+            command="desk:undo-correction")
+        if advisor_undo else
+        style.FooterAction(
+            "y", "correct" if compact else "Yabninu correct",
+            enabled=bool(matter.strip()) and not composing,
+            command="desk:correct"))
+    movement = [
+        style.FooterAction("↑", "block", command="desk:block:previous"),
+        style.FooterAction("↓", "block", command="desk:block:next"),
+        style.FooterAction("←", choice_label,
+                           command="desk:choice:previous"),
+        style.FooterAction("→", choice_label,
+                           command="desk:choice:next"),
+    ]
+    pieces = [
+        style.FooterAction(
+            "+", "add piece",
+            enabled=any(name not in laid
+                        for name in permitted_blocks(recipient)),
+            command="desk:block:add"),
+        style.FooterAction("-", "take off",
+                           enabled=block_focus not in REQUIRED_BLOCKS,
+                           command="desk:block:remove"),
+    ]
+    editing = [
+        style.FooterAction(
+            "e", "write" if compact else "write this piece",
+            command="desk:edit"),
+        advisor_action,
+    ]
+    # The desk always has this spare row. Use it: a visible control is faster
+    # than a memorised one, even after the window grows.
+    style.footer(surface, movement, y=height - 4,
+                 x=2, width=width - 4)
+    style.footer(surface, pieces + editing, y=height - 3,
+                 x=2, width=width - 4)
+    style.footer(surface, [
+        style.FooterAction(
+            "Enter", "review · 2h" if compact else "review & seal · 2h",
+            enabled=(
+                bool(matter.strip()) and not composing
+                and bool(seal_id(recipient, blocks))
+                and bool(seal_data.get("route"))),
+            command="desk:dispatch"),
+        style.FooterAction("esc", "keep"),
+        style.FooterAction("x", "discard", command="desk:discard"),
+    ], y=height - 2, x=2, width=width - 4)
+
+
 def compose(item: dict, draft: Draft, intent: str = "reply",
             dictating: bool = False, cursor: bool = True,
             house: dict | None = None, width: int = 100, height: int = 32,
@@ -591,8 +900,19 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     surface.text(right, 3, style.wedge_band(right_width, phase=7),
                  C["shadow"], C["ink"])
     style.notice(surface, right, 3, right_width, notice)
+    if height < 34:
+        _draw_compact_tablet(
+            surface, right, right_width, height,
+            draft, intent, matter, picked, laid,
+            terms, term_builder, term_focus, block_focus, bound, seal_data,
+            composing, advisor_undo, dictating, cursor, cursor_index)
+        _draw_footer(
+            surface, recipient, blocks, matter, dictating, composing,
+            advisor_undo, block_focus, laid, seal_data, width, height)
+        return surface.interactive()
+
     y = 4
-    address_rows = 2 if height < 30 else 3
+    address_rows = 3
     # Pieces standing above the matter, in the order they lie on the clay.
     for name in laid:
         if name == "matter":
@@ -675,13 +995,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
         surface, right, y, right_width, "seal", seal_choice,
         block_focus == "seal", 2, "block:seal")
 
-    failed_forms = tuple(
-        name for name, ok in (
-            ("address", draft.score.address_ok),
-            ("prostration", draft.score.prostration_ok),
-            ("self-designation", draft.score.self_designation_ok),
-            ("one matter", draft.score.topic_count <= 1),
-        ) if not ok)
+    failed_forms = _failed_forms(draft)
     advice_top = min(y, height - 7)
     reading_y = advice_top
     if height >= 30:
@@ -720,55 +1034,9 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             if reading_y >= height - 5:
                 break
 
-    if dictating:
-        style.footer(surface, [
-            style.FooterAction("arrows", "move stylus", command="Right"),
-            style.FooterAction("ctrl-z", "undo"),
-            style.FooterAction("ctrl-y", "redo"),
-        ], y=height - 3, x=2, width=width - 4)
-        style.footer(surface, [
-            style.FooterAction("ctrl-d", "keep matter"),
-            style.FooterAction("esc", "cancel changes"),
-        ], y=height - 2, x=2, width=width - 4)
-    else:
-        compact = width < 90
-        choice_label = "value" if block_focus == "terms" else "choice"
-        style.footer(surface, [
-            style.FooterAction("↑", "block", command="desk:block:previous"),
-            style.FooterAction("↓", "block", command="desk:block:next"),
-            style.FooterAction("←", choice_label,
-                               command="desk:choice:previous"),
-            style.FooterAction("→", choice_label,
-                               command="desk:choice:next"),
-            style.FooterAction("+", "add piece", command="desk:block:add"),
-            style.FooterAction("-", "take off",
-                               enabled=block_focus not in ("matter", "address"),
-                               command="desk:block:remove"),
-        ], y=height - 3, x=2, width=width - 4)
-        advisor_action = (
-            style.FooterAction(
-                "u", "restore" if compact else "restore my words",
-                command="desk:undo-correction")
-            if advisor_undo else
-            style.FooterAction(
-                "y", "correct" if compact else "Yabninu correct",
-                enabled=bool(matter.strip()) and not composing,
-                command="desk:correct"))
-        style.footer(surface, [
-            style.FooterAction(
-                "e", "write" if compact else "write this piece",
-                command="desk:edit"),
-            advisor_action,
-            style.FooterAction(
-                "Enter", "review · 2h" if compact else "review & seal · 2h",
-                enabled=(
-                    bool(matter.strip()) and not composing
-                    and bool(seal_id(recipient, blocks))
-                    and bool(seal_data.get("route"))),
-                command="desk:dispatch"),
-            style.FooterAction("esc", "keep"),
-            style.FooterAction("x", "discard", command="desk:discard"),
-        ], y=height - 2, x=2, width=width - 4)
+    _draw_footer(
+        surface, recipient, blocks, matter, dictating, composing,
+        advisor_undo, block_focus, laid, seal_data, width, height)
     return surface.interactive()
 
 

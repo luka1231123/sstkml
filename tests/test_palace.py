@@ -8,6 +8,8 @@ say what they are.
 """
 from __future__ import annotations
 
+import copy
+
 from belief.project import project
 from engine import actions as A
 from engine.tick import advance
@@ -61,7 +63,7 @@ def test_the_room_is_drawn_and_still_reads_as_plain_ascii() -> None:
     assert len(screen) == 36 and all(len(row) == 98 for row in screen)
     text = plain_text(pure_ascii(screen))
     assert all(ord(character) < 128 for character in text)
-    assert "THE PALACE" in text
+    assert "THE COURT" in text
 
 
 def test_the_figures_on_the_floor_are_the_rows_of_the_list() -> None:
@@ -91,8 +93,24 @@ def test_every_view_offers_every_order_its_context_claims() -> None:
     """The gap the ledgers' guard exists to catch, for this room too."""
     b = project(_world())
     for view, context in palace.CONTEXT_OF.items():
-        offered = {control.action_id
-                   for control in palace.controls_for(b, view, hours=8)}
+        beliefs = [b]
+        if view == "court":
+            heard = copy.deepcopy(b)
+            for petition in heard.get("justice", {}).get("petitions", []):
+                petition["heard"] = True
+            gate = copy.deepcopy(b)
+            gate["cohorts"] = [*gate.get("cohorts", []), {
+                "id": "test_gate", "status": "petitioning",
+                "people": 1, "origin": "place:test",
+            }]
+            beliefs.extend((heard, gate))
+        offered = {
+            control.action_id
+            for belief in beliefs
+            for row in palace.listing_rows(belief, view)
+            for control in palace.controls_for(
+                belief, view, chosen=row.id, hours=8)
+        }
         for descriptor in registry.in_context(context):
             assert descriptor.id in offered, (view, descriptor.id)
 
@@ -101,9 +119,13 @@ def test_every_control_the_room_offers_is_drawn_on_it() -> None:
     """A control listed and not printed is an order with no visible route."""
     b = project(_world())
     for view in palace.CONTEXT_OF:
-        screen = palace.compose(b, view=view, hours=8, width=98, height=36)
+        rows = palace.listing_rows(b, view)
+        chosen = rows[0].id if rows else ""
+        screen = palace.compose(
+            b, view=view, selected=chosen, hours=8, width=98, height=36)
         text = plain_text(screen)
-        for control in palace.controls_for(b, view, hours=8):
+        for control in palace.controls_for(
+                b, view, chosen=chosen, hours=8):
             assert f"[{control.key}]" in text, (view, control.key)
 
 
@@ -113,7 +135,7 @@ def test_a_man_must_be_heard_before_he_is_judged() -> None:
     game = _game()
     petition = project(game.world)["justice"]["petitions"][0]["id"]
     game.palace_state["view"] = "court"
-    game.palace_state["pick"]["court"] = petition
+    assert game.palace_pick("court") == petition
     game.on_palace_key(_Key("f"))
     assert not game.log
     assert game.notices["palace"].kind == registry.REFUSAL
@@ -122,6 +144,7 @@ def test_a_man_must_be_heard_before_he_is_judged() -> None:
     game.on_palace_key(_Key("h"))
     assert _kinds(game) == ["HearPetition"]
     game.on_palace_key(_Key("f"))
+    assert game.confirm_pending()
     assert _kinds(game) == ["HearPetition", "RulePetition"]
     assert game.log[-1]["action"]["verdict"] == "for"
     assert game.log[-1]["action"]["petition_id"] == petition
@@ -130,6 +153,7 @@ def test_a_man_must_be_heard_before_he_is_judged() -> None:
 def test_hearing_a_man_twice_is_refused_rather_than_charged() -> None:
     game = _game()
     petition = project(game.world)["justice"]["petitions"][0]["id"]
+    game.palace_state["view"] = "court"
     game.palace_state["pick"]["court"] = petition
     game.on_palace_key(_Key("h"))
     before = game.hours
@@ -187,6 +211,7 @@ def test_the_succession_can_be_settled_from_the_room() -> None:
     heir = next(p for p in palace._people(game.belief) if p.get("heir_rank"))
     game.palace_state["pick"]["house"] = heir["id"]
     game.on_palace_key(_Key("n"))
+    assert game.confirm_pending()
     assert _kinds(game) == ["NameHeir"]
 
 
@@ -197,6 +222,7 @@ def test_naming_a_man_who_cannot_inherit_says_the_engines_reason() -> None:
                    if not p.get("heir_rank"))
     game.palace_state["pick"]["house"] = brother["id"]
     game.on_palace_key(_Key("n"))
+    assert game.confirm_pending()
     assert not game.log
     assert "succession" in game.notices["palace"]
 
@@ -232,24 +258,36 @@ def test_marriage_from_the_house_opens_a_proposal_letter() -> None:
 def test_the_harbour_due_is_set_where_the_harbour_is() -> None:
     """The specification's complaint: it must not hide behind House brackets."""
     game = _game()
-    game.palace_state["view"] = "relations"
-    game.on_palace_key(_Key(">"))
+    game.trade_view = "dues"
+    before = game.belief["revenue"]["harbour_rate"]
+    game.on_trade_key(_Key(">"))
+    game.on_trade_key(_Key(keysym="Return"))
     assert _kinds(game) == ["SetHarbourDue"]
-    assert game.log[0]["action"]["rate"] == (
-        game.belief["revenue"]["harbour_rate"])
+    assert game.log[0]["action"]["rate"] == before + 25
 
 
 # --- moving about -------------------------------------------------------------
 
 def test_a_digit_chooses_a_view_and_the_views_keep_their_own_selection() -> None:
     game = _game()
-    game.on_palace_key(_Key("2"))
-    assert game.palace_state["view"] == "house"
-    game.palace_state["pick"]["house"] = palace._people(game.belief)[1]["id"]
     game.on_palace_key(_Key("3"))
-    assert game.palace_state["view"] == "relations"
-    game.on_palace_key(_Key("2"))
-    assert game.palace_pick("house") == palace._people(game.belief)[1]["id"]
+    assert game.palace_state["view"] == "household"
+    chosen = palace._people(game.belief)[1]["id"]
+    game.palace_state["pick"]["household"] = chosen
+    game.on_palace_key(_Key("4"))
+    assert game.palace_state["view"] == "audience"
+    game.on_palace_key(_Key("3"))
+    assert game.palace_pick("household") == chosen
+
+
+def test_a_stale_palace_pick_moves_to_the_row_the_room_shows() -> None:
+    game = _game()
+    game.palace_state["view"] = "household"
+    game.palace_state["pick"]["household"] = "person:no_longer_here"
+    first = palace.listing_rows(game.belief, "household")[0].id
+
+    assert game.palace_pick("household") == first
+    assert game.palace_state["pick"]["household"] == first
 
 
 def test_the_arrows_reach_every_person_not_only_the_ones_on_the_floor() -> None:

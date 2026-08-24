@@ -468,24 +468,42 @@ RECEPTIONS = (("t", "settle", "take them in"),
 
 def _court_controls(b: dict, chosen: str, hours: int) -> list[workbench.Control]:
     band = next((c for c in petitioners(b) if c["id"] == chosen), None)
-    controls = [workbench.affordable(workbench.Control(
-        "receive_cohort", key, label=label, enabled=band is not None,
-        why="nobody waits at the gate", command=f"receive:{decision}"), hours)
-        for key, decision, label in RECEPTIONS]
     if band is not None:
-        return controls
+        return [workbench.affordable(workbench.Control(
+            "receive_cohort", key, label=label,
+            command=f"receive:{decision}"), hours)
+            for key, decision, label in RECEPTIONS]
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
-    heard = bool(item and item["heard"])
-    controls += [workbench.affordable(workbench.Control(
+    if item is None:
+        return []
+    if not item["heard"]:
+        return [workbench.affordable(workbench.Control(
+            "hear_petition", registry.BY_ID["hear_petition"].mnemonic),
+            hours)]
+    # Hearing and ruling are consecutive steps, not a permanent seven-button
+    # toolbar. Once both sides have spoken, refugee controls and a disabled
+    # "Hear" only consume the rows needed to read their words.
+    return [workbench.Control(
+        "rule_petition", key, label=label,
+        command=f"verdict:{verdict}")
+        for key, verdict, label in VERDICTS]
+
+
+def _court_catalog(hours: int) -> list[workbench.Control]:
+    """All Court routes for the registry audit, outside a selected matter."""
+    controls = [workbench.affordable(workbench.Control(
+        "receive_cohort", key, label=label, enabled=False,
+        why="choose displaced people", command=f"receive:{decision}"), hours)
+        for key, decision, label in RECEPTIONS]
+    controls.append(workbench.Control(
         "hear_petition", registry.BY_ID["hear_petition"].mnemonic,
-        enabled=bool(item) and not heard,
-        why="already heard" if heard else "nobody waits"), hours)]
-    for key, verdict, label in VERDICTS:
-        controls.append(workbench.Control(
-            "rule_petition", key, label=label, enabled=heard,
-            why="hear him first" if item is not None else "nobody waits",
-            command=f"verdict:{verdict}"))
+        enabled=False, why="choose an unheard claim"))
+    controls.extend(
+        workbench.Control(
+            "rule_petition", key, label=label, enabled=False,
+            why="choose a heard claim", command=f"verdict:{verdict}")
+        for key, verdict, label in VERDICTS)
     return controls
 
 
@@ -700,17 +718,17 @@ def _relations_controls(b: dict, chosen: str, hours: int, amount: int,
 def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
                  choosing: str = "", person: str = "", amount: int = 0,
                  good: str = "copper") -> list[workbench.Control]:
-    """Every order this view offers, whether or not it can be given now.
+    """The current matter's controls, or every route when none is selected.
 
-    One list, read both by the screen that draws it and by the guard that
-    checks it against `registry.in_context`. A control's `command` is what
-    clicking it says, and for several of them that is not `do:<id>` -- four
-    verdicts are one action, and appointing begins by changing the list rather
-    than by giving an order -- so the action a control belongs to cannot be
-    recovered from the drawn screen, and the guard has to read this instead.
+    The no-selection catalog lets the registry guard audit every route. Once a
+    matter is selected the screen gets only its current step. A control's
+    `command` is what clicking it says, and for several of them that is not
+    `do:<id>` -- four verdicts are one action -- so the action cannot be
+    recovered from the drawn screen and the guard reads this declaration.
     """
     if view in {"court", "audience", "justice"}:
-        return _court_controls(b, chosen, hours)
+        return (_court_controls(b, chosen, hours) if chosen
+                else _court_catalog(hours))
     if view in {"house", "people", "household", "advisers"}:
         return _house_controls(b, person or chosen, hours, choosing)
     if view == "offices":
@@ -797,8 +815,13 @@ def compose(b: dict, view: str = "court", selected: str = "",
         detail = _post_detail(b, chosen)
     else:
         detail = _relations_detail(b, chosen, amount, good)
-    controls = controls_for(b, view, chosen, hours, choosing, person=who,
-                            amount=amount, good=good)
+    if view in {"court", "audience", "justice"}:
+        # A blank Court also has no toolbar. `controls_for` without a selected
+        # matter returns the full route catalog for the registry audit.
+        controls = _court_controls(b, chosen, hours)
+    else:
+        controls = controls_for(b, view, chosen, hours, choosing, person=who,
+                                amount=amount, good=good)
 
     band = scene_rows(height)
     queue = rows

@@ -1,3 +1,4 @@
+from tui import collection
 from tui import dues as due_text
 from tui import style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
@@ -22,7 +23,8 @@ def _lots(count: int) -> str:
 
 def compose(b: dict, width: int = 72, height: int = 24,
             notice: str = "", view: str = "exchange",
-            selected: str = "", due_draft: int | None = None
+            selected: str = "", due_draft: int | None = None,
+            scroll: int = 0,
             ) -> InteractiveScreen:
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="TRADE", drop=False)
@@ -63,12 +65,27 @@ def compose(b: dict, width: int = 72, height: int = 24,
         shown = rate if due_draft is None else due_draft
         rows = due_text.facts(
             b, "harbour", shown, draft=due_draft is not None)
+    source = {"cargo": trade.get("cargo", ()),
+              "movements": trade.get("movements", ()),
+              "routes": trade.get("routes", ())}.get(view, ())
+    ids = [str(item.get("id") or f"{view}:{index}")
+           for index, item in enumerate(source)]
+    if ids and selected not in ids:
+        selected = ids[0]
+    visible = list(enumerate(rows))
+    if view in {"cargo", "movements", "routes"}:
+        chosen = ids.index(selected) if selected in ids else -1
+        page = collection.page(
+            len(rows), max(0, height - 10), scroll, chosen)
+        visible = list(enumerate(
+            page.slice(rows), start=page.start))
+        if page.partial:
+            label = page.label()
+            surface.text(max(3, width - len(label) - 3), 4, label,
+                         C["dim"], C["ink"])
     if not rows:
         surface.text(3, y, "none reported", C["ash"], C["ink"])
-    for index, (name, value) in enumerate(rows[:max(0, height - 10)]):
-        source = {"cargo": trade.get("cargo", ()),
-                  "movements": trade.get("movements", ()),
-                  "routes": trade.get("routes", ())}.get(view, ())
+    for index, (name, value) in visible:
         ref = str(source[index].get("id") or f"{view}:{index}") if index < len(source) else ""
         surface.text(2, y, ">" if ref and ref == selected else " ", C["flame"], C["ink"])
         surface.text(3, y, str(name)[:max(8, width // 2 - 4)], C["clay"], C["ink"])
@@ -107,4 +124,4 @@ def compose(b: dict, width: int = 72, height: int = 24,
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions.append(style.FooterAction("Esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
-    return surface.interactive()
+    return surface.interactive(tuple(ids))
