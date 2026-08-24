@@ -11,7 +11,9 @@ assert the world actually changed.
 from __future__ import annotations
 
 from belief.project import project
+from engine import actions as A
 from engine import revenue
+from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
 from tui import ledgers, trade as trade_page, workbench
@@ -38,12 +40,12 @@ def _world(turns: int = 8):
     return world
 
 
-def _game():
+def _game(turns: int = 8, world=None):
     import play_gui
 
     game = play_gui.Game.__new__(play_gui.Game)
     game.seed = SEED
-    game.world = _world()
+    game.world = world if world is not None else _world(turns)
     game.hours = project(game.world)["attention"]
     game.log = []
     game.client = None
@@ -183,21 +185,23 @@ def test_the_roll_toggles_hands_in_and_out_of_the_fields() -> None:
 # --- the land -----------------------------------------------------------------
 
 def test_the_land_readies_a_corvee_and_drafts_the_due() -> None:
-    game = _game()
+    game = _game(13)
+    game.world, _ = apply(game.world, A.BeginBuild("walls", "seat"))
     state = game.ledger_state["land"]
     game.on_land_key(_Key("]"))
+    text = plain_text(game.compose_ledger(
+        "land", game.belief, 84, 29, ""))
+    assert "raise corvée 400d · unrest +16" in text
     game.on_land_key(_Key("c"))
-    assert not game.log
-    assert game.command_line == "levy "
-    assert state["amount"] == ledgers.STEPS["corvee"]
+    assert _kinds(game) == ["RaiseCorvee"]
+    assert state["amount"] == 0
 
     game.on_land_key(_Key(">"))
-    assert not game.log
     assert game.storehouse_view == "dues"
     assert game.ledger_state["dues"]["rates"]["land"] == (
         game.belief["land"]["land_due_rate"] + ledgers.STEPS["land_due"])
     game.on_storehouse_account_key(_Key(keysym="Return"))
-    assert _kinds(game) == ["SetLandDue"]
+    assert _kinds(game) == ["RaiseCorvee", "SetLandDue"]
 
 
 def test_due_steps_make_one_draft_and_one_policy_order() -> None:
@@ -339,6 +343,44 @@ def test_the_muster_can_ready_an_exact_cohort_levy() -> None:
     assert not game.log
     assert game.command_line == "levy "
     assert game.notices["muster"].kind == registry.PREVIEW
+
+
+def test_release_uses_only_the_selected_real_detachment() -> None:
+    world = _world()
+    world, _ = apply(world, A.LevyCohort(
+        "cohort:ugarit_field_hands", 10, "ma_hadu", 2))
+    world, _ = apply(world, A.LevyCohort(
+        "cohort:ugarit_smiths", 10, "ma_hadu", 2))
+    projected = project(world)["cohorts"]
+    detachments = [c["id"] for c in projected if c.get("parent")]
+    assert len(detachments) == 2
+    released_name = next(
+        c["name"] for c in projected if c["id"] == detachments[1])
+
+    game = _game(world=world)
+    game.muster_view = "detachments"
+    game.ledger_state["muster"]["pick"] = detachments[1]
+    game.on_muster_key(_Key("r"))
+
+    assert _kinds(game) == ["ReleaseCohort"]
+    assert game.log[0]["action"]["detachment_id"] == detachments[1]
+    assert released_name in str(game.notices["muster"])
+    remaining = [c["id"] for c in game.belief["cohorts"] if c.get("parent")]
+    assert remaining == [detachments[0]]
+    assert "command_line" not in game.__dict__
+
+
+def test_release_control_is_disabled_when_no_detachment_exists() -> None:
+    world = _world()
+    stale_cohort = next(
+        cohort["id"] for cohort in project(world)["cohorts"]
+        if not cohort.get("parent"))
+    screen = ledgers.muster(
+        project(world), selected=stale_cohort,
+        view="detachments", width=60, height=20, hours=6)
+    controls = [hit for hit in screen.hits
+                if hit.command == "do:release_cohort"]
+    assert controls and not any(hit.enabled for hit in controls)
 
 def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game = _game()

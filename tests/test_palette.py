@@ -48,7 +48,7 @@ def _example(descriptor: registry.ActionDescriptor, belief: dict,
 def test_every_action_in_the_registry_can_be_typed() -> None:
     belief = _belief()
     untypable = []
-    for descriptor in registry.DESCRIPTORS:
+    for descriptor in registry.player_descriptors():
         line = _example(descriptor, belief, descriptor.grammar[0])
         if line is None:
             continue                       # nothing of this kind exists to name
@@ -65,7 +65,7 @@ def test_every_action_in_the_registry_can_be_typed() -> None:
 
 def test_the_grammar_comes_from_the_registry_and_nowhere_else() -> None:
     """A reworded grammar line must not silently stop being parseable."""
-    known = {line for descriptor in registry.DESCRIPTORS
+    known = {line for descriptor in registry.player_descriptors()
              for line in descriptor.grammar}
     for text in palette.LITERAL_VALUES:
         assert text in known, text

@@ -190,6 +190,7 @@ class Game:
         self.desk_drafts: dict[str, dict] = {}
         self.works_pick = ""          # a work in hand, awaiting [x]
         self.works_plan_pick = ""     # a plan read before [Enter] commissions it
+        self.works_corvee_draft = 0    # days considered; one [c] raises them
         self.inbox_pick = ""
         self.inbox_filter = "all"
         self.inbox_scroll = 0
@@ -503,12 +504,13 @@ class Game:
         if cost is None:
             cost = registry.cost_of(action)
         target = self.active_window() if window is None else window
+        description = self._describe_order(action)
         if descriptor and descriptor.confirm and not confirmed:
             self.pending_action = (action, cost, target)
             unit = "hour" if cost == 1 else "hours"
             result = registry.ActionResult(
                 registry.PREVIEW, action_id,
-                f"{self._describe_order(action)} — {cost} {unit}. "
+                f"{description} — {cost} {unit}. "
                 "Enter confirms; Escape cancels.", cost, self.hours)
             self.notify(result.message, result.status, window=target)
             self.repaint()
@@ -534,7 +536,7 @@ class Game:
                 self.load_armed = False
                 result = registry.ActionResult(
                     registry.SUCCESS, action_id,
-                    "Entered: " + self._describe_order(action) + ".",
+                    "Entered: " + description + ".",
                     cost, self.hours)
         self.notify(result.message, result.status, window=target)
         self.repaint()
@@ -615,6 +617,7 @@ class Game:
         # Drafts and confirmations describe the world that was on screen, not
         # the one just loaded. None may leak forward from the abandoned state.
         self.__dict__.pop("_ledger_state", None)
+        self.works_corvee_draft = 0
         self.pending_action = None
         self.command_line = ""
         self.events = []
@@ -669,6 +672,10 @@ class Game:
                 "The unconfirmed draft lapsed when the fortnight ended."))
         self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
+        self.works_corvee_draft = 0
+        land_state = self.__dict__.get("_ledger_state", {}).get("land")
+        if land_state is not None:
+            land_state["amount"] = 0
         self.inbox_notice = ""
         self.alu_notice = ""
         self.plague_notice = ""
@@ -798,7 +805,8 @@ class Game:
                 b, self.works_pick, width, height, notice=notice,
                 scroll=self.scroll_of("works_scroll"),
                 plan_scroll=self.scroll_of("works_plan_scroll"),
-                selected_plan=getattr(self, "works_plan_pick", ""))
+                selected_plan=getattr(self, "works_plan_pick", ""),
+                corvee_draft=getattr(self, "works_corvee_draft", 0))
         if key == "palace":
             state = self.palace_state
             return palace.compose(
@@ -2583,12 +2591,39 @@ class Game:
 
     def on_land_key(self, event, window: str = "land") -> None:
         state = self.ledger_state["land"]
-        if self.ledger_key("land", event, ledger_page.STEPS["corvee"], window):
+        data = self.belief.get("land") or {}
+        if (event.char or "") in {"[", "]"}:
+            if not data.get("corvee_call_open", True):
+                state["amount"] = 0
+                away = data.get("corvee_call_opens_in", 0)
+                self.notify(
+                    f"new crews can be called in {away} fortnight"
+                    f"{'s' if away != 1 else ''}.",
+                    registry.REFUSAL, window=window)
+                self.repaint()
+                return
+            cap = max(0, data.get("corvee_max_days", 0)
+                      - data.get("corvee_days", 0))
+            remaining = min(cap, data.get("corvee_usable_days", cap))
+            if remaining <= 0:
+                state["amount"] = 0
+                message = ("commission a work before calling crews."
+                           if not self.belief.get("projects") else
+                           "enough crews are already called for this season.")
+                self.notify(message, registry.REFUSAL, window=window)
+                self.repaint()
+                return
+            step = ledger_page.STEPS["corvee"]
+            state["amount"] = min(
+                remaining, max(0, state["amount"] + (
+                    step if event.char == "]" else -step)))
+            self.repaint()
+            return
+        if self.ledger_key("land", event, 0, window):
             return
         char = event.char or ""
         command = getattr(event, "command", "")
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
-        data = self.belief.get("land") or {}
         rate = data.get("land_due_rate", 0)
         step = ledger_page.STEPS["land_due"]
         if char in {"<", ">"}:
@@ -2596,14 +2631,19 @@ class Game:
             self.storehouse_view = "dues"
             self.ledger_state["dues"]["pick"] = "land"
             self.repaint()
-        elif char.lower() == _key("levy_cohort") or wanted == "levy_cohort":
-            self.command_line = "levy "
-            if hasattr(self, "app"):
-                self.open_palette()
-            else:
-                self.notify("Command is ready: levy …", registry.PREVIEW,
-                            window=window)
+        elif char.lower() == _key("raise_corvee") or wanted == "raise_corvee":
+            if not data.get("corvee_call_open", True):
+                self.notify("new crews cannot be used in the coming fortnight.",
+                            registry.REFUSAL, window=window)
                 self.repaint()
+                return
+            if state["amount"] <= 0:
+                self.notify("choose corvée days with [ and ] first.",
+                            registry.REFUSAL, window=window)
+                self.repaint()
+                return
+            if self.do(A.RaiseCorvee(state["amount"]), window=window):
+                state["amount"] = 0
         elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
             estate = next(
                 (e for e in data.get("estates", [])
@@ -2691,8 +2731,16 @@ class Game:
                             window="muster")
                 self.repaint()
         elif view == "detachments" and (char == "r" or wanted == "release_cohort"):
-            self.command_line = "release "
-            self.open_palette()
+            detachment = next(
+                (item for item in b.get("cohorts", ())
+                 if item["id"] == state["pick"] and item.get("parent")), None)
+            if detachment is None:
+                self.notify("choose a detachment first.", registry.REFUSAL,
+                            window="muster")
+                self.repaint()
+                return
+            if self.do(A.ReleaseCohort(detachment["id"]), window="muster"):
+                state["pick"] = ""
         elif char == "t":
             tasks = ledger_page.TASKS
             state["task"] = tasks[
@@ -3024,7 +3072,30 @@ class Game:
             place = f" at {action.place}" if action.place else ""
             return f"{formation} will {action.task}{place}"
         if isinstance(action, A.RaiseCorvee):
-            return f"{action.days:,} days of corvée have been called"
+            from engine import works as works_engine
+
+            days = min(action.days, works_engine.useful_call_days(self.world))
+            return f"{days:,} days of corvée have been called"
+        if isinstance(action, A.FinanceTrade):
+            return f"{action.quantity:,} copper will finance counted grain"
+        if isinstance(action, A.RequisitionTrade):
+            from engine import trade_policy
+
+            lot = next((item for item in b.get("trade", {}).get("cargo", ())
+                        if item.get("id") == action.lot_id), None)
+            owner = (str(lot.get("owner_name", "the merchant cargo"))
+                     if lot else "the merchant cargo")
+            unrest = trade_policy.requisition_unrest(
+                self.world, action.good, action.quantity)
+            return (f"requisition {action.quantity:,} {action.good} from "
+                    f"{owner} · unrest +{unrest}")
+        if isinstance(action, A.ReleaseCohort):
+            detachment = next((
+                cohort for cohort in b.get("cohorts", ())
+                if cohort.get("id") == action.detachment_id), None)
+            name = (str(detachment.get("name", action.detachment_id))
+                    if detachment else action.detachment_id)
+            return f"{name} will return home"
         if isinstance(action, A.DredgeCanal):
             return f"{action.days:,} days will dredge the canal at {action.estate_id.replace('_', ' ')}"
         if isinstance(action, A.BeginBuild):
@@ -3453,6 +3524,11 @@ class Game:
         b = self.belief
         projects = b.get("projects") or []
         plans = b.get("plans") or []
+        remaining = works_page.corvee_remaining(b)
+        call_open = (b.get("land") or {}).get("corvee_call_open", True)
+        draft = min(max(0, getattr(self, "works_corvee_draft", 0)),
+                    remaining)
+        self.works_corvee_draft = draft
         width, height = self._size("works")
         out = collection.page(
             len(projects), works_page.project_room(height),
@@ -3461,6 +3537,35 @@ class Game:
             b, width, height,
             self.scroll_of("works_scroll"),
             self.scroll_of("works_plan_scroll"))
+
+        if char in {"[", "]"}:
+            if not call_open:
+                self.works_corvee_draft = 0
+                away = (b.get("land") or {}).get("corvee_call_opens_in", 0)
+                self.notify(
+                    f"new crews can be called in {away} fortnight"
+                    f"{'s' if away != 1 else ''}.",
+                    registry.REFUSAL, window="works")
+                self.repaint()
+                return
+            if remaining <= 0:
+                self.works_corvee_draft = 0
+                message = ("commission a work before calling crews."
+                           if not projects else
+                           "enough crews are already called for this season.")
+                self.notify(message, registry.REFUSAL, window="works")
+                self.repaint()
+                return
+            step = max(1, b.get("works_rate", ledger_page.STEPS["corvee"]))
+            self.works_corvee_draft = min(
+                remaining, max(0, draft + (step if char == "]" else -step)))
+            self.repaint()
+            return
+        if char == _key("raise_corvee") and draft:
+            if self.do(A.RaiseCorvee(draft), window="works"):
+                self.works_corvee_draft = 0
+                self.repaint()
+            return
 
         if event.keysym in self.STEPS:
             # Two lists in one window: the men out scroll, and shifted arrows
@@ -4273,12 +4378,22 @@ class Game:
             here = ids.index(picked) if picked in ids else 0
             self.open_focus(view.rstrip("s"), source[here])
             return
-        if view in {"exchange", "cargo"} and char in {"f", "r"}:
-            self.command_line = {"f": "finance ", "r": "requisition ",
-                                 }[char]
+        if view in {"exchange", "cargo"} and char == "f":
+            self.command_line = "finance "
             self.open_palette()
-        elif view in {"exchange", "cargo"} and char == "e":
-            self.do(A.ExemptTrade(), window="trade")
+        elif view == "cargo" and char == "r":
+            picked = getattr(self, "trade_pick", "")
+            item = next((item for item, ref in zip(source, ids)
+                         if ref == picked), None)
+            available = int((item or {}).get("available", 0))
+            if item is None or available <= 0:
+                self.notify("the selected cargo has nothing free to take.",
+                            registry.REFUSAL, window="trade")
+                self.repaint()
+                return
+            self.do(A.RequisitionTrade(
+                item["good"], available, str(item.get("id", ""))),
+                window="trade")
         elif view == "dues" and char in {"<", ">"}:
             self._draft_due("harbour", -25 if char == "<" else 25)
         elif view == "dues" and event.keysym == "Return":

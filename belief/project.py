@@ -507,6 +507,11 @@ def _land(world, perr: int) -> dict:
 
     hands = kernel.labour(seat)
     called = seat_door.corvee_days(world)
+    corvee_max = world.land_rules.get("corvee_max_days", 6000)
+    corvee_call_open, corvee_call_opens_in, _works_ticks = \
+        _corvee_call_window(world)
+    from engine import works as works_engine
+    useful_corvee = works_engine.useful_call_days(world)
     reading = transcribe(gauge(world), world.seed, now, f"gauge:{now}", perr)
     return {
         "estates": estates,
@@ -525,6 +530,13 @@ def _land(world, perr: int) -> dict:
         "standing": standing,
         "hands_to_the_fields": list(seat_door.at_harvest(world)),
         "corvee_days": called,
+        "corvee_max_days": corvee_max,
+        "corvee_unrest_per_1000_days": world.land_rules.get(
+            "corvee_unrest_per_1000_days", 40),
+        "corvee_call_open": corvee_call_open,
+        "corvee_call_opens_in": corvee_call_opens_in,
+        "corvee_usable_days": min(max(0, corvee_max - called),
+                                  useful_corvee),
         "works_days": court.works_days,
         "labour_days_this_turn": hands,
         "labour_days_needed": ask,
@@ -586,6 +598,28 @@ def _works_season(world) -> bool:
     from engine import works
 
     return works.working_season(world)
+
+
+def _corvee_call_window(world) -> tuple[bool, int, int]:
+    """Whether a levy can be used, next opening, and work ticks remaining."""
+    from engine.core import in_range
+
+    span = world.season.get(world.works_season)
+    if not span:
+        return True, 0, 1
+    ticks = 0
+    work_date = world.date.advance()
+    while ticks < 24 and in_range(work_date.fortnight, tuple(span)):
+        ticks += 1
+        work_date = work_date.advance()
+    if ticks:
+        return True, 0, ticks
+    probe = world.date
+    for away in range(1, 25):
+        probe = probe.advance()
+        if in_range(probe.advance().fortnight, tuple(span)):
+            return False, away, 0
+    return False, 0, 0
 
 
 def _projects(world) -> list[dict]:
@@ -1040,10 +1074,16 @@ def _trade(world, perr: int) -> dict:
     cargo = []
     for lot in world.kernel.book.at(seat):
         if lot.owner != controller and lot.quantity:
+            cohort = world.kernel.registry.cohorts.get(lot.owner)
+            org = world.kernel.registry.orgs.get(lot.owner)
+            fallback = lot.owner.split(":", 1)[-1].replace("_", " ")
             cargo.append({
                 "id": lot.id, "good": lot.good, "quantity": lot.quantity,
                 "reserved": lot.reserved, "available": lot.free,
                 "owner": lot.owner, "holder": lot.holder,
+                "owner_name": (
+                    (cohort.name or cohort.kind.replace("_", " "))
+                    if cohort else org.name if org else fallback),
                 "location": lot.location.split(":", 1)[-1],
                 "quality": lot.quality, "provenance": list(lot.provenance),
                 "source": "harbour cargo roll",

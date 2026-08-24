@@ -14,7 +14,9 @@ from tui.grid import cells, plain_text
 
 
 def test_every_action_in_the_registry_has_a_manual_entry():
-    assert manual.covered_actions() == {d.id for d in registry.DESCRIPTORS}
+    assert manual.covered_actions() == {
+        d.id for d in registry.player_descriptors()}
+    assert "action:exempt_trade" not in manual.BY_ID
 
 
 def test_every_action_entry_states_its_cost_and_its_command():
@@ -28,7 +30,7 @@ def test_every_action_entry_states_its_cost_and_its_command():
 
 def test_the_cost_in_help_is_the_cost_the_game_charges():
     """Help generated from the registry cannot quote a stale price."""
-    for descriptor in registry.DESCRIPTORS:
+    for descriptor in registry.player_descriptors():
         topic = manual.BY_ID[f"action:{descriptor.id}"]
         assert topic.cost == registry.cost_of(descriptor.action_type)
 

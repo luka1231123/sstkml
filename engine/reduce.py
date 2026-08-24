@@ -157,12 +157,20 @@ def apply(world: World, action) -> tuple[World, list]:
         return assign(world, action)
 
     if isinstance(action, A.RaiseCorvee):
+        from engine import works
+        if not works.calling_season(world):
+            raise ValueError(
+                "crews can only be called when work starts next fortnight")
+        if action.days <= 0:
+            raise ValueError("corvée days must be positive")
+        available = works.useful_call_days(world)
+        if available <= 0:
+            raise ValueError("no active work can use more crews this season")
+        if action.days > available:
+            raise ValueError(
+                f"only {available} useful corvée days can still be called")
+        days, sources, incremental = seat.source_corvee(world, action.days)
         rules = world.land_rules
-        cap = rules.get("corvee_max_days", 6000)
-        wanted = max(0, min(action.days, cap - seat.corvee_days(world)))
-        days, sources, incremental = seat.source_corvee(world, wanted)
-        if days <= 0:
-            raise ValueError("no field-labour days remain to levy this season")
         delta = days * rules.get("corvee_unrest_per_1000_days", 40) // 1000
         unrest = min(1000, world.court.unrest + delta)
         world = seat.levy(world, sources)

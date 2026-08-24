@@ -27,7 +27,7 @@ from tui.workbench import Control, Row, affordable, compose, detail_room
 
 # What `[` and `]` move by on each screen. Coarse enough to reach a useful
 # figure in a few presses, and never so fine that stepping is a chore.
-STEPS = {"roll": 50, "stores": 50, "corvee": 5, "dredge": 5,
+STEPS = {"roll": 50, "stores": 50, "corvee": 400, "dredge": 5,
          "land_due": 25, "expiate": 10}
 
 TASKS = ("garrison", "watch", "harvest", "campaign")
@@ -430,10 +430,13 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     chosen_group = next((g for g in hands if g["id"] == group), None)
 
     controls = []
-    if days > 0:
+    if days > 0 and data.get("corvee_call_open", True):
+        unrest_rate = data.get("corvee_unrest_per_1000_days", 0)
+        unrest = min(max(0, 1000 - b.get("unrest", 0)),
+                     days * unrest_rate // 1000)
         controls.append(affordable(Control(
-            "levy_cohort", key_for("levy_cohort"),
-            label=f"raise corvée {days}d"), hours))
+            "raise_corvee", key_for("raise_corvee"),
+            label=f"raise corvée {days}d · unrest +{unrest}"), hours))
     if estate is not None and estate.get("irrigated") and days > 0:
         controls.append(affordable(Control(
             "dredge_canal", key_for("dredge_canal"),
@@ -455,13 +458,20 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     def draw(surface, x, y, room, _rows):
         _year_band(surface, x + 2, y, room - 4, b)
 
+    corvee_note = (
+        "[ ] days" if data.get("corvee_call_open", True)
+        and data.get("corvee_usable_days", 0) > 0 else
+        "commission work before corvée" if not b.get("projects") else
+        f"corvée opens in {data.get('corvee_call_opens_in', 0)} fn"
+        if not data.get("corvee_call_open", True) else
+        "enough crews called")
     return compose(
         "THE STOREHOUSE — ESTATES AND HARVEST" if room else "THE LAND",
         ("estate", "hands"),
         (22, -6),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="this house holds no estates.",
-        note="Tab view   ↑↓ choose   [ ] days   [< >] due   [g] hands",
+        note=f"Tab view   ↑↓ choose   {corvee_note}   [< >] due   [g] hands",
         views=STOREHOUSE_VIEWS if room else (), view="land",
         scene=draw, scene_rows=band)
 
@@ -556,7 +566,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
 
     if view in {"cohorts", "detachments"}:
         cohorts = [c for c in b.get("cohorts", ())
-                   if (bool(c.get("parent") or c.get("task"))) == (view == "detachments")]
+                   if bool(c.get("parent")) == (view == "detachments")]
         rows = [Row(c["id"], ((c.get("name", c["id"]), "clay"),
                               (str(c.get("size", 0)), "dim"),
                               (_spoken(c.get("task", "at home")), "sand"),
@@ -596,7 +606,10 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
         controls.append(affordable(Control(
             "levy_cohort", key_for("levy_cohort"), label="write exact levy"), hours))
     elif view == "detachments":
-        controls.append(Control("release_cohort", "r", label="release detachment"))
+        controls.append(Control(
+            "release_cohort", "r", label="release detachment",
+            enabled=any(c["id"] == selected for c in cohorts),
+            why="no detachment is selected"))
     else:
         controls += [
             affordable(Control("assign_troops", key_for("assign_troops"),

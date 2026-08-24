@@ -5,7 +5,7 @@ conversation: correct, fast, compact, free, and never a model call. It answers
 "how do I assign troops?" and deliberately does not answer "should I?", which
 belongs to a named adviser who is allowed to be wrong.
 
-Topics come from two places and are joined here. `registry.DESCRIPTORS` knows
+Topics come from two places and are joined here. The live action registry knows
 the exact cost, the command grammar, the mnemonic, and which screens offer an
 action -- all of it generated rather than transcribed, so a new action arrives
 in Help the moment it arrives in the game. `content/help_commands.toml` carries
@@ -121,8 +121,9 @@ def _build() -> tuple[Topic, ...]:
     and concept entries -- the Hall, the Inbox, the terminal -- have no action
     behind them and are listed in their own right.
     """
-    topics = [_from_descriptor(d) for d in registry.DESCRIPTORS]
-    spoken_for = {d.help_topic for d in registry.DESCRIPTORS}
+    live = registry.player_descriptors()
+    topics = [_from_descriptor(d) for d in live]
+    spoken_for = {d.help_topic for d in live}
     topics += [_from_doc(doc) for doc in help_agent.DOCS
                if doc.id not in spoken_for]
     topics.sort(key=lambda topic: topic.title)

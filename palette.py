@@ -65,7 +65,7 @@ def _compile(descriptor: registry.ActionDescriptor) -> list[Form]:
 
 
 FORMS: tuple[Form, ...] = tuple(
-    form for descriptor in registry.DESCRIPTORS
+    form for descriptor in registry.player_descriptors()
     for form in _compile(descriptor))
 
 VERBS: tuple[str, ...] = tuple(dict.fromkeys(form.verb for form in FORMS))

@@ -57,6 +57,47 @@ def working_season(world: World) -> bool:
     return in_range(world.date.fortnight, tuple(span))
 
 
+def calling_season(world: World) -> bool:
+    """Whether days called now can reach at least one work fortnight.
+
+    Production resolves after the calendar advances.  The last harvest
+    fortnight also clears the old seasonal levy, so the useful order window
+    is the fortnight before low water through its penultimate fortnight.
+    """
+    span = world.season.get(world.works_season)
+    if not span:
+        return True
+    return in_range(world.date.advance().fortnight, tuple(span))
+
+
+def useful_call_days(world: World) -> int:
+    """New crew-days that active works can still spend before the reset."""
+    if not calling_season(world) or not world.court.projects:
+        return 0
+    span = world.season.get(world.works_season)
+    turns = 1
+    if span:
+        turns = 0
+        date = world.date.advance()
+        while turns < 24 and in_range(date.fortnight, tuple(span)):
+            turns += 1
+            date = date.advance()
+    rate = _rules(world).get("days_per_fortnight", 400)
+    spendable = sum(
+        min(max(0, project.days_needed - project.days_done), turns * rate)
+        for project in world.court.projects.values())
+    called = seat.corvee_days(world)
+    free = max(0, called - world.court.works_days)
+    cap = world.land_rules.get("corvee_max_days", 6000)
+    theoretical = min(max(0, cap - called), max(0, spendable - free))
+    # A date/project cap is only actionable if a non-revolting field cohort
+    # can still supply it. Keep every UI draft inside the same real source
+    # capacity the reducer will use.
+    available, _sources, _incremental = seat.source_corvee(
+        world, theoretical)
+    return available
+
+
 def repair_days(world: World, inst: Institution) -> int:
     """What it would take to make this whole, at today's condition.
 
@@ -138,7 +179,7 @@ def _afford(stores: dict, per_1000: dict[str, int], days: int) -> int:
 
 def status(world: World, project: Project) -> str:
     """The visible constraint that would stop the next day of work."""
-    if not working_season(world):
+    if not calling_season(world):
         return "waiting for low water"
     available = max(0, seat.corvee_days(world) - world.court.works_days)
     if available <= 0:
@@ -149,7 +190,7 @@ def status(world: World, project: Project) -> str:
         short = [good for good, qty in sorted(rates.items())
                  if qty > 0 and stores.get(good, 0) * 1000 < qty]
         return "short of " + ", ".join(short or ("crew supplies",))
-    return "able to move this fortnight"
+    return "able to move next fortnight"
 
 
 def _finish(world: World, project: Project) -> tuple[World, list]:

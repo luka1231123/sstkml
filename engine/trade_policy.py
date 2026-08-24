@@ -94,7 +94,15 @@ def _requisition(world, action: A.RequisitionTrade):
     seat = f"settlement:{world.chosen_alu}"
     crown = world.kernel.controller(seat)
     book = world.kernel.book
-    cargo = _available(book, seat, action.good, exclude=crown)
+    if action.lot_id:
+        lot = book.lots.get(action.lot_id)
+        here = {item.id for item in book.at(seat)}
+        if lot is None or lot.id not in here or lot.good != action.good \
+                or lot.owner == crown:
+            raise ValueError("that cargo lot is no longer at the quay")
+        cargo = (lot,)
+    else:
+        cargo = _available(book, seat, action.good, exclude=crown)
     available = sum(lot.free for lot in cargo)
     if available < action.quantity:
         raise ValueError(f"only {available} {action.good} is available")
@@ -107,10 +115,7 @@ def _requisition(world, action: A.RequisitionTrade):
         if not left:
             break
 
-    price = (carry.readings(world.kernel, seat)["price_grain"]
-             if action.good == farm.GRAIN else 1000)
-    value = action.quantity * price // 1000
-    unrest = max(5, min(200, value // 50))
+    unrest = requisition_unrest(world, action.good, action.quantity)
     court = dataclasses.replace(
         world.court, unrest=min(1000, world.court.unrest + unrest))
     actual = court.unrest - world.court.unrest
@@ -119,6 +124,16 @@ def _requisition(world, action: A.RequisitionTrade):
     if actual:
         events.append(A.UnrestChanged(actual, "the requisitioned cargo"))
     return dataclasses.replace(world, court=court, kernel=kernel), events
+
+
+def requisition_unrest(world, good: str, quantity: int) -> int:
+    """The exact public-order cost shown before a requisition is confirmed."""
+    seat = f"settlement:{world.chosen_alu}"
+    price = (carry.readings(world.kernel, seat)["price_grain"]
+             if good == farm.GRAIN else 1000)
+    value = max(0, quantity) * price // 1000
+    nominal = max(5, min(200, value // 50)) if quantity > 0 else 0
+    return min(max(0, 1000 - world.court.unrest), nominal)
 
 
 def apply(world, action):

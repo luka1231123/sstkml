@@ -131,6 +131,19 @@ def _draw_detail(surface: Surface, plan: dict, b: dict, x: int, y: int,
         y += 1
 
 
+def corvee_remaining(b: dict) -> int:
+    land = b.get("land") or {}
+    cap = max(0, land.get("corvee_max_days", 0)
+              - land.get("corvee_days", 0))
+    return min(cap, max(0, land.get("corvee_usable_days", cap)))
+
+
+def corvee_unrest(b: dict, days: int) -> int:
+    land = b.get("land") or {}
+    increase = days * land.get("corvee_unrest_per_1000_days", 0) // 1000
+    return min(max(0, 1000 - b.get("unrest", 0)), increase)
+
+
 def plan_page(b: dict, width: int, height: int, scroll: int = 0,
               plan_scroll: int = 0) -> collection.Page:
     """The plans whose numbered actions are genuinely visible.
@@ -153,7 +166,7 @@ def plan_page(b: dict, width: int, height: int, scroll: int = 0,
 def compose(b: dict, selected: str = "", width: int = 82,
             height: int = 32, notice: str = "",
             scroll: int = 0, plan_scroll: int = 0,
-            selected_plan: str = "") -> Screen:
+            selected_plan: str = "", corvee_draft: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE WORKS",
                 note="[esc] close", drop=False)
@@ -170,6 +183,10 @@ def compose(b: dict, selected: str = "", width: int = 82,
     land = b.get("land") or {}
     raised = land.get("corvee_days", 0)
     given = land.get("works_days", 0)
+    remaining = corvee_remaining(b)
+    call_open = land.get("corvee_call_open", True)
+    corvee_draft = min(max(0, corvee_draft), remaining)
+    draft_unrest = corvee_unrest(b, corvee_draft)
 
     style.bar(surface, 2, 3, width - 4, "  MEN OUT", fg=C["bone"],
               bg=C["faint"])
@@ -223,13 +240,40 @@ def compose(b: dict, selected: str = "", width: int = 82,
     # the player is actually spending and it is nowhere else in the game.
     style.rule(surface, 3, y, width - 6)
     surface.text(4, y + 1, "the corvée, this season", C["dim"], C["ink"])
-    surface.text(34, y + 1, f"{raised:,} days called up", C["clay"], C["ink"])
-    surface.text(34, y + 2, f"{given:,} given to the works", C["clay"], C["ink"])
-    surface.text(34, y + 3, f"{max(0, raised - given):,} unspent on the works",
-                 C["bone"], C["ink"])
-    season_note = ("low water: crews can work while the fields are idle"
-                   if b.get("works_season", True)
-                   else "work waits for low water")
+    surface.text(34, y + 1,
+                 f"{raised:,} called · {max(0, raised - given):,} free",
+                 C["clay"], C["ink"])
+    surface.text(4, y + 2, "given to the works", C["dim"], C["ink"])
+    surface.text(34, y + 2, f"{given:,} days", C["clay"], C["ink"])
+    if not call_open:
+        away = land.get("corvee_call_opens_in", 0)
+        opens = (f"opens in {away} fortnight{'s' if away != 1 else ''}"
+                 if away else "opens before low water")
+        surface.text(4, y + 3, "new crews cannot be called now",
+                     C["ash"], C["ink"])
+        surface.text(34, y + 3, opens, C["ash"], C["ink"])
+    elif corvee_draft:
+        surface.text(4, y + 3, f"draft {corvee_draft:,} more days",
+                     C["flame"], C["ink"])
+        surface.text(34, y + 3, f"unrest +{draft_unrest} · [c] levy",
+                     C["flame"], C["ink"])
+    elif remaining:
+        step = min(remaining, max(1, b.get("works_rate", 400)))
+        surface.text(4, y + 3, f"[ ] draft {step:,} more days",
+                     C["ash"], C["ink"])
+    else:
+        enough = ("commission a work before calling crews"
+                  if not projects else
+                  "enough crews are already called for this season")
+        surface.text(4, y + 3, enough, C["ash"], C["ink"])
+    season_note = (
+        "crews start next fortnight"
+        if call_open and not b.get("works_season", True) else
+        "low water closes; the next advance brings no work"
+        if b.get("works_season", True) and not call_open else
+        "low water: crews can work while the fields are idle"
+        if b.get("works_season", True) else
+        "work begins at low water")
     surface.text(4, y + 4, season_note, C["ash"], C["ink"])
     y += 5
 
@@ -282,9 +326,15 @@ def compose(b: dict, selected: str = "", width: int = 82,
     plan_action = (
         f"{plan_keys} inspect · [enter] commission" if plan_keys
         else "enlarge to see plans")
-    note = (" [x] call them off — what was spent stays spent"
-            if selected else
-            f" {plan_action}   [a-h] work in hand")
+    if corvee_draft:
+        note = (f" [ ] corvée {corvee_draft:,}d · unrest +{draft_unrest}"
+                " · [c] levy")
+    elif selected:
+        note = (" [x] call off" +
+                (" · [ ] draft corvée" if call_open and remaining else ""))
+    else:
+        note = (f" {plan_action}" +
+                (" · [ ] corvée" if call_open and remaining else ""))
     style.bar(surface, 2, height - 2, width - 4, note,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

@@ -227,6 +227,9 @@ class FinanceTrade:
 class RequisitionTrade:
     good: str
     quantity: int
+    # Direct Cargo orders name the counted lot the player selected. Empty is
+    # the compatibility form used by old logs and exact typed aggregate orders.
+    lot_id: str = ""
 
 
 @dataclasses.dataclass(frozen=True)

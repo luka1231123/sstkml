@@ -55,7 +55,8 @@ def compose(b: dict, width: int = 72, height: int = 24,
                 ("routes you know", f"{len(trade.get('routes', ()))} usable"),
                 ("cargo in hand", _lots(len(trade.get("cargo", ()))))]
     elif view == "cargo":
-        rows = [(c["good"], f"{c['quantity']:,}") for c in trade.get("cargo", ())]
+        rows = [(c["good"], f"{c.get('available', 0):,} available")
+                for c in trade.get("cargo", ())]
     elif view == "movements":
         rows = [(f"{m['origin']} > {m['destination']}",
                  f"{'cargo' if m.get('cargo') else 'news'} · due {m['arrives']}")
@@ -108,9 +109,13 @@ def compose(b: dict, width: int = 72, height: int = 24,
                 style.FooterAction("Enter", "open")]
     actions = []
     if view in {"exchange", "cargo"}:
-        actions += [style.FooterAction("f", "finance"),
-                    style.FooterAction("r", "requisition"),
-                    style.FooterAction("e", "exempt")]
+        actions.append(style.FooterAction("f", "finance"))
+        if view == "cargo":
+            cargo = next((item for item in trade.get("cargo", ())
+                          if str(item.get("id")) == selected), None)
+            actions.append(style.FooterAction(
+                "r", "requisition selected",
+                enabled=bool(cargo and cargo.get("available", 0))))
     elif view == "movements":
         actions += [style.FooterAction("g", "escort"),
                     style.FooterAction("c", "close route")]

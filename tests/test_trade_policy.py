@@ -1,15 +1,18 @@
 """Court trade orders return cargo and conserve the goods in the Book."""
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from belief.project import project
 from engine import actions as A
-from engine import seat, works
+from engine import seat, trade_policy, works
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
 import palette
+import registry
 from tui import trade
 from tui.grid import plain_text
 
@@ -77,6 +80,196 @@ def test_requisition_takes_the_visible_cargo_and_charges_unrest() -> None:
     assert events[0] == A.TradeRequisitioned("grain", 10_000)
     assert events[1] == A.UnrestChanged(
         world.court.unrest - unrest, "the requisitioned cargo")
+
+
+def _trade_world():
+    world = load_campaign("seat", SEED)
+    for _ in range(8):
+        world, _ = advance(world)
+    return world
+
+
+class _Key:
+    def __init__(self, char: str = "", keysym: str = "") -> None:
+        self.char = char
+        self.keysym = keysym or char
+        self.command = ""
+        self.state = 0
+
+
+def _game(world):
+    import play_gui
+
+    game = play_gui.Game.__new__(play_gui.Game)
+    game.world = world
+    game.hours = project(world)["attention"]
+    game.log = []
+    game.client = None
+    game.repaint = lambda: None
+    game.trade_view = "cargo"
+    game.trade_scroll = 0
+    return game
+
+
+def test_requisition_uses_the_selected_lot_without_retyping_it() -> None:
+    world = _trade_world()
+    cargo = [item for item in project(world)["trade"]["cargo"]
+             if item["good"] == "grain"]
+    first, selected = cargo[:2]
+    assert first["owner"] != selected["owner"]
+    before_first = world.kernel.book.lots[first["id"]]
+    before_grain = seat.held(world)["grain"]
+    expected_unrest = trade_policy.requisition_unrest(
+        world, selected["good"], selected["available"])
+    game = _game(world)
+    game.trade_pick = selected["id"]
+
+    game.on_trade_key(_Key("r"))
+
+    action, _cost, _window = game.pending_action
+    assert action == A.RequisitionTrade(
+        selected["good"], selected["available"], selected["id"])
+    preview = str(game.notices["trade"])
+    assert selected["owner_name"] in preview
+    assert f"unrest +{expected_unrest}" in preview
+    assert "Enter confirms" in preview
+    assert not game.log
+
+    game.confirm_pending()
+    assert game.log[-1]["action"]["lot_id"] == selected["id"]
+    assert game.world.kernel.book.lots[first["id"]] == before_first
+    assert seat.held(game.world)["grain"] == before_grain + selected["available"]
+    crown = game.world.kernel.controller("settlement:seat")
+    assert game.world.kernel.book.lots[selected["id"]].owner == crown
+
+
+def test_selected_lot_requisition_takes_only_its_free_quantity() -> None:
+    world = _trade_world()
+    selected = [item for item in project(world)["trade"]["cargo"]
+                if item["good"] == "grain"][1]
+    book = world.kernel.book.reserve(selected["id"], 100, "letter:test")
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, book=book))
+    item = next(c for c in project(world)["trade"]["cargo"]
+                if c["id"] == selected["id"])
+    before = seat.held(world)["grain"]
+
+    changed, _ = apply(world, A.RequisitionTrade(
+        item["good"], item["available"], item["id"]))
+
+    assert seat.held(changed)["grain"] == before + item["available"]
+    left = changed.kernel.book.lots[item["id"]]
+    assert left.quantity == left.reserved == 100
+
+
+def test_zero_free_cargo_disables_and_refuses_requisition() -> None:
+    world = _trade_world()
+    selected = project(world)["trade"]["cargo"][0]
+    book = world.kernel.book.reserve(
+        selected["id"], selected["available"], "letter:test")
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, book=book))
+    belief = project(world)
+    screen = trade.compose(
+        belief, width=66, height=22, view="cargo", selected=selected["id"])
+    controls = [hit for hit in screen.hits
+                if hit.command == "r"]
+    assert controls and not any(hit.enabled for hit in controls)
+    assert "0 available" in plain_text(screen)
+
+    game = _game(world)
+    game.trade_pick = selected["id"]
+    game.on_trade_key(_Key("r"))
+    assert game.notices["trade"].kind == "refusal"
+    assert not game.log and getattr(game, "pending_action", None) is None
+
+
+@pytest.mark.parametrize("lot_id, good", [
+    ("settlement:seat/999/lot/999", "grain"),
+    (None, "wrong-good"),
+])
+def test_stale_or_wrong_selected_lot_is_atomic(lot_id, good) -> None:
+    world = _trade_world()
+    if lot_id is None:
+        lot = next(item for item in project(world)["trade"]["cargo"]
+                   if item["good"] != good)
+        lot_id = lot["id"]
+    before = (world.kernel.book, world.court.unrest)
+    with pytest.raises(ValueError, match="no longer at the quay"):
+        apply(world, A.RequisitionTrade(good, 1, lot_id))
+    assert (world.kernel.book, world.court.unrest) == before
+
+
+def test_selected_lot_that_is_now_crown_owned_is_atomic() -> None:
+    world = _trade_world()
+    selected = project(world)["trade"]["cargo"][0]
+    seat_id = f"settlement:{world.chosen_alu}"
+    crown = world.kernel.controller(seat_id)
+    book = world.kernel.book.give(
+        selected["id"], selected["available"], crown, "seized", crown)
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, book=book))
+    before = (world.kernel.book, world.court.unrest)
+
+    with pytest.raises(ValueError, match="no longer at the quay"):
+        apply(world, A.RequisitionTrade(
+            selected["good"], selected["available"], selected["id"]))
+
+    assert (world.kernel.book, world.court.unrest) == before
+
+
+def test_selected_lot_that_has_left_the_quay_is_atomic() -> None:
+    world = _trade_world()
+    selected = project(world)["trade"]["cargo"][0]
+    book = world.kernel.book.relocate(
+        selected["id"], "settlement:ma_hadu", "carried")
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, book=book))
+    before = (world.kernel.book, world.court.unrest)
+
+    with pytest.raises(ValueError, match="no longer at the quay"):
+        apply(world, A.RequisitionTrade(
+            selected["good"], selected["available"], selected["id"]))
+
+    assert (world.kernel.book, world.court.unrest) == before
+
+
+def test_selected_lot_request_above_its_free_quantity_is_atomic() -> None:
+    world = _trade_world()
+    selected = project(world)["trade"]["cargo"][0]
+    book = world.kernel.book.reserve(selected["id"], 1, "letter:test")
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(world.kernel, book=book))
+    available = world.kernel.book.lots[selected["id"]].free
+    before = (world.kernel.book, world.court.unrest)
+
+    with pytest.raises(ValueError, match=rf"only {available} .* is available"):
+        apply(world, A.RequisitionTrade(
+            selected["good"], available + 1, selected["id"]))
+
+    assert (world.kernel.book, world.court.unrest) == before
+
+
+def test_old_trade_actions_still_decode_but_exempt_is_not_live() -> None:
+    requisition = A.from_dict({
+        "_t": "RequisitionTrade", "good": "grain", "quantity": 10,
+    })
+    exemption = A.from_dict({"_t": "ExemptTrade"})
+    assert requisition == A.RequisitionTrade("grain", 10, "")
+    assert exemption == A.ExemptTrade()
+
+    world = _trade_world()
+    before = seat.held(world)["grain"]
+    requisitioned, _ = apply(world, requisition)
+    assert seat.held(requisitioned)["grain"] == before + 10
+    exempted, _ = apply(world, exemption)
+    assert exempted.court.harbour_due_rate == 0
+
+    assert not registry.BY_ID["exempt_trade"].player_accessible
+    assert palette.parse("exempt trade", project(_trade_world())).status == "error"
+    text = plain_text(trade.compose(
+        project(_trade_world()), width=66, height=22))
+    assert "[e] exempt" not in text
 
 
 def test_remote_works_do_not_boost_the_capital_field_or_routes() -> None:

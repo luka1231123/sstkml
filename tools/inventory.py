@@ -214,6 +214,11 @@ def _workbench_gaps() -> list[str]:
         **belief,
         "land": {
             **land_data,
+            # Conditional controls need a useful order phase in this synthetic
+            # audit; the live projection keeps them hidden when calling crews
+            # would buy no work.
+            "corvee_call_open": True,
+            "corvee_usable_days": 400,
             "estates": (
                 [{**estates[0], "irrigated": True,
                   "canal_condition": 500}] + estates[1:]
