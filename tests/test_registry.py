@@ -28,7 +28,6 @@ REQUIRED_ATTENTION = {
     "set_land_due": 0, "set_harbour_due": 0, "place_person": 0,
     "dismiss_person": 0, "name_heir": 0, "begin_build": 1, "begin_repair": 1,
     "abandon_work": 1, "finance_trade": 1, "requisition_trade": 1,
-    "exempt_trade": 0, "levy_cohort": 1, "release_cohort": 0,
     "receive_cohort": 1,
 }
 

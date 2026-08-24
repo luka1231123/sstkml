@@ -323,7 +323,7 @@ def _divider(surface: Surface, x: int, y: int, width: int) -> None:
         surface.text(x + column, y, "◦", C["ash"], C["ink"])
 
 
-def table_room(height: int) -> int:
+def table_room(height: int, width: int = 96) -> int:
     """How many institutions the table can hold at this height.
 
     Public because the controller resolves a typed `[3]` against the same page
@@ -333,9 +333,22 @@ def table_room(height: int) -> int:
     # A reduced window is a four-house street: all four drawn buildings also
     # get a row and a number key. The full composition spends nine lines on the
     # Works précis, and can therefore grow its table one row at a time.
-    if height < COMPACT_HEIGHT:
-        return max(1, min(4, height - 20))
-    return max(1, min(9, (height - 9) - 20))
+    row_room = (
+        max(1, min(4, height - 20))
+        if height < COMPACT_HEIGHT else
+        max(1, min(DRAWN, (height - 9) - 20)))
+    skyline_room = max(1, min(DRAWN, (width - 5) // PITCH))
+    return min(row_room, skyline_room)
+
+
+def institution_page(institutions: list[dict], width: int, height: int,
+                     scroll: int = 0, selected: str = "") -> collection.Page:
+    """The one page shared by skyline, rows, cursor, and number keys."""
+    selected_index = next((
+        index for index, inst in enumerate(institutions)
+        if inst.get("id") == selected), -1)
+    return collection.page(
+        len(institutions), table_room(height, width), scroll, selected_index)
 
 
 def compose(b: dict, history: dict[str, list[int]] | None = None,
@@ -347,8 +360,6 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE ALU",
                 note="[esc] close", drop=False)
-    workbench.tabs(surface, 2, 2, width,
-                   tuple((name, name.title()) for name in VIEWS), view)
 
     institutions = b.get("institutions") or []
     history = history or {}
@@ -356,15 +367,18 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
 
     projects = b.get("projects") or []
-    under_work = frozenset(p["institution"] for p in projects if p["institution"])
+    under_work = frozenset(
+        p.get("institution") for p in projects if p.get("institution"))
 
     compact = height < COMPACT_HEIGHT
     ground = 12 if compact else 14
     sky(surface, b, width, horizon=ground - 3 if compact else ground - 6)
     lower_town(surface, width, base=ground - 4 if compact else ground - 7)
-    standing = collection.page(
-        len(institutions), table_room(height), scroll)
+    standing = institution_page(
+        institutions, width, height, scroll, selected)
     shown = standing.slice(institutions)
+    if shown and selected not in {inst.get("id") for inst in shown}:
+        selected = str(shown[0].get("id", ""))
     if institutions:
         skyline(surface, 3, ground, shown, width, under_work)
     else:
@@ -372,6 +386,12 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
                      "this court holds nothing that could fall down.",
                      C["ash"], C["ink"])
         surface.text(3, ground, "▒" * (width - 6), C["ash"], C["ink"])
+
+    # Sky and tall buildings may reach row 2. The tabs are navigation, so they
+    # take that row last and in full instead of being weathered with the city.
+    surface.fill(1, 2, width - 2, 1, " ", C["clay"], C["ink"])
+    workbench.tabs(surface, 2, 2, width,
+                   tuple((name, name.title()) for name in VIEWS), view)
 
     table = ground + 3
     if compact:
@@ -403,25 +423,25 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
             break
         # Vacant posts are marked with a word, never with a colour alone.
         vacancy = "" if inst["head"] else "no one minds it"
-        # The row carries the same number as the building above it. The
-        # skyline only has room for six; the table can show more, and every
-        # row it shows must be openable by the key printed on it.
-        surface.text(0, y, ">" if inst["id"] == selected else " ", C["flame"], C["ink"])
-        surface.text(1, y, str(number), C["flame"], C["ink"])
+        # The row carries the same number as the building above it. Both are
+        # slices of `standing`, so the key can never name different houses.
+        surface.text(1, y, ">" if inst["id"] == selected else " ",
+                     C["flame"], C["ink"])
+        surface.text(3, y, str(number), C["flame"], C["ink"])
         if compact:
-            surface.link(1, y, 20, 1, str(number))
-            surface.text(3, y, inst["name"][:18], C["clay"], C["ink"])
+            surface.link(1, y, width - 2, 1, str(number))
+            surface.text(5, y, inst["name"][:16], C["clay"], C["ink"])
             surface.text(22, y, DOES.get(inst["kind"], inst["kind"])[:13],
                          C["dim"], C["ink"])
         else:
-            surface.link(1, y, 24, 1, str(number))
-            surface.text(3, y, inst["name"][:22], C["clay"], C["ink"])
+            surface.link(1, y, width - 2, 1, str(number))
+            surface.text(5, y, inst["name"][:20], C["clay"], C["ink"])
             surface.text(27, y, DOES.get(inst["kind"], inst["kind"])[:16],
                          C["dim"], C["ink"])
 
         series = history.get(inst["id"]) or inst.get("history") or [
             inst["condition"]]
-        staff = vacancy or inst["group_name"] or "—"
+        staff = vacancy or inst.get("group_name") or "—"
         figure = str(inst["condition"])
         if compact:
             surface.text(37, y, sparkline(series, 8), C["sand"], C["ink"])
@@ -437,7 +457,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
                          C["bone"] if inst["inspected"] else C["dim"], C["ink"])
             surface.text(65, y, "!" if inst["inspected"] else " ",
                          C["barley"], C["ink"])
-            surface.text(67, y, staff[: width - 70],
+            surface.text(67, y, staff[:max(0, width - 70)],
                          C["blood"] if vacancy else C["dim"], C["ink"])
         y += 1
 

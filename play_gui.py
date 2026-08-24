@@ -743,6 +743,7 @@ class Game:
                         advisor_undo="advisor_origin" in self.desk,
                         term_builder=self.desk.get("term_builder"),
                         term_focus=self.desk.get("term_focus", "kind"),
+                        term_pick=self.desk.get("term_pick", 0),
                         block_order=self.desk.get("block_order"),
                         block_edits=self.desk.get("block_edits"),
                         bound=self._desk_bound(),
@@ -1390,6 +1391,9 @@ class Game:
             self.desk["block_edits"] = dict(saved.get("block_edits") or {})
             self.desk["matter"] = saved.get("matter", saved.get("buffer", ""))
             self.desk["terms"] = tuple(saved.get("terms", ()))
+            self.desk["term_pick"] = min(
+                max(0, int(saved.get("term_pick", 0))),
+                max(0, len(self.desk["terms"]) - 1))
             self.desk["term_builder"] = dict(
                 saved.get("term_builder")
                 or self._new_term_builder(target_place, preset_kind))
@@ -1419,6 +1423,7 @@ class Game:
                 "future": [],
                 "source_scroll": 0,
                 "terms": (),
+                "term_pick": 0,
                 "term_builder": builder,
                 "term_focus": "kind",
                 "blocks": composer.default_blocks(),
@@ -1749,9 +1754,20 @@ class Game:
                     registry.REFUSAL, window="stack")
                 return
             desk["terms"] = tuple(desk.get("terms", ())) + (term,)
+            desk["term_pick"] = len(desk["terms"]) - 1
             self.notify(
                 "The material term is impressed beneath the wording.",
                 registry.SUCCESS, window="stack")
+
+        def move_term(by: int) -> None:
+            terms = tuple(desk.get("terms", ()))
+            if not terms:
+                desk["term_pick"] = 0
+                return
+            picked = max(0, min(
+                int(desk.get("term_pick", 0)), len(terms) - 1))
+            desk["term_pick"] = (picked + by) % len(terms)
+            desk["block_focus"] = "terms"
 
         def remove_term() -> None:
             terms = tuple(desk.get("terms", ()))
@@ -1759,8 +1775,11 @@ class Game:
                 self.notify("No material term is impressed.",
                             registry.REFUSAL, window="stack")
                 return
-            desk["terms"] = terms[:-1]
-            self.notify("The last material term is smoothed away.",
+            picked = max(0, min(
+                int(desk.get("term_pick", 0)), len(terms) - 1))
+            desk["terms"] = terms[:picked] + terms[picked + 1:]
+            desk["term_pick"] = min(picked, max(0, len(terms) - 2))
+            self.notify(f"Material term {picked + 1} is smoothed away.",
                         registry.SUCCESS, window="stack")
 
         if desk["dictating"]:
@@ -1893,6 +1912,26 @@ class Game:
             move_term_value(1)
             self.repaint()
             return
+        if command == "desk:term:previous" or (
+                char == "p" and desk.get("block_focus") == "terms"):
+            move_term(-1)
+            self.repaint()
+            return
+        if command == "desk:term:next" or (
+                char == "n" and desk.get("block_focus") == "terms"):
+            move_term(1)
+            self.repaint()
+            return
+        if command == "desk:term:add" or (
+                char == "+" and desk.get("block_focus") == "terms"):
+            add_term()
+            self.repaint()
+            return
+        if command == "desk:term:remove" or (
+                char == "-" and desk.get("block_focus") == "terms"):
+            remove_term()
+            self.repaint()
+            return
         if command == "desk:block:add" or char == "+":
             add_block()
             self.repaint()
@@ -1910,11 +1949,17 @@ class Game:
             self.repaint()
             return
         if command == "desk:choice:previous" or event.keysym == "Left":
-            move_choice(-1)
+            if desk.get("block_focus") == "terms":
+                move_term_value(-1)
+            else:
+                move_choice(-1)
             self.repaint()
             return
         if command == "desk:choice:next" or event.keysym == "Right":
-            move_choice(1)
+            if desk.get("block_focus") == "terms":
+                move_term_value(1)
+            else:
+                move_choice(1)
             self.repaint()
             return
         if event.keysym == "Escape":
@@ -2278,8 +2323,6 @@ class Game:
         if key == "muster":
             return ledger_page.muster(b, task=state["task"],
                                       place=state["place"],
-                                      amount=state["amount"],
-                                      view=getattr(self, "muster_view", "formations"),
                                       **common)
         return ledger_page.oaths(b, amount=state["amount"], **common)
 
@@ -2644,20 +2687,6 @@ class Game:
                 return
             if self.do(A.RaiseCorvee(state["amount"]), window=window):
                 state["amount"] = 0
-        elif char.lower() == _key("dredge_canal") or wanted == "dredge_canal":
-            estate = next(
-                (e for e in data.get("estates", [])
-                 if e["id"] == state["pick"]), None)
-            if estate is None or not estate.get("irrigated") \
-                    or state["amount"] <= 0:
-                self.notify(
-                    "choose an estate with a canal, and days to spend on it.",
-                    registry.REFUSAL, window=window)
-                self.repaint()
-                return
-            if self.do(A.DredgeCanal(estate["id"], state["amount"]),
-                       window=window):
-                state["amount"] = 0
         elif char.lower() == "g":
             groups = [item["id"] for item in self.belief.get("groups", [])]
             if groups:
@@ -2689,59 +2718,21 @@ class Game:
         state = self.ledger_state["muster"]
         command = getattr(event, "command", "")
         char = (event.char or "").lower()
-        views = tuple(key for key, _label in ledger_page.MUSTER_VIEWS)
-        view = getattr(self, "muster_view", views[0])
-        if command.startswith("tab:"):
-            self.muster_view = command.split(":", 1)[1]
-            self.repaint()
-            return
-        if event.keysym in {"Tab", "ISO_Left_Tab"}:
-            step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
-            self.muster_view = views[(views.index(view) + step) % len(views)]
-            self.repaint()
-            return
-        if char.isdigit() and 1 <= int(char) <= len(views):
-            self.muster_view = views[int(char) - 1]
-            self.repaint()
-            return
-        if self.ledger_key(
-                "muster", event, ledger_page.STEPS["corvee"]):
+        if self.ledger_key("muster", event, 0):
             return
         wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         b = self.belief
         if event.keysym == "Return" and state["pick"]:
             item = next((item for item in b.get("troops", {}).get("formations", ())
                          if item["id"] == state["pick"]), None)
-            item = item or next((item for item in b.get("cohorts", ())
-                                 if item["id"] == state["pick"]), None)
             if item:
-                self.open_focus("formation" if "strength" in item else "cohort", item)
+                self.open_focus("formation", item)
             return
         formations = b.get("troops", {}).get("formations", [])
         formation = next(
             (f for f in formations if f["id"] == state["pick"]), None)
         places = [place["id"] for place in affordances.places(b)]
-        if view in {"cohorts", "draft"} and (
-                char == _key("levy_cohort") or wanted == "levy_cohort"):
-            self.command_line = "levy "
-            if hasattr(self, "app"):
-                self.open_palette()
-            else:
-                self.notify("Command is ready: levy …", registry.PREVIEW,
-                            window="muster")
-                self.repaint()
-        elif view == "detachments" and (char == "r" or wanted == "release_cohort"):
-            detachment = next(
-                (item for item in b.get("cohorts", ())
-                 if item["id"] == state["pick"] and item.get("parent")), None)
-            if detachment is None:
-                self.notify("choose a detachment first.", registry.REFUSAL,
-                            window="muster")
-                self.repaint()
-                return
-            if self.do(A.ReleaseCohort(detachment["id"]), window="muster"):
-                state["pick"] = ""
-        elif char == "t":
+        if char == "t":
             tasks = ledger_page.TASKS
             state["task"] = tasks[
                 (tasks.index(state["task"]) + 1) % len(tasks)]
@@ -2751,8 +2742,7 @@ class Game:
                 else -1
             state["place"] = places[(here + 1) % len(places)]
             self.repaint()
-        elif view == "formations" and (
-                char == _key("assign_troops") or wanted == "assign_troops"):
+        elif char == _key("assign_troops") or wanted == "assign_troops":
             if formation is None or not state["place"]:
                 self.notify(
                     "choose a formation, then a task and a place with [t]"
@@ -3089,15 +3079,6 @@ class Game:
                 self.world, action.good, action.quantity)
             return (f"requisition {action.quantity:,} {action.good} from "
                     f"{owner} · unrest +{unrest}")
-        if isinstance(action, A.ReleaseCohort):
-            detachment = next((
-                cohort for cohort in b.get("cohorts", ())
-                if cohort.get("id") == action.detachment_id), None)
-            name = (str(detachment.get("name", action.detachment_id))
-                    if detachment else action.detachment_id)
-            return f"{name} will return home"
-        if isinstance(action, A.DredgeCanal):
-            return f"{action.days:,} days will dredge the canal at {action.estate_id.replace('_', ' ')}"
         if isinstance(action, A.BeginBuild):
             return f"a {action.kind.replace('_', ' ')} has been put in hand"
         if isinstance(action, A.BeginRepair):
@@ -3655,6 +3636,8 @@ class Game:
         command = getattr(event, "command", "")
         if command.startswith("tab:"):
             self.alu_view = command.split(":", 1)[1]
+            self.alu_pick = ""
+            self.alu_scroll = 0
             self.repaint()
             return
         if command.startswith("alu:open:"):
@@ -3677,11 +3660,15 @@ class Game:
         if event.keysym in {"Tab", "ISO_Left_Tab"}:
             step = -1 if event.keysym == "ISO_Left_Tab" or getattr(event, "state", 0) & 1 else 1
             self.alu_view = views[(views.index(view) + step) % len(views)]
+            self.alu_pick = ""
+            self.alu_scroll = 0
             self.repaint()
             return
         if (view != "institutions" and char.isdigit()
                 and 1 <= int(char) <= len(views)):
             self.alu_view = views[int(char) - 1]
+            self.alu_pick = ""
+            self.alu_scroll = 0
             self.repaint()
             return
         if char.lower() == "n":
@@ -3736,7 +3723,17 @@ class Game:
             return
         if view != "institutions":
             return
-        institutions = self.belief.get("institutions", [])
+        institutions = list(self.belief.get("institutions", []))
+        ids = [item["id"] for item in institutions]
+        width, height = self._size("alu")
+        room = alu.table_room(height, width)
+        self.alu_scroll = max(0, min(
+            self.scroll_of("alu_scroll"), max(0, len(institutions) - room)))
+        page = alu.institution_page(
+            institutions, width, height, self.alu_scroll,
+            getattr(self, "alu_pick", ""))
+        if ids and getattr(self, "alu_pick", "") not in ids:
+            self.alu_pick = ids[page.start]
 
         def open_institution(inst):
             self.alu_pick = inst["id"]
@@ -3751,10 +3748,31 @@ class Game:
             self.repaint()
             window.focus()
 
-        if (event.keysym in {"Up", "Down"} or command == "alu:next") and institutions:
-            ids = [item["id"] for item in institutions]
-            here = ids.index(getattr(self, "alu_pick", "")) if getattr(self, "alu_pick", "") in ids else 0
-            self.alu_pick = ids[(here + (-1 if event.keysym == "Up" else 1)) % len(ids)]
+        if (event.keysym in {"Up", "Down"} or command == "alu:next") \
+                and institutions:
+            here = ids.index(self.alu_pick)
+            index = collection.step(
+                len(ids), here, -1 if event.keysym == "Up" else 1)
+            self.alu_pick = ids[index]
+            if index < self.alu_scroll:
+                self.alu_scroll = index
+            elif index >= self.alu_scroll + room:
+                self.alu_scroll = index - room + 1
+            self.repaint()
+            return
+        if event.keysym in {"Prior", "Next", "Home", "End"} and institutions:
+            here = ids.index(self.alu_pick)
+            if event.keysym == "Home":
+                index = 0
+            elif event.keysym == "End":
+                index = len(ids) - 1
+            else:
+                index = collection.step(
+                    len(ids), here,
+                    -room if event.keysym == "Prior" else room)
+            self.alu_pick = ids[index]
+            self.alu_scroll = max(
+                0, min(index, max(0, len(institutions) - room)))
             self.repaint()
             return
         if event.keysym == "Return" and institutions:
@@ -3762,18 +3780,11 @@ class Game:
                          if item["id"] == getattr(self, "alu_pick", "")), institutions[0])
             open_institution(inst)
             return
-        _width, height = self._size("alu")
-        room = alu.table_room(height)
-        if event.keysym in self.STEPS:
-            if self.scrolled("alu_scroll", len(institutions), room,
-                             self.STEPS[event.keysym]):
-                self.repaint()
-            return
         if char.isdigit() and char != "0":
             # The digit means the nth row *shown*, which after a scroll is not
             # the nth institution. The screen's own page resolves it.
-            page = collection.page(
-                len(institutions), room, self.scroll_of("alu_scroll"))
+            page = alu.institution_page(
+                institutions, width, height, self.alu_scroll, self.alu_pick)
             index = page.absolute(int(char))
             if index < 0:
                 return

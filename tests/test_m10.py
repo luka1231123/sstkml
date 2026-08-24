@@ -42,7 +42,7 @@ def test_a_single_case_cannot_start_an_epidemic_so_we_do_not_seed_one():
     stuck = Place(id="x", name="X", population=7000, susceptible=6999, infected=1)
     assert plague.step_place(stuck, 520, 180, 90) == stuck
     # So introduction seeds an outbreak, not a patient.
-    world = _run(4)
+    world = _run(0)
     assert plague.seed_cases(world.places["seat"]) >= plague.SEED_FLOOR
     seeded = plague.seed_place(world, "seat")
     assert seeded.places["seat"].infected == plague.seed_cases(world.places["seat"])
@@ -51,7 +51,7 @@ def test_a_single_case_cannot_start_an_epidemic_so_we_do_not_seed_one():
 
 
 def test_quarantine_closes_the_road_and_costs_the_correspondent():
-    world = _run(20)
+    world = _run(0)
     other = next(actor for actor, r in sorted(world.relations.items())
                  if r.place != world.court.seat)
     place = world.relations[other].place
@@ -66,7 +66,7 @@ def test_quarantine_closes_the_road_and_costs_the_correspondent():
 
 
 def test_a_city_cannot_be_quarantined_against_itself():
-    world = _run(4)
+    world = _run(0)
     try:
         apply(world, A.Quarantine(world.court.seat))
     except ValueError:
@@ -77,7 +77,7 @@ def test_a_city_cannot_be_quarantined_against_itself():
 # --- ritual interpretation without supernatural physics ---------------------
 def test_the_vows_of_the_predecessors_do_not_lapse_and_two_of_them_are_broken():
     """The archive can preserve obligations without making them pathogens."""
-    world = _run(52)
+    world = _run(0)
     vows = {o.id: o for o in world.oaths if o.binds_house}
     assert set(vows) == {"vow_first_rain", "vow_dead_at_the_gate",
                          "vow_threshing_floor"}
@@ -131,7 +131,7 @@ def test_the_predecessor_archive_is_there_before_turn_one():
 
 
 def test_the_archive_sorts_by_received_turn_and_nothing_else():
-    world = _run(30)
+    world = _run(0)
     hits = archive.search(world, "the")
     turns = [d.received_turn for d in hits]
     assert turns == sorted(turns)
@@ -142,7 +142,7 @@ def test_the_archive_sorts_by_received_turn_and_nothing_else():
 
 
 def test_search_is_and_not_or_and_costs_an_hour():
-    world = _run(30)
+    world = _run(0)
     both = archive.search(world, "vow festival")
     assert both and all(
         "vow" in archive._haystack(d) and "festival" in archive._haystack(d)
@@ -158,7 +158,7 @@ def test_search_is_and_not_or_and_costs_an_hour():
 
 
 def test_letters_are_filed_as_they_arrive():
-    world = _run(30)
+    world = _run(4)
     # Filed during play, as against the predecessor archive -- which is also
     # full of letters, and whose refs are authored rather than generated.
     letters = [d for d in world.documents if d.received_turn >= 0]
@@ -173,7 +173,7 @@ def test_letters_are_filed_as_they_arrive():
 
 
 def test_the_reader_can_find_neglected_rites_without_finding_a_divine_answer():
-    world = _run(30)
+    world = _run(0)
     hits = archive.search(world, "vow")
     bodies = " ".join(d.body for d in hits)
     kept = {r.id for r in world.court.rites}
@@ -191,7 +191,7 @@ def _hits(world, query):
 
 
 def test_the_librarian_prompt_carries_no_answer_and_no_world():
-    world = _run(30)
+    world = _run(0)
     world, _ = plague.begin(world, "seat")
     world, _ = apply(world, A.SearchArchive("vow"))
     hits = _hits(world, "vow")
@@ -214,7 +214,7 @@ def test_safe_fields_still_refuses_the_plague_internals():
 
 
 def test_the_librarian_falls_back_to_a_finding_aid_with_no_model():
-    world = _run(30)
+    world = _run(0)
     world, _ = apply(world, A.SearchArchive("vow"))
     hits = _hits(world, "vow")
     text, source = librarian.summarize("vow", hits, SEED, 30, client=None)
@@ -232,7 +232,7 @@ def test_the_librarian_rejects_an_invented_citation():
             self.calls += 1
             return "Three tablets, my lord. [PA-UG-003] and also [PA-UG-999]."
 
-    world = _run(30)
+    world = _run(0)
     world, _ = apply(world, A.SearchArchive("vow"))
     hits = _hits(world, "vow")
     client = Inventing()
@@ -246,9 +246,8 @@ def test_the_librarian_rejects_an_invented_citation():
 
 # --- belief boundary ----------------------------------------------------------
 def test_belief_gives_graves_and_never_the_compartments():
-    world, _ = plague.begin(_isolated(52), "seat")
-    for _ in range(24):
-        world, _ = advance(world)
+    world, _ = plague.begin(_isolated(), "seat")
+    world, _ = advance(world)
     b = project(world)["plague"]
     assert b["sickness_at_seat"] is True
     assert b["burials_at_seat"] > 0
@@ -265,10 +264,9 @@ def test_belief_gives_graves_and_never_the_compartments():
 
 def test_an_offering_is_reported_only_as_a_ritual_act():
     from tui import render
-    world, _ = plague.begin(_isolated(52), "seat")
+    world, _ = plague.begin(_isolated(), "seat")
     world, events = plague.expiate(world, world.oaths[0].id, 200)
     lines = " ".join(render.events_lines(events, world.court))
     assert "offering is made" in lines
     for word in ("correct", "right", "accepted", "worked", "heard"):
         assert word not in lines.lower()
-

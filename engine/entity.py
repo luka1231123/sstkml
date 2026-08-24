@@ -336,13 +336,9 @@ class Cohort:
     status: str = ""
     institution: EntityId = ""
     armed: bool = False
-    parent: EntityId = ""
     task: str = ""
     path: tuple[EntityId, ...] = ()
     arrives: int = -1
-    until: int = -1
-    ration_source: EntityId = ""
-    official: EntityId = ""
     infected: int = 0
     recovered: int = 0
     dead: int = 0

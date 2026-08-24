@@ -472,8 +472,6 @@ def _land(world, perr: int) -> dict:
             "id": site_id,
             "name": site.name or "the palace fields",
             "place": (site.settlement or seat).split(":")[-1],
-            "irrigated": False,
-            "canal_condition": None,
             # The crown's own field hands, head count (spec 6.4).
             "hands": field.people if field is not None else 0,
             "extent": F.extent(kernel, site_id),
@@ -1248,7 +1246,7 @@ def project(world) -> dict:
     cohorts = []
     for cohort in sorted(world.kernel.registry.cohorts.values(),
                          key=lambda item: item.id):
-        if cohort.settlement != seat_id and not cohort.parent:
+        if cohort.settlement != seat_id:
             continue
         cohorts.append({
             "id": cohort.id,
@@ -1266,16 +1264,12 @@ def project(world) -> dict:
             "institution": cohort.institution,
             "representative": cohort.representative,
             "armed": cohort.armed,
-            "parent": cohort.parent,
             "roll_id": cohort.roll_id,
             "roll_place": cohort.roll_place,
             "roll_function": cohort.roll_function,
             "task": cohort.task,
             "path": [part.split(":", 1)[-1] for part in cohort.path],
             "arrives": cohort.arrives if cohort.arrives >= 0 else None,
-            "until": cohort.until if cohort.until >= 0 else None,
-            "ration_source": cohort.ration_source,
-            "official": cohort.official,
             "labour_per_head": cohort.labour_per_head,
             "labour": cohort.labour(),
             "ration_per_head": cohort.ration_per_head,

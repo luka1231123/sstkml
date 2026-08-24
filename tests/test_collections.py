@@ -96,7 +96,7 @@ def _institutions(count: int) -> dict:
     return {"institutions": [
         {"id": f"i{n}", "name": f"house{n}", "kind": "granary", "head": "",
          "condition": 500, "inspected": False, "history": [500],
-         "staff": 0, "upkeep": 0}
+         "group_name": "", "staff": 0, "upkeep": 0}
         for n in range(count)], "projects": [], "revenue": {}, "date": "first"}
 
 
@@ -135,9 +135,12 @@ def test_the_house_shows_its_tenth_adult() -> None:
 def test_the_city_table_pages_rather_than_stopping() -> None:
     for count in SIZES:
         belief = _institutions(count)
-        assert plain_text(alu.compose(belief, height=36))
-    text = plain_text(alu.compose(_institutions(100), height=36, scroll=95))
+        assert plain_text(alu.compose(
+            belief, height=36, view="institutions"))
+    text = plain_text(alu.compose(
+        _institutions(100), height=36, scroll=95, view="institutions"))
     assert "house99" in text
+    assert "95–100 OF 100" in text
 
 
 def _works(projects: int, plans: int) -> dict:

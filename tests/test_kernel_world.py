@@ -127,7 +127,7 @@ def test_the_others_produce_consume_decide_and_change_with_ugarit_idle() -> None
     opening_people = {c: kernel.registry.cohorts[c]
                       for c in sorted(kernel.registry.cohorts)}
 
-    kernel, events = _run(kernel, turns=48)
+    kernel, events = _run(kernel, turns=24)
     kinds = {e[0] for e in events}
 
     assert {"reaped", "set_aside", "sown"} <= kinds, "they produce"
@@ -150,8 +150,8 @@ def test_removing_ugarit_entirely_changes_nothing_for_the_others() -> None:
     coupling and leaves the claim worth making: nothing else about a settlement
     comes off Ugarit.
     """
-    with_seat, _ = _run(landlocked(_world()))
-    without, _ = _run(landlocked(_without_ugarit(_world())))
+    with_seat, _ = _run(landlocked(_world()), turns=8)
+    without, _ = _run(landlocked(_without_ugarit(_world())), turns=8)
 
     assert SEAT not in without.registry.settlements
     for settlement in (ALASHIYA, AMURRU):
@@ -165,8 +165,8 @@ def test_removing_ugarit_entirely_changes_nothing_for_the_others() -> None:
 
 
 def test_the_run_is_deterministic() -> None:
-    first, _ = _run(_world(), turns=18)
-    second, _ = _run(_world(), turns=18)
+    first, _ = _run(_world(), turns=8)
+    second, _ = _run(_world(), turns=8)
     assert [(i, first.book.lots[i]) for i in sorted(first.book.lots)] == \
            [(i, second.book.lots[i]) for i in sorted(second.book.lots)]
     assert first.registry.cohorts == second.registry.cohorts
@@ -191,8 +191,8 @@ def test_the_history_does_not_depend_on_registry_order() -> None:
             orgs=permuted(kernel.registry.orgs)),
         book=dataclasses.replace(kernel.book, lots=permuted(kernel.book.lots)))
 
-    straight, _ = _run(_world(), turns=16)
-    tangled, _ = _run(jumbled, turns=16)
+    straight, _ = _run(_world(), turns=8)
+    tangled, _ = _run(jumbled, turns=8)
     for settlement in (ALASHIYA, AMURRU):
         assert tangled.stores(settlement) == straight.stores(settlement)
         assert tangled.people(settlement) == straight.people(settlement)

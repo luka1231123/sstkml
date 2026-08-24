@@ -35,9 +35,9 @@ EVENT_SUFFIXES = (
     "Succeeded", "Failed", "Abroad", "Assigned", "Received", "Smelted",
     "Worn", "Melted", "Met", "Decayed", "Consumed", "Begun", "Finished",
     "Abandoned", "Fled", "Sought", "Applied", "Violated", "Threshed",
-    "Sown", "Harvested", "Dredged", "Raised", "Spoiled", "Grumbling",
+    "Sown", "Harvested", "Raised", "Spoiled", "Grumbling",
     "Conceived", "Revolt", "Landed",
-    "Detached", "Returned", "Displaced", "Defended", "Fell", "Recovered",
+    "Displaced", "Defended", "Fell", "Recovered",
     "Financed", "Requisitioned",
 )
 
@@ -52,12 +52,6 @@ EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched",
                          # cost, no room, and no grammar, so a descriptor would
                          # put a phantom order in the palace.
                          "RecordReplyText"})
-
-# Intent that is deliberately not offered (C4): the canal is gone, and the
-# action survives only so the typed and voiced paths can be refused honestly
-# ("there is no canal to dredge") instead of never having heard of the verb.
-UNOFFERED = frozenset({"DredgeCanal"})
-
 
 def _player_action_types() -> list[type]:
     """Every dataclass in the action union that is player intent, not an event.
@@ -74,8 +68,6 @@ def _player_action_types() -> list[type]:
         if getattr(cls, "_registry_value", False):
             continue
         if name in EVENT_NAMES:
-            continue
-        if name in UNOFFERED:
             continue
         if any(name.endswith(suffix) for suffix in EVENT_SUFFIXES):
             continue
@@ -219,10 +211,7 @@ def _workbench_gaps() -> list[str]:
             # would buy no work.
             "corvee_call_open": True,
             "corvee_usable_days": 400,
-            "estates": (
-                [{**estates[0], "irrigated": True,
-                  "canal_condition": 500}] + estates[1:]
-                if estates else []),
+            "estates": estates,
         },
     }
     oaths = list(belief.get("oaths", []))
@@ -262,9 +251,8 @@ def _workbench_gaps() -> list[str]:
                 "registry says belongs to it")
     offered_muster = {
         hit.command.split(":", 1)[1]
-        for view, _label in ledgers.MUSTER_VIEWS
         for hit in ledgers.muster(
-            belief, hours=8, width=84, height=28, view=view).hits
+            belief, hours=8, width=84, height=28).hits
         if hit.command.startswith("do:")
     }
     for descriptor in registry.in_context("muster"):

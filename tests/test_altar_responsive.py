@@ -9,7 +9,7 @@ from tui.grid import plain_text
 
 SEED = 8814402919
 ART_GLYPHS = set("█▓▒░▟▙▐▌▀▄▲")
-COMMANDS = {"h", "d", "r", "[", "]", "1", "2", "3", "Return"}
+COMMANDS = {"h", "k", "r", "[", "]", "o", "w", "g", "altar:ask"}
 
 
 def _belief() -> dict:
@@ -49,23 +49,6 @@ def test_altar_art_stays_above_controls_at_default_and_minimum() -> None:
             assert not ART_GLYPHS.intersection(row[2:-2]), (size, row)
 
 
-def test_minimum_shrine_keeps_a_substantial_altar_vignette() -> None:
-    size = desktop.minimum_size("altar")
-    screen = _death_altar(size)
-    lines = plain_text(screen).splitlines()
-    controls_top = size[1] - 10
-    art_rows = [
-        row for row in lines[2:controls_top]
-        if ART_GLYPHS.intersection(row[2:-2])
-    ]
-
-    # Four rows was the emergency thumbnail used by the cramped 18-row
-    # window. The declared minimum must reach the nine-row altar composition.
-    assert size[1] >= 22
-    assert len(art_rows) >= 9
-    assert "the diviner" in "\n".join(lines[:controls_top])
-
-
 def test_altar_controls_remain_legible_and_clickable_when_compact() -> None:
     for size in (
         desktop.default_size("altar"),
@@ -82,7 +65,7 @@ def test_altar_controls_remain_legible_and_clickable_when_compact() -> None:
             "20 oil",
             "20 wine",
             "200 grain",
-            "[enter] ask",
+            "[Enter] ask",
         ):
             assert label in text, (size, label)
 

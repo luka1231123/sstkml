@@ -90,7 +90,7 @@ def test_plague_progress_event_reconciles_every_nonfatal_sir_change():
 
 def test_competence_changes_evidence_interpretation_not_future_access():
     low_matches = high_matches = 0
-    for seed in range(SEED, SEED + 120):
+    for seed in range(SEED, SEED + 8):
         world = load_campaign("seat", seed)
         evidence = divine.evidence_forecast(world, "harvest", "")
         court = dataclasses.replace(

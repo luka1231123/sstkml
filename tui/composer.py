@@ -319,6 +319,45 @@ def terms_summary(terms: tuple[object, ...] | list[object]) -> str:
     return "; ".join(term_summary(term) for term in terms)
 
 
+def selected_term_summary(terms: tuple[object, ...] | list[object],
+                          term_pick: int, *, compact: bool = False) -> str:
+    """Number and read the one impressed term currently under the stylus."""
+    if not terms:
+        return "none impressed"
+    picked = max(0, min(int(term_pick), len(terms) - 1))
+    term = terms[picked]
+    if not compact:
+        reading = term_summary(term)
+    else:
+        kind = str(_term_value(term, "kind", "term"))
+        label = {
+            "gift": "GIFT",
+            "request_good": "ASK",
+            "promise_good": "PROMISE",
+            "service": "SERVICE",
+            "marriage_proposal": "MARRIAGE",
+        }.get(kind, kind.replace("_", " ").upper())
+        parts = [label]
+        good = str(_term_value(term, "good"))
+        person = str(_term_value(term, "person_id"))
+        destination = str(_term_value(term, "destination"))
+        quantity = _term_value(term, "quantity", 0)
+        due = _term_value(term, "due_turn", 0)
+        if good:
+            parts.append(good.replace("_", " "))
+        if person:
+            parts.append(person.replace("_", " "))
+        if type(quantity) is int and quantity:
+            parts.append(f"×{quantity:,}")
+        if destination:
+            parts.append(">" + destination.replace("_", " "))
+        if type(due) is int and due:
+            parts.append(f"t{due}")
+        reading = " ".join(parts)
+    joiner = " " if compact else " · "
+    return f"{picked + 1}/{len(terms)}{joiner}{reading}"
+
+
 def seal_id(recipient: str, blocks: dict[str, int] | None) -> str:
     """Material seal corresponding to the visible Seal block choice."""
     selected = normalize_blocks(blocks, recipient)
@@ -410,20 +449,20 @@ def _draw_bound(surface: Surface, x: int, y: int, width: int, rows: int,
 
 def _draw_terms(surface: Surface, x: int, y: int, width: int,
                 terms: tuple[object, ...], builder: dict,
-                focused: bool, term_focus: str) -> int:
+                focused: bool, term_focus: str, term_pick: int) -> int:
     """Draw the structured marks separately from the king's prose."""
     surface.fill(x + 1, y, max(0, width - 2), 3,
                  " ", C["clay"], C["ink"])
     surface.text(x, y, ">" if focused else " ",
                  C["flame"] if focused else C["faint"], C["ink"])
     heading = f"TERMS · {len(terms)} IMPRESSED"
-    if terms:
-        heading += " · " + terms_summary(terms)
-    else:
-        heading += " · CANDIDATE BELOW"
     surface.text(x + 2, y, _short(heading, width - 2),
                  C["bone"], C["ink"])
     surface.link(x, y, width, 3, "block:terms")
+
+    selected = selected_term_summary(terms, term_pick)
+    surface.text(x + 3, y + 1, _short(selected, width - 4),
+                 C["gold"] if terms else C["ash"], C["ink"])
 
     column = x + 3
     limit = x + width - 1
@@ -452,29 +491,12 @@ def _draw_terms(surface: Surface, x: int, y: int, width: int,
         token = f"<{token}>" if field == term_focus else token
         if column + len(token) >= limit:
             break
-        surface.text(column, y + 1, token,
+        surface.text(column, y + 2, token,
                      C["gold"] if field == term_focus else C["clay"],
                      C["ink"])
-        surface.link(column, y + 1, len(token), 1,
+        surface.link(column, y + 2, len(token), 1,
                      f"desk:term:focus:{field}")
         column += len(token) + 2
-
-    controls = (
-        ("←", "", "desk:term:value:previous"),
-        ("→", "", "desk:term:value:next"),
-        ("t", "", "desk:term:field:next"),
-        ("+", "add", "desk:term:add"),
-        ("-", "remove", "desk:term:remove"),
-    )
-    column = x + 3
-    for key, label, command in controls:
-        needed = len(key) + len(label) + 3
-        if column + needed >= limit:
-            break
-        column += style.keycap(
-            surface, column, y + 2, key, label,
-            enabled=(bool(terms) if key == "-" else True),
-            command=command) + 1
     return y + 3
 
 
@@ -552,31 +574,12 @@ def _compact_reading(draft: Draft, intent: str, matter: str,
     return rows
 
 
-def _compact_term_controls(surface: Surface, x: int, y: int,
-                           width: int, has_terms: bool) -> None:
-    column = x + 2
-    limit = x + width
-    controls = (
-        ("←", "", "desk:term:value:previous", True),
-        ("→", "", "desk:term:value:next", True),
-        ("t", "field", "desk:term:field:next", True),
-        ("+", "add", "desk:term:add", True),
-        ("-", "del", "desk:term:remove", has_terms),
-    )
-    for key, label, command, enabled in controls:
-        needed = len(key) + len(label) + 3
-        if column + needed >= limit:
-            break
-        column += style.keycap(
-            surface, column, y, key, label,
-            enabled=enabled, command=command) + 1
-
-
 def _draw_compact_tablet(
         surface: Surface, right: int, width: int, height: int,
         draft: Draft, intent: str, matter: str,
         picked: dict[str, BlockChoice], laid: tuple[str, ...],
         terms: tuple[object, ...], term_builder: dict, term_focus: str,
+        term_pick: int,
         block_focus: str, bound: tuple[str, ...], seal_data: dict,
         composing: bool, advisor_undo: bool, dictating: bool,
         cursor: bool, cursor_index: int | None) -> None:
@@ -612,25 +615,7 @@ def _draw_compact_tablet(
                 f"{sentence_count(matter)} sentence"
                 f"{'' if sentence_count(matter) == 1 else 's'}")
         elif name == "terms":
-            if focused:
-                fields = term_fields(term_builder)
-                field = term_focus if term_focus in fields else fields[0]
-                raw = term_builder.get(field, "")
-                if field == "kind":
-                    raw = TERM_LABELS.get(str(raw), str(raw))
-                elif field == "due_turn":
-                    raw = "—" if not raw else f"t{raw}"
-                elif field == "quantity":
-                    raw = f"{int(raw or 0):,}"
-                else:
-                    raw = str(raw).replace("_", " ") or "—"
-                value = f"{len(terms)} set · {field}:{raw}"
-            else:
-                value = (
-                    terms_summary(terms) if terms
-                    else TERM_LABELS.get(
-                        str(term_builder.get("kind", TERM_KINDS[0])), "term")
-                        + " candidate")
+            value = selected_term_summary(terms, term_pick, compact=True)
         else:
             value = picked.get(name, BlockChoice("", "")).label
         line = f"{pointer} {label} · {value}"
@@ -677,7 +662,21 @@ def _draw_compact_tablet(
                     tone, C["ink"])
                 y += 1
         elif name == "terms" and term_controls:
-            _compact_term_controls(surface, right, y, width, bool(terms))
+            fields = term_fields(term_builder)
+            field = term_focus if term_focus in fields else fields[0]
+            raw = term_builder.get(field, "")
+            if field == "kind":
+                raw = TERM_LABELS.get(str(raw), str(raw))
+            elif field == "due_turn":
+                raw = "—" if not raw else f"t{raw}"
+            elif field == "quantity":
+                raw = f"{int(raw or 0):,}"
+            else:
+                raw = str(raw).replace("_", " ") or "—"
+            surface.text(
+                right + 3, y,
+                _short(f"CANDIDATE · {field}:{raw}", width - 4),
+                C["gold"], C["ink"])
             y += 1
         elif name == "seal" and seal_data:
             scribe = str(seal_data.get("scribe") or "unknown scribe")
@@ -718,6 +717,7 @@ def _draw_footer(surface: Surface, recipient: str,
                  blocks: dict[str, int] | None, matter: str,
                  dictating: bool, composing: bool, advisor_undo: bool,
                  block_focus: str, laid: tuple[str, ...], seal_data: dict,
+                 term_count: int,
                  width: int,
                  height: int) -> None:
     if dictating:
@@ -733,7 +733,40 @@ def _draw_footer(surface: Surface, recipient: str,
         return
 
     compact = width < 90
-    choice_label = "value" if block_focus == "terms" else "choice"
+    if block_focus == "terms":
+        style.footer(surface, [
+            style.FooterAction("↑", "block", command="desk:block:previous"),
+            style.FooterAction("↓", "block", command="desk:block:next"),
+            style.FooterAction("←", "value",
+                               command="desk:term:value:previous"),
+            style.FooterAction("→", "value",
+                               command="desk:term:value:next"),
+            style.FooterAction("t", "field",
+                               command="desk:term:field:next"),
+        ], y=height - 4, x=2, width=width - 4)
+        style.footer(surface, [
+            style.FooterAction("p", "previous term", enabled=term_count > 1,
+                               command="desk:term:previous"),
+            style.FooterAction("n", "next term", enabled=term_count > 1,
+                               command="desk:term:next"),
+            style.FooterAction("+", "impress", command="desk:term:add"),
+            style.FooterAction("-", "remove", enabled=bool(term_count),
+                               command="desk:term:remove"),
+        ], y=height - 3, x=2, width=width - 4)
+        style.footer(surface, [
+            style.FooterAction(
+                "Enter", "review · 2h" if compact else "review & seal · 2h",
+                enabled=(
+                    bool(matter.strip()) and not composing
+                    and bool(seal_id(recipient, blocks))
+                    and bool(seal_data.get("route"))),
+                command="desk:dispatch"),
+            style.FooterAction("esc", "keep"),
+            style.FooterAction("x", "discard", command="desk:discard"),
+        ], y=height - 2, x=2, width=width - 4)
+        return
+
+    choice_label = "choice"
     advisor_action = (
         style.FooterAction(
             "u", "restore" if compact else "restore my words",
@@ -798,6 +831,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             advisor_undo: bool = False,
             term_builder: dict | None = None,
             term_focus: str = "kind",
+            term_pick: int = 0,
             seal_data: dict | None = None,
             block_order=None,
             block_edits: dict[str, str] | None = None,
@@ -808,6 +842,8 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     laid = normalise_order(block_order or OPENING_BLOCKS, recipient)
     bound = tuple(bound)
     terms = tuple(terms)
+    term_pick = (
+        max(0, min(int(term_pick), len(terms) - 1)) if terms else 0)
     term_builder = dict(term_builder or {"kind": TERM_KINDS[0]})
     seal_data = dict(seal_data or {})
     if matter is None:
@@ -904,11 +940,13 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
         _draw_compact_tablet(
             surface, right, right_width, height,
             draft, intent, matter, picked, laid,
-            terms, term_builder, term_focus, block_focus, bound, seal_data,
+            terms, term_builder, term_focus, term_pick, block_focus, bound,
+            seal_data,
             composing, advisor_undo, dictating, cursor, cursor_index)
         _draw_footer(
             surface, recipient, blocks, matter, dictating, composing,
-            advisor_undo, block_focus, laid, seal_data, width, height)
+            advisor_undo, block_focus, laid, seal_data, len(terms), width,
+            height)
         return surface.interactive()
 
     y = 4
@@ -963,7 +1001,8 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             continue
         if name == "terms":
             y = _draw_terms(surface, right, y, right_width, terms,
-                            term_builder, block_focus == name, term_focus)
+                            term_builder, block_focus == name, term_focus,
+                            term_pick)
             continue
         y = _draw_block(
             surface, right, y, right_width, BLOCK_LABELS.get(name, name),
@@ -1036,7 +1075,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
 
     _draw_footer(
         surface, recipient, blocks, matter, dictating, composing,
-        advisor_undo, block_focus, laid, seal_data, width, height)
+        advisor_undo, block_focus, laid, seal_data, len(terms), width, height)
     return surface.interactive()
 
 

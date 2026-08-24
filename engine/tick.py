@@ -109,12 +109,9 @@ def _arrivals(world: World) -> tuple[World, list]:
     from engine import displacement, house, justice, mail, relations, revenue, troops
 
     events: list = []
-    world = seat.arrive_detachments(world)
     if not world.baseline:
         world, arrived = displacement.arrivals(world)
         events += arrived
-    world, returned = seat.return_due(world)
-    events += returned
     world, fired = drain_schedule(world)
     world, fired = relations.resolve_scheduled(world, fired)
     world, fired = justice.resolve_scheduled(world, fired)

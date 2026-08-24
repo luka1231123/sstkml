@@ -30,7 +30,6 @@ HARVEST_COST = 1
 CORVEE_COST = 1
 WORKS_COST = 1
 ASSIGN_COST = 1
-DREDGE_COST = 1
 OMEN_COST = 2
 SWEAR_COST = 2
 SEARCH_COST = 1       # spec 6.17: one hour per query, and it is a real hour
@@ -63,7 +62,6 @@ HELP = """  commands (a leading ':' is optional)
     corvee <days>            levy labour outside the lists; costs unrest (1 hour)
     assign <formation> <task> [place]
                              garrison | watch | harvest | campaign   (1 hour)
-    dredge <estate> <days>   restore a canal, at low water only   (1 hour)
     build <kind> [place]     put something up; it eats corvee and grain (1 hour)
     repair <institution>     make a thing whole; cheaper than building (1 hour)
     abandon <work>           call the men off; what they ate is gone (1 hour)
@@ -483,20 +481,6 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
                     screen = "house"
                 except ValueError as ex:
                     print(f"  {ex}")
-            elif verb == "dredge" and len(args) == 2:
-                if left < DREDGE_COST:
-                    print("  no hour remains for the canal.")
-                else:
-                    try:
-                        evs = commit(A.DredgeCanal(args[0], int(args[1])))
-                        spent += DREDGE_COST
-                        done = next(
-                            (e for e in evs if isinstance(e, A.CanalDredged)), None)
-                        if done:
-                            print(f"  the channel is cleared; it stands at "
-                                  f"{done.condition}.")
-                    except ValueError as ex:
-                        print(f"  {ex}")
             elif verb == "omen" and args:
                 if left < OMEN_COST:
                     print(f"  the liver takes {OMEN_COST} hours to read.")

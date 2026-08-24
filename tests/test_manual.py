@@ -16,7 +16,6 @@ from tui.grid import cells, plain_text
 def test_every_action_in_the_registry_has_a_manual_entry():
     assert manual.covered_actions() == {
         d.id for d in registry.player_descriptors()}
-    assert "action:exempt_trade" not in manual.BY_ID
 
 
 def test_every_action_entry_states_its_cost_and_its_command():

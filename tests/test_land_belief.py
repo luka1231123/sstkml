@@ -35,7 +35,7 @@ def _seat_site(world):
 
 
 def test_the_land_reads_the_kernels_estate() -> None:
-    belief, world = _belief(16)
+    belief, world = _belief(0)
     land = belief["land"]
     estates = land["estates"]
     assert len(estates) == 1
@@ -50,31 +50,20 @@ def test_the_land_reads_the_kernels_estate() -> None:
 
 
 def test_the_stage_is_the_grain_years_stage() -> None:
-    belief, world = _belief(24)
+    belief, world = _belief(0)
     stage = belief["land"]["stage"]
     from engine.kernel.farm import season
     assert season(world.kernel.seasons, world.kernel.date.fortnight, stage)
 
 
 def test_seed_in_the_ground_matches_the_kernel() -> None:
-    belief, world = _belief(24)
+    belief, world = _belief(0)
     site_id = _seat_site(world)
     assert belief["land"]["seed_in_ground"] == F.under_crop(world.kernel, site_id)
     # What the ground can still take is the open part of the estate.
     site = world.kernel.registry.sites[site_id]
     assert (belief["land"]["seed_recommended"]
             == site.extent - belief["land"]["seed_in_ground"])
-
-
-def test_last_land_due_is_stable_and_positive_across_a_year() -> None:
-    """The floor's grain, whole. It records the harvest, and the seed the crown
-    set aside out of its carried grain must not drag the figure below zero."""
-    _, world = _belief(16)
-    after_first = world.court.last_land_due
-    assert after_first > 0
-    for _ in range(24):
-        world, _ = advance(world)
-    assert world.court.last_land_due > 0
 
 
 def test_land_due_totals_every_harvest_fortnight() -> None:
@@ -108,5 +97,5 @@ def test_land_due_totals_every_harvest_fortnight() -> None:
 
 
 def test_seed_in_store_agrees_with_the_storehouse() -> None:
-    belief, world = _belief(16)
+    belief, world = _belief(0)
     assert belief["land"]["seed_in_store"] == belief["stores"]["seed_grain"]

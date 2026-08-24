@@ -414,8 +414,6 @@ def land_screen(b: dict) -> str:
     lines.append("")
     for estate in land["estates"]:
         note = f"   hands {estate['hands'] // 10}%"
-        if estate["irrigated"]:
-            note += f"; canal at {estate['canal_condition']}"
         lines.append(f"    {estate['name']:<44}{note}")
     lines.append("\n  order hands to the fields with:  harvest <group>")
     return "\n".join(lines)

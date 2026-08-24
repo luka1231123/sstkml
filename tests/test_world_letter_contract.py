@@ -51,16 +51,6 @@ def test_dispatch_round_trips_nested_terms_through_json() -> None:
     assert encoded["terms"][0]["_t"] == "LetterTerm"
 
 
-def test_legacy_flat_action_still_decodes_with_defaults() -> None:
-    old = A.from_dict({
-        "_t": "DictateReply",
-        "letter_id": "L1",
-        "intent": "warn",
-    })
-    assert old == A.DictateReply("L1", "warn")
-    assert A.from_dict(json.loads(json.dumps(A.to_dict(old)))) == old
-
-
 def test_letter_term_rejects_structurally_invalid_values() -> None:
     invalid = [
         lambda: A.LetterTerm("unknown"),

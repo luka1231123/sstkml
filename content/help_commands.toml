@@ -65,7 +65,7 @@ id = "reports"
 category = "interface"
 title = "Kingdom reports"
 syntax = "[t] Storehouse [m] Muster [y] Alu [w] World; [Tab] changes each room's view"
-answer = "Storehouse owns stores, Roll, Land, and dues. Muster owns formations, cohorts, detachments, and exact levy orders. Alu owns cohorts, institutions, sites, and works. Trade owns cargo, movements, routes, and commercial orders. World owns places, routes, journeys, news, disease, and displacement. Court owns justice, household, offices, relations, and counsel. Shrine owns rites, divination, and oaths. Escape closes any room."
+answer = "Storehouse owns stores, Roll, Land, and dues. Muster owns formations and military orders. Alu owns cohorts, institutions, sites, and works. Trade owns cargo, movements, routes, and commercial orders. World owns places, routes, journeys, news, disease, and displacement. Court owns justice, household, offices, relations, and counsel. Shrine owns rites, divination, and oaths. Escape closes any room."
 examples = ["Where do I see arrears?", "Where are my troops shown?"]
 keywords = ["report", "stores", "roll", "land", "muster", "oaths", "alu", "city", "world", "relations", "sickness", "plague", "quarantine", "arrears", "grain", "troops", "institution"]
 keys = []
@@ -235,17 +235,6 @@ examples = ["raise a corvee of 400 days"]
 keywords = ["corvee", "levy", "labour", "days", "workers", "hands", "unrest"]
 keys = []
 verbs = ["RAISE_CORVEE"]
-
-[[command]]
-id = "dredge"
-category = "orders"
-title = "Dredge an estate canal"
-syntax = "dredge <estate> <days>"
-answer = "Tell Counsel the estate and labour days to put on its canal. Dredging costs one hour and useful work happens at low water."
-examples = ["dredge ashiranu 800 days", "Clear the canal at Ashiranu with 800 days."]
-keywords = ["dredge", "canal", "estate", "water", "irrigation", "days", "clear"]
-keys = []
-verbs = ["DREDGE_CANAL"]
 
 [[command]]
 id = "build"

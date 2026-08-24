@@ -37,10 +37,9 @@ def test_plain_text_carries_no_escape_codes() -> None:
 def test_the_hall_names_a_person_and_a_number_in_plain_text() -> None:
     """Colour never carries meaning alone (spec 9.6), so both survive here."""
     text = screens.show(hall.compose(_belief(), 92, 30))
-    assert "WAITING ON YOU" in text
-    assert "courier" in text
+    assert "AMMURAPI OF UGARIT" in text
     assert "granary" in text
-    assert "hours" in text
+    assert "10 of 10 hours remain" in text
 
 
 def test_every_named_screen_renders() -> None:

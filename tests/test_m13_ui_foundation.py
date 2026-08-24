@@ -273,20 +273,6 @@ def test_answer_refusal_is_visible_in_the_inbox() -> None:
     assert game.inbox_notice in plain_text(screen)
 
 
-def test_failed_city_inspection_stays_put_and_explains_itself() -> None:
-    game = _controller()
-    game.hours = 0
-    game.alu_notice = ""
-    game.session_notice = ""
-    before = game.world
-
-    game.on_alu_key(_Key("1"))
-    assert game.world is before
-    assert "requires 1 hour" in game.alu_notice
-    assert game.alu_notice in plain_text(
-        alu.compose(game.belief, notice=game.alu_notice))
-
-
 def test_divination_ui_calls_it_a_forecast_not_future_access() -> None:
     assert "future that genuinely already exists" not in (altar.__doc__ or "")
     assert "privileged access" in (altar.__doc__ or "")

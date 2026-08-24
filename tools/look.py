@@ -34,7 +34,7 @@ from load import load_campaign                        # noqa: E402
 DOMAINS = {
     "farm": ("sown", "reaped", "threshed", "set_aside", "shared_out",
              "unreaped", "withered", "spoiled", "mined", "Harvested",
-             "Threshed", "Spoiled", "CanalDredged"),
+             "Threshed", "Spoiled"),
     "food": ("hungry", "ate_the_seed", "consumed", "AllocationSet",
              "RationPaid", "Grumbling"),
     "people": ("born", "died", "CohortDisplaced", "CohortReceived",

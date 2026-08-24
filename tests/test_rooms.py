@@ -171,7 +171,8 @@ def test_the_digest_carries_the_house_and_not_the_answers() -> None:
 
 def test_the_room_says_what_a_question_costs() -> None:
     text = plain_text(counsel.compose(_belief(), [], 6))
-    assert "an hour a question" in text
+    assert "questions cost 1h" in text
+    assert "[enter] tell him" in text
 
 
 # --- the map ------------------------------------------------------------------

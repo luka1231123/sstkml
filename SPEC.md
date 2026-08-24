@@ -302,9 +302,7 @@ not raw dictionaries or aliases for another view:
 4. **Trade** — Exchange, Cargo, Routes, Movements, Dues, and letter-backed
    foreign orders.
 5. **Storehouse** — Stores, Labour, Land, Reserves, Dues, and exact accounts.
-6. **Muster** — formations, detachments, escorts, missions, and the same exact
-   parsed order as corvee: who, number, destination, duration, purpose,
-   rations, and official.
+6. **Muster** — formations, assignments, commanders, and summons.
 7. **Court** — People, Offices, Household, Audience, Justice, and Advisers.
 8. **Shrine** — Rites, Offerings, Oaths, and Obligations.
 9. **World** — Places, Routes, Journeys, Courts, News, Disease, and

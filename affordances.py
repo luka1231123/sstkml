@@ -19,7 +19,6 @@ LEDGERS = ("granary", "seed")
 VERDICTS = ("for", "against", "split", "defer")
 QUESTIONS = ("harvest", "sickness", "war", "voyage", "death")
 RECEPTIONS = ("accept", "settle", "redirect", "refuse")
-CORVEE_TASKS = ("work", "dredge", "build", "repair", "harvest", "escort")
 
 
 def normal(value: str) -> str:
@@ -88,11 +87,7 @@ def groups(belief: dict) -> list[dict]:
 
 
 def cohorts(belief: dict) -> list[dict]:
-    return [row for row in belief.get("cohorts", []) if not row.get("parent")]
-
-
-def detachments(belief: dict) -> list[dict]:
-    return [row for row in belief.get("cohorts", []) if row.get("parent")]
+    return list(belief.get("cohorts", []))
 
 
 def displaced(belief: dict) -> list[dict]:
@@ -186,7 +181,6 @@ def _closed(values) -> list[dict]:
 DOMAINS = {
     "group": groups,
     "cohort": cohorts,
-    "detachment": detachments,
     "displaced": displaced,
     "formation": formations,
     "institution": institutions,
@@ -207,7 +201,6 @@ DOMAINS = {
     "verdict": lambda b: _closed(VERDICTS),
     "question": lambda b: _closed(QUESTIONS),
     "reception": lambda b: _closed(RECEPTIONS),
-    "corvee_task": lambda b: _closed(CORVEE_TASKS),
 }
 
 

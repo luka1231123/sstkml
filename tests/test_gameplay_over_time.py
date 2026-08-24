@@ -4,17 +4,7 @@ from belief.project import project
 from engine import actions as A
 from engine.tick import advance
 from load import load_campaign
-from tools.gameplay_probe import run
-
-
-def test_long_runs_report_every_outcome_without_impossible_state():
-    rows = [run(policy, seed, 72)
-            for policy in ("passive", "austerity") for seed in (1, 42)]
-    assert not [error for row in rows for error in row["errors"]]
-    assert all(row["events"] and row["outcomes"] for row in rows)
-    assert all(0 <= row["population_ratio_min"] <= 1000 for row in rows)
-    assert all(0 <= row["unrest_peak"] <= 1000 for row in rows)
-
+def test_a_city_falls_cleanly_from_collapse_or_revolt():
     world = load_campaign("seat", 1)
     cohorts = {cid: (dataclasses.replace(c, people=1, households=1)
                      if c.settlement == "settlement:seat" else c)

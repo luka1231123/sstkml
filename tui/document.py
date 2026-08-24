@@ -406,10 +406,7 @@ def land(b: dict, width: int = 70, height: int = 24) -> Screen:
         (0, "", "clay"),
     ]
     for estate in data["estates"]:
-        canal = estate.get("canal_condition")
-        water = (f"canal {canal}" if estate["irrigated"] and canal is not None
-                 else "rain-fed")
-        state = f"{water}; hands {estate['hands'] // 10}%"
+        state = f"hands {estate['hands'] // 10}%"
         # No area and no yield: Belief does not carry them, because a king who
         # wants to know what a field gave has to ask the man who worked it.
         name = _trunc(estate["name"], 30).ljust(31)

@@ -72,7 +72,7 @@ def _settle(cohorts: dict, cohort, **fields):
     """
     settled = dataclasses.replace(cohort, status="household", **fields)
     for other in sorted(cohorts.values(), key=lambda c: c.id):
-        if other.id == settled.id or other.parent:
+        if other.id == settled.id:
             continue
         try:
             joined = SP.merge((other, settled), into=other.id)
@@ -104,8 +104,8 @@ def step(world: World) -> tuple[World, list]:
         if cohort.status == "distressed" and cohort.hunger < 3:
             _settle(cohorts, cohort)
             continue
-        if cohort.parent or cohort.status in {
-                "distressed", "travelling", "travelling_displaced",
+        if cohort.status in {
+                "distressed", "travelling_displaced",
                 "travelling_raider", "petitioning", "attacker", "displaced",
                 "guest", "raider", "defeated"}:
             continue
@@ -127,7 +127,7 @@ def step(world: World) -> tuple[World, list]:
             world, party, destination,
             "travelling_raider" if hostile else "travelling_displaced")
         party = dataclasses.replace(
-            party, parent="", armed=hostile,
+            party, armed=hostile,
             status=party.status, origin=cohort.origin or cohort.settlement)
         cohorts[parent.id] = parent
         cohorts[party.id] = party

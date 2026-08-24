@@ -180,8 +180,7 @@ supervisor, start date, and projected completion under the current allocation.
 - Land shows every estate and field: extent, capacity, planted area, crop
   stage, seed in ground, standing crop, grain harvested, labour need, labour
   assigned, due base, rate, last due, and known weather gauge.
-- Reserves and Dues must be real datasets, not alternative summaries of Stores
-  and Land.
+- Dues must be a real dataset, not an alternative summary of Stores and Land.
 
 ### 5.6 Muster
 
@@ -190,11 +189,9 @@ replacement need, task, place, commander, linked cohort, ration source,
 mission, and losses. If readiness is only an armourer's estimate, show a range
 and the report; do not omit it.
 
-Every levy, detachment, escort, and mission shows the same complete order:
-cohort, number, destination, route, start, duration, purpose, rations,
-official, authority, current status, and result. Summons also show oath,
-caller, required strength, already committed strength, due date, travel time,
-and shortfall.
+Every formation order shows its destination, task, authority, status, and
+result. Summons also show oath, caller, required strength, already committed
+strength, due date, travel time, and shortfall.
 
 ### 5.7 Court
 

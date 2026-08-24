@@ -72,9 +72,8 @@ class ActionDescriptor:
     examples: tuple[str, ...] = ()
     confirm: bool = False
     batch: bool = False
-    # Old save logs may contain actions which no longer belong to the live
-    # interface. Keep their descriptor for decoding/cost compatibility while
-    # excluding them from contexts, controls, and typed player affordances.
+    # Some orders belong to workflows rather than the typed palette. Excluding
+    # one here hides its descriptor from live controls and typed affordances.
     player_accessible: bool = True
 
 
@@ -167,17 +166,6 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
      _d("raise_corvee", A.RaiseCorvee, "Raise corvée", "Corvée",
         ("land", "works"), ("raise corvee <days>",), 1,
         (Field("days", "quantity"),), mnemonic="c", help_topic="corvee"),
-     _d("levy_cohort", A.LevyCohort, "Levy cohort", "Levy",
-        ("muster",),
-        ("levy <heads> from <cohort> to <destination> for <duration> on <task> rationed by <ration_source> under <official>",), 1,
-        (Field("cohort", "cohort"), Field("heads", "quantity"),
-         Field("destination", "place"), Field("duration", "quantity"),
-         Field("task", "corvee_task"), Field("ration_source", "institution"),
-         Field("official", "person")),
-        mnemonic="c", help_topic="corvee", confirm=True),
-     _d("release_cohort", A.ReleaseCohort, "Release detachment", "Release",
-        ("muster",), ("release <detachment>",), 0,
-        (Field("detachment", "detachment"),), help_topic="corvee"),
      _d("receive_cohort", A.ReceiveCohort, "Answer displaced cohort", "Answer",
         ("alu", "justice"), ("<decision> <cohort> [to <place>]",), 1,
         (Field("cohort", "displaced"), Field("decision", "reception"),
@@ -194,10 +182,6 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         (Field("amount", "quantity", argument="quantity"),
          Field("good", "good", argument="good")),
         mnemonic="r", help_topic="trade", confirm=True),
-     _d("exempt_trade", A.ExemptTrade, "Exempt trade from dues", "Exempt",
-        ("trade",), ("exempt trade",), 0,
-        mnemonic="e", help_topic="trade", confirm=True,
-        player_accessible=False),
      _d("marry_abroad", A.MarryAbroad, "Marry abroad", "Marry",
        ("house", "relations"), ("marry <person> to <court>",), 2,
        (Field("person", "person"), Field("court", "actor")),

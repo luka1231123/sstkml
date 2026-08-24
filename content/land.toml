@@ -10,11 +10,6 @@ labour_days_per_head = 12
 # Corvee: raised by the crown outside the dependent lists, paid for in unrest.
 corvee_unrest_per_1000_days = 40
 corvee_max_days = 6000
-# Canal condition decays every turn and is restored only by dredging in the
-# authored low_water window.
-canal_decay_per_turn = 60
-canal_dredge_per_1000_days = 90
-
 [metal]
 # The bronze chain (spec 6.5). 9:1 copper to tin by weight; the *10 keeps the
 # arithmetic in shekels of finished bronze.

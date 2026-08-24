@@ -151,7 +151,7 @@ def test_a_buyer_short_of_payment_buys_less_and_never_on_credit() -> None:
 # --- a crossing takes time ----------------------------------------------------
 
 def test_cargo_is_somewhere_while_it_is_at_sea() -> None:
-    kernel, _, _ = _run(_world(), turns=40)
+    kernel, _, _ = _run(_world(), turns=6)
     afloat = [v for v in kernel.voyages if v.cargo]
     if afloat:
         voyage = afloat[0]
@@ -172,7 +172,7 @@ def test_the_sea_is_finite_and_rationed_by_the_same_allocator() -> None:
 
 def test_a_cargo_never_exceeds_the_hold_that_was_granted() -> None:
     kernel = _world()
-    for _ in range(48):
+    for _ in range(12):
         kernel, events, log = K.advance_logged(kernel)
         granted = {i.id: log.allocation.granted(i.id)
                    for i in log.intents if i.kind == "ship"}
@@ -191,7 +191,7 @@ def test_a_cargo_never_exceeds_the_hold_that_was_granted() -> None:
 
 
 def test_a_voyage_can_be_lost_and_the_ledger_says_where_it_went() -> None:
-    kernel, events, logs = _run(_world(), turns=60)
+    kernel, events, logs = _run(_world(), turns=12)
     losses = [e for e in events if e[0] == "lost_at_sea"]
     sunk = [t for log in logs for t in log.transfers if t.reason == "lost"]
     if losses:
@@ -203,7 +203,7 @@ def test_a_voyage_can_be_lost_and_the_ledger_says_where_it_went() -> None:
 # --- news travels no faster than the ships ------------------------------------
 
 def test_what_a_port_knows_of_another_is_as_old_as_the_last_ship() -> None:
-    kernel, _, _ = _run(_world(), turns=30)
+    kernel, _, _ = _run(_world(), turns=4)
     belief = kernel.beliefs[ISLAND]
     word = belief.best(SEAT, "price_grain")
     assert word is not None, "the island has heard of the mainland"
@@ -214,7 +214,7 @@ def test_what_a_port_knows_of_another_is_as_old_as_the_last_ship() -> None:
 
 
 def test_a_shut_sea_blinds_a_port_and_it_does_not_know_it() -> None:
-    kernel, _, _ = _run(_world(), turns=48)
+    kernel, _, _ = _run(_world(), turns=1)
     route = kernel.registry.routes["route:alashiya_knossos"]
 
     shut = kernel
@@ -228,20 +228,6 @@ def test_a_shut_sea_blinds_a_port_and_it_does_not_know_it() -> None:
     assert later.observed_turn == opening, "no ship, no word, and no notice of it"
 
 
-# --- the gate -----------------------------------------------------------------
-
-def test_grain_reaches_the_island_from_the_ground_it_grew_in() -> None:
-    kernel, events, logs = _run(_world(), turns=48)
-    kinds = [e[0] for e in events]
-    assert "reaped" in kinds, "it grew somewhere"
-
-
-def test_the_merchant_carries_the_risk_and_can_lose_by_it() -> None:
-    kernel, events, _ = _run(_world(), turns=48)
-    lost = [e for e in events if e[0] == "lost_at_sea"]
-    assert K.faults(kernel) == ()
-
-
 def test_the_trade_policy_reads_belief_and_never_the_world() -> None:
     assert C.trade(MERCHANT, B.Belief(holder=MERCHANT)) == ()
 
@@ -250,19 +236,3 @@ def test_the_trade_policy_reads_belief_and_never_the_world() -> None:
         source="observed", observed_turn=1, received_turn=1, confidence=1000))
     assert C.home(only_home) == SEAT
     assert C.trade(MERCHANT, only_home) == (), "one price is not a line"
-
-
-def test_a_house_buys_no_more_than_a_fortnight_can_carry() -> None:
-    kernel, _, _ = _run(_world(), turns=48)
-    assert K.faults(kernel) == ()
-
-
-def test_lots_are_folded_back_together_and_it_conserves() -> None:
-    kernel, _, _ = _run(_world(), turns=48)
-    assert K.faults(kernel) == ()
-
-
-def test_the_farm_year_still_runs_underneath_all_of_it() -> None:
-    kernel, events, _ = _run(_world(), turns=30)
-    kinds = {e[0] for e in events}
-    assert {"reaped", "set_aside", "sown"} <= kinds

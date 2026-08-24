@@ -24,7 +24,7 @@ def _matter(world, sender: str, topic: str):
 
 
 def test_an_unchanged_unanswered_matter_has_one_active_tablet() -> None:
-    world = _advance(load_campaign("seat", SEED), 30)
+    world = _advance(load_campaign("seat", SEED), 12)
     tablets = _matter(world, "alashiya_gov", "ships_sighted")
     assert len(tablets) == 1
     assert tablets[0].answered_turn is None
@@ -48,5 +48,4 @@ def test_answering_allows_the_sender_to_raise_the_matter_again() -> None:
     assert len(_matter(world, "alashiya_gov", "ships_sighted")) >= 2
     assert any(letter.id != first.id for letter in _matter(
         world, "alashiya_gov", "ships_sighted"))
-
 

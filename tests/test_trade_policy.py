@@ -12,7 +12,6 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
 import palette
-import registry
 from tui import trade
 from tui.grid import plain_text
 
@@ -248,28 +247,6 @@ def test_selected_lot_request_above_its_free_quantity_is_atomic() -> None:
             selected["good"], available + 1, selected["id"]))
 
     assert (world.kernel.book, world.court.unrest) == before
-
-
-def test_old_trade_actions_still_decode_but_exempt_is_not_live() -> None:
-    requisition = A.from_dict({
-        "_t": "RequisitionTrade", "good": "grain", "quantity": 10,
-    })
-    exemption = A.from_dict({"_t": "ExemptTrade"})
-    assert requisition == A.RequisitionTrade("grain", 10, "")
-    assert exemption == A.ExemptTrade()
-
-    world = _trade_world()
-    before = seat.held(world)["grain"]
-    requisitioned, _ = apply(world, requisition)
-    assert seat.held(requisitioned)["grain"] == before + 10
-    exempted, _ = apply(world, exemption)
-    assert exempted.court.harbour_due_rate == 0
-
-    assert not registry.BY_ID["exempt_trade"].player_accessible
-    assert palette.parse("exempt trade", project(_trade_world())).status == "error"
-    text = plain_text(trade.compose(
-        project(_trade_world()), width=66, height=22))
-    assert "[e] exempt" not in text
 
 
 def test_remote_works_do_not_boost_the_capital_field_or_routes() -> None:

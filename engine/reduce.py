@@ -180,20 +180,6 @@ def apply(world: World, action) -> tuple[World, list]:
                 days, unrest - world.court.unrest, incremental)],
         )
 
-    if isinstance(action, A.LevyCohort):
-        world, event = seat.detach(
-            world, action.cohort_id, action.heads, action.destination,
-            action.duration, action.task, action.ration_source, action.official)
-        delta = action.heads * world.land_rules.get(
-            "corvee_unrest_per_1000_days", 40) // 1000
-        world = replace_court(
-            world, unrest=min(1000, world.court.unrest + delta))
-        return world, [event]
-
-    if isinstance(action, A.ReleaseCohort):
-        world, event = seat.release(world, action.detachment_id)
-        return world, [event]
-
     if isinstance(action, A.ReceiveCohort):
         from engine import displacement
         world, event = displacement.receive(
@@ -204,10 +190,6 @@ def apply(world: World, action) -> tuple[World, list]:
         from engine import trade_policy
         return trade_policy.apply(world, action)
 
-    if isinstance(action, A.ExemptTrade):
-        from engine import revenue
-        return revenue.set_harbour_due(world, 0)
-
     if isinstance(action, (A.BeginBuild, A.BeginRepair, A.AbandonWork)):
         from engine import works
         if isinstance(action, A.BeginBuild):
@@ -215,12 +197,6 @@ def apply(world: World, action) -> tuple[World, list]:
         if isinstance(action, A.BeginRepair):
             return works.begin_repair(world, action)
         return works.abandon(world, action)
-
-    if isinstance(action, A.DredgeCanal):
-        # C4: the canals were the court estates' and are gone; the kernel has
-        # no canal to dredge, and Ugarit authors none. The command stays in the
-        # vocabulary and answers truthfully.
-        raise ValueError(f"there is no canal at {action.estate_id} to dredge")
 
     if isinstance(action, A.MarryAbroad):
         from engine.house import marry_abroad

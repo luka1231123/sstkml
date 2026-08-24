@@ -49,7 +49,7 @@ def test_inbox_uses_the_grounded_model_voice_and_social_metadata() -> None:
     assert "1 in this exchange" in text
     assert "╲·╱" in text
     assert "PgUp" not in text and "PgDn" not in text
-    assert "[tab] focus tablet" in text
+    assert "[space] focus tablet" in text
 
 
 def test_unread_tablet_uses_a_compact_physical_prompt() -> None:
@@ -57,7 +57,7 @@ def test_unread_tablet_uses_a_compact_physical_prompt() -> None:
     text = plain_text(inbox.compose(
         _belief(letter), selected=letter["id"], filter_name="unread"))
     assert "THE TABLET IS UNREAD" in text
-    assert "break seal" in text
+    assert "[enter] read" in text
     assert "2 hours" in text
     assert "Reading it takes two hours of the fortnight." not in text
 

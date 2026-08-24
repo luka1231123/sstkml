@@ -27,13 +27,10 @@ from tui.workbench import Control, Row, affordable, compose, detail_room
 
 # What `[` and `]` move by on each screen. Coarse enough to reach a useful
 # figure in a few presses, and never so fine that stepping is a chore.
-STEPS = {"roll": 50, "stores": 50, "corvee": 400, "dredge": 5,
+STEPS = {"roll": 50, "stores": 50, "corvee": 400,
          "land_due": 25, "expiate": 10}
 
 TASKS = ("garrison", "watch", "harvest", "campaign")
-MUSTER_VIEWS = (("formations", "Formations"), ("cohorts", "Cohorts"),
-                ("detachments", "Detachments"))
-
 # Which store rows are a ledger the king can have counted. `inspect_ledger`
 # takes `granary` or `seed` and nothing else, so the control is offered on
 # exactly those two rows and is plainly absent on the others.
@@ -401,12 +398,9 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
                      f"took {qa(data.get('last_land_due', 0))} qa last year",
                      "gold")
     if estate is not None:
-        canal = estate.get("canal_condition")
-        water = (f"canal {canal}" if estate.get("irrigated")
-                 and canal is not None else "rain-fed")
         open_ground = max(0, estate["extent"] - estate["under_crop"])
         detail.append(("THE ESTATE · qa", "gold"))
-        detail += paired(f"at {_spoken(estate['place'])} · {water}",
+        detail += paired(f"at {_spoken(estate['place'])}",
                          f"{estate['hands']} hands", "dim")
         detail += paired(f"ground {qa(estate['extent'])}",
                          f"returns {estate['capacity']:,}/1000", "sand")
@@ -437,10 +431,6 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         controls.append(affordable(Control(
             "raise_corvee", key_for("raise_corvee"),
             label=f"raise corvée {days}d · unrest +{unrest}"), hours))
-    if estate is not None and estate.get("irrigated") and days > 0:
-        controls.append(affordable(Control(
-            "dredge_canal", key_for("dredge_canal"),
-            label=f"dredge {days}d"), hours))
     controls += [
         affordable(Control("inspect_ledger", key_for("inspect_ledger"), label="count the seed"),
                    hours),
@@ -535,8 +525,7 @@ def storehouse_account(b: dict, view: str, selected: str = "",
 
 def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
            scroll: int = 0, task: str = "garrison", place: str = "",
-           amount: int = 0, notice: str = "",
-           hours: int = 0, view: str = "formations") -> InteractiveScreen:
+           notice: str = "", hours: int = 0) -> InteractiveScreen:
     troops = b.get("troops", {})
     formations = list(troops.get("formations", []))
     rows = [
@@ -564,14 +553,6 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
             (_spoken(summons["oath_id"]), "dim"),
         ), mark="!" if summons["overdue"] else ""))
 
-    if view in {"cohorts", "detachments"}:
-        cohorts = [c for c in b.get("cohorts", ())
-                   if bool(c.get("parent")) == (view == "detachments")]
-        rows = [Row(c["id"], ((c.get("name", c["id"]), "clay"),
-                              (str(c.get("size", 0)), "dim"),
-                              (_spoken(c.get("task", "at home")), "sand"),
-                              (_spoken(c.get("place", "")), "dim")))
-                for c in cohorts]
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
     formation = next((f for f in formations if f["id"] == selected), None)
@@ -584,7 +565,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
             ("    ◉──╫════▷", "gold"),
             ("   ╱█╲ ║", "clay"),
             ("   ╱ ╲ ╨", "sand"),
-            (" SPEAR-BEARER OF THE LEVY", "dim"),
+            (" SPEAR FORMATION", "dim"),
             ("", "ink"),
             (f"{formation['strength']} men", "clay"),
             (f"now {formation['task']} at {_spoken(formation['place'])}",
@@ -601,35 +582,24 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
         detail = [("A SUMMONS", "gold"), ("", "ink"),
                   ("choose a formation above, then send it", "dim")]
 
-    controls = []
-    if view == "cohorts":
-        controls.append(affordable(Control(
-            "levy_cohort", key_for("levy_cohort"), label="write exact levy"), hours))
-    elif view == "detachments":
-        controls.append(Control(
-            "release_cohort", "r", label="release detachment",
-            enabled=any(c["id"] == selected for c in cohorts),
-            why="no detachment is selected"))
-    else:
-        controls += [
-            affordable(Control("assign_troops", key_for("assign_troops"),
-                               label=f"send to {task}"
-                                     + (f" at {_spoken(place)}" if place else ""),
-                               enabled=formation is not None and bool(place),
-                               why="choose a formation and a place"), hours),
-            Control("place_person", key_for("place_person"), label="give command",
-                    enabled=formation is not None),
-            Control("dismiss_person", key_for("dismiss_person"), label="remove command",
-                    enabled=formation is not None),
-        ]
+    controls = [
+        affordable(Control("assign_troops", key_for("assign_troops"),
+                           label=f"send to {task}"
+                                 + (f" at {_spoken(place)}" if place else ""),
+                           enabled=formation is not None and bool(place),
+                           why="choose a formation and a place"), hours),
+        Control("place_person", key_for("place_person"), label="give command",
+                enabled=formation is not None),
+        Control("dismiss_person", key_for("dismiss_person"), label="remove command",
+                enabled=formation is not None),
+    ]
     return compose(
-        "THE MUSTER — LEVY AND SPEAR",
-        ("levy / formation / summons", "heads", "duty", "place"),
+        "THE MUSTER — FORMATIONS",
+        ("formation / summons", "heads", "duty", "place"),
         (24, -5, 10, 14),
         rows, selected, detail, controls, hours, width, height, scroll,
-        notice, empty="no hands or formations are recorded.",
-        note="Tab / Shift-Tab view   ↑↓ choose   Enter open",
-        views=MUSTER_VIEWS, view=view)
+        notice, empty="no formations are recorded.",
+        note="↑↓ choose   Enter open")
 
 
 # --- the oaths ----------------------------------------------------------------

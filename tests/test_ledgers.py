@@ -317,70 +317,21 @@ def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
 
 # --- the corvée and muster ----------------------------------------------------
 
-def test_the_muster_keeps_formations_and_exact_levies_together() -> None:
+def test_the_muster_keeps_formation_orders_together() -> None:
     game = _game()
     formation = game.belief["troops"]["formations"][0]
     screen = ledgers.muster(
-        game.belief, selected=formation["id"], amount=10,
+        game.belief, selected=formation["id"],
         place=game.belief["seat"],
         width=72, height=24, hours=game.hours)
     text = plain_text(screen)
     actions = {hit.command for hit in screen.hits if hit.enabled}
 
-    assert "THE MUSTER — LEVY AND SPEAR" in text
-    assert "Cohorts" in text and "Detachments" in text
-    assert "Draft order" not in text
+    assert "THE MUSTER — FORMATIONS" in text
     assert formation["name"] in text
-    assert "SPEAR-BEARER OF THE LEVY" in text
+    assert "SPEAR FORMATION" in text
     assert "════▷" in text
     assert "do:assign_troops" in actions
-
-
-def test_the_muster_can_ready_an_exact_cohort_levy() -> None:
-    game = _game()
-    game.muster_view = "cohorts"
-    game.on_muster_key(_Key("c"))
-    assert not game.log
-    assert game.command_line == "levy "
-    assert game.notices["muster"].kind == registry.PREVIEW
-
-
-def test_release_uses_only_the_selected_real_detachment() -> None:
-    world = _world()
-    world, _ = apply(world, A.LevyCohort(
-        "cohort:ugarit_field_hands", 10, "ma_hadu", 2))
-    world, _ = apply(world, A.LevyCohort(
-        "cohort:ugarit_smiths", 10, "ma_hadu", 2))
-    projected = project(world)["cohorts"]
-    detachments = [c["id"] for c in projected if c.get("parent")]
-    assert len(detachments) == 2
-    released_name = next(
-        c["name"] for c in projected if c["id"] == detachments[1])
-
-    game = _game(world=world)
-    game.muster_view = "detachments"
-    game.ledger_state["muster"]["pick"] = detachments[1]
-    game.on_muster_key(_Key("r"))
-
-    assert _kinds(game) == ["ReleaseCohort"]
-    assert game.log[0]["action"]["detachment_id"] == detachments[1]
-    assert released_name in str(game.notices["muster"])
-    remaining = [c["id"] for c in game.belief["cohorts"] if c.get("parent")]
-    assert remaining == [detachments[0]]
-    assert "command_line" not in game.__dict__
-
-
-def test_release_control_is_disabled_when_no_detachment_exists() -> None:
-    world = _world()
-    stale_cohort = next(
-        cohort["id"] for cohort in project(world)["cohorts"]
-        if not cohort.get("parent"))
-    screen = ledgers.muster(
-        project(world), selected=stale_cohort,
-        view="detachments", width=60, height=20, hours=6)
-    controls = [hit for hit in screen.hits
-                if hit.command == "do:release_cohort"]
-    assert controls and not any(hit.enabled for hit in controls)
 
 def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game = _game()
@@ -397,30 +348,6 @@ def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game.on_muster_key(_Key("a"))
     assert _kinds(game) == ["AssignTroops"]
     assert game.log[0]["action"]["task"] == state["task"]
-
-
-def test_muster_page_keys_move_the_selection_instead_of_snapping_back() -> None:
-    game = _game()
-    game.muster_view = "cohorts"
-    game._size = lambda _key: (60, 20)
-    rows = game.window_rows("muster")
-    screen = game.compose("muster")
-    visible = [
-        hit.command.split(":", 1)[1] for hit in screen.hits
-        if hit.command.startswith("pick:")]
-    assert len(rows) > len(visible)
-
-    game.on_muster_key(_Key(keysym="Next"))
-    assert game.ledger_state["muster"]["pick"] == rows[len(visible)]
-    assert game.ledger_state["muster"]["pick"] in {
-        hit.command.split(":", 1)[1]
-        for hit in game.compose("muster").hits
-        if hit.command.startswith("pick:")}
-
-    game.on_muster_key(_Key(keysym="End"))
-    assert game.ledger_state["muster"]["pick"] == rows[-1]
-    game.on_muster_key(_Key(keysym="Home"))
-    assert game.ledger_state["muster"]["pick"] == rows[0]
 
 
 # --- the oaths ----------------------------------------------------------------

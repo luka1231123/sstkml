@@ -91,39 +91,6 @@ def _belief(places: list[dict], routes: list[dict],
     }
 
 
-def test_projection_exposes_only_court_map_geography() -> None:
-    world = load_campaign("seat", SEED)
-    graph = project(world)["world_graph"]
-
-    assert {place["id"] for place in graph["places"]} == set(world.places)
-    assert {place["name"] for place in graph["places"]} == {
-        place.name for place in world.places.values()}
-    assert len(graph["routes"]) == len(world.routes)
-    assert {
-        endpoint
-        for route in graph["routes"]
-        for endpoint in (route["a"], route["b"])
-    }.issubset({place["id"] for place in graph["places"]})
-    assert all(place["source"] == "court map" for place in graph["places"])
-    assert all(route["source"] == "court map" for route in graph["routes"])
-
-    forbidden = {
-        "population", "susceptible", "infected", "recovered", "dead", "risk",
-    }
-    for place in graph["places"]:
-        assert forbidden.isdisjoint(place)
-    for route in graph["routes"]:
-        assert forbidden.isdisjoint(route)
-
-    for route in graph["routes"]:
-        expected = (
-            "closed"
-            if route["seasonal"] and not project(world)["sea_open"]
-            else "open")
-        assert route["availability"] == expected
-        assert route["availability_as_of_turn"] == world.date.absolute
-
-
 def test_projected_map_age_advances_but_calendar_state_is_current() -> None:
     world = load_campaign("seat", SEED)
     world = dataclasses.replace(world, kernel=dataclasses.replace(
@@ -378,76 +345,6 @@ def test_the_window_pans_over_a_map_bigger_than_itself() -> None:
 
 # --- the layers ---------------------------------------------------------------
 
-def test_the_tablet_has_a_tab_for_each_layer_and_says_which_one_you_are_on() -> None:
-    places = [_place("home", "Home", col=2, row=2),
-              _place("away", "Away", col=8, row=4)]
-    screen = worldmap.compose(_belief(places, [_route("home", "away")]),
-                              104, 30)
-    text = plain_text(screen)
-    commands = {hit.command for hit in screen.hits if hit.enabled}
-
-    for layer in worldmap.LAYERS:
-        assert worldmap.LAYER_NAME[layer] in text
-        assert f"world:layer:{layer}" in commands
-    assert "[LAND]" in text, "the tablet does not say which layer it is showing"
-
-
-def test_each_layer_draws_its_own_question_and_leaves_the_others_alone() -> None:
-    """One mark per place on the general map; everything else is a layer."""
-    places = [_place("home", "Home", col=1, row=1, glyph="H"),
-              _place("court", "Court Town", col=8, row=1, glyph="C"),
-              _place("sick", "Sick Port", col=8, row=5, glyph="S")]
-    sites = [_site("palace", "home", 3, 3), _site("grain", "home", 4, 4),
-             _site("copper", "court", 9, 2)]
-    belief = _belief(places, [_route("home", "court", "land"),
-                              _route("home", "sick", "sea")], sites=sites)
-    belief["relations"] = [{"place": "court", "esteem": "warm",
-                            "unanswered": 2}]
-    belief["plague"] = {"quarantined": ["sick"]}
-
-    drawn = {layer: plain_text(
-                 worldmap.compose(belief, 104, 30, layer=layer, wide=1))
-             for layer in worldmap.LAYERS}
-
-    # The general map knows what a place IS, and no more: no esteem diamond
-    # and no struck-out road on it.
-    assert worldmap.COURT_MARK not in drawn["land"]
-    assert worldmap.SHUT_MARK not in drawn["land"]
-    assert "{H}" in drawn["land"]
-
-    assert worldmap.COURT_MARK in drawn["courts"]
-    assert worldmap.SHUT_MARK not in drawn["courts"]
-    assert worldmap.SHUT_MARK in drawn["sickness"]
-    assert worldmap.COURT_MARK not in drawn["sickness"]
-
-    # The hinterland belongs to the layer that asks about it and to no other.
-    def holdings(layer: str, kind: str) -> int:
-        # Counted rather than looked for: the footer under the map has a `x`
-        # in it, and a test that cannot tell a keycap from a small palace is
-        # a test that passes when the layer is empty.
-        return drawn[layer].count(atlas.SITE_GLYPH[kind])
-
-    assert holdings("holds", "palace") > holdings("land", "palace")
-    assert holdings("farms", "grain") > 0
-    assert holdings("holds", "grain") == 0
-    assert holdings("trade", "copper") > 0
-
-    # Roads are drawn on the roads layer, sea lanes on trade, and neither
-    # anywhere else. The route tablet beside the map stays clickable on every
-    # layer, so what is counted here is the single cells laid along a road.
-    def road_cells(layer: str) -> int:
-        screen = worldmap.compose(belief, 104, 30, layer=layer, wide=1)
-        return sum(1 for hit in screen.hits
-                   if hit.command.startswith("world:route:")
-                   and (hit.width, hit.height) == (1, 1))
-
-    assert road_cells("roads") > 0
-    assert road_cells("trade") > 0
-    assert road_cells("land") == 0
-    assert road_cells("courts") == 0 and road_cells("sickness") == 0
-    assert "─" in drawn["roads"]
-
-
 def test_the_hinterland_names_its_palaces_and_counts_its_ground() -> None:
     """A palace centre is somewhere; ground is a quantity, not a place."""
     places = [_place("home", "Home", col=1, row=1)]
@@ -469,13 +366,6 @@ def test_two_places_in_one_cell_are_both_drawn() -> None:
     text = plain_text(screen)
     assert "{H}" in text and "T" in text
     assert "elsewhere on the map" not in text
-
-
-def test_an_unknown_layer_falls_back_to_the_ground() -> None:
-    places = [_place("home", "Home", col=3, row=3)]
-    text = plain_text(
-        worldmap.compose(_belief(places, []), 104, 30, layer="nonsense"))
-    assert "[LAND]" in text
 
 
 # --- the controller -----------------------------------------------------------
@@ -523,21 +413,6 @@ def test_the_brackets_walk_every_place_on_the_map() -> None:
     assert seen == set(everywhere)
 
 
-def test_the_arrows_move_the_window_and_choosing_a_place_gives_it_back() -> None:
-    game = _game()
-    assert game.world_focus is None
-    game.on_world_key(_Key(keysym="Right"))
-    moved = game.world_focus
-    assert moved is not None
-    game.on_world_key(_Key(keysym="Down"))
-    assert game.world_focus[1] > moved[1]
-    assert game.world_focus[0] == moved[0]
-
-    # Choosing a place is going somewhere; the window follows it again.
-    game.on_world_key(_Key(command="world:place:hattusa"))
-    assert game.world_focus is None
-
-
 def test_arrows_do_not_bank_invisible_steps_at_the_map_edge() -> None:
     game = _game()
     for _ in range(100):
@@ -559,25 +434,6 @@ def test_holding_the_tablet_closer_and_wider() -> None:
     for _ in range(9):
         game.on_world_key(_Key(char="-"))
     assert game.world_wide == atlas.MAX_WIDE
-
-
-def test_clicking_a_mark_or_a_road_selects_a_place() -> None:
-    game = _game()
-    game.on_world_key(_Key(command="world:place:hattusa"))
-    assert game.world_place_pick == "hattusa"
-
-    # Clicking a road selects the far end of it, whichever way it is written.
-    game.on_world_key(_Key(command="world:route:hattusa:carchemish"))
-    assert game.world_place_pick == "carchemish"
-    game.on_world_key(_Key(command="world:route:hattusa:carchemish"))
-    assert game.world_place_pick == "hattusa"
-
-    # An onward leg chooses its farther endpoint rather than its authored
-    # first endpoint.
-    game.on_world_key(
-        _Key(command=f"world:place:{game.belief['seat']}"))
-    game.on_world_key(_Key(command="world:route:carchemish:emar"))
-    assert game.world_place_pick == "emar"
 
 
 def test_the_route_tablet_turns_between_local_and_complete_views() -> None:

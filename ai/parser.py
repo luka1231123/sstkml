@@ -15,7 +15,7 @@ VERBS = {
     "INSPECT_LEDGER", "END_TURN",
     "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE", "ASSIGN_TROOPS",
     "CONSULT_DIVINER", "SWEAR_OATH",
-    "DREDGE_CANAL", "BUILD", "REPAIR", "ABANDON_WORK",
+    "BUILD", "REPAIR", "ABANDON_WORK",
     "SUPPRESS_OMEN", "DEFY_OMEN", "QUARANTINE", "LIFT_QUARANTINE",
     "EXPIATE", "SEARCH_ARCHIVE", "HEAR_PETITION", "RULE_PETITION",
     "SET_LAND_DUE", "SET_HARBOUR_DUE", "PLACE_PERSON", "DISMISS_PERSON",
@@ -184,12 +184,6 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
         order = tuple(match[1].split())
         if order and all(group in groups for group in order):
             return ParseResult((A.SetPriority(order),), source="preparser")
-    match = re.fullmatch(
-        r"(?:dredge|clear)(?:\s+the)?\s+([\w:.-]+)(?:\s+canal)?"
-        r"(?:\s+(?:with|for))?\s+(\d+)(?:\s+days)?", text)
-    if match and match[1] in _estate_ids(belief):
-        return ParseResult(
-            (A.DredgeCanal(match[1], int(match[2])),), source="preparser")
     match = re.fullmatch(
         r"(?:build|put\s+up)\s+(.+?)(?:\s+(?:at|in)\s+(.+))?", text)
     plan = _resolve_plan(match[1], belief) if match else None
@@ -418,11 +412,6 @@ def _action(item: dict, belief: dict):
         return A.AssignTroops(formation, task, place if type(place) is str else "")
     if verb == "RAISE_CORVEE" and type(args.get("days")) is int:
         return A.RaiseCorvee(args["days"])
-    if verb == "DREDGE_CANAL":
-        estate, days = args.get("estate"), args.get("days")
-        if estate not in _estate_ids(belief) or type(days) is not int:
-            raise ValueError("invalid canal order")
-        return A.DredgeCanal(estate, days)
     if verb == "BUILD":
         kind = args.get("kind")
         place = args.get("place", belief.get("seat", "seat"))

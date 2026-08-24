@@ -108,7 +108,7 @@ class Kernel:
 
     def labour(self, settlement: EntityId) -> int:
         return sum(c.labour() for c in self.cohorts_of(settlement)
-                   if not c.in_transit and not c.parent
+                   if not c.in_transit
                    and (not c.roll_id or c.kind == "field_labour"
                         or c.reaping))
 
