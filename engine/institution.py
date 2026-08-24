@@ -176,12 +176,18 @@ def _consume_upkeep(stores: dict[str, int], inst) -> bool:
     return True
 
 
-def effective(world, inst) -> int:
-    """What it can actually do this fortnight. Derived, never stored."""
+def effective_at_condition(world, inst, condition: int) -> int:
+    """Output at a stated condition, with the institution's known staffing."""
     court = world.court
     staff = _staff_factor(world, inst)
-    return (inst.capacity * inst.condition // 1000 * staff // 1000
+    condition = max(0, min(1000, condition))
+    return (inst.capacity * condition // 1000 * staff // 1000
             * _head_factor(court, inst) // 1000)
+
+
+def effective(world, inst) -> int:
+    """What it can actually do this fortnight. Derived, never stored."""
+    return effective_at_condition(world, inst, inst.condition)
 
 
 def factor(world, kind: str) -> int:

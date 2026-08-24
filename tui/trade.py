@@ -1,3 +1,4 @@
+from tui import dues as due_text
 from tui import style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
 
@@ -60,11 +61,8 @@ def compose(b: dict, width: int = 72, height: int = 24,
     else:
         rate = b.get("revenue", {}).get("harbour_rate", 0)
         shown = rate if due_draft is None else due_draft
-        rows = [("harbour due", f"{shown}/1000"
-                 + (" · DRAFT" if due_draft is not None else "")),
-                ("finance / requisition", "crown cargo"),
-                ("authorize / offer / protect", "written tablet"),
-                ("escort / close", "formation / route")]
+        rows = due_text.facts(
+            b, "harbour", shown, draft=due_draft is not None)
     if not rows:
         surface.text(3, y, "none reported", C["ash"], C["ink"])
     for index, (name, value) in enumerate(rows[:max(0, height - 10)]):

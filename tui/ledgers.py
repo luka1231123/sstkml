@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import registry
 from belief import project
+from tui import dues as due_text
 from tui import render, style
 from tui.grid import INDEX as C
 from tui.grid import InteractiveScreen, sparkline
@@ -497,30 +498,15 @@ def storehouse_account(b: dict, view: str, selected: str = "",
         selected = rows[0].id if rows else ""
     chosen = next((row for row in rows if row.id == selected), None)
     detail = [("DATED ACCOUNT", "gold"), (str(dated), "sky")]
-    if chosen:
+    if chosen and view != "dues":
         detail += [("", "ink")] + list(chosen.cells)
     if view == "dues":
         revenue, land_data = b.get("revenue", {}), b.get("land", {})
-        if selected == "land":
-            detail += [
-                (f"customary {land_data.get('land_due_base', 0)}/1000", "dim"),
-                ("above custom raises unrest each fortnight", "ash"),
-                ("more grain comes at harvest; unroofed grain spoils fast", "ash"),
-            ]
-        else:
-            low = revenue.get("response_min_turns", 3)
-            high = revenue.get("response_max_turns", 6)
-            detail += [
-                (f"customary {revenue.get('harbour_customary', 0)}/1000", "dim"),
-                (f"merchants answer a rise in {low}–{high} fortnights", "ash"),
-                ("the due is taken as cargo clears", "ash"),
-            ]
-        detail += [
-            ("", "ink"),
-            (("DRAFT · Enter gives one order" if selected in drafts
-              else "[< >] drafts the selected rate by 25"),
-             "flame" if selected in drafts else "dim"),
-        ]
+        rate = (drafts.get(selected, land_data.get("land_due_rate", 0))
+                if selected == "land" else
+                drafts.get(selected, revenue.get("harbour_rate", 0)))
+        detail = due_text.detail(
+            b, selected, rate, draft=selected in drafts)
     controls = []
     if view == "dues" and selected in drafts:
         controls.append(Control(
@@ -529,7 +515,10 @@ def storehouse_account(b: dict, view: str, selected: str = "",
     return compose(
         f"THE STOREHOUSE — {view.upper()}", headers, widths, rows, selected,
         detail, controls, hours, width, height, scroll, notice,
-        note="Tab view   ↑↓ choose" + ("   [< >] draft   Enter give" if view == "dues" else ""),
+        note=("Tab view   ↑↓ choose"
+              + ("   [< >] draft" if view == "dues" else "")
+              + ("   Enter give" if view == "dues" and selected in drafts
+                 else "")),
         views=STOREHOUSE_VIEWS, view=view)
 
 

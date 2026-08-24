@@ -30,6 +30,11 @@ _GRANARY_FORTNIGHTS = 60
 _OVERFLOW_PER_1000 = 100
 
 
+def granary_capacity_for(owed: int, working: int) -> int:
+    """Roof room implied by a ration roll and reported working capacity."""
+    return max(0, owed) * _GRANARY_FORTNIGHTS * max(1, working) // 1000
+
+
 def granary_capacity(world: World) -> int:
     """What all working granaries can keep under roof."""
     from engine import institution, seat
@@ -48,7 +53,7 @@ def granary_capacity(world: World) -> int:
     else:
         owed = sum(g.size * g.entitlement
                    for g in seat.groups(world).values())
-    return owed * _GRANARY_FORTNIGHTS * max(1, working) // 1000
+    return granary_capacity_for(owed, working)
 
 
 def spoilage(world: World) -> tuple[World, list]:

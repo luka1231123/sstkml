@@ -11,9 +11,10 @@ assert the world actually changed.
 from __future__ import annotations
 
 from belief.project import project
+from engine import revenue
 from engine.tick import advance
 from load import load_campaign
-from tui import ledgers, workbench
+from tui import ledgers, trade as trade_page, workbench
 from tui.grid import plain_text
 
 import registry
@@ -226,6 +227,50 @@ def test_stepping_a_due_back_to_the_live_rate_cancels_the_draft() -> None:
 
     game.on_trade_key(_Key(keysym="Return"))
     assert not game.log
+
+
+def test_due_drafts_show_the_take_and_the_cost_at_real_window_sizes() -> None:
+    belief = project(_world())
+    for width, height in ((82, 28), (84, 29)):
+        text = plain_text(ledgers.storehouse_account(
+            belief, "dues", selected="land", drafts={"land": 175},
+            width=width, height=height))
+        assert "LAND DUE · DRAFT" in text
+        assert "this harvest" in text and "storage risk" in text
+        assert "unrest +6" in text and "Enter gives one order" in text
+
+    for width, height in ((66, 22), (72, 24)):
+        text = plain_text(trade_page.compose(
+            belief, width=width, height=height, view="dues", due_draft=150))
+        assert "next clearance" in text and "~48 oil  (+16)" in text
+        assert "2 merchants take offence" in text
+        assert "up to −12 in 3–6 fortnights" in text
+        assert "finance / requisition" not in text
+
+
+def test_harbour_due_shows_old_and_new_trade_losses_without_hidden_scores() -> None:
+    world, _ = revenue.set_harbour_due(load_campaign("seat", SEED), 125)
+    belief = project(world)
+    text = plain_text(trade_page.compose(
+        belief, width=66, height=22, view="dues", due_draft=150))
+    assert "new trade loss" in text and "up to −6" in text
+    assert "already pending" in text and "up to −6 from 2 answers" in text
+    assert "traffic after" in text and "~988 / 1,000" in text
+    assert "esteem" not in text
+    lowered = plain_text(trade_page.compose(
+        belief, width=66, height=22, view="dues", due_draft=100))
+    assert "past offence remains" in lowered and "esteem" not in lowered
+
+
+def test_storehouse_only_offers_enter_when_a_due_is_drafted() -> None:
+    belief = project(_world())
+    quiet = plain_text(ledgers.storehouse_account(
+        belief, "dues", selected="land", width=82, height=28, drafts={}))
+    drafted = plain_text(ledgers.storehouse_account(
+        belief, "dues", selected="land", width=82, height=28,
+        drafts={"land": 175}))
+    assert "Enter give" not in quiet and "Enter gives one order" not in quiet
+    assert "Enter give" in drafted and "Enter gives one order" in drafted
 
 
 def test_the_land_sends_a_chosen_group_to_the_fields() -> None:

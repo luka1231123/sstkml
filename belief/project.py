@@ -558,7 +558,6 @@ def _institutions(world) -> list[dict]:
         condition = (inst.condition if seen else I.reported_condition(
             world, inst, world.seed, world.date.absolute))
         group = seat_door.groups(world).get(inst.group)
-        staff = group.output_modifier if group is not None else 1000
         out.append({
             "id": inst.id, "name": inst.name, "kind": inst.kind,
             "place": inst.place, "head": inst.head,
@@ -567,8 +566,7 @@ def _institutions(world) -> list[dict]:
             "condition": condition,
             "inspected": seen,
             "capacity": inst.capacity,
-            "effective": (inst.capacity * condition // 1000 * staff // 1000
-                          * I._head_factor(court, inst) // 1000),
+            "effective": I.effective_at_condition(world, inst, condition),
             "upkeep": {good: qty for good, qty in inst.upkeep},
             "history": list(court.institution_history.get(key, ())),
             "source": ("royal inspection" if seen else
@@ -1067,6 +1065,67 @@ def _trade(world, perr: int) -> dict:
     }
 
 
+def _forecast_basis(world, land: dict, institutions: list[dict],
+                    stores: dict, groups: list[dict]) -> dict:
+    """Current, reportable quantities a drafted due can be priced against."""
+    from engine import actions as A
+    from engine import revenue as R
+    from engine import systems
+
+    standing = max(0, land.get("standing", 0))
+    grain_per_1000 = max(0, land.get("rates", {}).get(
+        "grain_per_1000", 0))
+    crop = standing * grain_per_1000 // 1000
+    # The harvest reserves toward the estate's full annual seed requirement,
+    # not toward the weather-thinned crop still visible today.
+    sown = sum(max(0, estate.get("extent", 0))
+               for estate in land.get("estates", ()))
+    seed = max(0, land.get("seed_in_store", 0))
+    assessable = None if standing <= 0 else max(0, crop - max(0, sown - seed))
+
+    working = sum(max(0, item.get("effective", 0))
+                  for item in institutions if item.get("kind") == "granary")
+    owed = sum(max(0, item.get("size", 0))
+               * max(0, item.get("entitlement", 0)) for item in groups)
+    roof = systems.granary_capacity_for(owed, working)
+
+    harbour = next((item for item in institutions
+                    if item.get("kind") == "harbour"), None)
+    assessment = (() if harbour is None else R.harbour_assessment(
+        world, max(0, harbour.get("effective", 0))))
+    merchants = sum(1 for actor in world.revenue_merchants
+                    if actor in world.relations)
+    responses = [item.payload for item in world.schedule
+                 if isinstance(item.payload, A.MerchantResponseDue)]
+    rules = world.revenue_rules
+    return {
+        "land": {
+            "assessable": assessable,
+            "already_taken": max(0, world.court.land_due_in_progress),
+            "grain": max(0, stores.get("grain", 0)),
+            "roof_capacity": roof,
+            "unrest_divisor": max(1, rules.get("unrest_divisor", 4)),
+            "source": "standing crop and granary reports",
+            "certainty": "estimated",
+        },
+        "harbour": {
+            "assessment": list(assessment),
+            "clearable": sum(quantity for _lot, quantity in assessment),
+            "waiting": R.harbour_waiting(world),
+            "merchant_count": merchants,
+            "traffic_loss_per_esteem": max(
+                0, rules.get("traffic_loss_per_esteem", 3)),
+            "delay_min": max(0, rules.get("response_min_turns", 3)),
+            "delay_max": max(0, rules.get("response_max_turns", 6)),
+            "pending": len(responses),
+            "pending_traffic_loss": sum(
+                max(0, -response.traffic_delta) for response in responses),
+            "source": "harbour master's cargo roll",
+            "certainty": (harbour or {}).get("certainty", "reported"),
+        },
+    }
+
+
 def project(world) -> dict:
     from engine import fall
     c = world.court
@@ -1232,6 +1291,11 @@ def project(world) -> dict:
     for place in graph["places"]:
         if place["id"] in by_place:
             place["court_record"] = by_place[place["id"]]
+    trade = _trade(world, perr)
+    land = _land(world, perr)
+    institutions = _institutions(world)
+    forecast_basis = _forecast_basis(
+        world, land, institutions, stores, groups)
     return {
         "scenario": world.kernel.registry.settlements[
             f"settlement:{world.chosen_alu}"].name,
@@ -1269,9 +1333,9 @@ def project(world) -> dict:
         "regnal_year": d.year,
         "house": _house(world),
         "world_graph": graph,
-        "trade": _trade(world, perr),
+        "trade": trade,
         "calendar": _calendar(world.kernel, d.fortnight, d.absolute),
-        "land": _land(world, perr),
+        "land": land,
         "plague": _plague(world, perr),
         "calamities": _calamities(world),
         "archive_index": _archive(world),
@@ -1281,7 +1345,7 @@ def project(world) -> dict:
         # casualties, which is several milestones away.
         "metal": _metal(world),
         "seat": world.court.seat,
-        "institutions": _institutions(world),
+        "institutions": institutions,
         "projects": _projects(world),
         "plans": _plans(world),
         "justice": _justice(world),
@@ -1299,6 +1363,7 @@ def project(world) -> dict:
             "response_max_turns": world.revenue_rules.get(
                 "response_max_turns", 6),
         },
+        "forecast_basis": forecast_basis,
         "works_season": _works_season(world),
         "works_materials": dict(world.works_materials),
         "repair_days_per_point": world.works_rules.get(

@@ -106,33 +106,76 @@ def land_cargo(world: World) -> tuple[World, list]:
     return dataclasses.replace(world, harbour_cargo=cargo), events
 
 
-def collect_harbour(world: World) -> tuple[World, list]:
-    """Clear finite owned lots and transfer the assessed share to the crown."""
-    from engine.institution import effective
-
-    harbour = next((
+def _harbour(world: World):
+    return next((
         inst for inst in sorted(
             world.court.institutions.values(), key=lambda item: item.id)
         if inst.kind == "harbour"), None)
+
+
+def harbour_assessment(
+        world: World, effective_capacity: int | None = None,
+        ) -> tuple[tuple[str, int], ...]:
+    """The cargo lots the next clearance can assess, in ledger order.
+
+    Projection may pass the harbour master's reported capacity. The engine
+    omits it and uses the institution's actual output. Keeping the lot split is
+    important: the due is rounded on each merchant's lot, not on one invented
+    heap.
+    """
+    from engine.institution import effective
+
+    harbour = _harbour(world)
     if harbour is None:
-        return world, []
-    court = world.court
-    capacity = (
-        effective(world, harbour)
-        * court.harbour_traffic
+        return ()
+    output = (effective(world, harbour) if effective_capacity is None
+              else max(0, effective_capacity))
+    remaining = (
+        output
+        * world.court.harbour_traffic
         * world.revenue_rules.get("clearance_units_per_1000", 100)
         // 1_000_000
     )
+    assessed = []
+    for lot_id in sorted(world.harbour_cargo):
+        lot = world.harbour_cargo[lot_id]
+        if lot.place != harbour.place or lot.quantity <= 0 or remaining <= 0:
+            continue
+        cleared = min(remaining, lot.quantity)
+        assessed.append((lot_id, cleared))
+        remaining -= cleared
+    return tuple(assessed)
+
+
+def harbour_take(assessment: tuple[tuple[str, int], ...], rate: int) -> int:
+    """The due on a clearance assessment, preserving per-lot rounding."""
+    rate = max(0, min(1000, rate))
+    return sum(max(0, quantity) * rate // 1000
+               for _lot_id, quantity in assessment)
+
+
+def harbour_waiting(world: World) -> int:
+    """Cargo physically waiting at the court's harbour."""
+    harbour = _harbour(world)
+    if harbour is None:
+        return 0
+    return sum(max(0, lot.quantity) for lot in world.harbour_cargo.values()
+               if lot.place == harbour.place)
+
+
+def collect_harbour(world: World) -> tuple[World, list]:
+    """Clear finite owned lots and transfer the assessed share to the crown."""
+    harbour = _harbour(world)
+    if harbour is None:
+        return world, []
+    court = world.court
+    assessment = harbour_assessment(world)
     stores = seat.held(world)
     cargo = dict(world.harbour_cargo)
     events = []
     total_taken = 0
-    remaining = capacity
-    for lot_id in sorted(cargo):
+    for lot_id, cleared in assessment:
         lot = cargo[lot_id]
-        if lot.place != harbour.place or lot.quantity <= 0 or remaining <= 0:
-            continue
-        cleared = min(remaining, lot.quantity)
         taken = cleared * court.harbour_due_rate // 1000
         if taken:
             stores[lot.good] = stores.get(lot.good, 0) + taken
@@ -142,7 +185,6 @@ def collect_harbour(world: World) -> tuple[World, list]:
         else:
             del cargo[lot_id]
         total_taken += taken
-        remaining -= cleared
         events.append(A.HarbourDueTaken(
             lot.good, cleared, court.harbour_due_rate, taken,
             lot.id, lot.owner, cleared))
