@@ -12,7 +12,7 @@ from engine import actions as A
 
 VERBS = {
     "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
-    "INSPECT_LEDGER", "EAT_SEED", "END_TURN",
+    "INSPECT_LEDGER", "END_TURN",
     "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE", "ASSIGN_TROOPS",
     "CONSULT_DIVINER", "SWEAR_OATH",
     "DREDGE_CANAL", "BUILD", "REPAIR", "ABANDON_WORK",
@@ -147,9 +147,6 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     match = re.fullmatch(r"(?:inspect|count)(?:\s+the)?\s+(granary|seed)", text)
     if match:
         return ParseResult((A.InspectLedger(match[1]),), source="preparser")
-    match = re.fullmatch(r"(?:eat|use)\s+(\d+)(?:\s+qa)?(?:\s+of)?\s+seed(?:\s+grain)?", text)
-    if match:
-        return ParseResult((A.EatSeed(int(match[1])),), source="preparser")
     match = re.fullmatch(r"(?:reply|answer)(?:\s+to)?\s+([\w:.-]+)\s+(.{1,200})", text)
     if match and (letter := _resolve_letter(match[1], belief)):
         return ParseResult((A.DictateReply(letter, match[2]),), source="preparser")
@@ -405,8 +402,6 @@ def _action(item: dict, belief: dict):
         return A.DictateReply(letter, intent.strip())
     if verb == "INSPECT_LEDGER" and args.get("ledger") in {"granary", "seed"}:
         return A.InspectLedger(args["ledger"])
-    if verb == "EAT_SEED" and type(args.get("qa")) is int:
-        return A.EatSeed(args["qa"])
     if verb in ("SEND_TO_HARVEST", "RECALL_FROM_HARVEST"):
         group = args.get("group")
         if group not in groups:

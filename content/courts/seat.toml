@@ -1,7 +1,7 @@
 # Ammurapi of Ugarit (spec 7.2).
 # Wealthy because everyone passes through, sworn to Hatti, militarily hopeless.
 # The tightest, cleanest ruleset -- the default and the tutorial.
-# Grain comes off a threshing floor once a year (M8); what the fields return is
+# Grain comes in during the harvest once a year; what the fields return is
 # opaque, and the player reasons about it from proxies.
 # The economy runs a structural deficit: you cannot feed everyone forever.
 # The game is the order in which you let them starve.
@@ -31,7 +31,7 @@ names = [
 # Feeding the people who bring in the harvest before the people who guard it is
 # the right answer and the game should not hide it -- but it is only the right
 # answer until the season the coast is raided.
-priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers"]
+priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
 
 # The palace scribe who copies every number the ruler reads (spec 6.7). Ugarit's
 # ruler is literate, but the granary is still counted by a tired junior hand.
@@ -40,18 +40,17 @@ priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_
 competence = 800
 fatigue = 500
 
-# Opening stores. Grain is roughly ten fortnights of full entitlement, so the
-# granary is visibly falling from turn one and the inherited harvest at
-# fortnight 12 is a genuine relief rather than a formality.
+# Opening stores. Grain is roughly ten fortnights of what the granary owes: the
+# named roll and the nine thousand of the palace sector, who eat from the store
+# and not off the land. So the granary is visibly falling from turn one and the
+# inherited harvest is a genuine relief rather than a formality.
 #
 # seed_grain opens at NOUGHT, and that is not an oversight: the game begins at
 # fortnight 1, mid-growing-season, so the predecessor's seed is already in the
-# ground. The store refills off the threshing floor at fortnight 12 and empties
-# into the fields again at 19, which means there is exactly one window a year --
-# six fortnights, f13 to f18 -- in which seed grain is a thing you could eat.
-# Doing so is free that turn and ruinous at the next threshing (spec 6.2).
+# ground. The store refills during harvest and empties into the fields again at
+# 19. Between them, seed is visible capital kept apart from ordinary rations.
 [stores]
-grain = 820000
+grain = 1070000
 seed_grain = 0
 oil = 4000
 wine = 3000
@@ -79,7 +78,7 @@ quantity = 1200
 id = "household"
 name = "the king's household"
 size = 120
-entitlement = 100
+entitlement = 16
 function = "household"
 place = "seat"
 
@@ -87,7 +86,7 @@ place = "seat"
 id = "garrison_mahadu"
 name = "garrison at Ma'hadu"
 size = 60
-entitlement = 90
+entitlement = 14
 function = "garrison"
 place = "ma_hadu"
 
@@ -95,7 +94,7 @@ place = "ma_hadu"
 id = "cult_baal"
 name = "servants of the temple of Baal"
 size = 80
-entitlement = 80
+entitlement = 13
 function = "cult"
 place = "seat"
 
@@ -103,7 +102,7 @@ place = "seat"
 id = "smiths_palace"
 name = "smiths of the palace quarter"
 size = 140
-entitlement = 70
+entitlement = 12
 function = "bronze_working"
 place = "seat"
 
@@ -111,26 +110,34 @@ place = "seat"
 id = "weavers"
 name = "weavers of the queen's house"
 size = 210
-entitlement = 60
+entitlement = 11
 function = "weaving"
 place = "seat"
 
 # The people who actually bring the harvest in. Starve them and the fields go
-# short of hands, which does nothing at all until the following threshing.
+# short of hands, which does nothing at all until the following harvest.
 [[groups]]
 id = "field_hands"
 name = "field hands of the crown estates"
 size = 400
-entitlement = 40
+entitlement = 10
 function = "field_labour"
+place = "seat"
+
+[[groups]]
+id = "palace_dependents"
+name = "workers and dependents of the palace quarter"
+size = 9600
+entitlement = 10
+function = "populace"
 place = "seat"
 
 # The sea shuts outside this window (spec 3.2). Nine fortnights of frozen
 # information, then the spring flood. sailing_open is inclusive [7, 21].
 #
 # The farming year is Levantine and rain-fed: sow after the first autumn rains,
-# grow through the wet winter, cut barley then wheat in late spring, thresh on
-# the floor before high summer. low_water is authored but idle here -- Ugarit
+# grow through the wet winter, then bring barley and wheat in during late
+# spring. low_water is authored but idle here -- Ugarit
 # has no canals, and the window exists for the Delta and Mesopotamian
 # scenarios that arrive in M12.
 

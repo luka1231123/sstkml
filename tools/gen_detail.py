@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 from load import mint_from_scenario  # noqa: E402
 
-SCENARIO, SEED = "ugarit", 1
+SCENARIO, SEED = "seat", 1
 SRC = ROOT / "content/world.toml"
 OUT = ROOT / "content/kernel/detail.toml"
 
@@ -171,27 +171,19 @@ FREE = "free"
 # The player's own settlement. What the scenario authors, this file does not.
 SEAT = "settlement:seat"
 
-# The crown's own ground, in qa of seed a year, and it is not the seat's.
-#
-# Every other settlement here farms the whole extent its people need, because
-# every other settlement's people are the ones farming it. The seat's are not:
-# the kernel works the seat's fields for the crown, and the eighty thousand who
-# live in the Alu of Ugarit do not yet hold or eat anything (`world._mouths`).
-# Sizing the seat like the others would hand the crown the entire kingdom's
-# harvest -- some thirty-five million qa a year against a payroll that eats
-# under a million -- which is not a balance figure, it is a different game.
-#
-# So the crown farms the crown's estates and nothing else. The four the
-# scenario authored before C4 retired them are 8,400 iku at 10 qa of seed the
-# iku: the royal lands about the city, the plain of Siyannu, the fields of
-# Ilishtamai, and the lands of the house of Baal. `content/kernel/idmap.toml`
-# still names the four sites they became.
-#
-# The rest of the Alu's ground is real and is left unsown, which understates
-# what this one settlement produces. That is the honest state of the migration
-# rather than a rate: the fields are there, and nobody in the model works them
-# until the seat's own people cross.
-SEAT_EXTENT = 84000
+# Ground the seat has past bare subsistence. Everywhere else sits level by
+# construction, so any due at all would starve the villages and the crown could
+# not exist. Ugarit's coastal plain and the plain of Siyannu are the best ground
+# on this coast and the kingdom exported grain, so the seat carries a surplus and
+# the crown lives off the due taken out of it. This is the number that decides
+# whether the land due is a decision or a formality.
+SEAT_SURPLUS = 1.5
+
+# The seat farms the whole extent its people need, like every other Alu. It did
+# not used to: the seat's eighty thousand neither held nor ate anything, so the
+# crown took the whole harvest of ground nobody was fed off, and any figure but
+# a token was absurd. They hold and eat now (`world._mouths`, `farm.divide`),
+# so the ground is theirs to work and the crown takes the due off it.
 
 
 def _split(total, shares):
@@ -237,7 +229,7 @@ def build():
             cap = int(RETURN_PER_1000 * yld)
             for i, site in enumerate(food):
                 per_head = EXTENT_PER_HEAD / yld * ARABLE_CEILING.get(region, 1.0)
-                whole = SEAT_EXTENT if sid == SEAT else int(pop * per_head)
+                whole = int(pop * per_head * (SEAT_SURPLUS if sid == SEAT else 1))
                 extent = whole if i == 0 else 0
                 sites.append({
                     "id": site.id, "settlement": sid, "region": f"region:{region}",
@@ -277,17 +269,20 @@ def build():
 
         # The one minted cohort becomes three.
         base = reg.cohorts[f"cohort:{slug}_people"]
-        for kind, people in _split(base.people, SPLITS[rank]):
-            if not people:
-                continue
-            cohorts.append({
-                "id": f"cohort:{slug}_{kind}", "settlement": sid, "kind": kind,
-                "households": people // 5, "people": people,
-            })
+        split = [(kind, people)
+                 for kind, people in _split(base.people, SPLITS[rank]) if people]
+        for kind, people in split:
+            row = {"id": f"cohort:{slug}_{kind}", "settlement": sid,
+                   "kind": kind, "households": people // 5, "people": people}
+            # The seat's palace sector is fed by the palace, which is what makes
+            # the crown's granary answerable to more than its own payroll.
+            if sid == SEAT and kind == "palace":
+                row["tenure"] = "redistributive"
+            cohorts.append(row)
 
         # No opening seed: the crop is in the ground already, and next year's
-        # seed is what the threshing floor sets aside out of it. A settlement
-        # that eats its seed has made that decision itself.
+        # seed is what the harvest sets aside out of it and keeps apart from
+        # ordinary food.
         #
         # The seat is the exception, and it is not a special case so much as the
         # rule about who authors what. Every other settlement is described here
@@ -299,6 +294,15 @@ def build():
         if sid != SEAT:
             stores.append({"settlement": sid, "good": "grain",
                            "quantity": int(pop * GRAIN_PER_HEAD * yld)})
+        else:
+            # The seat's villages hold their own crop, so their opening grain is
+            # theirs and not the crown's. The crown's granary is the scenario's.
+            for kind, people in split:
+                if kind == "palace":       # fed from the crown's granary
+                    continue
+                stores.append({"settlement": sid, "good": "grain",
+                               "owner": f"cohort:{slug}_{kind}",
+                               "quantity": int(people * GRAIN_PER_HEAD * yld)})
 
         orgs.append({
             "id": f"org:{slug}_{ORG_KIND[rank]}", "name": f"the {ORG_KIND[rank]} of {place['name']}"

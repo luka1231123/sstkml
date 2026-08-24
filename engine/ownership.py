@@ -184,15 +184,15 @@ class Book:
         after the migration than before it.
 
         `from_lots` names what was drawn down to make this, where anything was.
-        A conversion is a source and a sink standing side by side -- sheaves are
-        consumed and grain is created -- and without the link the two are only
-        adjacent in the ledger rather than connected in it. Naming them is what
-        lets an inspector walk a household's ration back to the furrow instead
-        of inferring the join from a shared turn and phase.
+        A conversion is a source and a sink standing side by side -- standing
+        crop is consumed and grain is created -- and without the link the two
+        are only adjacent in the ledger rather than connected in it. Naming
+        them lets an inspector walk a ration back to the furrow instead of
+        inferring the join from a shared turn and phase.
 
         It is provenance and not a transfer: nothing moved between the old lots
         and the new one. The old goods left the world and different goods
-        entered it, which is exactly what a threshing floor does.
+        entered it, which is exactly what a harvest conversion does.
         """
         if reason not in SOURCES:
             raise LedgerError(f"{reason!r} does not bring goods into the world")

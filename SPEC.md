@@ -105,6 +105,11 @@ correct them.
 No screen may read World directly. A quantity the court has not measured is
 shown as an estimate or a range, or not shown.
 
+Every fact the court does know must be reachable in the interface. A fact may
+be absent only because the court has no evidence for it; in that case the
+relevant dossier says that it is unknown, why, and what report, inspection, or
+event could reveal it. Uncertainty limits precision, not access.
+
 ### 2.5 Orders act through people and institutions
 
 An order names its subject, its authority, and the person or institution that
@@ -349,7 +354,7 @@ Prose belongs in tablets, where a person wrote it and a scribe read it out.
 
 The same action uses the same key everywhere. Tab and Shift-Tab cycle room
 tabs; arrows select; Enter opens or confirms a displayed preview; Space
-toggles, except in Hall where it previews ending the fortnight; Escape cancels
+toggles, except in Hall where it ends the fortnight; Escape cancels
 the active mode and otherwise closes; `:` opens Command and `?` opens Help.
 Ctrl-H raises Hall, Ctrl-G opens the window switcher, Ctrl-Tab and
 Ctrl-Shift-Tab cycle windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S

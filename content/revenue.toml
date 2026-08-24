@@ -1,8 +1,11 @@
 # M12, 6.20. Rates are per thousand. The land due is a share of gross produce;
 # the harbour due is assessed only on finite, owned cargo present in World.
 [land]
-base_rate = 300
-initial_rate = 300
+# The share of its own villages' harvest the crown takes. Customary is
+# about what the granary needs in an ordinary year; above it the villages are
+# short and say so (`revenue.pressure`, `farm.divide`).
+base_rate = 150
+initial_rate = 150
 unrest_divisor = 4
 flight_per_100 = 20
 
@@ -10,7 +13,16 @@ flight_per_100 = 20
 customary_rate = 100
 initial_rate = 100
 cargo_good = "oil"
-clearance_units_per_1000 = 100
+# How often the merchants come, and what each lands at full traffic and full
+# esteem. Deliberately more than the quay can clear, so what the court takes is
+# set by the harbour it keeps and the due it charges, not by the sea.
+cargo_fortnights = 6
+cargo_per_merchant = 2400
+# What the quay clears a fortnight, per thousand of harbour and traffic. At a
+# sound harbour and the customary due this is a little more oil than the lamps
+# and the rites burn, so the store settles near its opening figure. Let the
+# harbour fall in, or drive the merchants off, and the lamps go out.
+clearance_units_per_1000 = 380
 response_min_turns = 3
 response_max_turns = 6
 traffic_loss_per_esteem = 3

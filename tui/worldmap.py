@@ -806,7 +806,6 @@ def orders_for(b: dict, place: str) -> list[tuple[str, str, str, bool, str]]:
     return [
         ("w", "Letter", "at the Scribe's Desk", can_write,
          stem + "letter" if can_write else ""),
-        ("e", "Envoy", "not yet wired", False, ""),
         ("g", "Gift", "by letter", can_write,
          stem + "gift" if can_write else ""),
         ("m", "Marriage", "by letter", can_write,

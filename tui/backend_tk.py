@@ -238,6 +238,19 @@ class GridWindow:
     def resize_pixels(self, width: int, height: int) -> None:
         self.root.geometry(f"{int(width)}x{int(height)}")
 
+    def resize_cells(self, columns: int, rows: int) -> None:
+        """Give the window exactly this many cells and let Tk find the pixels.
+
+        Clearing the geometry string is the point: a window that has been
+        dragged carries an explicit pixel size that outranks anything the text
+        widget asks for, so without dropping it the widget would be resized
+        and the window would not move.
+        """
+        self.width, self.height = desktop.clamp_size(self.key, columns, rows)
+        self.text.configure(width=self.width, height=self.height)
+        self.root.geometry("")
+        self.root.update_idletasks()
+
     def place(self, rect) -> None:
         x, y, width, height = rect
         self.root.geometry(f"{int(width)}x{int(height)}+{int(x)}+{int(y)}")
@@ -492,6 +505,23 @@ class App:
         size = (int(area[2] * 0.6), int(area[3] * 0.6))
         for key, rect in zip(keys, desktop.cascaded(len(keys), area, size)):
             self.windows[key].place(rect)
+
+    def reset_size(self, key: str) -> tuple[int, int] | None:
+        """Put one window back to the size its screen was designed for."""
+        window = self.windows.get(key)
+        if window is None or not window.root.winfo_exists():
+            return None
+        columns, rows = desktop.default_size(key)
+        window.resize_cells(columns, rows)
+        # Forget the drag as well as undoing it, or the next run restores it.
+        self.prefs.forget(key)
+        if window.on_resize is not None:
+            window.on_resize(key)
+        return window.width, window.height
+
+    def reset_sizes(self) -> int:
+        """Every open window back to its default. Returns how many moved."""
+        return sum(self.reset_size(key) is not None for key in self.live())
 
     def set_font_size(self, size: int) -> int:
         """Retype every window at once and report the size settled on."""

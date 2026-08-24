@@ -9,7 +9,11 @@ year's set-aside.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from belief.project import project
+from engine import seat
+from engine.core import Date
 from engine.kernel import farm as F
 from engine.kernel import seat_people as SP
 from engine.tick import advance
@@ -71,6 +75,36 @@ def test_last_land_due_is_stable_and_positive_across_a_year() -> None:
     for _ in range(24):
         world, _ = advance(world)
     assert world.court.last_land_due > 0
+
+
+def test_land_due_totals_every_harvest_fortnight() -> None:
+    world = load_campaign("seat", SEED)
+
+    def at(fortnight: int):
+        return dataclasses.replace(
+            world, kernel=dataclasses.replace(
+                world.kernel,
+                date=Date(1, fortnight, fortnight)))
+
+    world, _ = seat.harvest(
+        at(8), [("reaped", world.court.actor, SP.SEAT, 100)])
+    assert world.court.last_land_due == 0
+    assert world.court.land_due_in_progress == 100
+
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(
+            world.kernel, date=Date(1, 9, 9)))
+    world, _ = seat.harvest(
+        world, [("reaped", world.court.actor, SP.SEAT, 200)])
+    assert world.court.land_due_in_progress == 300
+
+    world = dataclasses.replace(
+        world, kernel=dataclasses.replace(
+            world.kernel, date=Date(1, 13, 13)))
+    world, _ = seat.harvest(
+        world, [("reaped", world.court.actor, SP.SEAT, 400)])
+    assert world.court.last_land_due == 700
+    assert world.court.land_due_in_progress == 0
 
 
 def test_seed_in_store_agrees_with_the_storehouse() -> None:

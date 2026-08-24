@@ -1,41 +1,8 @@
 # LAND AND METAL (spec 6.4, 6.5).
 #
-# The response tables are the whole balance of agriculture. Each is read with
-# `lerp_table(table, x)` -- integer linear interpolation over authored points --
-# and returns a 0..1000 multiplier applied in the fixed order documented in
-# engine/land.py. The player never sees any of this, only proxies (6.4).
-
-# x = mean climate index over the growing season (0..200, 100 = normal).
-# Deliberately asymmetric: a wet year is worth less than a dry year costs. Rain
-# beyond sufficiency does nothing, drought takes everything.
-[tables]
-water_response = [
-  [0, 0], [40, 120], [60, 380], [80, 720], [95, 950],
-  [100, 1000], [120, 1060], [150, 1080], [200, 1000],
-]
-
-# x = 1000 * labour_days_supplied // labour_days_needed.
-# Note the shoulder: the first shortfall is nearly free (there is slack in any
-# harvest), and then it is not. A court that pulls the garrison off the fields
-# every year will not notice for two years and cannot recover in the third.
-labour_response = [
-  [0, 0], [250, 260], [500, 560], [750, 830], [900, 960],
-  [1000, 1000], [1200, 1030],
-]
-
-# x = 1000 * seed_sown // seed_recommended.
-# Near-linear and unforgiving, because it is: land sown at half rate yields
-# about half. This is where `eat seed` finally presents its bill, 19 turns on.
-seed_response = [
-  [0, 0], [250, 270], [500, 530], [750, 790], [1000, 1000], [1200, 1040],
-]
-
-# x = canal_condition (0..1000). Spec 6.4: "falls off a cliff below 300", so
-# one year of neglect is recoverable and two are not.
-canal_response = [
-  [0, 0], [100, 60], [200, 150], [300, 420], [500, 760],
-  [750, 930], [1000, 1000],
-]
+# The live agricultural rates. Weather and neglect are applied per fortnight in
+# engine/kernel/farm.py; sowing rate sets the standing crop directly through a
+# site's capacity. The player never sees any of this, only proxies (6.4).
 
 [agriculture]
 # Labour a single head supplies per fortnight when working the fields.

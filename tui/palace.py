@@ -35,8 +35,8 @@ from tui.grid import INDEX, InteractiveScreen, Surface
 C = INDEX
 
 VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
-         ("household", "HOUSEHOLD"), ("audience", "AUDIENCE"),
-         ("justice", "JUSTICE"), ("advisers", "ADVISERS"))
+         ("household", "HOUSE"), ("audience", "AUDIENCE"),
+         ("justice", "JUSTICE"), ("advisers", "ADVICE"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -337,8 +337,26 @@ def _name(actor: str, b: dict) -> str:
     return render.actor_name(actor, b.get("house"))
 
 
+def _where(place: str) -> str:
+    return place.split(":", 1)[-1].replace("_", " ") or "the road"
+
+
+def petitioners(b: dict) -> list[dict]:
+    """Bands of displaced people waiting at the gate for an answer."""
+    return [c for c in b.get("cohorts", ())
+            if c.get("status") == "petitioning"]
+
+
 def _court(b: dict) -> list[workbench.Row]:
     rows = []
+    for band in petitioners(b):
+        rows.append(workbench.Row(
+            band["id"],
+            (("reception", "bone"),
+             (f"{band['people']:,} from {_where(band.get('origin', ''))}", "clay"),
+             (f"hunger {band.get('hunger', 0)}", "dim"),
+             ("at the gate", "flame")),
+            mark="!"))
     for item in b.get("justice", {}).get("petitions", []):
         parties = f"{_name(item['petitioner'], b)} v {_name(item['against'], b)}"
         rows.append(workbench.Row(
@@ -382,6 +400,20 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
 
 def _court_detail(b: dict, chosen: str,
                   width: int = 44) -> list[tuple[str, str]]:
+    band = next((c for c in petitioners(b) if c["id"] == chosen), None)
+    if band is not None:
+        eats = band["people"] * band.get("ration_per_head", 10)
+        return [
+            (f"{band['people']:,} people from {_where(band.get('origin', ''))}",
+             "bone"),
+            (f"hungry {band.get('hunger', 0)} fortnights · "
+             f"grievance {band.get('grievance', 0)}", "clay"),
+            (f"they would eat {eats:,} qa a fortnight", "clay"),
+            ("", "clay"),
+            ("Take them in and they are yours to feed. Turn them away and "
+             "they go hungry to the next gate, or take what they need at "
+             "this one.", "ash"),
+        ]
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
     if item is None:
@@ -430,19 +462,48 @@ def _wrapped(text: str, rows: int, width: int = 44) -> list[tuple[str, str]]:
             for line in textwrap.wrap(text or "—", width)[:rows]]
 
 
+RECEPTIONS = (("t", "settle", "take them in"),
+              ("y", "refuse", "turn them away"))
+
+
 def _court_controls(b: dict, chosen: str, hours: int) -> list[workbench.Control]:
+    band = next((c for c in petitioners(b) if c["id"] == chosen), None)
+    if band is not None:
+        return [workbench.affordable(workbench.Control(
+            "receive_cohort", key, label=label,
+            command=f"receive:{decision}"), hours)
+            for key, decision, label in RECEPTIONS]
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)
-    heard = bool(item and item["heard"])
+    if item is None:
+        return []
+    if not item["heard"]:
+        return [workbench.affordable(workbench.Control(
+            "hear_petition", registry.BY_ID["hear_petition"].mnemonic),
+            hours)]
+    # Hearing and ruling are consecutive steps, not a permanent seven-button
+    # toolbar. Once both sides have spoken, refugee controls and a disabled
+    # "Hear" only consume the rows needed to read their words.
+    return [workbench.Control(
+        "rule_petition", key, label=label,
+        command=f"verdict:{verdict}")
+        for key, verdict, label in VERDICTS]
+
+
+def _court_catalog(hours: int) -> list[workbench.Control]:
+    """All Court routes for the registry audit, outside a selected matter."""
     controls = [workbench.affordable(workbench.Control(
+        "receive_cohort", key, label=label, enabled=False,
+        why="choose displaced people", command=f"receive:{decision}"), hours)
+        for key, decision, label in RECEPTIONS]
+    controls.append(workbench.Control(
         "hear_petition", registry.BY_ID["hear_petition"].mnemonic,
-        enabled=bool(item) and not heard,
-        why="already heard" if heard else "nobody waits"), hours)]
-    for key, verdict, label in VERDICTS:
-        controls.append(workbench.Control(
-            "rule_petition", key, label=label, enabled=heard,
-            why="hear him first" if item is not None else "nobody waits",
-            command=f"verdict:{verdict}"))
+        enabled=False, why="choose an unheard claim"))
+    controls.extend(
+        workbench.Control(
+            "rule_petition", key, label=label, enabled=False,
+            why="choose a heard claim", command=f"verdict:{verdict}")
+        for key, verdict, label in VERDICTS)
     return controls
 
 
@@ -657,17 +718,17 @@ def _relations_controls(b: dict, chosen: str, hours: int, amount: int,
 def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
                  choosing: str = "", person: str = "", amount: int = 0,
                  good: str = "copper") -> list[workbench.Control]:
-    """Every order this view offers, whether or not it can be given now.
+    """The current matter's controls, or every route when none is selected.
 
-    One list, read both by the screen that draws it and by the guard that
-    checks it against `registry.in_context`. A control's `command` is what
-    clicking it says, and for several of them that is not `do:<id>` -- four
-    verdicts are one action, and appointing begins by changing the list rather
-    than by giving an order -- so the action a control belongs to cannot be
-    recovered from the drawn screen, and the guard has to read this instead.
+    The no-selection catalog lets the registry guard audit every route. Once a
+    matter is selected the screen gets only its current step. A control's
+    `command` is what clicking it says, and for several of them that is not
+    `do:<id>` -- four verdicts are one action -- so the action cannot be
+    recovered from the drawn screen and the guard reads this declaration.
     """
     if view in {"court", "audience", "justice"}:
-        return _court_controls(b, chosen, hours)
+        return (_court_controls(b, chosen, hours) if chosen
+                else _court_catalog(hours))
     if view in {"house", "people", "household", "advisers"}:
         return _house_controls(b, person or chosen, hours, choosing)
     if view == "offices":
@@ -754,11 +815,19 @@ def compose(b: dict, view: str = "court", selected: str = "",
         detail = _post_detail(b, chosen)
     else:
         detail = _relations_detail(b, chosen, amount, good)
-    controls = controls_for(b, view, chosen, hours, choosing, person=who,
-                            amount=amount, good=good)
+    if view in {"court", "audience", "justice"}:
+        # A blank Court also has no toolbar. `controls_for` without a selected
+        # matter returns the full route catalog for the registry audit.
+        controls = _court_controls(b, chosen, hours)
+    else:
+        controls = controls_for(b, view, chosen, hours, choosing, person=who,
+                                amount=amount, good=good)
 
     band = scene_rows(height)
     queue = rows
+    scene_listing = {"people": "house", "household": "house",
+                     "advisers": "house", "audience": "court",
+                     "justice": "court", "offices": "post"}.get(listing, listing)
 
     title = "THE COURT — RELATIONS" if view == "relations" else "THE COURT"
     note = "↑↓ choose   Enter open   Tab view   [c] counsel"
@@ -792,7 +861,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
 
     def draw(surface, x, y, room, rows_available):
         _draw_scene(surface, x, y, room, rows_available, view, queue, chosen,
-                    b=b, listing=listing)
+                    b=b, listing=scene_listing)
 
     return workbench.compose(
         title, headers, widths, rows, chosen, detail, controls, hours,

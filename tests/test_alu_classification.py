@@ -52,7 +52,7 @@ def test_every_mark_has_a_classification_and_an_owning_alu() -> None:
     counted = collections.Counter(
         "palace_centre" if site.function == "palace_centre" else "capacity"
         for site in sites)
-    assert counted == {"capacity": 149, "palace_centre": 91}
+    assert counted == {"capacity": 151, "palace_centre": 91}
 
 
 def test_an_unowned_or_unclassified_mark_is_a_load_error() -> None:

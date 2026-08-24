@@ -28,7 +28,7 @@ QUESTIONS = (
     ("r", "of the road and the sea", "route"),
 )
 
-OFFERINGS = (("1", "oil", 20), ("2", "wine", 20), ("3", "grain", 200))
+OFFERINGS = (("o", "oil", 20), ("w", "wine", 20), ("g", "grain", 200))
 
 _MEDIUM_ALTAR = art.ALTAR[:8] + (art.ALTAR[-1],)
 _MEDIUM_PRIEST = art.PRIEST[:6] + (art.PRIEST[-1],)
@@ -127,6 +127,20 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
     _room(surface, width, foot, readings)
     workbench.tabs(surface, 2, 2, width,
                    tuple((name, name.title()) for name in VIEWS), view)
+    rites = b.get("rites", ())
+    if rites:
+        for index, rite in enumerate(rites[:max(1, (foot - 5) // 2)]):
+            y = 3 + index * 2
+            needs = ", ".join(f"{qty} {good}" for good, qty in rite["requires"].items())
+            line = (f"{rite['id'].replace('_', ' ')} · fortnight "
+                    f"{rite['fortnight']} · {rite['hours']}h")
+            surface.text(3, y, line[:width - 6],
+                         C["sky"], C["ink"])
+            needs = needs.replace(", ", " + ")
+            consequence = (f"{needs} · skip L{rite['skip_legitimacy']:+} "
+                           f"U{rite['skip_unrest']:+}")
+            surface.text(5, y + 1, consequence[:width - 8],
+                         C["dim"], C["ink"])
     style.bar(surface, 2, foot, width - 4, " WHAT YOU WOULD KNOW",
               fg=C["bone"], bg=C["faint"])
     people = [

@@ -106,6 +106,21 @@ def tabs(surface: Surface, x: int, y: int, width: int,
         x += len(text) + 1
 
 
+def detail_room(widths: tuple[int, ...], width: int,
+                detail_min: int = 18) -> int:
+    """How many columns the detail pane will get, before it is composed.
+
+    A screen that wants to lay its facts out in two columns has to know this
+    before it builds them, and guessing it wrong is how a value ends in an
+    ellipsis. Kept beside `compose`, which is the only place the arithmetic
+    may live, so the two cannot drift apart.
+    """
+    natural = sum(abs(spec) for spec in widths) + 2 * len(widths) + 2
+    if width < 68 or natural > width - detail_min - 6:
+        return width - 5            # stacked: the pane owns the whole column
+    return width - (max(30, min(natural, width - detail_min - 6)) + 4) - 2
+
+
 def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             rows: list[Row], selected: str, detail: list[tuple[str, str]],
             controls: list[Control], hours: int,
@@ -114,7 +129,7 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             note: str = "",
             views: tuple[tuple[str, str], ...] = (),
             view: str = "", scene=None, scene_rows: int = 0,
-            detail_min: int = 18) -> InteractiveScreen:
+            detail_min: int = 18, list_min: int = 5) -> InteractiveScreen:
     """The whole screen: list left, detail right, controls along the bottom.
 
     `scene` is a band across the top for a window that is a room rather than a
@@ -165,7 +180,8 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
         # row -- which is a list that has stopped being a list. The detail is
         # what gets cut, and it is cut at the end, where the least urgent lines
         # already are.
-        room = max(1, min(available - 4, max(available // 3, 5)))
+        room = max(1, min(
+            available - 4, max(available // 3, list_min)))
         detail = detail[:max(0, available - room - 1)]
     else:
         room = max(1, available)
@@ -209,7 +225,9 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
     if note:
         surface.text(3, height - 3 - footer_rows, note[:width - 6],
                      C["ash"], C["ink"])
-    return surface.interactive()
+    # Keyboard navigation needs the whole collection, not only the rows that
+    # fit on this page. Mouse targets remain limited to what is drawn.
+    return surface.interactive(tuple(row.id for row in rows))
 
 
 def _columns(surface: Surface, x: int, y: int, cells, widths, limit: int,

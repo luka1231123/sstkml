@@ -140,6 +140,17 @@ def _decay_for(court, inst, *, upkeep_met: bool) -> int:
     return decay
 
 
+def _tended(world, inst) -> int:
+    """The line routine minding holds the fabric at, 0..1000.
+
+    Decay is not a countdown. Hands, a head and the upkeep put back most of what
+    the weather takes, so a minded building settles where its care buys it and a
+    neglected one still goes to rubble. Repair (`works`) is what lifts it above
+    the line; nothing but care holds it there.
+    """
+    return _staff_factor(world, inst) * _head_factor(world.court, inst) // 1000
+
+
 def _upkeep_required(inst) -> dict[str, int]:
     required: dict[str, int] = {}
     for good, qty in inst.upkeep:
@@ -165,12 +176,18 @@ def _consume_upkeep(stores: dict[str, int], inst) -> bool:
     return True
 
 
-def effective(world, inst) -> int:
-    """What it can actually do this fortnight. Derived, never stored."""
+def effective_at_condition(world, inst, condition: int) -> int:
+    """Output at a stated condition, with the institution's known staffing."""
     court = world.court
     staff = _staff_factor(world, inst)
-    return (inst.capacity * inst.condition // 1000 * staff // 1000
+    condition = max(0, min(1000, condition))
+    return (inst.capacity * condition // 1000 * staff // 1000
             * _head_factor(court, inst) // 1000)
+
+
+def effective(world, inst) -> int:
+    """What it can actually do this fortnight. Derived, never stored."""
+    return effective_at_condition(world, inst, inst.condition)
 
 
 def factor(world, kind: str) -> int:
@@ -186,7 +203,7 @@ def factor(world, kind: str) -> int:
 
 
 def factor_at(world, kind: str, place: str | None = None) -> int:
-    """Working factor for a kind, optionally at one physical place."""
+    """Combined working factor for a kind, optionally at one physical place."""
     court = world.court
     matching = sorted((
         inst for inst in court.institutions.values()
@@ -194,11 +211,9 @@ def factor_at(world, kind: str, place: str | None = None) -> int:
     ), key=lambda item: item.id)
     if not matching:
         return 0
-    inst = matching[0]
-    staff = _staff_factor(world, inst)
-    return max(0, min(
-        1000, inst.condition * staff // 1000
-        * _head_factor(court, inst) // 1000))
+    reference = _STAFFING_NORMS.get(kind, (100, 1000))[1]
+    working = sum(effective(world, inst) for inst in matching)
+    return max(0, min(1000, working * 1000 // max(1, reference)))
 
 
 def reported_condition(world, inst, seed: int, turn: int) -> int:
@@ -248,11 +263,11 @@ def step(world: World) -> tuple[World, list]:
                 A.InstitutionUpkeepConsumed(inst.id, good, qty)
                 for good, qty in sorted(_upkeep_required(inst).items())
             )
-        condition = max(0, min(
-            1000,
-            inst.condition - _decay_for(
-                court, inst, upkeep_met=upkeep_met),
-        ))
+        target = _tended(world, inst) if upkeep_met else 0
+        move = _decay_for(court, inst, upkeep_met=upkeep_met)
+        condition = (max(target, inst.condition - move) if inst.condition > target
+                     else min(target, inst.condition + move))
+        condition = max(0, min(1000, condition))
         if condition != inst.condition:
             events.append(A.InstitutionDecayed(inst.id, condition))
         inst = dataclasses.replace(inst, condition=condition)

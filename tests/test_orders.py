@@ -94,7 +94,7 @@ def test_an_order_with_no_inverse_is_simply_done() -> None:
 # --- reading it back ----------------------------------------------------------
 
 def test_an_order_reads_back_in_the_words_it_was_given_in() -> None:
-    world = _world()
+    world = _world(7)
     b = project(world)
     group = b["groups"][0]
     _world_, log = _given(world, [A.SendToHarvest(group["id"], True)])
@@ -102,6 +102,19 @@ def test_an_order_reads_back_in_the_words_it_was_given_in() -> None:
     said = orders.phrase(order, project(_world_))
     assert group["name"] in said, said
     assert "_" not in said, "engine ids are not a record anybody can audit"
+
+
+def test_a_ration_order_shows_every_rank_at_the_real_window_size() -> None:
+    world = _world()
+    belief = project(world)
+    action = A.SetPriority(tuple(belief["priority"]))
+    _world_, log = _given(world, [action])
+    text = plain_text(orders.compose(
+        belief, log, world.date.absolute, view="all", width=72, height=24))
+    for rank, group_id in enumerate(action.order, 1):
+        group = next(item for item in belief["groups"]
+                     if item["id"] == group_id)
+        assert f"{rank}  {group['name']}" in text
 
 
 def test_the_reverse_of_an_order_is_not_called_by_its_name() -> None:
@@ -138,6 +151,25 @@ def test_the_window_shows_each_view_and_says_when_one_is_empty() -> None:
     assert "no order of yours is still in force" in empty
 
 
+def test_arrow_keys_reach_orders_below_the_visible_page() -> None:
+    game = _game([A.InspectLedger("granary") for _ in range(12)])
+    game.orders_state["view"] = "all"
+    every = orders.visible(
+        orders.history(game.log), "all", game.world.date.absolute)
+    shown = {hit.command.split(":", 1)[1]
+             for hit in game.compose("orders").hits
+             if hit.command.startswith("pick:")}
+    assert every[-1].id not in shown, "the test needs an order below the fold"
+
+    for _ in every:
+        game.on_orders_key(_Key(keysym="Down"))
+    assert game.orders_state["pick"] == every[-1].id
+    revealed = {hit.command.split(":", 1)[1]
+                for hit in game.compose("orders").hits
+                if hit.command.startswith("pick:")}
+    assert every[-1].id in revealed
+
+
 def test_countermanding_gives_the_inverse_order_at_its_own_price() -> None:
     world = _world()
     place = project(world)["world_graph"]["places"][0]["id"]
@@ -145,6 +177,8 @@ def test_countermanding_gives_the_inverse_order_at_its_own_price() -> None:
     before = game.hours
     game.orders_state["pick"] = orders.history(game.log)[0].id
     game.on_orders_key(_Key("u"))
+    assert game.pending_action is not None
+    game.confirm_pending()
     kinds = [entry["action"] for entry in game.log]
     assert kinds[-1]["_t"] == "Quarantine" and kinds[-1]["lift"] is True
     assert game.hours == before - registry.BY_ID["quarantine"].cost

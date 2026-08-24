@@ -358,6 +358,9 @@ default = "pooled"
 [tenure.polities]
 "polity:egypt" = "redistributive"
 "polity:assur" = "redistributive"
+# The seat's villages hold their own crop and render a due. The crown's roll is
+# authored redistributive per cohort and keeps eating from the store.
+"polity:seat" = "subsistence"
 
 [[regions]]
 id = "north_levant"
@@ -1900,6 +1903,24 @@ alu = "seat"
 col = 376
 row = 80
 
+# The olive terraces and the vines on the slopes behind the town. Neither is
+# sown or reaped; they stand, and give once a year at the pressing.
+[[sites]]
+kind = "olives"
+role = "capacity"
+capacity = "oil"
+alu = "seat"
+col = 372
+row = 78
+
+[[sites]]
+kind = "vines"
+role = "capacity"
+capacity = "wine"
+alu = "seat"
+col = 378
+row = 78
+
 [[sites]]
 name = "Shuksi"
 kind = "palace"
@@ -3255,8 +3276,7 @@ row = 140
 sailing_open = [7, 21]
 sowing       = [19, 22]
 growing      = [23, 7]
-harvest      = [8, 11]
-threshing    = [12, 13]
+harvest      = [8, 13]
 low_water    = [14, 18]
 
 # The twelfth-century downturn (spec 6.4). x = regnal year, y = the climate

@@ -31,7 +31,7 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 
 `run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
-Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter` opens or confirms, `Space` toggles, and `Escape` cancels or closes. In Hall, `Space`, then `Enter`, ends the fortnight. `Ctrl-H` raises Hall, `Ctrl-G` opens the switcher, `Ctrl-Tab` cycles windows, `Ctrl-S` saves, `Ctrl-O` asks before reload, `:` opens Command, and `?` opens grounded Help.
+Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter` opens or confirms, `Space` toggles, and `Escape` cancels or closes. In Hall, `Space` ends the fortnight. `Ctrl-H` raises Hall, `Ctrl-G` opens the switcher, `Ctrl-Tab` cycles windows, `Ctrl-S` saves, `Ctrl-O` asks before reload, `:` opens Command, and `?` opens grounded Help.
 
 ## Required local language model
 
@@ -51,14 +51,24 @@ Model supply language, not simulation truth. It may correct player's one- or two
 ./run.sh --test
 .venv/bin/python tools/inventory.py
 .venv/bin/python tools/corpus_lint.py
-.venv/bin/python tools/m13_audit.py
 .venv/bin/python tools/m13_benchmark.py
 .venv/bin/python tools/balance.py austerity 96
 .venv/bin/python tools/gameplay_probe.py 4 180
+.venv/bin/python tools/information_audit.py
 .venv/bin/python tools/kernel_inspect.py where grain
 ```
 
 `tools/kernel_inspect.py` = omniscient developer inspector. Explain why lot exist, where quantity went, why actor decided, what evidence belief rest on, what obligation authorized, which request unsatisfied. Never player-facing.
+
+`tools/look.py` = read a run without reading a screen.
+
+```sh
+.venv/bin/python tools/look.py figures --turns 60 --every 4   # numbers, one row a turn
+.venv/bin/python tools/look.py events --turns 40              # events by domain, not 767 lines
+.venv/bin/python tools/look.py events --turns 40 --each --kind hungry
+.venv/bin/python tools/look.py belief justice.petitions       # what a screen could show
+.venv/bin/python tools/look.py belief stores --diff --turns 8 # what the last turn changed
+```
 
 Runtime engine standard-library-only, integer-state, immutable, seeded, replayable. `belief/` = only World-to-player projection boundary.
 

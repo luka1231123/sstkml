@@ -70,7 +70,7 @@ def _shown_fact(key: str, value) -> str:
 def _fact_lines(item: dict, width: int) -> list[str]:
     facts = item.get("facts") or {}
     if not facts:
-        return ["no quantity or named term is impressed here"]
+        return ["no exact quantity, deadline, or named term is impressed here"]
     lines: list[str] = []
     current = ""
     for key, value in facts.items():

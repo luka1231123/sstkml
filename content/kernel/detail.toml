@@ -3,11 +3,10 @@
 
 [season]
 growing = [23, 7]
-harvest = [8, 11]
+harvest = [8, 13]
 low_water = [14, 18]
 sailing_open = [7, 21]
 sowing = [19, 22]
-threshing = [12, 13]
 
 [climate]
 drought_curve = [[0, 104], [1, 100], [2, 97], [3, 99], [4, 92], [5, 88], [6, 91], [7, 82], [8, 78], [9, 74], [12, 68]]
@@ -243,7 +242,7 @@ id = "site:assur_552_84"
 settlement = "settlement:assur"
 region = "region:upper_mesopotamia"
 function = "tin"
-capacity = 800
+capacity = 700
 extent = 0
 
 [[sites]]
@@ -587,7 +586,7 @@ id = "site:emar_426_78"
 settlement = "settlement:emar"
 region = "region:upper_mesopotamia"
 function = "tin"
-capacity = 800
+capacity = 700
 extent = 0
 
 [[sites]]
@@ -1460,7 +1459,28 @@ settlement = "settlement:seat"
 region = "region:north_levant"
 function = "food"
 capacity = 7000
-extent = 84000
+extent = 7920000
+
+# The olive terraces and the vines above the town. `capacity` is the whole
+# year's pressing, taken in one fortnight. Sized so the crown's store settles
+# near its authored opening figure instead of draining: the lamps, the temple's
+# upkeep and the rites burn about four hundred qa of oil a year and the jars in
+# the cellar lose the rest, so the press must find both.
+[[sites]]
+id = "site:seat_372_78"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "oil"
+capacity = 390
+extent = 0
+
+[[sites]]
+id = "site:seat_378_78"
+settlement = "settlement:seat"
+region = "region:north_levant"
+function = "wine"
+capacity = 280
+extent = 0
 
 [[sites]]
 id = "site:seat_374_80"
@@ -2844,6 +2864,7 @@ settlement = "settlement:seat"
 kind = "palace"
 households = 1920
 people = 9600
+tenure = "redistributive"
 
 [[cohorts]]
 id = "cohort:shechem_field_labour"
@@ -3698,7 +3719,19 @@ quantity = 3000
 settlement = "settlement:seat"
 site = "site:seat_372_76"
 good = "standing_grain"
-quantity = 588000
+quantity = 55440000
+
+[[stores]]
+settlement = "settlement:seat"
+good = "grain"
+owner = "cohort:seat_field_labour"
+quantity = 10400000
+
+[[stores]]
+settlement = "settlement:seat"
+good = "grain"
+owner = "cohort:seat_craft"
+quantity = 3680000
 
 [[stores]]
 settlement = "settlement:seat"

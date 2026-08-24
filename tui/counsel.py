@@ -321,7 +321,7 @@ def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
     surface.link(3, foot + 1, width - 6, 1, "focus")
     if not pending:
         surface.text(3, foot + 2,
-                     "orders cost what the act costs; an hour a question",
+                     "orders cost as shown; questions cost 1h",
                      C["ash"], C["ink"])
 
     suggestions = suggestions or []

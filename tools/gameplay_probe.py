@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from belief.project import project
 from engine import actions as A, fall, seat
+from engine.core import in_range
 from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
@@ -19,11 +20,55 @@ SEEDS = (1, 7, 42, 1009, 65537, 271828, 8814402919, 4294967291)
 POLICIES = {
     "passive": "leaves authored rations and labour untouched",
     "austerity": "cuts rations to last land revenue and sends hands to harvest when grain is thin",
+    "stewardship": "rations against the fortnights the granary can feed, banking a good year to spend through a bad one",
 }
 
 
 def event_name(event) -> str:
     return f"kernel:{event[0]}" if isinstance(event, tuple) and event else type(event).__name__
+
+
+def _act(policy: str, world) -> tuple:
+    """What a court that is paying attention does with its granary.
+
+    `austerity` only reacts once the grain is nearly gone, which is why it
+    stopped differing from doing nothing as soon as the seat had reserves: the
+    trigger never fired. `stewardship` reads the same figure the Hall now shows
+    the player -- how many fortnights the granary feeds the roll -- and rations
+    against it, so a good year is banked and a bad one is spent through.
+    """
+    made: list = []
+    roll = seat.groups(world)
+    owed = sum(g.size * g.entitlement for g in roll.values())
+    if owed <= 0:
+        return world, made
+    kept = seat.held(world).get("grain", 0) // owed
+
+    if policy == "austerity":
+        budget = (world.court.last_land_due // 24
+                  if world.court.last_land_due else owed)
+        thin = kept < 6
+    else:
+        # Full rations while a year is banked; three quarters while half a year
+        # stands; half when the floor is in sight. Never nothing: a court that
+        # feeds nobody is not economising, it is abdicating.
+        share = 1000 if kept >= 24 else 750 if kept >= 12 else 500
+        budget = owed * share // 1000
+        thin = kept < 12
+
+    for action in _austerity_allocations(world, budget):
+        world, got = apply(world, action)
+        made += got
+    harvest = tuple(world.season.get("harvest") or ())
+    may_send = bool(harvest) and in_range(
+        world.date.advance().fortnight, harvest)
+    if thin and may_send:
+        for gid in ("weavers", "garrison_mahadu"):
+            group = roll.get(gid)
+            if group and not group.at_fields:
+                world, got = apply(world, A.SendToHarvest(gid, True))
+                made += got
+    return world, made
 
 
 def run(policy: str, seed: int, turns: int = 120) -> dict:
@@ -41,19 +86,9 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
         falls += [(world.date.absolute, event.alu, event.cause,
                    event.population, event.unrest)
                   for event in made if isinstance(event, A.AluFell)]
-        if policy == "austerity" and not world.ended:
-            budget = (world.court.last_land_due // 24
-                      if world.court.last_land_due else sum(
-                          g.size * g.entitlement for g in seat.groups(world).values()))
-            for action in _austerity_allocations(world, budget):
-                world, made = apply(world, action)
-                events.update(event_name(event) for event in made)
-            if seat.held(world).get("grain", 0) < world.court.last_land_due // 4:
-                for gid in ("weavers", "garrison_mahadu"):
-                    group = seat.groups(world).get(gid)
-                    if group and not group.at_fields:
-                        world, made = apply(world, A.SendToHarvest(gid, True))
-                        events.update(event_name(event) for event in made)
+        if policy in {"austerity", "stewardship"} and not world.ended:
+            world, made = _act(policy, world)
+            events.update(event_name(event) for event in made)
         for sid in opening:
             low[sid] = min(low[sid], world.kernel.people(sid))
             cohorts = tuple(c for c in world.kernel.cohorts_of(sid)
@@ -116,7 +151,7 @@ def main(argv: list[str]) -> int:
     count = int(argv[1]) if len(argv) > 1 else 4
     turns = int(argv[2]) if len(argv) > 2 else 120
     rows = [run(policy, seed, turns)
-            for policy in ("passive", "austerity") for seed in SEEDS[:count]]
+            for policy in POLICIES for seed in SEEDS[:count]]
     for policy, meaning in POLICIES.items():
         print(f"{policy}: {meaning}")
     all_events = Counter()

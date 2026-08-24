@@ -99,12 +99,13 @@ def test_every_settlement_has_an_organization_that_decides():
         assert kernel.controller(sid), f"{sid} decides nothing"
 
 
-def test_opening_stores_are_lots_owned_by_the_controller():
+def test_opening_stores_are_lots_owned_by_an_organization_or_cohort():
     kernel = _kernel()
     for sid in sorted(kernel.registry.settlements):
         assert kernel.stores(sid) > 0, f"{sid} opens with no grain"
     for lot in kernel.book.lots.values():
-        assert lot.owner in kernel.registry.orgs
+        assert (lot.owner in kernel.registry.orgs
+                or lot.owner in kernel.registry.cohorts)
 
 
 def test_a_tributary_owes_its_overlord_and_a_free_place_owes_nothing():
@@ -128,7 +129,7 @@ def test_the_weather_is_the_region_s_and_not_the_world_s():
 
 def test_the_scenario_seasons_reach_the_kernel():
     kernel = _kernel()
-    assert kernel.seasons["harvest"] == (8, 11)
+    assert kernel.seasons["harvest"] == (8, 13)
     assert kernel.seasons["sowing"]
 
 

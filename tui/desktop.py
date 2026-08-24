@@ -76,8 +76,12 @@ WINDOWS: dict[str, WindowSpec] = {
     spec.key: spec for spec in (
         # The Hall stops at the narrowest width that preserves its carved
         # palace column. Below 84 columns the room lost its identity and read
-        # as another flat dashboard.
-        _spec("hall", "The Hall", "anchor", (84, 28), (84, 26)),
+        # as another flat dashboard. It no longer shrinks vertically either:
+        # twenty-eight rows is what the year wheel needs under the legitimacy
+        # block, and below that the calendar was dropped in silence -- the one
+        # thing a room may never do with a fact it holds. Refusing to shrink is
+        # the house rule for exactly this case.
+        _spec("hall", "The Hall", "anchor", (84, 28), (84, 28)),
         _spec("stack", "The Scribes' Room", "workbench", (80, 27), (78, 26)),
         # Four full-size houses, their labels and their matching ledger rows
         # all fit at this floor. A shorter Alu used to cover those labels
@@ -91,14 +95,17 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("works", "Works", "ledger", (66, 23), (62, 21)),
         _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
         _spec("roll", "The Roll", "ledger", (66, 23), (62, 21)),
-        # The Land carries the full estate dossier -- gauge, season, last
-        # year's crop, the seed and the ground -- which the compact stacked
-        # geometry cut to half a page. Taller by default so the whole dossier
-        # sits on one screen (spec 6.4).
-        _spec("land", "The Land", "ledger", (64, 30), (60, 24)),
+        # The Land carries the year band and the full estate dossier -- season,
+        # hands, gauge, crop, due, ground. Eighty-two by twenty-eight is the
+        # measured floor at which none of it is cut, now that the pane lays its
+        # facts two to a row; it is wider than the old sixty-four and two rows
+        # shorter, because the width is what the dossier was actually short of.
+        _spec("land", "The Land", "ledger", (84, 29), (82, 28)),
         _spec("muster", "The Muster", "ledger", (64, 22), (60, 20)),
         _spec("oaths", "The Oaths", "ledger", (62, 22), (58, 20)),
-        _spec("stores", "The Storehouse", "workbench", (78, 25), (76, 24)),
+        # The Storehouse hosts the Land page on its third tab, so it cannot be
+        # smaller than the Land: the same dossier cut in half is still cut.
+        _spec("stores", "The Storehouse", "workbench", (84, 29), (82, 28)),
         # The Shrine keeps enough vertical room for its medium altar vignette
         # above the fixed ritual controls, even at the minimum geometry.
         _spec("altar", "The Shrine", "document", (54, 24), (52, 22)),
@@ -108,7 +115,7 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("palette", "Command", "palette"),
         _spec("switcher", "Windows", "utility", (42, 17), (40, 15)),
         _spec("institution:", "Institution", "document", (50, 19), (46, 18)),
-        _spec("focus:", "Record", "document", (58, 22), (46, 18)),
+        _spec("focus:", "Record", "document", (72, 30), (58, 22)),
         _spec("letter:", "Tablet", "document", (50, 20), (46, 18)),
         _spec("archive:", "Tablet", "document", (50, 20), (46, 18)),
     )
@@ -317,6 +324,18 @@ class Preferences:
                  columns: int, rows: int) -> None:
         self.geometry[key] = {"x": int(x), "y": int(y),
                               "columns": int(columns), "rows": int(rows)}
+
+    def forget(self, key: str = "") -> None:
+        """Drop a remembered geometry: one window, or every one.
+
+        Without this a window could only ever be resized, never reset: the
+        size the player last dragged it to outlived every change to what the
+        screen actually needs to show.
+        """
+        if key:
+            self.geometry.pop(key, None)
+        else:
+            self.geometry.clear()
 
     def recall(self, key: str) -> dict | None:
         remembered = self.geometry.get(key)

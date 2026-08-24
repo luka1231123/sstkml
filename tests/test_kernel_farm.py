@@ -67,15 +67,13 @@ def test_each_task_happens_only_in_its_own_season() -> None:
     for _ in range(24):
         kernel, events = K.advance(kernel)
         for event in events:
-            if event[0] in ("sown", "reaped", "threshed"):
+            if event[0] in ("sown", "reaped"):
                 seen.setdefault(event[0], set()).add(kernel.date.fortnight)
 
     assert seen["sown"] <= {19, 20, 21, 22}
-    assert seen["reaped"] <= {8, 9, 10, 11}
-    assert seen["threshed"] <= {12, 13}
+    assert seen["reaped"] <= {8, 9, 10, 11, 12, 13}
     # And they are disjoint, which is what makes the harvest window a window.
     assert not seen["sown"] & seen["reaped"]
-    assert not seen["reaped"] & seen["threshed"]
 
 
 def test_nothing_is_sown_outside_the_sowing_season() -> None:
@@ -100,20 +98,19 @@ def test_reaping_is_the_years_labour_peak() -> None:
     demand = {task: F.days_for(crop, rate) for task, rate in (
         ("sow", F.SOW_PER_DAY * 7),      # sowing handles seed, not the crop it
         ("tend", F.TEND_PER_DAY),        # returns, so compare like with like
-        ("reap", F.REAP_PER_DAY),
-        ("thresh", F.THRESH_PER_DAY))}
+        ("reap", F.REAP_PER_DAY))}
     assert demand["reap"] == max(demand.values())
-    assert demand["reap"] > demand["thresh"] > demand["tend"]
+    assert demand["reap"] > demand["tend"]
 
 
 # --- everything conserves -----------------------------------------------------
 
 def test_every_good_in_the_chain_is_conserved_across_a_full_year() -> None:
-    """Seed, standing crop, sheaves, grain, and straw all account for themselves.
+    """Seed, standing crop and grain all account for themselves.
 
     Conservation per good is what makes the chain one quantity changing form
-    rather than four stocks that happen to move together. A step that turned
-    sheaves into grain without recording what the threshing floor took would
+    rather than three stocks that happen to move together. A harvest that turned
+    a standing crop into grain without recording what the field took would
     balance the grain books and still be wrong.
     """
     kernel = _world()
@@ -121,7 +118,7 @@ def test_every_good_in_the_chain_is_conserved_across_a_full_year() -> None:
         before = dataclasses.replace(kernel.book, transfers=())
         kernel, _ = K.advance(kernel)
         report = W.conservation(before, kernel.book)
-        for good in (F.GRAIN, F.SEED, F.STANDING, F.SHEAVES, F.FODDER):
+        for good in (F.GRAIN, F.SEED, F.STANDING):
             if good not in report:
                 continue
             _sourced, _sunk, unexplained = report[good]
@@ -143,37 +140,38 @@ def test_the_losses_are_named_rather_than_rounded_away() -> None:
     assert reasons <= W.REASONS, "nothing moves for an unregistered reason"
 
 
-def test_threshing_does_not_return_all_of_what_was_cut() -> None:
-    """A thousand qa of sheaves is not a thousand qa of bread."""
-    kernel = _to_fortnight(_world(), 11)
-    sheaves = F.held(kernel.book, COUNCIL, F.SHEAVES, AMURRU)
+def test_the_harvest_does_not_return_all_of_what_stood() -> None:
+    """A thousand qa standing is not a thousand qa of bread."""
+    kernel = _to_fortnight(_world(), 7)
+    standing = F.held(kernel.book, COUNCIL, F.STANDING,
+                      kernel.field_site(AMURRU, COUNCIL))
     grain = F.held(kernel.book, COUNCIL, F.GRAIN, AMURRU)
-    assert sheaves > 0
+    assert standing > 0
 
     kernel = _to_fortnight(kernel, 14)
     made = F.held(kernel.book, COUNCIL, F.GRAIN, AMURRU) - grain
-    assert 0 < made < sheaves, "the floor and the wind take their share"
-    assert F.held(kernel.book, COUNCIL, F.FODDER, AMURRU) > 0, "and straw is left"
+    assert 0 < made < standing, "the field and the wind take their share"
 
 
-# --- seed is food, and the ground has an extent -------------------------------
+# --- seed is capital, and the ground has an extent ----------------------------
 
-def test_a_settlement_that_eats_its_seed_sows_less_next_year() -> None:
-    """The chain's sharpest consequence, and the reason seed is a separate good.
+def test_a_settlement_that_runs_out_of_grain_keeps_its_seed() -> None:
+    """The seed corn is capital for next year's field, not a last meal.
 
-    Nothing forbids eating the seed corn. `_consume` reaches for it when the
-    grain is gone, because households always have. The price is not paid then;
-    it is paid at the sowing, and it is paid in the harvest after that.
+    Nothing here forbids eating the seed corn in the abstract -- households have
+    always reached for it when the granary runs dry. The rule is elsewhere:
+    the seed is set aside and guarded, so a short year sharpens the famine
+    rather than eating the field that would end it.
     """
     # Just after the threshing: next year's seed is set aside and the sowing is
     # still five fortnights off. The gap is the whole of the test -- households
-    # reach for the seed because it is there and the granary is not.
+    # reach for anything because the granary is not.
     kernel = _to_fortnight(_world(), 14)
     seed = F.held(kernel.book, COUNCIL, F.SEED, AMURRU)
     assert seed > 0
 
-    # Take the granary away and leave only the seed. The households will eat it,
-    # because the alternative is starving beside it.
+    # Take the granary away and leave only the seed. The bodies of people will
+    # be hungry, but the seed for next year's field is not touched.
     stripped = kernel.book
     for lot in kernel.book.at(AMURRU):
         if lot.good == F.GRAIN and lot.owner == COUNCIL:
@@ -181,13 +179,11 @@ def test_a_settlement_that_eats_its_seed_sows_less_next_year() -> None:
     hungry = dataclasses.replace(kernel, book=stripped)
 
     hungry, events = _year(hungry, turns=10)      # through the sowing season
-    assert any(e[0] == "ate_the_seed" for e in events), "they ate it"
-
-    fed, _ = _year(kernel, turns=10)              # the same ten, granary intact
+    assert not any(e[0] == "ate_the_seed" for e in events), \
+        "the seed corn was never eaten"
     site = kernel.field_site(AMURRU, COUNCIL)
-    assert (F.held(hungry.book, COUNCIL, F.STANDING, site)
-            < F.held(fed.book, COUNCIL, F.STANDING, site)), \
-        "and there is less in the ground for it"
+    assert F.held(hungry.book, COUNCIL, F.STANDING, site) > 0, \
+        "the seed went to the field, as it should"
 
 
 def test_the_ground_bounds_the_sowing_however_much_seed_there_is() -> None:

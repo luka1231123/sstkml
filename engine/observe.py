@@ -21,8 +21,8 @@ from engine.entity import EntityId
 # The farming readings are here because they pass the same test as the granary:
 # could this actor learn it by walking round its own place in a fortnight? The
 # extent of the fields and how much of them is under crop, yes -- you can see a
-# sown field from its edge. Its own seed, its own standing crop, and its own
-# stacked sheaves, yes -- they are its property and it counts them. What the
+# sown field from its edge. Its own seed and standing crop, yes -- they are its
+# property and it counts them. What the
 # temple across the square is holding, no: that arrives as a report or not at
 # all, and there is no attribute here that would let a policy help itself to it.
 # The market readings pass it too, and it is worth saying why, because "the
@@ -35,10 +35,11 @@ from engine.entity import EntityId
 # below, or not at all.
 LOCAL = ("stores_grain", "people", "labour",
          "extent", "under_crop",          # the ground, and how much of it is sown
-         "own_grain", "own_seed", "own_standing", "own_sheaves",
+         "own_grain", "own_seed", "own_standing",
          "own_copper",                    # the purse, counted like any other store
          "price_grain", "market_grain",   # what it costs, and what is on the quay
          "season",                        # which moment of the farming year
+         "cover",                         # how long the grain in the yard feeds the roll
          "home")                          # and that this is where the actor is
 
 

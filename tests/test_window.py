@@ -170,7 +170,7 @@ def _game(turns: int = 7):
     doing nothing at all.
     """
     import play_gui
-    game = play_gui.Game("ugarit", SEED)
+    game = play_gui.Game("seat", SEED)
     for _ in range(turns):
         game.end_fortnight()
     assert game.belief["stack"], "no post arrived; the read tests would be hollow"
@@ -306,8 +306,14 @@ def test_save_and_reload_preserve_spent_attention() -> None:
         game.hours = 3
         assert game.save_current()
         game.hours = game.belief["attention"]
+        game.ledger_state["dues"]["rates"] = {"land": 900}
+        game.pending_action = (object(), 1, "stores")
+        game.command_line = "levy people who do not exist"
         assert game.load_current()
         assert game.hours == 3
+        assert not game.ledger_state["dues"].get("rates")
+        assert game.pending_action is None
+        assert not game.command_line
     game.app.stop()
 
 

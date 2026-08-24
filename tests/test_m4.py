@@ -75,7 +75,7 @@ def test_parser_accepts_only_current_ids():
 
 def test_parser_rejects_model_invented_numbers_and_survives_offline():
     invented = {"kind": "actions", "actions": [
-        {"verb": "EAT_SEED", "args": {"qa": 999}},
+        {"verb": "ALLOCATE", "args": {"group": "ghosts", "qa": 999}},
     ]}
     result = parse("use some seed", _belief(), 6, 1, 1, _Client(invented))
     assert result.question and not result.actions

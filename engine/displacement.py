@@ -63,36 +63,58 @@ def arrivals(world: World) -> tuple[World, list]:
         world, kernel=dataclasses.replace(world.kernel, registry=registry)), []
 
 
+def _settle(cohorts: dict, cohort, **fields):
+    """A body of people that stops being displaced rejoins its house.
+
+    Every displacement splits one record into two and nothing used to put them
+    back, so a long reign accumulated thousands of one-family cohorts: the turn
+    cost grew with them, and the Roll listed the same people many times over.
+    """
+    settled = dataclasses.replace(cohort, status="household", **fields)
+    for other in sorted(cohorts.values(), key=lambda c: c.id):
+        if other.id == settled.id or other.parent:
+            continue
+        try:
+            joined = SP.merge((other, settled), into=other.id)
+        except ValueError:
+            continue
+        cohorts.pop(settled.id, None)
+        cohorts[other.id] = joined
+        return
+    cohorts[settled.id] = settled
+
+
 def step(world: World) -> tuple[World, list]:
     cohorts = dict(world.kernel.registry.cohorts)
     events = []
     for cohort_id in sorted(tuple(cohorts)):
-        cohort = cohorts[cohort_id]
+        cohort = cohorts.get(cohort_id)
+        if cohort is None:
+            continue
         if cohort.status == "displaced" and cohort.hunger < 3:
-            cohorts[cohort_id] = dataclasses.replace(
-                cohort, status="household", arrives=-1)
+            _settle(cohorts, cohort, arrives=-1)
             continue
         if (cohort.status == "petitioning" and cohort.arrives >= 0
-                and world.date.absolute - cohort.arrives >= 8
+                and world.date.absolute - cohort.arrives >= 6
                 and cohort.hunger >= 7):
             cohorts[cohort_id] = dataclasses.replace(
                 cohort, status="attacker", armed=True,
                 grievance=max(700, cohort.grievance))
             continue
         if cohort.status == "distressed" and cohort.hunger < 3:
-            cohorts[cohort_id] = dataclasses.replace(cohort, status="household")
+            _settle(cohorts, cohort)
             continue
         if cohort.parent or cohort.status in {
                 "distressed", "travelling", "travelling_displaced",
                 "travelling_raider", "petitioning", "attacker", "displaced",
                 "guest", "raider", "defeated"}:
             continue
-        if cohort.hunger < 6 or cohort.people < 20:
+        if cohort.hunger < 4 or cohort.people < 20:
             continue
         destination = _destination(world, cohort.settlement)
         if not destination:
             continue
-        heads = max(1, cohort.people * min(250, cohort.hunger * 20) // 1000)
+        heads = max(1, cohort.people * min(450, cohort.hunger * 55) // 1000)
         if heads >= cohort.people:
             continue
         parent, party = SP.split(
@@ -100,7 +122,7 @@ def step(world: World) -> tuple[World, list]:
         if parent.id != cohort.id:
             parent, party = party, parent
         parent = dataclasses.replace(parent, status="distressed")
-        hostile = cohort.grievance >= 700 and cohort.hunger >= 8
+        hostile = cohort.grievance >= 500 and cohort.hunger >= 6
         party = _send(
             world, party, destination,
             "travelling_raider" if hostile else "travelling_displaced")

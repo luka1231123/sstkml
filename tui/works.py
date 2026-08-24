@@ -1,17 +1,15 @@
 """The works: what is being built, and what could be (spec 6.21, M12).
 
 Two lists in one window, because they are the same decision seen from either
-end. Above: the men who are already out, how many days they have put in, and
-what they have eaten doing it. Below: what else could be put up, and what it
-would cost in days.
+end. Above: the men already out and what they have spent. Below: each plan's
+live return, failure case, labour, supplies, upkeep, and current stock.
 
 What this window will not tell you is **when anything will be finished**. It
 cannot: that depends on corvée you have not raised yet and a season you cannot
 hurry. A completion date would be the one honest-looking lie on the screen.
 
-Nor does anything here say a project is a good idea. Building is a bet on which
-crisis is coming, made with the hands that feed you and settled a year and a
-half later (6.21), and the game does not grade bets (D19).
+The window names the wager without grading it. Building is still a bet on which
+crisis is coming, settled long after the supplies leave the store (6.21).
 """
 from __future__ import annotations
 
@@ -55,6 +53,11 @@ def _plan_top(b: dict, height: int, scroll: int) -> int:
 
 
 def _material_cost(plan: dict, per: dict) -> str:
+    materials = plan.get("materials")
+    if materials is not None:
+        return ", ".join(
+            f"{qty:,} {good}" for good, qty in sorted(materials.items())
+            if qty)
     return ", ".join(
         f"{qty * plan['days'] // 1000:,} {good}"
         for good, qty in sorted(per.items()) if qty)
@@ -72,6 +75,8 @@ def _cost_lines(cost: str, width: int) -> list[str]:
 
 def _plan_shape(b: dict, width: int) -> tuple[bool, int]:
     """Whether costs need their own rows, and rows consumed by each plan."""
+    if width >= 76:
+        return False, 1
     plans = b.get("plans") or []
     per = b.get("works_materials") or {}
     costs = [_material_cost(plan, per) for plan in plans]
@@ -84,6 +89,46 @@ def _plan_shape(b: dict, width: int) -> tuple[bool, int]:
         default=1,
     )
     return True, 1 + cost_rows
+
+
+def _detail_rows(plan: dict, b: dict, width: int) -> list[tuple[str, int]]:
+    rows: list[tuple[str, int]] = []
+
+    def add(label: str, value: str, colour: int) -> None:
+        wrapped = textwrap.wrap(
+            f"{label} · {value}", width=max(1, width),
+            break_long_words=False, break_on_hyphens=False) or [label]
+        rows.extend((line, colour) for line in wrapped)
+
+    rows.append((plan.get("category", "WORK"), C["bone"]))
+    add("RETURN", plan.get("effect", "adds institutional capacity"), C["sky"])
+    add("WAGER", plan.get("tradeoff", "uses labour and supplies"), C["flame"])
+    rate = b.get("works_rate", 400)
+    season = b.get("works_season_name", "low water") or "low water"
+    add("LABOUR", f"{plan['days']:,} corvée days; at most {rate:,} each fortnight in {season}", C["clay"])
+    add("SUPPLY", _material_cost(plan, b.get("works_materials") or {})
+        or "labour only", C["barley"])
+    upkeep = plan.get("upkeep") or {}
+    if upkeep:
+        add("UPKEEP", ", ".join(
+            f"{qty:,} {good} each fortnight"
+            for good, qty in sorted(upkeep.items())), C["sand"])
+    stores = b.get("stores") or {}
+    materials = plan.get("materials") or {}
+    if materials:
+        add("IN STORE", ", ".join(
+            f"{stores.get(good, 0):,} {good}"
+            for good in sorted(materials)), C["dim"])
+    return rows
+
+
+def _draw_detail(surface: Surface, plan: dict, b: dict, x: int, y: int,
+                 width: int, bottom: int) -> None:
+    for line, colour in _detail_rows(plan, b, width):
+        if y >= bottom:
+            break
+        surface.text(x, y, line, colour, C["ink"])
+        y += 1
 
 
 def plan_page(b: dict, width: int, height: int, scroll: int = 0,
@@ -107,12 +152,18 @@ def plan_page(b: dict, width: int, height: int, scroll: int = 0,
 
 def compose(b: dict, selected: str = "", width: int = 82,
             height: int = 32, notice: str = "",
-            scroll: int = 0, plan_scroll: int = 0) -> Screen:
+            scroll: int = 0, plan_scroll: int = 0,
+            selected_plan: str = "") -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="THE WORKS",
                 note="[esc] close", drop=False)
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
     style.notice(surface, 2, 1, width - 4, notice)
+    brief = (
+        "CORVÉE, NOT COIN · LOW WATER · STORE-FED CREWS · NEW WORK OPENS HEADLESS"
+        if width >= 76 else
+        "CORVÉE, NOT COIN · LOW WATER · STORE-FED CREWS")
+    surface.text(3, 2, brief[:max(0, width - 6)], C["dim"], C["ink"])
 
     projects = b.get("projects") or []
     plans = b.get("plans") or []
@@ -131,26 +182,38 @@ def compose(b: dict, selected: str = "", width: int = 82,
     for number, _absolute, project in out.rows(projects):
         key = PICK[number - 1]
         chosen = key == selected
+        mode = "making it whole" if project["repair"] else "putting it up"
+        percent = f"{project['days_done'] * 100 // max(1, project['days_needed'])}%"
+        content_right = width - 3
+        bar_width = 12 if width >= 72 else 8
+        bar_x = min(52, max(8, content_right - len(percent) - 1 - bar_width))
+        percent_x = bar_x + bar_width + 1
+        mode_x = min(35, max(8, bar_x - len(mode) - 2))
+        name_width = max(1, mode_x - 9)
         style.keycap(surface, 3, y, key, "")
-        surface.text(8, y, project["what"][:26],
+        surface.text(8, y, project["what"][:name_width],
                      C["bone"] if chosen else C["clay"], C["ink"])
-        surface.text(35, y, "making it whole" if project["repair"]
-                     else "putting it up", C["dim"], C["ink"])
-        _bar(surface, 52, y, 12, project["days_done"], project["days_needed"])
-        surface.text(65, y, f"{project['days_done'] * 100 // max(1, project['days_needed'])}%",
-                     C["sand"], C["ink"])
+        surface.text(mode_x, y, mode, C["dim"], C["ink"])
+        _bar(surface, bar_x, y, bar_width,
+             project["days_done"], project["days_needed"])
+        surface.text(percent_x, y, percent, C["sand"], C["ink"])
         spent = project.get("spent") or {}
+        days_text = (
+            f"{project['days_done']:,} of {project['days_needed']:,} days")
+        days_x = min(52, max(8, content_right - len(days_text) + 1))
         if spent:
             # Heaviest first: the grain is the number that matters and the
             # oil is a rounding error nobody would have started a war over.
             eaten = ", ".join(
                 f"{qty:,} {good}" for good, qty
                 in sorted(spent.items(), key=lambda kv: (-kv[1], kv[0])))
-            surface.text(8, y + 1, f"eaten so far: {eaten}"[:42],
+            surface.text(8, y + 1,
+                         f"spent so far: {eaten}"[:max(0, days_x - 9)],
                          C["ash"], C["ink"])
-        surface.text(52, y + 1,
-                     f"{project['days_done']:,} of {project['days_needed']:,} days",
-                     C["dim"], C["ink"])
+        surface.text(days_x, y + 1, days_text, C["dim"], C["ink"])
+        surface.text(8, y + 2, project.get("status", ""),
+                     C["barley"] if project.get("status", "").startswith("able")
+                     else C["ash"], C["ink"])
         y += 3
     if out.partial:
         surface.text(4, y, f"↑↓ men out {out.label()}", C["dim"], C["ink"])
@@ -162,10 +225,12 @@ def compose(b: dict, selected: str = "", width: int = 82,
     surface.text(4, y + 1, "the corvée, this season", C["dim"], C["ink"])
     surface.text(34, y + 1, f"{raised:,} days called up", C["clay"], C["ink"])
     surface.text(34, y + 2, f"{given:,} given to the works", C["clay"], C["ink"])
-    surface.text(34, y + 3, f"{max(0, raised - given):,} left to the fields",
+    surface.text(34, y + 3, f"{max(0, raised - given):,} unspent on the works",
                  C["bone"], C["ink"])
-    if not b.get("works_season", True):
-        surface.text(4, y + 3, "the rains are on", C["ash"], C["ink"])
+    season_note = ("low water: crews can work while the fields are idle"
+                   if b.get("works_season", True)
+                   else "work waits for low water")
+    surface.text(4, y + 4, season_note, C["ash"], C["ink"])
     y += 5
 
     style.bar(surface, 2, y, width - 4, "  WHAT COULD BE PUT UP",
@@ -174,33 +239,52 @@ def compose(b: dict, selected: str = "", width: int = 82,
     per = b.get("works_materials") or {}
     stacked, plan_height = _plan_shape(b, width)
     buildable = plan_page(b, width, height, scroll, plan_scroll)
+    visible = buildable.slice(plans)
+    chosen = next((plan for plan in visible
+                   if plan.get("kind") == selected_plan), None)
+    chosen = chosen or (visible[0] if visible else None)
+    wide = width >= 76
+    list_top = y
+    divider = max(36, min(42, width // 2))
     for number, _absolute, plan in buildable.rows(plans):
+        active = chosen is not None and plan.get("kind") == chosen.get("kind")
         style.keycap(surface, 3, y, ORDER[number - 1], "")
-        surface.text(8, y, plan["name"][:24], C["clay"], C["ink"])
-        surface.text(33, y, f"{plan['days']:,} days", C["dim"], C["ink"])
+        right = divider if wide else width - 2
+        surface.text(8, y, plan["name"][:max(1, right - 20)],
+                     C["bone"] if active else C["clay"], C["ink"])
+        days = f"{plan['days']:,}d"
+        surface.text(max(8, right - len(days) - 2), y, days,
+                     C["sand"], C["ink"])
+        surface.link(2, y, max(1, right - 3), plan_height,
+                     f"works:plan:{plan.get('kind', '')}")
         cost = _material_cost(plan, per)
         if stacked:
             for offset, line in enumerate(_cost_lines(cost, width), 1):
                 surface.text(8, y + offset, line, C["ash"], C["ink"])
-        else:
-            surface.text(44, y, cost, C["ash"], C["ink"])
         y += plan_height
+
+    if wide and chosen is not None:
+        for row in range(list_top, height - 2):
+            surface.put(divider, row, "│", C["faint"], C["ink"])
+        _draw_detail(surface, chosen, b, divider + 3, list_top,
+                     max(1, width - divider - 5), height - 2)
 
     if buildable.partial and y < height - 2:
         paging = (
             f"shift+↑↓ plans {buildable.label()}" if buildable.room
             else "plans do not fit · enlarge this window")
-        surface.text(8, y, paging, C["dim"], C["ink"])
+        edge = divider if wide else width - 2
+        surface.text(8, y, paging[:max(0, edge - 8)], C["dim"], C["ink"])
     visible_plans = len(buildable.slice(plans))
     plan_keys = (
         f"[1-{visible_plans}]" if visible_plans > 1
         else "[1]" if visible_plans else "")
     plan_action = (
-        f"{plan_keys} set it in hand" if plan_keys
+        f"{plan_keys} inspect · [enter] commission" if plan_keys
         else "enlarge to see plans")
-    note = (" [x] call them off — what they have eaten is eaten"
+    note = (" [x] call them off — what was spent stays spent"
             if selected else
-            f" {plan_action}   [a-h] a work already out   [esc] close")
+            f" {plan_action}   [a-h] work in hand")
     style.bar(surface, 2, height - 2, width - 4, note,
               fg=C["clay"], bg=C["lapis"])
     return surface.interactive()

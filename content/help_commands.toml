@@ -32,9 +32,9 @@ id = "hall"
 category = "interface"
 title = "Hall and navigation"
 syntax = "[s] Scribes [y] Alu [x] Trade [t] Storehouse [m] Muster [j] Court [v] Shrine [w] World [:] Command"
-answer = "The Hall is home. Its eight letter keys open the working rooms. Tab and Shift-Tab cycle room tabs, arrows select, Enter opens or confirms, Space toggles, and Escape cancels or closes. In Hall, Space previews ending the fortnight and Enter confirms it. Ctrl-H raises Hall, Ctrl-G opens the switcher, Ctrl-Tab cycles windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S saves, Ctrl-O reloads, Ctrl-+/Ctrl--/Ctrl-0 resize type, : opens Command, and ? opens Help. Printed controls can also be clicked."
+answer = "The Hall is home. Its eight letter keys open the working rooms. Tab and Shift-Tab cycle room tabs, arrows select, Enter opens or confirms, Space toggles, and Escape cancels or closes. In Hall, Space ends the fortnight. Ctrl-H raises Hall, Ctrl-G opens the switcher, Ctrl-Tab cycles windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-Shift-R puts every window back to its default size and forgets the one you dragged, Ctrl-S saves, Ctrl-O reloads, Ctrl-+/Ctrl--/Ctrl-0 resize type, : opens Command, and ? opens Help. Printed controls can also be clicked."
 examples = ["Press j for the Court, then c for Counsel.", "Click a numbered concern to follow it."]
-keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit"]
+keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit", "window", "windows", "size", "resize", "reset", "default", "tile", "cascade", "too", "big", "small"]
 keys = ["s", "y", "x", "t", "m", "j", "v", "w", "space", ":", "?", "q"]
 verbs = []
 
@@ -164,7 +164,7 @@ id = "allocate"
 category = "orders"
 title = "Allocate grain"
 syntax = "allocate <group> <qa>"
-answer = "Tell Counsel how much grain a named group should receive. This changes its allocation; payment is resolved by the roll and the available stores."
+answer = "Open Storehouse, then Rations. Choose a group, use the brackets to draft a ration in four useful steps, and press A to give it. The queue previews who is fed with the grain now; exact figures can still be typed as an order."
 examples = ["allocate smiths_palace 7000", "Give the smiths of the palace quarter 7000 qa."]
 keywords = ["allocate", "allocation", "pay", "grain", "qa", "wages", "arrears", "group", "roll"]
 keys = []
@@ -173,11 +173,11 @@ verbs = ["ALLOCATE"]
 [[command]]
 id = "priority"
 category = "orders"
-title = "Set payment priority"
+title = "Set the ration order"
 syntax = "set priority to <group> <group> ..."
-answer = "Tell Counsel the groups in the order the roll should pay them down. Use current group IDs when precision matters."
-examples = ["set priority to corvee_workers smiths_palace harbour_workers"]
-keywords = ["priority", "pay", "order", "roll", "arrears", "first", "group"]
+answer = "Open Storehouse, then Rations. Move groups earlier or later; the list shows who eats and what is at stake. Enter gives the order."
+examples = ["Put the field hands before the palace quarter."]
+keywords = ["priority", "food", "ration", "order", "roll", "first", "group"]
 keys = []
 verbs = ["SET_PRIORITY"]
 
@@ -191,17 +191,6 @@ examples = ["inspect granary", "count the seed"]
 keywords = ["inspect", "count", "ledger", "granary", "seed", "true", "stores"]
 keys = []
 verbs = ["INSPECT_LEDGER"]
-
-[[command]]
-id = "eat_seed"
-category = "orders"
-title = "Open seed grain for food"
-syntax = "eat <qa> of seed"
-answer = "Tell Counsel how much seed grain to open for food. It moves that amount into the granary now, leaving less to sow."
-examples = ["eat 5000 qa of seed", "Use 5000 seed grain."]
-keywords = ["eat", "seed", "food", "grain", "granary", "famine", "open"]
-keys = []
-verbs = ["EAT_SEED"]
 
 [[command]]
 id = "gift"
@@ -219,8 +208,8 @@ id = "harvest_labour"
 category = "orders"
 title = "Send or recall workers from the harvest"
 syntax = "harvest <group> | recall <group>"
-answer = "Tell Counsel to send a named work group to the fields, or recall it to its own work. Either move costs one hour and changes the labour available to the harvest."
-examples = ["send the harbour workers to the fields", "recall corvee_workers from harvest"]
+answer = "Open Storehouse, then Rations or Land. Choose a group and press H on the eve of harvest or during it to send them; press H again to recall them. The extra hands raise the harvest, but that group stops doing its usual work while it is away. Either move costs one hour."
+examples = ["send the palace dependents to the fields", "recall the garrison from harvest"]
 keywords = ["harvest", "field", "labour", "workers", "send", "recall", "return", "hands", "group"]
 keys = []
 verbs = ["SEND_TO_HARVEST", "RECALL_FROM_HARVEST"]
@@ -241,7 +230,7 @@ id = "corvee"
 category = "orders"
 title = "Raise corvée"
 syntax = "raise corvee <days>"
-answer = "Tell Counsel how many days of corvée to levy. The order costs one hour. Those hands can feed works but are taken from other labour and the levy raises unrest."
+answer = "Tell Counsel how many days of corvée to levy. The order costs one hour and raises unrest. Works spend those days at low water, when the fields are idle; unused days do not reduce the harvest. Crews still draw grain and metal from the palace stores."
 examples = ["raise a corvee of 4000 days"]
 keywords = ["corvee", "levy", "labour", "days", "workers", "hands", "unrest"]
 keys = []
@@ -263,7 +252,7 @@ id = "build"
 category = "orders"
 title = "Begin a building project"
 syntax = "build <kind> [at <place>]"
-answer = "Tell Counsel a known build kind and place. Beginning work costs one hour; progress then consumes corvée days and materials in the proper season."
+answer = "In Works, choose a plan to read its return, wager, full supply draw, upkeep, and current stores; press Enter to commission it. Beginning costs one hour. Progress consumes corvée days and supplies at low water, and the finished capacity feeds the named land, defence, cult, storage, archive, bronze, or route system."
 examples = ["build a granary at seat", "Build walls at Ugarit."]
 keywords = ["build", "building", "project", "granary", "walls", "construct", "works", "place"]
 keys = []
@@ -380,11 +369,22 @@ keys = []
 verbs = ["HEAR_PETITION", "RULE_PETITION"]
 
 [[command]]
+id = "trade"
+category = "orders"
+title = "Buy or requisition cargo"
+syntax = "finance <copper> copper | requisition <amount> <good>"
+answer = "Finance spends at most the named copper on grain already counted in Trade, at the shown price; the grain enters the palace store at once, and an empty quay spends nothing. Requisition takes reported cargo without payment, but raises unrest with the value seized. Either order costs one hour."
+examples = ["finance 3000 copper", "requisition 10000 grain"]
+keywords = ["trade", "finance", "buy", "requisition", "cargo", "grain", "copper", "price", "merchant"]
+keys = []
+verbs = []
+
+[[command]]
 id = "dues"
 category = "orders"
 title = "Set land and harbour dues"
 syntax = "set land due to <rate> | set harbour due to <rate>"
-answer = "Tell Counsel the rate per thousand for the land or harbour due. Setting a due costs no hour. Land pressure drives hands away; harbour merchants respond after a delay."
+answer = "Open Storehouse, then Dues. Choose land or harbour, use < and > to draft the rate per thousand, and press Enter once to give the order. Land above custom brings more grain at harvest but raises unrest each fortnight, and grain without roof room spoils fast. Harbour rises take from cargo now; merchants answer three to six fortnights later."
 examples = ["set the land due to 250", "raise the harbour due to 150"]
 keywords = ["due", "tax", "rate", "land", "harbour", "revenue", "per thousand", "merchant", "estate"]
 keys = []
@@ -417,7 +417,7 @@ id = "end_turn"
 category = "orders"
 title = "End the fortnight"
 syntax = "end the fortnight | [Space] in the Hall"
-answer = "Press Space in the Hall or tell Counsel to end the fortnight. It advances the world and restores the next fortnight's attention. If spoken as part of a compound order, it must be given separately."
+answer = "Press Space in the Hall, which ends it at once, or tell Counsel to end the fortnight. It advances the world and restores the next fortnight's attention. If spoken as part of a compound order, it must be given separately."
 examples = ["end the fortnight"]
 keywords = ["end", "turn", "fortnight", "advance", "next", "space", "finish"]
 keys = []
@@ -449,4 +449,53 @@ answer = "Delegating hands the matter a tablet raises to a courtier who is at th
 examples = ["delegate the harbour complaint to Ehli-Nikkalu", "who has this matter?"]
 keywords = ["delegate", "hand", "give", "courtier", "assign", "someone", "else", "answerable", "tablet"]
 keys = ["g"]
+verbs = []
+
+# The farming year and what it costs in hands. These are concepts rather than
+# orders: they explain the numbers the Land ledger prints, which no descriptor
+# can derive and which the player could previously learn only by losing a
+# harvest.
+
+[[command]]
+id = "grain_year"
+category = "land"
+title = "The grain year"
+syntax = "The Hall's left column and the band across the Land ledger"
+answer = "The year is twenty-four fortnights. Sowing is 19 to 22, growing runs from 23 through 7, harvest is 8 to 13, and low water is 14 to 18. The wheel in the Hall and Land ledger marks the current fortnight. One deadline matters: crop still standing after fortnight 13 is lost. Seed is set aside as the harvest comes in; outside these spans the fields ask for nothing."
+examples = ["Which fortnight does the harvest close?", "How long until sowing?"]
+keywords = ["year", "season", "calendar", "fortnight", "sowing", "growing", "harvest", "low", "water", "wheel", "deadline", "when", "time"]
+keys = []
+verbs = []
+
+[[command]]
+id = "person_days"
+category = "land"
+title = "Hands and person-days"
+syntax = "THE HANDS band on the Land ledger; labour on every cohort dossier"
+answer = "Labour is counted in person-days. One person supplies ten to twelve days a fortnight, less when hungry. One day sows 3 qa of seed, watches 200 qa of crop, or harvests 12 qa. Harvest is the bottleneck. The Land bar compares the hands available with the work waiting; if the work is larger, some crop will remain in the field."
+examples = ["How many days does the harvest need?", "Why did the reaping not finish?"]
+keywords = ["labour", "hands", "person-days", "days", "work", "corvee", "idle", "pool", "rate", "sow", "reap", "tend", "bottleneck"]
+keys = []
+verbs = []
+
+[[command]]
+id = "river_gauge"
+category = "land"
+title = "The river gauge and the weather"
+syntax = "The first line of the Land ledger's detail"
+answer = "The gauge is a mark on the river wall copied by a scribe, not the weather itself. An ordinary year reads 30; below 27 the river is low and below 21 it is failing. The reading is reported, not counted, so a tired hand may miscopy it and the ledger says so. What the weather actually does happens to the standing crop during the growing season: a dry year thins it every fortnight, and past a break in the dryness each further step costs a multiple rather than an addition. The true index is never shown, because nobody at court can see it."
+examples = ["Is this a dry year?", "Can I trust the gauge?"]
+keywords = ["gauge", "river", "weather", "climate", "rain", "drought", "dry", "flood", "reading", "scribe", "reported", "wither"]
+keys = []
+verbs = []
+
+[[command]]
+id = "units"
+category = "land"
+title = "Units of the kingdom"
+syntax = "Every quantity is printed with its unit"
+answer = "Grain, seed and standing crop are counted in qa. Metal is counted in shekels, and sixty shekels of copper stow like one qa of grain. People are heads, and households where the roll records them. Labour is person-days, ten to twelve per head per fortnight. A ration is ten to eleven qa per head per fortnight. An estate's extent is the qa of seed the ground takes in a year, and its capacity is the qa returned per thousand qa sown, so 7500 is a sevenfold return. Every rate and share is per thousand: 940 per thousand is ninety-four in the hundred. Condition, grievance, loyalty and legitimacy are all out of a thousand."
+examples = ["What is a qa?", "What does capacity 7500 mean?"]
+keywords = ["unit", "units", "qa", "shekel", "parisu", "talent", "head", "heads", "household", "person-day", "extent", "capacity", "per", "thousand", "measure", "glossary"]
+keys = []
 verbs = []

@@ -1,35 +1,32 @@
 # Building and repair (spec 6.21). What a thing costs to put up, and what it
 # costs to buy back the years nobody minded it.
 #
-# Everything here is in **days of the corvée** and in goods eaten as the work
-# proceeds. The goods are the real surprise: a building site is four hundred men
-# who have to be fed, so the material cost of a wall is grain — the same grain
-# the granary is holding against the year the harvest fails. Building is
-# therefore a bet placed with your food, resolved a year and a half later.
+# Everything here is in **days of the corvée** and in supplies consumed as the
+# work proceeds. Every crew eats the same grain and wears the same copper tools;
+# project tables add the fittings peculiar to that work. A wall therefore draws
+# on the food held against a bad year and on the metal that could maintain the
+# forge or finance grain trade. Building is a bet placed with both reserves.
 
 [rules]
-# What one project can absorb in a fortnight. The corvée cap is 6,000 days a
-# season (content/land.toml), so a single project running all four working
-# fortnights takes about a quarter of what the crown can call up in a year.
+# What one project can absorb in a fortnight. Low water lasts five fortnights,
+# so one project can use at most 2,000 days in a year. A bigger levy can feed
+# several sites, but cannot make one wall appear instantly.
 days_per_fortnight = 400
 # Days of labour to buy back one point of condition. A ruin at 300 is 2,100
-# days to make whole: five fortnights of every hand you have.
+# days to make whole: five full fortnights and part of the next low water.
 repair_days_per_point = 3
 # The season mudbrick can go up in, named out of the scenario's [season] table.
-# Work in the rains is work washed away, so nothing happens outside it and
-# nothing says so — the number simply does not move.
+# Outside it the project waits, and the Works roll says so.
 season = "low_water"
 
-# Goods eaten per thousand days worked, whatever the project. Men on a wall eat
-# the same as men on a quay.
+# Crew supplies per thousand days worked, whatever the project. Men on a wall
+# eat the same as men on a quay. A plan may add its own rate below.
 #
 # Grain and copper only, and the omission is deliberate. Every good on this list
-# is a good that can stop a project dead, and oil has no source in the game
-# before trade (M13) -- so a rate of forty a thousand, trivial on paper, meant
-# that every long run reached a fortnight where the wall stopped forever for
-# want of a lamp. A material cost the player cannot resolve is not difficulty,
-# it is a wall in the road. Grain he can grow; copper comes from Alashiya and
-# running out of it is a story.
+# can stop a project dead. Oil belongs to the continuing upkeep of quays and
+# temples, not to every wall and road: making every crew wait for lamps turned a
+# small shortage into a universal deadlock. Grain can be grown and copper can be
+# brought from Alashiya, so running short of either remains a resolvable story.
 [rules.per_1000_days]
 grain = 5000
 copper = 60
@@ -45,51 +42,110 @@ name = "a granary"
 days = 900
 condition = 900
 capacity = 1000
+category = "PALACE & STOREROOM"
+effect = "adds roofed grain capacity and cuts overflow spoilage"
+tradeoff = "only pays while the palace has a surplus worth storing"
+history = "Knossos, Mari, and Mycenae collected staples here and paid dependents back out."
+
+[build.granary.per_1000_days]
+copper = 40
 
 [build.walls]
 name = "a circuit of walls"
 days = 4000
 condition = 900
 capacity = 1000
+category = "FORTIFICATION"
+effect = "multiplies the strength of troops holding this place"
+tradeoff = "empty while troops reap or campaign; its copper cannot maintain bronze"
+history = "Uruk, Zhengzhou, and Hattusa used walls for defence, gate control, and royal display."
+
+[build.walls.per_1000_days]
+copper = 440
 
 [build.workshop]
 name = "a workshop"
 days = 1200
 condition = 900
 capacity = 400
+category = "PALACE & STOREROOM"
+effect = "adds bronze-making capacity for tools, weapons, and repairs"
+tradeoff = "still needs paid smiths and imported copper and tin"
+history = "Palace workshops turned distant metal into the fittings that kept the redistributive system running."
+
+[build.workshop.per_1000_days]
+copper = 440
 
 [build.archive]
 name = "a tablet house"
 days = 700
 condition = 900
 capacity = 1000
+category = "PALACE & STOREROOM"
+effect = "adds archive capacity, so searches return more records"
+tradeoff = "buys information, not food, and opens without a head"
+history = "Palace tablet houses made collection, storage, and redistribution legible."
 
 [build.harbour]
 name = "a quay"
 days = 2600
 condition = 850
 capacity = 800
+upkeep = { oil = 6 }
+category = "TRANSPORT"
+effect = "adds sea-route capacity and clears more customs cargo"
+tradeoff = "needs traffic, oil, staff, and open sea; its copper could finance grain trade"
+history = "Mesopotamian harbours and towpaths made redistribution possible over distance."
+
+[build.harbour.per_1000_days]
+copper = 240
 
 [build.temple]
 name = "a temple"
 days = 3000
 condition = 900
 capacity = 1000
+upkeep = { oil = 10 }
+category = "MONUMENT"
+effect = "adds cult capacity and softens the cost of a missed rite"
+tradeoff = "burns oil and feeds no one directly"
+history = "Pyramids, ziggurats, and Anyang tombs legitimated rule; Wadi al-Jarf records rationed Giza crews rotating as floods idled fields."
+
+[build.temple.per_1000_days]
+copper = 60
 
 [build.canal]
 name = "a canal"
 days = 1800
 condition = 850
-capacity = 1000
+capacity = 80000
+category = "WATER CONTROL & RECLAMATION"
+effect = "adds maintained sowable ground to the crown fields"
+tradeoff = "pays at sowing; neglect closes the extra ground again"
+history = "Mesopotamia re-dredged canals; dupšikku, the corvée basket, named the duty. Egypt raised dikes and flood basins; Lake Kopais was drained into farmland."
 
 [build.road]
 name = "a road"
 days = 1500
 condition = 850
 capacity = 1000
+category = "TRANSPORT"
+effect = "adds working capacity to every court land route"
+tradeoff = "moves no cargo by itself and remains exposed to route risk"
+history = "Egyptian haul roads moved quarry stone and supplied Sinai mining expeditions."
+
+[build.road.per_1000_days]
+copper = 140
 
 [build.garrison]
 name = "a garrison"
 days = 1100
 condition = 900
 capacity = 600
+category = "FORTIFICATION"
+effect = "raises the effectiveness of troops holding this place"
+tradeoff = "without troops at the gate it returns nothing"
+history = "Fortified gates controlled goods and people as well as attackers."
+
+[build.garrison.per_1000_days]
+copper = 190

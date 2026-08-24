@@ -7,6 +7,7 @@ M3). Belief for the wider world arrives as Claims later.
 """
 from __future__ import annotations
 
+import dataclasses
 import tomllib
 from pathlib import Path
 
@@ -363,10 +364,79 @@ def _grain_stage(kernel, fortnight: int) -> str:
     """
     from engine.kernel.farm import season
 
-    for name in ("sowing", "growing", "harvest", "threshing", "low_water"):
+    for name in ("sowing", "growing", "harvest", "low_water"):
         if season(kernel.seasons, fortnight, name):
             return name
     return "low_water"
+
+
+# The mark an ordinary year leaves on the river wall (`engine/climate.gauge`).
+GAUGE_ORDINARY = 30
+GAUGE_WORDS = ((21, "the river is failing"), (27, "the river is low"),
+               (33, "the river stands ordinary"), (39, "the river is full"))
+
+
+def gauge_word(reading: int) -> str:
+    """The gauge in words, so a number nobody has a feel for means something."""
+    for mark, word in GAUGE_WORDS:
+        if reading < mark:
+            return word
+    return "the river is in flood"
+
+
+# The grain year, in the order it happens, with the task each moment asks for.
+STAGES = (("sowing", "sow"), ("growing", "tend"), ("harvest", "reap"),
+          ("low_water", ""))
+
+
+def _calendar(kernel, fortnight: int, turn: int) -> dict:
+    """The whole year at once, not only the fortnight the king stands in.
+
+    The calendar is not secret and never was. Withholding it made every
+    quantity in the Land ledger unplannable: the ruler could see that the
+    harvest asked more days than he had, and could not see that the asking
+    stopped in two fortnights.
+    """
+    wheel = [_grain_stage(kernel, f) for f in range(1, 25)]
+    spans = []
+    for name, task in STAGES:
+        marked = [f for f in range(1, 25) if wheel[f - 1] == name]
+        if not marked:
+            continue
+        wraps = 1 in marked and 24 in marked and len(marked) < 24
+        first = next(f for f in marked if not wraps or wheel[f - 2] != name)
+        last = next(f for f in reversed(marked) if not wraps or wheel[f % 24] != name)
+        spans.append({"name": name, "task": task, "from": first, "to": last,
+                      "fortnights": len(marked)})
+    year = {"fortnight": max(0, fortnight), "turn": turn, "wheel": wheel,
+            "spans": spans, "source": "the calendar", "as_of_turn": turn,
+            "certainty": "counted"}
+    if fortnight < 1:
+        # Before the first turn resolves. The year has a shape; the king does
+        # not stand anywhere in it yet, and saying otherwise would be false.
+        return {**year, "stage": "", "index": 0, "length": 0, "left": 0,
+                "next": "", "next_in": 0}
+
+    stage = wheel[fortnight - 1]
+    # Where in the season this is, counting from the fortnight it opened.
+    index, length = 1, 1
+    back = fortnight
+    while wheel[(back - 2) % 24] == stage and length < 24:
+        back -= 1
+        index += 1
+        length += 1
+    ahead = fortnight
+    while wheel[ahead % 24] == stage and length < 24:
+        ahead += 1
+        length += 1
+
+    order = [name for name, _ in STAGES]
+    following = order[(order.index(stage) + 1) % len(order)]
+    ahead_by = next((n for n in range(1, 25)
+                     if wheel[(fortnight - 1 + n) % 24] == following), 0)
+    return {**year, "stage": stage, "index": index, "length": length,
+            "left": length - index + 1,
+            "next": following, "next_in": ahead_by}
 
 
 def _land(world, perr: int) -> dict:
@@ -406,48 +476,67 @@ def _land(world, perr: int) -> dict:
             "canal_condition": None,
             # The crown's own field hands, head count (spec 6.4).
             "hands": field.people if field is not None else 0,
-            "extent": site.extent,
+            "extent": F.extent(kernel, site_id),
             "capacity": site.capacity,
             "under_crop": F.under_crop(kernel, site_id),
             "seed": F.held(kernel.book, controller, F.SEED, seat),
             "standing": F.held(kernel.book, controller, F.STANDING, site_id),
-            "sheaves": F.held(kernel.book, controller, F.SHEAVES, seat),
             "grain": F.held(kernel.book, controller, F.GRAIN, seat),
         })
 
     now = world.date.absolute
     sown = sum(e["under_crop"] for e in estates)
-    open_ground = max(0, (site.extent if site is not None else 0) - sown)
+    open_ground = max(0, (F.extent(kernel, site_id) if site is not None else 0)
+                      - sown)
     standing = sum(e["standing"] for e in estates)
-    sheaves = sum(e["sheaves"] for e in estates)
     stage = _grain_stage(kernel, kernel.date.fortnight)
 
-    # What the fields ask in the fortnight that is. The ruler can count the
-    # standing crop; the ask is the days the moment needs on this estate.
-    ask = {
+    # What the fields ask in the fortnight that is, and what each other moment
+    # of the year would ask of the stock standing here now. The ruler can count
+    # the crop; the ask is the days that count needs on this estate. Keeping
+    # all four is the planning figure: an ask of nothing this fortnight while
+    # eight thousand parisu stand uncut is not the same fact as an ask of
+    # nothing with the barns empty.
+    asks = {
         "sowing": open_ground // F.SOW_PER_DAY,
         "growing": standing // F.TEND_PER_DAY,
         "harvest": standing // F.REAP_PER_DAY,
-        "threshing": sheaves // F.THRESH_PER_DAY,
         "low_water": 0,
-    }[stage]
+    }
+    ask = asks[stage]
 
+    hands = kernel.labour(seat)
+    called = seat_door.corvee_days(world)
+    reading = transcribe(gauge(world), world.seed, now, f"gauge:{now}", perr)
     return {
         "estates": estates,
         "stage": stage,
-        "gauge": transcribe(gauge(world), world.seed, now,
-                            f"gauge:{now}", perr),
+        "gauge": reading,
+        "gauge_says": gauge_word(reading),
+        # The gauge is a tired hand's copy of a mark on a wall, not the weather.
+        "gauge_source": "the river mark, as the scribe read it",
+        "gauge_certainty": "reported",
         "last_land_due": court.last_land_due,
         "land_due_rate": court.land_due_rate,
         "land_due_base": court.land_due_base,
         "seed_in_store": _stores(world, perr).get("seed_grain", 0),
         "seed_in_ground": sown,
         "seed_recommended": open_ground,
+        "standing": standing,
         "hands_to_the_fields": list(seat_door.at_harvest(world)),
-        "corvee_days": seat_door.corvee_days(world),
+        "corvee_days": called,
         "works_days": court.works_days,
-        "labour_days_this_turn": kernel.labour(seat),
+        "labour_days_this_turn": hands,
         "labour_days_needed": ask,
+        # Works are confined to low water, whose field ask is zero. Keep the
+        # seasonal levy on its own line instead of pretending it withholds
+        # labour from sowing, tending, or harvest.
+        "labour_days_committed": 0,
+        "labour_days_idle": max(0, hands - ask),
+        "labour_days_by_season": asks,
+        "rates": {"sow": F.SOW_PER_DAY, "tend": F.TEND_PER_DAY,
+                  "reap": F.REAP_PER_DAY,
+                  "grain_per_1000": F.HARVEST_PER_1000},
     }
 
 
@@ -473,7 +562,6 @@ def _institutions(world) -> list[dict]:
         condition = (inst.condition if seen else I.reported_condition(
             world, inst, world.seed, world.date.absolute))
         group = seat_door.groups(world).get(inst.group)
-        staff = group.output_modifier if group is not None else 1000
         out.append({
             "id": inst.id, "name": inst.name, "kind": inst.kind,
             "place": inst.place, "head": inst.head,
@@ -482,10 +570,13 @@ def _institutions(world) -> list[dict]:
             "condition": condition,
             "inspected": seen,
             "capacity": inst.capacity,
-            "effective": (inst.capacity * condition // 1000 * staff // 1000
-                          * I._head_factor(court, inst) // 1000),
+            "effective": I.effective_at_condition(world, inst, condition),
             "upkeep": {good: qty for good, qty in inst.upkeep},
             "history": list(court.institution_history.get(key, ())),
+            "source": ("royal inspection" if seen else
+                       f"report of {inst.head or 'the institution'}"),
+            "as_of_turn": world.date.absolute,
+            "certainty": "counted" if seen else "reported",
         })
     return out
 
@@ -506,28 +597,60 @@ def _projects(world) -> list[dict]:
     estimate of when it will be done -- that depends on the corvée he has not
     raised yet and the season he cannot hurry.
     """
+    from engine import works as W
+
     court = world.court
     out = []
     for key in sorted(court.projects):
         p = court.projects[key]
+        plan = world.works_plans.get(p.kind, {})
+        materials = W.material_cost(world, p.kind, p.days_needed)
+        spent = {good: qty for good, qty in p.spent}
         out.append({
             "id": p.id, "what": p.name, "kind": p.kind, "place": p.place,
             "repair": bool(p.institution), "institution": p.institution,
             "days_done": p.days_done, "days_needed": p.days_needed,
-            "spent": {good: qty for good, qty in p.spent},
+            "days_remaining": max(0, p.days_needed - p.days_done),
+            "spent": spent,
+            "materials": materials,
+            "materials_remaining": {
+                good: max(0, qty - spent.get(good, 0))
+                for good, qty in materials.items()},
+            "status": W.status(world, p),
+            "category": str(plan.get("category", "WORK")),
+            "effect": str(plan.get("effect", "adds institutional capacity")),
+            "tradeoff": str(plan.get("tradeoff", "uses labour and supplies")),
+            "upkeep": {good: int(qty)
+                       for good, qty in plan.get("upkeep", {}).items()},
+            "condition_target": p.condition_target,
+            "capacity": p.capacity,
             "started_turn": p.started_turn,
+            "source": "works roll", "as_of_turn": world.date.absolute,
+            "certainty": "counted",
         })
     return out
 
 
 def _plans(world) -> list[dict]:
     """What can be put up, and what it would cost. Authored, so exact."""
+    from engine import works as W
+
     out = []
-    for kind in sorted(world.works_plans):
+    for kind in sorted(world.works_plans, key=lambda item: (
+            int(world.works_plans[item].get("order", 999)), item)):
         plan = world.works_plans[kind]
+        days = int(plan["days"])
         out.append({"kind": kind, "name": plan["name"],
-                    "days": int(plan["days"]),
-                    "capacity": int(plan["capacity"])})
+                    "days": days,
+                    "capacity": int(plan["capacity"]),
+                    "category": str(plan.get("category", "WORK")),
+                    "effect": str(plan.get("effect", "adds institutional capacity")),
+                    "tradeoff": str(plan.get("tradeoff", "uses labour and supplies")),
+                    "history": str(plan.get("history", "")),
+                    "upkeep": {good: int(qty)
+                               for good, qty in plan.get("upkeep", {}).items()},
+                    "per_1000_days": W.cost_per_1000(world, kind),
+                    "materials": W.material_cost(world, kind, days)})
     return out
 
 
@@ -563,6 +686,8 @@ def _justice(world) -> dict:
             "claim_text": petition.claim_text if petition.heard else "",
             "counter_text": petition.counter_text if petition.heard else "",
             "precedent": None,
+            "source": "court docket", "as_of_turn": world.date.absolute,
+            "certainty": "counted" if petition.heard else "reported",
         }
         if cited is not None:
             item["precedent"] = {
@@ -627,7 +752,11 @@ def _troops(world) -> dict:
     return {
         "formations": [
             {"id": f.id, "name": f.name, "strength": f.strength,
-             "task": f.task, "place": f.place, "commander": f.commander}
+             "ready": f.ready, "equipment_floor": f.equipment_floor,
+             "replacement_rate": f.replacement_rate,
+             "task": f.task, "place": f.place, "commander": f.commander,
+             "source": "muster roll", "as_of_turn": world.date.absolute,
+             "certainty": "counted"}
             for f in sorted(court.formations, key=lambda f: f.id)
         ],
         "garrisons": {p: garrison_strength(world, p) for p in places},
@@ -640,6 +769,32 @@ def _troops(world) -> dict:
             if (s.oath_id, s.called_turn) in read_summons
         ],
     }
+
+
+SEEN = {
+    "drought": "the rain has failed",
+    "crop_failure": "the crop has failed in the field",
+    "earthquake": "the ground has shaken",
+    "destructive_sea": "the sea has broken the shore",
+    "epidemic": "there is sickness",
+    "route_violence": "the roads are not safe",
+    "political_rupture": "the ruling house is broken",
+    "volcanic": "the sky is dark with ash",
+    "fire": "there has been a fire",
+    "locusts": "locusts have come",
+    "flood": "the water has come over the banks",
+}
+
+
+def _calamities(world) -> list[dict]:
+    """A disaster in the king's own Alu is not a report, it is a thing he can
+    see from the roof. Disasters elsewhere reach him by letter or not at all,
+    so they are not here."""
+    seat = f"settlement:{world.chosen_alu}"
+    return [{"kind": shock.kind, "say": SEEN.get(shock.kind, shock.kind),
+             "began": shock.turn, "until": shock.until}
+            for shock in world.shocks
+            if shock.target == seat and shock.recovered_turn < 0]
 
 
 def _plague(world, perr: int) -> dict:
@@ -746,6 +901,9 @@ def _house(world) -> dict:
             "post": person.post,
             "interests": list(person.interests),
             "named_heir": court.named_heir == person.id,
+            "source": "court household roll",
+            "as_of_turn": world.date.absolute,
+            "certainty": "reported",
         })
     return {
         "ruler": court.ruler,
@@ -808,11 +966,18 @@ def _world_graph(world) -> dict:
         ],
         "routes": [
             {
+                "id": route.id,
+                "name": route.name,
                 "a": route.ends[0],
                 "b": route.ends[1],
+                "origin": route.ends[0],
+                "destination": route.ends[1],
                 "mode": route.legs[0].mode,
                 "seasonal": _seasonal(route),
                 "legs": route.fortnights(),
+                "capacity": route.capacity,
+                "risk": route.risk,
+                "tolls": list(route.toll_jurisdictions),
                 # Scenery on the same terms as the terrain: the course is the
                 # inherited map of where the road runs, not a live report.
                 "course": [list(turn) for turn in route.course],
@@ -844,12 +1009,18 @@ def _world_graph(world) -> dict:
             "legend": world.terrain.legend,
         },
         "sites": [
-            {"kind": site.kind, "alu": site.settlement.split(":", 1)[1],
+            {"id": site.id, "kind": site.kind,
+             "alu": site.settlement.split(":", 1)[1],
+             "settlement": site.settlement.split(":", 1)[-1],
              "role": ("palace_centre" if site.function == "palace_centre"
                       else "capacity"),
-             "capacity": ("" if site.function == "palace_centre"
-                          else site.function),
-             "name": site.name, "col": site.col, "row": site.row}
+             "function": site.function, "capacity": site.capacity,
+             "extent": site.extent, "holder": site.holder,
+             "region": site.region, "harbour": site.harbour,
+             "population": site.population,
+             "name": site.name, "col": site.col, "row": site.row,
+             "source": source, "as_of_turn": 0,
+             "age_turns": max(0, now), "certainty": "charted"}
             # Addressable marks are drawn from `places` above; listing them
             # here as well would put Ma'hadu in the hinterland twice.
             for site in [world.kernel.registry.sites[i]
@@ -866,12 +1037,20 @@ def _trade(world, perr: int) -> dict:
     seat = f"settlement:{world.chosen_alu}"
     controller = world.kernel.controller(seat)
     market = carry.readings(world.kernel, seat)
-    cargo: dict[str, int] = {}
+    cargo = []
     for lot in world.kernel.book.at(seat):
         if lot.owner != controller and lot.quantity:
-            cargo[lot.good] = cargo.get(lot.good, 0) + lot.quantity
+            cargo.append({
+                "id": lot.id, "good": lot.good, "quantity": lot.quantity,
+                "reserved": lot.reserved, "available": lot.free,
+                "owner": lot.owner, "holder": lot.holder,
+                "location": lot.location.split(":", 1)[-1],
+                "quality": lot.quality, "provenance": list(lot.provenance),
+                "source": "harbour cargo roll",
+                "as_of_turn": world.date.absolute, "certainty": "counted",
+            })
     routes = []
-    for route_id in world.kernel.commercial_routes():
+    for route_id in sorted(world.kernel.registry.routes):
         route = world.kernel.registry.routes[route_id]
         if any(world.kernel.registry.settlements[leg.origin].fallen
                or world.kernel.registry.settlements[leg.destination].fallen
@@ -879,26 +1058,108 @@ def _trade(world, perr: int) -> dict:
             continue
         if not any(seat in (leg.origin, leg.destination) for leg in route.legs):
             continue
-        routes.append({"id": route_id, "name": route.name,
-                       "strength": world.kernel.trade_routes[route_id],
-                       "mode": route.legs[0].mode})
+        routes.append({
+            "id": route_id, "name": route.name,
+            "origin": route.origin.split(":", 1)[-1],
+            "destination": route.destination.split(":", 1)[-1],
+            "strength": world.kernel.trade_routes.get(route_id, 0),
+            "mode": route.legs[0].mode, "legs": route.fortnights(),
+            "capacity": carry.route_capacity(world.kernel, route_id),
+            "base_capacity": route.capacity,
+            "works_bonus": world.kernel.route_capacity_bonus.get(route_id, 0),
+            "risk": route.risk,
+            "tolls": list(route.toll_jurisdictions),
+            "seasonal": _seasonal(route), "source": "court route tablet",
+            "as_of_turn": 0, "certainty": "charted",
+        })
     movements = [{
         "id": voyage.id,
+        "route": voyage.route,
+        "carrier": voyage.carrier,
         "origin": voyage.origin.split(":", 1)[-1],
         "destination": voyage.destination.split(":", 1)[-1],
+        "departed": voyage.departed,
         "arrives": voyage.arrives,
+        "remaining": max(0, voyage.arrives - world.date.absolute),
         "mode": voyage.mode,
-        "cargo": len(voyage.cargo),
+        "cargo": list(voyage.cargo),
+        "news": dict(voyage.news),
+        "source": "dispatch and harbour reports",
+        "as_of_turn": world.date.absolute, "certainty": "reported",
     } for voyage in world.kernel.voyages
-        if voyage.origin == seat or voyage.carrier == controller]
+        if seat in (voyage.origin, voyage.destination)
+        or voyage.carrier == controller]
     return {
         "grain_price": transcribe(
             market["price_grain"], world.seed, world.date.absolute,
             "trade:grain_price", perr),
-        "cargo": [{"good": good, "quantity": quantity}
-                  for good, quantity in sorted(cargo.items())],
+        "cargo": cargo,
         "routes": routes,
         "movements": movements,
+    }
+
+
+def _forecast_basis(world, land: dict, institutions: list[dict],
+                    stores: dict, groups: list[dict]) -> dict:
+    """Current, reportable quantities a drafted due can be priced against."""
+    from engine import actions as A
+    from engine import revenue as R
+    from engine import systems
+
+    standing = max(0, land.get("standing", 0))
+    grain_per_1000 = max(0, land.get("rates", {}).get(
+        "grain_per_1000", 0))
+    crop = standing * grain_per_1000 // 1000
+    # The harvest reserves toward the estate's full annual seed requirement,
+    # not toward the weather-thinned crop still visible today.
+    sown = sum(max(0, estate.get("extent", 0))
+               for estate in land.get("estates", ()))
+    seed = max(0, land.get("seed_in_store", 0))
+    assessable = None if standing <= 0 else max(0, crop - max(0, sown - seed))
+
+    working = sum(max(0, item.get("effective", 0))
+                  for item in institutions if item.get("kind") == "granary")
+    owed = sum(max(0, item.get("size", 0))
+               * max(0, item.get("entitlement", 0)) for item in groups)
+    roof = systems.granary_capacity_for(owed, working)
+
+    harbours = [item for item in institutions
+                if item.get("kind") == "harbour"]
+    harbour_output = sum(max(0, item.get("effective", 0))
+                         for item in harbours)
+    assessment = (() if not harbours else R.harbour_assessment(
+        world, harbour_output))
+    merchants = sum(1 for actor in world.revenue_merchants
+                    if actor in world.relations)
+    responses = [item.payload for item in world.schedule
+                 if isinstance(item.payload, A.MerchantResponseDue)]
+    rules = world.revenue_rules
+    return {
+        "land": {
+            "assessable": assessable,
+            "already_taken": max(0, world.court.land_due_in_progress),
+            "grain": max(0, stores.get("grain", 0)),
+            "roof_capacity": roof,
+            "unrest_divisor": max(1, rules.get("unrest_divisor", 4)),
+            "source": "standing crop and granary reports",
+            "certainty": "estimated",
+        },
+        "harbour": {
+            "assessment": list(assessment),
+            "clearable": sum(quantity for _lot, quantity in assessment),
+            "waiting": R.harbour_waiting(world),
+            "merchant_count": merchants,
+            "traffic_loss_per_esteem": max(
+                0, rules.get("traffic_loss_per_esteem", 3)),
+            "delay_min": max(0, rules.get("response_min_turns", 3)),
+            "delay_max": max(0, rules.get("response_max_turns", 6)),
+            "pending": len(responses),
+            "pending_traffic_loss": sum(
+                max(0, -response.traffic_delta) for response in responses),
+            "source": "harbour master's cargo roll",
+            "certainty": (harbours[0] if harbours else {}).get(
+                "certainty", "reported"),
+        },
     }
 
 
@@ -925,15 +1186,23 @@ def project(world) -> dict:
     for gid in sorted(roll):
         g = roll[gid]
         owed = g.size * g.entitlement
+        ordinary_claim = owed + min(g.arrears, owed)
         groups.append({
             "id": gid, "name": g.name, "size": g.size,
             "entitlement": g.entitlement, "function": g.function,
             "place": g.place,
-            "allocated": allowances.get(gid, owed),
+            "allocated": min(
+                allowances.get(gid, ordinary_claim), ordinary_claim),
             "arrears_qa": g.arrears,
             "arrears_weeks": g.arrears // max(1, owed),
             "loyalty": _loyalty_word(g.loyalty),
+            "loyalty_report": g.loyalty,
+            "output_modifier": g.output_modifier,
+            "revolting": g.revolting,
+            "at_fields": g.at_fields,
             "member_name": g.member_name,
+            "source": "palace labour roll", "as_of_turn": d.absolute,
+            "certainty": "counted",
         })
     seat_id = f"settlement:{world.chosen_alu}"
     cohorts = []
@@ -946,12 +1215,43 @@ def project(world) -> dict:
             "name": cohort.name or cohort.kind.replace("_", " "),
             "size": transcribe(cohort.people, world.seed, d.absolute,
                                f"cohort:{cohort.id}", perr),
+            "people": transcribe(cohort.people, world.seed, d.absolute,
+                                 f"cohort:{cohort.id}", perr),
+            "households": cohort.households,
+            "origin": cohort.origin,
             "ethnicity": cohort.ethnicity,
             "status": cohort.status,
             "place": cohort.settlement.split(":", 1)[-1],
+            "tenure": world.kernel.tenure_of(cohort),
+            "institution": cohort.institution,
+            "representative": cohort.representative,
+            "armed": cohort.armed,
             "parent": cohort.parent,
+            "roll_id": cohort.roll_id,
+            "roll_place": cohort.roll_place,
+            "roll_function": cohort.roll_function,
             "task": cohort.task,
-            "until": cohort.until,
+            "path": [part.split(":", 1)[-1] for part in cohort.path],
+            "arrives": cohort.arrives if cohort.arrives >= 0 else None,
+            "until": cohort.until if cohort.until >= 0 else None,
+            "ration_source": cohort.ration_source,
+            "official": cohort.official,
+            "labour_per_head": cohort.labour_per_head,
+            "labour": cohort.labour(),
+            "ration_per_head": cohort.ration_per_head,
+            "ration": cohort.ration(),
+            "allowance": cohort.allowance if cohort.allowance >= 0 else None,
+            "shortfall": cohort.shortfall,
+            "hunger": cohort.hunger,
+            "grievance": cohort.grievance,
+            "precedence": cohort.precedence,
+            "corvee": cohort.corvee,
+            "reaping": cohort.reaping,
+            "infected": cohort.infected,
+            "recovered": cohort.recovered,
+            "dead": cohort.dead,
+            "source": "current cohort roll", "as_of_turn": d.absolute,
+            "certainty": "reported",
         })
     relations = []
     for actor, relation in sorted(world.relations.items()):
@@ -977,26 +1277,69 @@ def project(world) -> dict:
             "seeking_patron": (
                 relation.seeking_patron
                 if relation.patron_notice_received else None),
+            "source": "received correspondence", "as_of_turn": d.absolute,
+            "certainty": "reported",
         })
     oaths = [{
         "id": oath.id, "parties": list(oath.parties),
         "superior": oath.superior, "gods": list(oath.gods),
         "sworn_turn": oath.sworn_turn, "sworn_by": oath.sworn_by,
         "dissolved": oath.dissolved,
+        "binds_house": oath.binds_house,
         # After a succession this is the most important word on the screen:
         # nobody is bound, and somebody has to swear again (spec 6.9).
         "lapsed": oath.lapsed,
         "clauses": [{
             "kind": clause.kind, "args": dict(clause.args),
         } for clause in oath.clauses],
+        "source": "oath tablet", "as_of_turn": d.absolute,
+        "certainty": "counted",
     } for oath in world.oaths]
+    obligations = []
+    for kind, records in (
+            ("reservation", world.letter_reservations),
+            ("promise", world.letter_obligations),
+            ("request", world.letter_claims),
+            ("marriage proposal", world.marriage_proposals)):
+        for record in records:
+            item = dataclasses.asdict(record)
+            item["kind"] = item.get("kind") or kind
+            item.update(source="correspondence record", as_of_turn=d.absolute,
+                        certainty="counted")
+            obligations.append(item)
     stores = _stores(world, perr)
+    priority = list(seat_door.order_of_payment(world))
+    by_group = {group["id"]: group for group in groups}
+    grain_left = stores.get("grain", 0)
+    for rank, gid in enumerate(priority, 1):
+        group = by_group[gid]
+        paid = min(grain_left, group["allocated"])
+        grain_left -= paid
+        owed = group["size"] * group["entitlement"]
+        group.update(
+            priority=rank,
+            next_paid=paid,
+            next_short=max(0, owed - paid),
+            next_status=("full" if paid >= owed else
+                         "none" if paid <= 0 else "short"),
+        )
+    graph = _world_graph(world)
+    by_place = {relation["place"]: relation for relation in relations}
+    for place in graph["places"]:
+        if place["id"] in by_place:
+            place["court_record"] = by_place[place["id"]]
+    trade = _trade(world, perr)
+    land = _land(world, perr)
+    institutions = _institutions(world)
+    forecast_basis = _forecast_basis(
+        world, land, institutions, stores, groups)
     return {
         "scenario": world.kernel.registry.settlements[
             f"settlement:{world.chosen_alu}"].name,
         "actor": c.actor,
         "date": date_label(world.chosen_alu, d.year, d.fortnight),
         "year": d.year, "fortnight": d.fortnight,
+        "turn": d.absolute,
         "attention": attention_available(c, d.fortnight),
         "attention_base": c.attention_base,
         "sea_open": sea_open(world.season, d.fortnight),
@@ -1011,17 +1354,27 @@ def project(world) -> dict:
         "end_reason": world.end_reason,
         "legitimacy": c.legitimacy,
         "stores": stores,
-        "priority": list(seat_door.order_of_payment(world)),
+        "priority": priority,
+        "ration_grain_left": grain_left,
         "groups": groups,
         "cohorts": cohorts,
         "relations": relations,
         "oaths": oaths,
+        "obligations": obligations,
+        "rites": [{"id": rite.id, "fortnight": rite.fortnight,
+                   "hours": rite.hours, "requires": dict(rite.requires),
+                   "skip_legitimacy": rite.skip_legitimacy,
+                   "skip_unrest": rite.skip_unrest,
+                   "source": "ritual calendar", "as_of_turn": d.absolute,
+                   "certainty": "counted"} for rite in c.rites],
         "regnal_year": d.year,
         "house": _house(world),
-        "world_graph": _world_graph(world),
-        "trade": _trade(world, perr),
-        "land": _land(world, perr),
+        "world_graph": graph,
+        "trade": trade,
+        "calendar": _calendar(world.kernel, d.fortnight, d.absolute),
+        "land": land,
         "plague": _plague(world, perr),
+        "calamities": _calamities(world),
         "archive_index": _archive(world),
         # Note what `_metal` does not return: `replacement_rate`. Strength is
         # visible and never falls; the ability to replace losses is not visible
@@ -1029,7 +1382,7 @@ def project(world) -> dict:
         # casualties, which is several milestones away.
         "metal": _metal(world),
         "seat": world.court.seat,
-        "institutions": _institutions(world),
+        "institutions": institutions,
         "projects": _projects(world),
         "plans": _plans(world),
         "justice": _justice(world),
@@ -1042,8 +1395,15 @@ def project(world) -> dict:
             "harbour_traffic": c.harbour_traffic,
             "last_harbour_due": c.last_harbour_due,
             "harbour_good": world.revenue_good,
+            "response_min_turns": world.revenue_rules.get(
+                "response_min_turns", 3),
+            "response_max_turns": world.revenue_rules.get(
+                "response_max_turns", 6),
         },
+        "forecast_basis": forecast_basis,
         "works_season": _works_season(world),
+        "works_season_name": world.works_season.replace("_", " "),
+        "works_rate": world.works_rules.get("days_per_fortnight", 400),
         "works_materials": dict(world.works_materials),
         "repair_days_per_point": world.works_rules.get(
             "repair_days_per_point", 3),

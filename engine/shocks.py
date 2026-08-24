@@ -10,8 +10,12 @@ from engine.state import Shock, ShockChange, World
 KINDS = (
     "drought", "crop_failure", "earthquake", "destructive_sea",
     "epidemic", "route_violence", "political_rupture", "volcanic",
+    "fire", "locusts", "flood",
 )
 FOOD = {"estate", "food"}
+# What burns in a granary fire and what a flood ruins where it is stacked.
+BURNS = ("grain", "seed_grain", "oil", "wine")
+DROWNS = ("grain", "seed_grain")
 
 
 def _settlement(world: World, target: str) -> str:
@@ -85,6 +89,38 @@ def land(world: World, kind: str, target: str, severity: int,
         controller = world.kernel.controller(settlement)
         if controller:
             set_field("orgs", orgs, controller, "policy", "")
+    elif kind in {"fire", "flood"}:
+        # A fire takes what is stacked under one roof; a flood takes the grain
+        # wherever it is standing and leaves the canal to be dug out again.
+        goods = BURNS if kind == "fire" else DROWNS
+        book = world.kernel.book
+        places = [settlement] + local_sites
+        for place in places:
+            for lot in tuple(book.at(place)):
+                if lot.good not in goods or not lot.free:
+                    continue
+                lost = lot.free * severity // 1000
+                if lost:
+                    book = book.consume(lot.id, lost, "lost", authority=shock_id)
+        if kind == "flood":
+            for site_id in local_sites:
+                set_field("sites", sites, site_id, "capacity",
+                          sites[site_id].capacity * (1000 - severity // 2) // 1000)
+        world = dataclasses.replace(
+            world, kernel=dataclasses.replace(world.kernel, book=book))
+    elif kind == "locusts":
+        # They eat the standing crop and then the seed set aside for next year,
+        # which is why a locust year is two bad harvests and not one.
+        book = world.kernel.book
+        for place in [settlement] + local_sites:
+            for lot in tuple(book.at(place)):
+                if lot.good not in (F.STANDING, F.SEED) or not lot.free:
+                    continue
+                lost = lot.free * severity // 1000
+                if lost:
+                    book = book.consume(lot.id, lost, "lost", authority=shock_id)
+        world = dataclasses.replace(
+            world, kernel=dataclasses.replace(world.kernel, book=book))
     elif kind == "volcanic":
         region = registry.settlements[settlement].region
         for site_id in sorted(sites):
@@ -140,15 +176,29 @@ def step(world: World) -> tuple[World, list]:
     world, events = _recover(world)
     if world.date.absolute < world.pressure_turn:
         return world, events
-    rng = stream(world.seed, world.date.absolute, "world.shock", "regional")
-    if not rng.chance(80, 1000):
-        return world, events
+    # The age gets worse. Every four years the world is likelier to be struck
+    # and strikes harder, so a reign that was survivable in its first decade is
+    # not the same reign in its third. Nothing here picks a victim. At the old
+    # eight-year step the escalation was unreachable: the rate ceiling stood at
+    # turn 790 and no campaign lasts that long, so the age never turned.
+    age = (world.date.absolute - world.pressure_turn) // 96
+    # Every Alu faces its own weather. One roll for the whole map meant fifty-
+    # five places shared a single misfortune between them and the seat was
+    # struck about twice in thirty years, which is not the Late Bronze Age.
     targets = tuple(s for s in sorted(world.kernel.registry.settlements)
                     if not world.kernel.registry.settlements[s].fallen)
-    if not targets:
-        return world, events
-    target = rng.pick(targets)
-    kind = rng.pick(KINDS)
-    world, landed = land(
-        world, kind, target, 150 + rng.int(351), 2 + rng.int(11))
-    return world, events + landed
+    for target in targets:
+        rng = stream(world.seed, world.date.absolute, "world.shock", target)
+        if not rng.chance(min(6, 2 + age), 1000):
+            continue
+        # Rare and ruinous, rather than constant and survivable. At one roll in
+        # five hundred a place is struck about once in twenty years, and three
+        # times as often once the age has turned; when it is struck it loses
+        # half to nine tenths of whatever the shock touches --
+        # the standing crop, the granary, the road, the capacity of the ground.
+        # Recovery restores half the difference, so a bad one is felt for years.
+        world, landed = land(
+            world, rng.pick(KINDS), target,
+            min(900, 500 + 60 * age + rng.int(401)), 4 + rng.int(17))
+        events += landed
+    return world, events

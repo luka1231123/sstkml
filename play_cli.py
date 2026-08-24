@@ -355,11 +355,6 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
                     commit(A.SetPriority(tuple(args)))
                 except ValueError as ex:
                     print(f"  {ex}")
-            elif verb == "eat" and len(args) == 1:
-                try:
-                    commit(A.EatSeed(int(args[0])))
-                except ValueError:
-                    print("  eat needs an integer qa.")
             elif verb in ("harvest", "recall") and len(args) == 1:
                 if left < HARVEST_COST:
                     print("  no hour remains to send the order out.")
@@ -666,6 +661,6 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    sc = argv[0] if argv else "ugarit"
+    sc = argv[0] if argv else "seat"
     sd = int(argv[1]) if len(argv) > 1 else None
     run(sc, sd)

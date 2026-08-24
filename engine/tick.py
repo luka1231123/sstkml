@@ -59,9 +59,48 @@ def advance(world: World) -> tuple[World, list]:
 
 
 def _calendar(world: World) -> tuple[World, list]:
+    from engine import institution
+    from engine.kernel import carry
+
+    kernel = world.kernel
+    seat_id = getattr(kernel.seat_goods, "seat", "")
+
+    def at_seat(item) -> bool:
+        place = world.places.get(item.place)
+        alu = (item.place if place is not None and place.kind == "alu"
+               else place.alu if place is not None else "")
+        return alu == world.chosen_alu
+
+    by_kind = {
+        kind: sum(institution.effective(world, item)
+                  for item in world.court.institutions.values()
+                  if item.kind == kind and at_seat(item))
+        for kind in ("canal", "harbour", "road")
+    }
+    field = kernel.field_site(seat_id, kernel.controller(seat_id))
+    site_bonus = ({field: by_kind["canal"]}
+                  if field and by_kind["canal"] else {})
+    route_bonus = {}
+    for route_id, route in kernel.registry.routes.items():
+        if not route.legs:
+            continue
+        ends = {carry.settlement_of(kernel, route.origin),
+                carry.settlement_of(kernel, route.destination)}
+        if seat_id not in ends:
+            continue
+        mode = route.legs[0].mode
+        bonus = (by_kind["harbour"] if mode == "sea" else
+                 by_kind["road"] if mode in {"land", "road"} else 0)
+        if bonus:
+            route_bonus[route_id] = bonus
     world = dataclasses.replace(
         world, court=dataclasses.replace(
-            world.court, inspected=(), searched=()))
+            world.court, inspected=(), searched=()),
+        # The court's due is the share its own harvest renders.
+        kernel=dataclasses.replace(
+            kernel, land_due_per_1000=world.court.land_due_rate,
+            baseline=world.baseline, site_extent_bonus=site_bonus,
+            route_capacity_bonus=route_bonus))
     return world, [_turn_advanced(world)]
 
 
@@ -71,8 +110,9 @@ def _arrivals(world: World) -> tuple[World, list]:
 
     events: list = []
     world = seat.arrive_detachments(world)
-    world, arrived = displacement.arrivals(world)
-    events += arrived
+    if not world.baseline:
+        world, arrived = displacement.arrivals(world)
+        events += arrived
     world, returned = seat.return_due(world)
     events += returned
     world, fired = drain_schedule(world)
@@ -101,6 +141,7 @@ def _production(world: World, kernel_events: list) -> tuple[World, list]:
     world = seat.close_year(world)
     world, produced = metal.step(world); events += produced
     world, produced = institution.step(world); events += produced
+    world, produced = revenue.land_cargo(world); events += produced
     world, produced = revenue.collect_harbour(world); events += produced
     world, produced = works.step(world); events += produced
     return world, events
@@ -111,8 +152,9 @@ def _consumption(world: World) -> tuple[World, list]:
     world, produced = systems.spoilage(world); events += produced
     world, produced = systems.do_rites(
         world, world.date.fortnight); events += produced
+    before = seat.groups(world)
     world = seat.feed(world)
-    world, produced = seat.settle_payroll(world); events += produced
+    world, produced = seat.settle_payroll(world, before); events += produced
     return world, events
 
 
@@ -120,8 +162,10 @@ def _health(world: World) -> tuple[World, list]:
     from engine import house, plague, shocks
 
     events: list = []
-    world, produced = shocks.step(world); events += produced
-    world, produced = plague.step(world); events += produced
+    if not world.baseline:
+        world, produced = shocks.step(world); events += produced
+        world, produced = plague.step(world); events += produced
+    # Births and deaths are the normal state of existence; always run.
     world, produced = house.step(world); events += produced
     return world, events
 
@@ -136,9 +180,10 @@ def _politics(world: World) -> tuple[World, list]:
     world, produced = justice.step(world); events += produced
     world, produced = relations.audit_oaths(world); events += produced
     world, produced = correspondence_policy.step(world); events += produced
-    world, produced = displacement.step(world); events += produced
-    world, produced = fall.step(world); events += produced
-    world, produced = defence.step(world); events += produced
+    if not world.baseline:
+        world, produced = displacement.step(world); events += produced
+        world, produced = fall.step(world); events += produced
+        world, produced = defence.step(world); events += produced
     return world, events
 
 

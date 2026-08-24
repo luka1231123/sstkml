@@ -12,7 +12,7 @@ from pathlib import Path
 
 from engine import obligation as O
 from engine import ownership as W
-from engine.core import Date, stream
+from engine.core import Date, lerp_table, stream
 from engine.entity import Cohort as KernelCohort
 from engine.entity import Leg as KernelLeg
 from engine.entity import Organization as KernelOrganization
@@ -61,7 +61,7 @@ OVERLORD_SEATS = {
 SITE_FUNCTIONS = frozenset({
     "palace_centre", "food", "copper", "tin", "gold", "silver",
     "cedar", "horses", "lapis", "estate", "mine", "forest", "quarry",
-    "pasture", "harbour",
+    "pasture", "harbour", "oil", "wine",
 })
 
 
@@ -127,6 +127,14 @@ def parse_places(cfg: dict) -> dict:
             raise ValueError(f"{place.id}: palace centre of unknown Alu "
                              f"{place.alu!r}")
     return places
+
+
+# Hold a crossing carries in a fortnight, in qa-of-grain equivalents, by how
+# the goods travel. Nothing authored a route capacity, so every route took the
+# `0 = unmodelled` default and the whole cargo system -- voyages, pools,
+# loading, arrival -- ran but moved nothing, for every route in the world. A
+# ship carries what a donkey train cannot, so the number belongs to the mode.
+ROUTE_CAPACITY = {"sea": 6000, "river": 3000, "land": 800}
 
 
 def _course(flat) -> tuple[tuple[int, int], ...]:
@@ -314,6 +322,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
                 season=("sailing_open"
                         if r.get("seasonal") and r["mode"] == "sea" else "")),),
             risk=int(r["risk"]),
+            capacity=ROUTE_CAPACITY.get(r["mode"], 0),
             course=_course(r.get("path", ())),
             ends=(r["a"], r["b"]),
         )
@@ -385,7 +394,7 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
             id=row["id"], settlement=row["settlement"], kind=row["kind"],
             households=int(row["households"]), people=int(row["people"]),
             ethnicity=registry.settlements[row["settlement"]].region,
-            status="household",
+            status="household", tenure=str(row.get("tenure", "")),
             institution=registry.settlements[row["settlement"]].owner)
         split_people[row["settlement"]] = (
             split_people.get(row["settlement"], 0) + int(row["people"]))
@@ -430,7 +439,8 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
         settlement = row["settlement"]
         known("stores", "settlement", settlement, registry.settlements)
         owner = row.get("owner") or _controller(orgs, settlement) or settlement
-        if owner not in orgs and owner not in registry.settlements:
+        if (owner not in orgs and owner not in registry.settlements
+                and owner not in cohorts):
             raise ValueError(f"detail.toml: {settlement}: stores owned by "
                              f"{owner!r}, which does not exist")
         location = row.get("site", settlement)
@@ -482,8 +492,45 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
             raise ValueError(f"climate series for {region_id}, which is not a region")
     drought_curve = tuple(
         (int(p[0]), int(p[1])) for p in climate_raw.get("drought_curve", []))
-
     return registry, book, tuple(obligations), seasons, region_climate, drought_curve
+
+
+def _with_drought(series: tuple[int, ...],
+                  curve: tuple[tuple[int, int], ...],
+                  seed: int, region: str) -> tuple[int, ...]:
+    """Lay the authored weather over the authored drought, for thirty years.
+
+    The per-region series are four years long and `climate_at` reads them with
+    a modulo, so every region repeated the same four years forever and the
+    drought curve -- the whole reason a Late Bronze Age court is interesting --
+    reached nobody.
+
+    The curve itself is authored once, so the seed says only when this reign
+    met the dry years and how hard this ground took them. Without that every
+    campaign died in the same year. The first two years are never shifted: a
+    reign does not open in the middle of a drought.
+    """
+    if not series or not curve:
+        return series
+    rng = stream(seed, 0, "climate.drought", region)
+    early = rng.int(9) - 4                 # the dry years come +/- 4 years
+    bite = 850 + rng.int(301)              # and bite 85% to 115% as deep
+    opening = lerp_table(curve, 0)
+
+    def sink(turn: int) -> int:
+        year = turn // 24
+        if year < 2:
+            return 0
+        return (lerp_table(curve, max(0, year + early)) - opening) * bite // 1000
+
+    # The curve is the authority on how dry it gets. Noise may make one
+    # fortnight worse than the year, but never so much worse that the ground
+    # stops being ground: below this the crop is not thin, it is absent, and a
+    # decade of absent crop is not a game.
+    floor = min(value for _year, value in curve) - 8
+    return tuple(
+        max(0, min(200, max(floor, series[turn % len(series)] + sink(turn))))
+        for turn in range(CLIMATE_YEARS * 24))
 
 
 def load_idmap(registry: Registry) -> dict[str, dict[str, str]]:
@@ -834,13 +881,15 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     kernel = Kernel(
         seed=seed, date=date, registry=kernel_registry, book=book,
         obligations=obligations, seasons=seasons, seat_goods=seat_view,
-        region_climate=region_climate, spoilage=load_spoilage())
+        region_climate={region: _with_drought(series, drought_curve, seed, region)
+                        for region, series in region_climate.items()},
+        spoilage=load_spoilage())
 
     # The opening division. A settlement's authored granary is one heap, and
     # under subsistence tenure the households' part of it is theirs already --
     # the world does not begin the fortnight before its first harvest. Without
     # this every village in a subsistence country would own nothing until the
-    # threshing floor came round and would starve on the calendar.
+    # harvest came round and would starve on the calendar.
     kernel, _ = farm.divide(kernel)
 
     world = World(
@@ -863,9 +912,6 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
         protocol_rules={
             k: int(v) for k, v in relation_cfg["protocol"].items()},
         climate=climate_series(seed, CLIMATE_YEARS * 24, drought_curve),
-        land_tables={
-            name: tuple((int(x), int(y)) for x, y in points)
-            for name, points in land_cfg["tables"].items()},
         land_rules={
             **{k: int(v) for k, v in land_cfg["agriculture"].items()},
             **{k: int(v) for k, v in land_cfg["metal"].items()}},

@@ -71,7 +71,7 @@ SLOTS: dict[str, Slot] = {
     "AssignTroops": Slot("this formation", ("formation_id",)),
     "SetLandDue": Slot("the land due"),
     "SetHarbourDue": Slot("the harbour due"),
-    "SetPriority": Slot("the pay-down order"),
+    "SetPriority": Slot("the ration order"),
     "NameHeir": Slot("the succession"),
 }
 
@@ -191,6 +191,10 @@ def phrase(order: Order, belief: dict) -> str:
             continue
         if field.domain == "quantity":
             parts.append(f"{int(value):,}")
+        elif isinstance(value, (list, tuple)):
+            parts.append(" → ".join(
+                affordances.name_in(field.domain, str(item), belief)
+                for item in value))
         else:
             parts.append(affordances.name_in(field.domain, str(value), belief))
     # A flag-flipped order is a different order and must not borrow the name
@@ -276,11 +280,23 @@ def _empty(view: str) -> str:
 
 def _detail(order: Order, belief: dict, now: int) -> list[tuple[str, str]]:
     descriptor = order.descriptor
-    lines: list[tuple[str, str]] = [
-        (phrase(order, belief), "bone"),
-        ("", "clay"),
-        (f"given {when(order, now)}", "sky"),
-    ]
+    if order.action.get("_t") == "SetPriority":
+        names = [affordances.name_in("group", str(group), belief)
+                 for group in order.action.get("order", ())]
+        lines: list[tuple[str, str]] = [("RATION ORDER", "bone")]
+        # Two ranks per line keep all seven visible in the real 72×24 window.
+        for index in range(0, len(names), 2):
+            left = f"{index + 1}  {names[index]}"
+            right = (f"{index + 2}  {names[index + 1]}"
+                     if index + 1 < len(names) else "")
+            lines.append((f"{left:<32}{right}", "clay"))
+        lines += [("", "clay"), (f"given {when(order, now)}", "sky")]
+    else:
+        lines = [
+            (phrase(order, belief), "bone"),
+            ("", "clay"),
+            (f"given {when(order, now)}", "sky"),
+        ]
     if descriptor is not None and descriptor.cost:
         unit = "hour" if descriptor.cost == 1 else "hours"
         lines.append((f"it cost {descriptor.cost} {unit}", "dim"))

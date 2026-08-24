@@ -28,11 +28,6 @@ class SetPriority:
 
 
 @dataclasses.dataclass(frozen=True)
-class EatSeed:
-    qa: int          # move seed_grain into the granary now, ruin the sowing later
-
-
-@dataclasses.dataclass(frozen=True)
 class ReadLetter:
     letter_id: str   # reveal a Stack item's body; costs attention
 
@@ -416,11 +411,6 @@ class Grumbling:
 
 
 @dataclasses.dataclass(frozen=True)
-class SeedEaten:
-    amount: int
-
-
-@dataclasses.dataclass(frozen=True)
 class AllocationSet:
     group_id: str
     qa: int
@@ -634,6 +624,8 @@ class CohortReceived:
 class TradeFinanced:
     good: str
     quantity: int
+    received_good: str = ""
+    received_quantity: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -648,6 +640,16 @@ class SeatDefended:
     defenders: int
     dead: int
     grain: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class SeatTaken:
+    """The gate went. The granary is emptied and people are killed; whether the
+    reign ends is the ordinary population and unrest rule's to say (spec 6.4)."""
+    attackers: int
+    defenders: int
+    grain: int
+    dead: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -921,6 +923,14 @@ class HarbourDueTaken:
 
 
 @dataclasses.dataclass(frozen=True)
+class HarbourCargoLanded:
+    lot_id: str
+    owner: str
+    good: str
+    quantity: int
+
+
+@dataclasses.dataclass(frozen=True)
 class HarbourCargoWithdrawn:
     lot_id: str
     owner: str
@@ -1031,7 +1041,7 @@ class OfferingConsumed:
 
 _TYPES = {
     c.__name__: c for c in (
-        EndTurn, Allocate, SetPriority, EatSeed, ReadLetter, ArchiveLetter,
+        EndTurn, Allocate, SetPriority, ReadLetter, ArchiveLetter,
         DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
         RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee, LevyCohort,
@@ -1044,7 +1054,7 @@ _TYPES = {
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
         CohortDetached, CohortReturned, CohortDisplaced, CohortReceived,
         TradeFinanced, TradeRequisitioned,
-        SeatDefended, SeatFell, AluFell, CanalDredged,
+        SeatDefended, SeatTaken, SeatFell, AluFell, CanalDredged,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,
         BronzeMelted, WorkshopDemandMet,
         InstitutionDecayed, InstitutionUpkeepConsumed,
@@ -1060,12 +1070,12 @@ _TYPES = {
         QuarantineSet, ArchiveSearched,
         PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
         LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,
-        HarbourCargoWithdrawn,
+        HarbourCargoLanded, HarbourCargoWithdrawn,
         MerchantResponseDue, MerchantWithdrew, PersonPlaced, PersonDismissed,
         HeirNamed,
         TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,
         DependentsDied, GroupRevoltChanged, RitePerformed,
-        RiteSkipped, UnrestChanged, Grumbling, SeedEaten, AllocationSet,
+        RiteSkipped, UnrestChanged, Grumbling, AllocationSet,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,
         LetterIntercepted, LetterRead, LetterArchived, LetterDelegated,
         LedgerInspected, GiftSent, GiftArrived,

@@ -55,8 +55,7 @@ climate = [
 [seasons]
 sowing    = [19, 22]
 growing   = [23, 7]
-harvest   = [8, 11]
-threshing = [12, 13]
+harvest   = [8, 13]
 low_water = [14, 18]
 sailing   = [5, 20]     # the sea is shut outside this span
 overland  = [1, 21]     # and the road up-country is out in the deep wet
@@ -123,7 +122,7 @@ quantity = 26000
 # Sized to feed itself in an ordinary year with something over, and to fail in
 # a dry one. Five hundred and sixty people eating ten qa a fortnight need
 # 134,400 qa in a year; twenty-six thousand qa of seed at seven to one returns
-# about 182,000 standing, which is a little under 171,000 threshed -- enough,
+# about 182,000 standing, which returns a little under 171,000 grain -- enough,
 # once next year's seed is taken out of it, and not enough twice running.
 
 [[settlements]]

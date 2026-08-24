@@ -10,6 +10,7 @@ from engine import observe as OB
 from engine import ownership as W
 from engine.core import Date, stream
 from engine.entity import HUNGER_MAX, Cohort, EntityId, Person, Polity, Registry, check, mint
+from engine.kernel import arms as AR
 from engine.kernel import carry as C
 from engine.kernel import farm as F
 from engine.kernel import resolve as R
@@ -41,11 +42,25 @@ class Kernel:
         default_factory=dict)
     # Per good, per fortnight, scaled 1000.
     spoilage: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    # What the crown takes from its own villages' harvest, per 1000. The
+    # court owns the figure; `engine.tick` pushes it in each turn.
+    land_due_per_1000: int = 1000 - F.HOUSEHOLD_SHARE_PER_1000
+    # Calm-state analysis: the authored downturn is frozen and every reading is
+    # an ordinary year, so the economy can be measured without the collapse the
+    # campaign is about. `engine.tick` pushes it in from `World.baseline`.
+    baseline: bool = False
     # Which lots at the seat are the court's stores, and which goods it counts (Task 2 C2).
     seat_goods: "SG.SeatGoods | None" = None
     # Cargo at sea.
     voyages: tuple[C.Voyage, ...] = ()
     trade_routes: Mapping[EntityId, int] = dataclasses.field(default_factory=dict)
+    # Court infrastructure is outside the autonomous kernel, so the court
+    # adapter derives these at the opening of each turn. They are bonuses over
+    # authored ground and route capacity, keyed by the thing they improve.
+    site_extent_bonus: Mapping[EntityId, int] = dataclasses.field(
+        default_factory=dict)
+    route_capacity_bonus: Mapping[EntityId, int] = dataclasses.field(
+        default_factory=dict)
 
     # --- reading ------------------------------------------------------------
 
@@ -93,7 +108,9 @@ class Kernel:
 
     def labour(self, settlement: EntityId) -> int:
         return sum(c.labour() for c in self.cohorts_of(settlement)
-                   if not c.in_transit and not c.parent)
+                   if not c.in_transit and not c.parent
+                   and (not c.roll_id or c.kind == "field_labour"
+                        or c.reaping))
 
     def field_site(self, settlement: EntityId, actor: EntityId = "") -> EntityId:
         """The estate an actor works at a place, or the place's first estate."""
@@ -141,6 +158,8 @@ class Kernel:
             and self.registry.settlements[s].autonomous and self.controller(s))
 
     def climate_at(self, absolute: int, region: EntityId = "") -> int:
+        if self.baseline:
+            return 100
         series = self.region_climate.get(region) or self.climate
         if not series:
             return 100
@@ -183,18 +202,17 @@ def _farm(actor: EntityId, belief: B.Belief, home: EntityId,
         elif task == "tend":
             days = F.days_for(belief.value(subject, "own_standing", 0),
                               F.TEND_PER_DAY)
-        elif task == "reap":
+        else:
             days = F.days_for(belief.value(subject, "own_standing", 0),
                               F.REAP_PER_DAY)
-        else:
-            days = F.days_for(belief.value(subject, "own_sheaves", 0),
-                              F.THRESH_PER_DAY)
 
         ask = _work(actor, belief, subject, task, days)
         if ask is not None:
             intents.append(ask)
 
-        if task != "thresh":
+        # Seed comes off the harvest, which is the only moment there is grain
+        # to take it from.
+        if task != "reap":
             continue
 
         # Seed for next year, out of grain that could be eaten this one.
@@ -280,15 +298,16 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
             "people": world.people(settlement),
             "labour": world.labour(settlement),
             # The ground and how much of it is sown: visible from the field edge, and the same.
-            "extent": site.extent if site else 0,
+            "extent": F.extent(world, site_id) if site else 0,
             "under_crop": F.under_crop(world, site_id) if site_id else 0,
             # Its own property, counted.
             "own_grain": F.held(world.book, actor, F.GRAIN, settlement),
             "own_seed": F.held(world.book, actor, F.SEED, settlement),
             "own_standing": F.held(world.book, actor, F.STANDING, site_id),
-            "own_sheaves": F.held(world.book, actor, F.SHEAVES, settlement),
             "own_copper": F.held(world.book, actor, C.COPPER, settlement),
             "season": F.code_for(world.seasons, world.date.fortnight),
+            # How long the grain in the yard feeds the roll.
+            "cover": world.stores(settlement, F.GRAIN) // max(1, need),
             # Which place this is: the actor's own claim about where it stands, so that a policy.
             "home": 1,
             **C.readings(world, settlement),
@@ -389,10 +408,13 @@ def _local_food(kernel: Kernel, book: W.Book,
 
 
 def _foods(kernel: Kernel, cohort: Cohort) -> tuple[str, ...]:
-    """Grain, and the seed corn where reaching for it is theirs to decide."""
-    if kernel.tenure_of(cohort) in ("redistributive", "prebendal"):
-        return (GRAIN,)
-    return (GRAIN, F.SEED)
+    """What a body of people may eat: grain, and never the seed corn.
+
+    Seed is capital for next year's field. It is set aside by `store_seed` and
+    returned to the ground at sowing; eating it converts a short year into a
+    lost one, so it is protected here rather than left to the mouth.
+    """
+    return (GRAIN,)
 
 
 def _within_reach(kernel: Kernel, book: W.Book,
@@ -411,15 +433,40 @@ def _within_reach(kernel: Kernel, book: W.Book,
     return tuple(lots)
 
 
+def _reaped(captured: dict) -> dict[EntityId, int]:
+    """What each harvest brought in this turn, less the seed it then set aside."""
+    made: dict[EntityId, int] = {}
+    for event in captured.get("production", ()):
+        if not isinstance(event, tuple) or len(event) < 3:
+            continue
+        if event[0] == "reaped":
+            made[event[1]] = made.get(event[1], 0) + event[3]
+        elif event[0] == "set_aside":
+            made[event[1]] = made.get(event[1], 0) - event[2]
+    return made
+
+
 def _mouths(kernel: Kernel) -> tuple[Cohort, ...]:
-    """Whose meal this phase is answerable for, in a stable order (spec 2.6)."""
-    seen: set[EntityId] = set()
+    """Whose meal this phase is answerable for, in a stable order (spec 2.6).
+
+    Every settlement, the seat included. The seat's villages hold their own
+    crop and eat it; the crown's roll is redistributive and is served
+    separately by `engine.seat.feed` out of the store.
+    """
     out: list[Cohort] = []
     for settlement in kernel.autonomous():
         for cohort in kernel.cohorts_of(settlement):
+            if not cohort.in_transit:
+                out.append(cohort)
+    for settlement in sorted(kernel.registry.settlements):
+        place = kernel.registry.settlements[settlement]
+        if place.fallen or place.autonomous:
+            continue
+        for cohort in kernel.cohorts_of(settlement):
             if cohort.in_transit:
                 continue
-            seen.add(cohort.id)
+            if kernel.tenure_of(cohort) in ("redistributive", "prebendal"):
+                continue
             out.append(cohort)
     return tuple(out)
 
@@ -441,6 +488,44 @@ def kept_mouths(kernel: Kernel) -> tuple[Cohort, ...]:
     return tuple(fed)
 
 
+# What a fed body of people adds to itself in a year, per thousand. Low on
+# purpose: a bronze-age roll grows in generations, not in reigns, and a campaign
+# is twenty years. It is the loop that matters, not the speed of it -- surplus
+# grain becomes mouths, mouths eat the surplus, and the two find each other.
+BIRTH_PER_1000 = 1
+BIRTH_FORTNIGHT = 16
+
+
+def _breed(kernel: Kernel) -> tuple[Kernel, list]:
+    """Phase 11. The roll grows where the year fed it, once a year.
+
+    Hunger is the whole of the check. A body of people that went short at any
+    point since the last count does not grow this year: the loop closes on food
+    rather than on any authored ceiling, so a settlement settles at the number
+    its ground will carry and famine is what pushes it back down.
+    """
+    if kernel.date.fortnight != BIRTH_FORTNIGHT:
+        return kernel, []
+    cohorts = dict(kernel.registry.cohorts)
+    events: list = []
+    for cid in sorted(cohorts):
+        cohort = cohorts[cid]
+        if cohort.hunger or cohort.people <= 0 or cohort.in_transit:
+            continue
+        born = cohort.people * BIRTH_PER_1000 // 1000
+        if born <= 0:
+            continue
+        cohorts[cid] = dataclasses.replace(
+            cohort, people=cohort.people + born,
+            households=cohort.households + born * cohort.households
+            // max(1, cohort.people))
+        events.append(("born", cid, born))
+    if not events:
+        return kernel, []
+    registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
+    return dataclasses.replace(kernel, registry=registry), events
+
+
 def _consume(kernel: Kernel) -> tuple[Kernel, list]:
     """Phase 7. People eat, and remember it when they do not."""
     return feed(kernel, _mouths(kernel))
@@ -455,10 +540,15 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
 
     for cohort in mouths:
         want = cohort.ration()
-        # What is owed and what will be handed over are two figures, and only under redistributive.
-        cap = want if cohort.allowance < 0 else max(0, cohort.allowance)
+        # A recovered granary clears at most one old ration alongside this
+        # fortnight's meal. Otherwise one missed payment is permanent unless
+        # the player discovers a hidden double-allocation trick.
+        claim = want + min(cohort.shortfall, want)
+        # An explicit allowance remains an explicit ceiling; the ordinary roll
+        # repays arrears automatically when grain exists.
+        cap = (claim if cohort.allowance < 0
+               else min(claim, max(0, cohort.allowance)))
         got = 0
-        ate_seed = 0
         for lot in _local_food(kernel, book, cohort):
             if cap - got <= 0:
                 break
@@ -470,10 +560,6 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
                 continue
             book = book.consume(current.id, take, "consumed")
             got += take
-            if current.good == F.SEED:
-                ate_seed += take
-        if ate_seed:
-            events.append(("ate_the_seed", cohort.id, ate_seed))
         if got >= want:
             cohorts[cohort.id] = dataclasses.replace(
                 cohort, hunger=max(0, cohort.hunger - 1),
@@ -656,15 +742,18 @@ def advance_logged(kernel: Kernel, extra_steps: tuple[T.Step, ...] = (),
         T.Step("production", "sowing", lambda k: F.sow(k, intents, allocation)),
         T.Step("production", "growing", lambda k: F.tend(k, intents, allocation)),
         T.Step("production", "harvest", lambda k: F.reap(k, intents, allocation)),
-        T.Step("production", "threshing", lambda k: F.thresh(k, intents, allocation)),
         T.Step("production", "seed corn", lambda k: F.store_seed(k, intents)),
-        T.Step("production", "the share", F.share_out),
+        T.Step("production", "the mines", F.mine),
+        T.Step("production", "the share",
+               lambda k: F.share_out(k, _reaped(captured))),
+        T.Step("production", "the forge", AR.step),
         T.Step("production", "the stack", F.keep),
         T.Step("consumption", "rations", _consume),
         T.Step("market", "bargains", market),
         T.Step("movement", "sailings", lambda k: C.movement(k, intents, allocation)),
         T.Step("settlement", "obligations", lambda k: _settle(k, intents)),
         T.Step("settlement", "the stores", C.consolidate),
+        T.Step("health", "the roll", _breed),
     )))
     steps = tuple(sorted(core + extra_steps, key=lambda step: T.index(step.phase)))
     kernel, events, _trace = T.run(kernel, steps)

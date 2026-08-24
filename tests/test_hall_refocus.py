@@ -4,7 +4,7 @@ from __future__ import annotations
 from belief.project import project
 from engine.tick import advance
 from load import load_campaign
-from tui import desktop, hall
+from tui import desktop, hall, render
 from tui.grid import plain_text
 
 
@@ -56,9 +56,11 @@ def test_minimum_header_keeps_the_turns_three_primary_signals_separate() -> None
     lines = plain_text(hall.compose(b, width, height)).splitlines()
     assert f"{b['attention']} of {b['attention_base']} hours" in lines[2]
     assert "the sea is " in lines[2]
+    # The three signals by their meaning, not by wording the header has since
+    # changed: the store, the city's temper, and the king's standing.
     assert "granary " in lines[3]
-    assert "unrest " in lines[3]
-    assert "legitimacy " in lines[3]
+    assert render.temper(b["unrest"]) in lines[3]
+    assert render.standing(b["legitimacy"]) in lines[3]
 
 
 def test_audience_row_shows_both_wait_and_business_when_space_allows() -> None:
