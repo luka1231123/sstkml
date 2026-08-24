@@ -107,10 +107,14 @@ def land_cargo(world: World) -> tuple[World, list]:
 
 
 def _harbour(world: World):
-    return next((
+    return next(iter(_harbours(world)), None)
+
+
+def _harbours(world: World):
+    return tuple(
         inst for inst in sorted(
             world.court.institutions.values(), key=lambda item: item.id)
-        if inst.kind == "harbour"), None)
+        if inst.kind == "harbour")
 
 
 def harbour_assessment(
@@ -125,11 +129,13 @@ def harbour_assessment(
     """
     from engine.institution import effective
 
-    harbour = _harbour(world)
-    if harbour is None:
+    harbours = _harbours(world)
+    if not harbours:
         return ()
-    output = (effective(world, harbour) if effective_capacity is None
+    output = (sum(effective(world, harbour) for harbour in harbours)
+              if effective_capacity is None
               else max(0, effective_capacity))
+    harbour = harbours[0]
     remaining = (
         output
         * world.court.harbour_traffic

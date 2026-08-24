@@ -230,7 +230,7 @@ id = "corvee"
 category = "orders"
 title = "Raise corvée"
 syntax = "raise corvee <days>"
-answer = "Tell Counsel how many days of corvée to levy. The order costs one hour. Those hands can feed works but are taken from other labour and the levy raises unrest."
+answer = "Tell Counsel how many days of corvée to levy. The order costs one hour and raises unrest. Works spend those days at low water, when the fields are idle; unused days do not reduce the harvest. Crews still draw grain and metal from the palace stores."
 examples = ["raise a corvee of 4000 days"]
 keywords = ["corvee", "levy", "labour", "days", "workers", "hands", "unrest"]
 keys = []
@@ -252,7 +252,7 @@ id = "build"
 category = "orders"
 title = "Begin a building project"
 syntax = "build <kind> [at <place>]"
-answer = "Tell Counsel a known build kind and place. Beginning work costs one hour; progress then consumes corvée days and materials in the proper season."
+answer = "In Works, choose a plan to read its return, wager, full supply draw, upkeep, and current stores; press Enter to commission it. Beginning costs one hour. Progress consumes corvée days and supplies at low water, and the finished capacity feeds the named land, defence, cult, storage, archive, bronze, or route system."
 examples = ["build a granary at seat", "Build walls at Ugarit."]
 keywords = ["build", "building", "project", "granary", "walls", "construct", "works", "place"]
 keys = []
@@ -367,6 +367,17 @@ examples = ["hear boundary_ashiranu", "rule boundary_ashiranu split"]
 keywords = ["hear", "rule", "judge", "petition", "case", "justice", "verdict", "for", "against", "split", "defer"]
 keys = []
 verbs = ["HEAR_PETITION", "RULE_PETITION"]
+
+[[command]]
+id = "trade"
+category = "orders"
+title = "Buy or requisition cargo"
+syntax = "finance <copper> copper | requisition <amount> <good>"
+answer = "Finance spends at most the named copper on grain already counted in Trade, at the shown price; the grain enters the palace store at once, and an empty quay spends nothing. Requisition takes reported cargo without payment, but raises unrest with the value seized. Either order costs one hour."
+examples = ["finance 3000 copper", "requisition 10000 grain"]
+keywords = ["trade", "finance", "buy", "requisition", "cargo", "grain", "copper", "price", "merchant"]
+keys = []
+verbs = []
 
 [[command]]
 id = "dues"

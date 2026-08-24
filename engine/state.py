@@ -315,8 +315,9 @@ class Court:
     institution_history: Mapping[str, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
     # Work in hand (6.21), and the days of this season's corvée already given
-    # to it. `labour_supplied` subtracts those days from the fields, which is
-    # the whole cost of building: not the goods, the hands.
+    # to it. Works run only at low water, when the fields make no labour ask;
+    # the counter prevents one levy being spent twice rather than charging a
+    # second, hidden field penalty.
     projects: Mapping[str, "Project"] = dataclasses.field(default_factory=dict)
     works_days: int = 0
     project_seq: int = 0
@@ -769,7 +770,7 @@ class World:
     works_season: str = ""       # the named span in `season` mudbrick goes up in
     works_materials: Mapping[GoodId, int] = dataclasses.field(
         default_factory=dict)
-    works_plans: Mapping[str, Mapping[str, int]] = dataclasses.field(
+    works_plans: Mapping[str, Mapping[str, object]] = dataclasses.field(
         default_factory=dict)
     # Authored disputes, including their hidden truth, fixed at load. A case
     # enters the hall when its `arrived_turn` comes.

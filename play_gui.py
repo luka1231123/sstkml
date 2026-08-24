@@ -189,6 +189,7 @@ class Game:
         self.desk: dict | None = None
         self.desk_drafts: dict[str, dict] = {}
         self.works_pick = ""          # a work in hand, awaiting [x]
+        self.works_plan_pick = ""     # a plan read before [Enter] commissions it
         self.inbox_pick = ""
         self.inbox_filter = "all"
         self.inbox_scroll = 0
@@ -796,7 +797,8 @@ class Game:
             return works_page.compose(
                 b, self.works_pick, width, height, notice=notice,
                 scroll=self.scroll_of("works_scroll"),
-                plan_scroll=self.scroll_of("works_plan_scroll"))
+                plan_scroll=self.scroll_of("works_plan_scroll"),
+                selected_plan=getattr(self, "works_plan_pick", ""))
         if key == "palace":
             state = self.palace_state
             return palace.compose(
@@ -3440,14 +3442,14 @@ class Game:
         window.focus()
 
     def on_works_key(self, event) -> None:
-        """Commission, or call off. Both are one hour and neither is confirmed
-        twice -- except calling off, which is two keys because what the men
-        have eaten does not come back (6.21)."""
+        """Read and commission a plan, or call off sunk work."""
         if event.keysym == "Escape":
             self.works_pick = ""
+            self.works_plan_pick = ""
             self.app.close("works")
             return
         char = (event.char or "").lower()
+        command = getattr(event, "command", "")
         b = self.belief
         projects = b.get("projects") or []
         plans = b.get("plans") or []
@@ -3468,6 +3470,8 @@ class Game:
             if shifted:
                 moved = bool(plan_page.room) and self.scrolled(
                     "works_plan_scroll", len(plans), plan_page.room, step)
+                if moved:
+                    self.works_plan_pick = ""
             else:
                 moved = self.scrolled(
                     "works_scroll", len(projects),
@@ -3475,9 +3479,17 @@ class Game:
             if moved:
                 self.repaint()
             return
-        if char in works_page.PICK:
+        if command.startswith("works:plan:"):
+            kind = command.split(":", 2)[2]
+            if kind in {plan["kind"] for plan in plan_page.slice(plans)}:
+                self.works_plan_pick = kind
+                self.works_pick = ""
+                self.repaint()
+            return
+        if char and char in works_page.PICK:
             if out.absolute(works_page.PICK.index(char) + 1) >= 0:
                 self.works_pick = char
+                self.works_plan_pick = ""
                 self.repaint()
             return
         if char == "x" and self.works_pick:
@@ -3487,10 +3499,21 @@ class Game:
             self.works_pick = ""
             self.repaint()
             return
-        if char in works_page.ORDER:
+        if char and char in works_page.ORDER:
             index = plan_page.absolute(works_page.ORDER.index(char) + 1)
             if index >= 0:
-                self.order(A.BeginBuild(plans[index]["kind"],
+                self.works_plan_pick = plans[index]["kind"]
+                self.works_pick = ""
+                self.repaint()
+            return
+        if event.keysym == "Return":
+            visible = plan_page.slice(plans)
+            chosen = next((plan for plan in visible
+                           if plan["kind"] == getattr(
+                               self, "works_plan_pick", "")), None)
+            chosen = chosen or (visible[0] if visible else None)
+            if chosen is not None:
+                self.order(A.BeginBuild(chosen["kind"],
                                         b.get("seat", "seat")),
                            window="works")
             return

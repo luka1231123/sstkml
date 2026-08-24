@@ -624,6 +624,8 @@ class CohortReceived:
 class TradeFinanced:
     good: str
     quantity: int
+    received_good: str = ""
+    received_quantity: int = 0
 
 
 @dataclasses.dataclass(frozen=True)

@@ -54,6 +54,13 @@ class Kernel:
     # Cargo at sea.
     voyages: tuple[C.Voyage, ...] = ()
     trade_routes: Mapping[EntityId, int] = dataclasses.field(default_factory=dict)
+    # Court infrastructure is outside the autonomous kernel, so the court
+    # adapter derives these at the opening of each turn. They are bonuses over
+    # authored ground and route capacity, keyed by the thing they improve.
+    site_extent_bonus: Mapping[EntityId, int] = dataclasses.field(
+        default_factory=dict)
+    route_capacity_bonus: Mapping[EntityId, int] = dataclasses.field(
+        default_factory=dict)
 
     # --- reading ------------------------------------------------------------
 
@@ -291,7 +298,7 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
             "people": world.people(settlement),
             "labour": world.labour(settlement),
             # The ground and how much of it is sown: visible from the field edge, and the same.
-            "extent": site.extent if site else 0,
+            "extent": F.extent(world, site_id) if site else 0,
             "under_crop": F.under_crop(world, site_id) if site_id else 0,
             # Its own property, counted.
             "own_grain": F.held(world.book, actor, F.GRAIN, settlement),

@@ -37,9 +37,12 @@ def compose(b: dict, width: int = 72, height: int = 24,
         surface.text(3, y, f"grain price  {price:,} copper shekels / 1,000 qa",
                      C["barley"], C["ink"])
         y += 1
-        surface.text(3, y, f"             one talent of copper buys "
-                           f"{3000 * 1000 // max(1, price):,} qa of grain",
+        surface.text(3, y, f"             one talent buys up to "
+                           f"{3000 * 1000 // max(1, price):,} qa of counted grain",
                      C["dim"], C["ink"])
+        y += 1
+        surface.text(3, y, "requisition: take cargo now; unrest rises with value",
+                     C["flame"], C["ink"])
         y += 2
         movements = trade.get("movements", ())
         carrying = [m for m in movements if m.get("cargo")]

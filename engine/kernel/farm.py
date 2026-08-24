@@ -131,6 +131,13 @@ def under_crop(kernel, site_id: EntityId) -> int:
     return standing * 1000 // site.capacity
 
 
+def extent(kernel, site_id: EntityId) -> int:
+    site = kernel.registry.sites.get(site_id)
+    if site is None:
+        return 0
+    return max(0, site.extent + kernel.site_extent_bonus.get(site_id, 0))
+
+
 def _draw(book, lots, quantity: int, reason: str, authority: EntityId = ""):
     """Take a quantity across an owner's lots, in id order."""
     taken = 0
@@ -199,10 +206,11 @@ def sow(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
         if not site_id:
             continue
         site = kernel.registry.sites[site_id]
-        if site.capacity <= 0 or site.extent <= 0:
+        field_extent = extent(kernel, site_id)
+        if site.capacity <= 0 or field_extent <= 0:
             continue
         if site_id not in left:
-            left[site_id] = max(0, site.extent - under_crop(
+            left[site_id] = max(0, field_extent - under_crop(
                 dataclasses.replace(kernel, book=book), site_id))
 
         sowable = _sowable(kernel, book, actor, settlement)
@@ -388,7 +396,7 @@ def mine(kernel):
 
 def sown_extent(kernel, settlement: EntityId) -> int:
     """Qa of seed the settlement's food ground takes in a year."""
-    return sum(site.extent for site in kernel.registry.sites.values()
+    return sum(extent(kernel, site.id) for site in kernel.registry.sites.values()
                if site.settlement == settlement and site.function == "food")
 
 

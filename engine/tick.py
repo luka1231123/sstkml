@@ -59,13 +59,48 @@ def advance(world: World) -> tuple[World, list]:
 
 
 def _calendar(world: World) -> tuple[World, list]:
+    from engine import institution
+    from engine.kernel import carry
+
+    kernel = world.kernel
+    seat_id = getattr(kernel.seat_goods, "seat", "")
+
+    def at_seat(item) -> bool:
+        place = world.places.get(item.place)
+        alu = (item.place if place is not None and place.kind == "alu"
+               else place.alu if place is not None else "")
+        return alu == world.chosen_alu
+
+    by_kind = {
+        kind: sum(institution.effective(world, item)
+                  for item in world.court.institutions.values()
+                  if item.kind == kind and at_seat(item))
+        for kind in ("canal", "harbour", "road")
+    }
+    field = kernel.field_site(seat_id, kernel.controller(seat_id))
+    site_bonus = ({field: by_kind["canal"]}
+                  if field and by_kind["canal"] else {})
+    route_bonus = {}
+    for route_id, route in kernel.registry.routes.items():
+        if not route.legs:
+            continue
+        ends = {carry.settlement_of(kernel, route.origin),
+                carry.settlement_of(kernel, route.destination)}
+        if seat_id not in ends:
+            continue
+        mode = route.legs[0].mode
+        bonus = (by_kind["harbour"] if mode == "sea" else
+                 by_kind["road"] if mode in {"land", "road"} else 0)
+        if bonus:
+            route_bonus[route_id] = bonus
     world = dataclasses.replace(
         world, court=dataclasses.replace(
             world.court, inspected=(), searched=()),
         # The court's due is the share its own harvest renders.
         kernel=dataclasses.replace(
-            world.kernel, land_due_per_1000=world.court.land_due_rate,
-            baseline=world.baseline))
+            kernel, land_due_per_1000=world.court.land_due_rate,
+            baseline=world.baseline, site_extent_bonus=site_bonus,
+            route_capacity_bonus=route_bonus))
     return world, [_turn_advanced(world)]
 
 

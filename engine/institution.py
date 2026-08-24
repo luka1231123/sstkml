@@ -203,7 +203,7 @@ def factor(world, kind: str) -> int:
 
 
 def factor_at(world, kind: str, place: str | None = None) -> int:
-    """Working factor for a kind, optionally at one physical place."""
+    """Combined working factor for a kind, optionally at one physical place."""
     court = world.court
     matching = sorted((
         inst for inst in court.institutions.values()
@@ -211,11 +211,9 @@ def factor_at(world, kind: str, place: str | None = None) -> int:
     ), key=lambda item: item.id)
     if not matching:
         return 0
-    inst = matching[0]
-    staff = _staff_factor(world, inst)
-    return max(0, min(
-        1000, inst.condition * staff // 1000
-        * _head_factor(court, inst) // 1000))
+    reference = _STAFFING_NORMS.get(kind, (100, 1000))[1]
+    working = sum(effective(world, inst) for inst in matching)
+    return max(0, min(1000, working * 1000 // max(1, reference)))
 
 
 def reported_condition(world, inst, seed: int, turn: int) -> int:

@@ -53,6 +53,8 @@ def garrison_strength(world, place: str) -> int:
     )
     from engine.institution import factor_at
 
+    quarters = factor_at(world, "garrison", place)
+    raw = raw * (1000 + quarters // 2) // 1000
     walls = factor_at(world, "walls", place)
     fortification = _UNFORTIFIED_SHARE + walls * (
         1000 - _UNFORTIFIED_SHARE) // 1000

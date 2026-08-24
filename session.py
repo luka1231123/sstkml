@@ -25,7 +25,7 @@ def new_seed() -> int:
     return secrets.randbits(48)
 
 
-SAVE_VERSION = 19
+SAVE_VERSION = 20
 
 
 def play(seed: int, chosen_alu: str, script: list[list]) -> tuple[object, list, list]:

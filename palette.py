@@ -226,6 +226,7 @@ def parse(line: str, belief: dict) -> Parse:
 # `tests/test_palette.py` asserts every one of them still exists -- so a
 # reworded grammar line fails the suite rather than quietly ceasing to parse.
 LITERAL_VALUES: dict[str, dict] = {
+    "finance <amount>": {"good": "copper"},
     "inspect granary": {"ledger": "granary"},
     "inspect seed": {"ledger": "seed"},
     "file <tablet>": {"archived": True},

@@ -128,10 +128,17 @@ def capacity(kernel) -> dict[EntityId, int]:
             continue
         here = settlement_of(kernel, route.origin)
         there = settlement_of(kernel, route.destination)
-        space = route.capacity if sea_open(kernel, route) else 0
+        space = route_capacity(kernel, route_id) if sea_open(kernel, route) else 0
         for key in (pool(here, there), pool(there, here)):
             pools[key] = pools.get(key, 0) + space
     return pools
+
+
+def route_capacity(kernel, route_id: EntityId) -> int:
+    route = kernel.registry.routes.get(route_id)
+    if route is None:
+        return 0
+    return max(0, route.capacity + kernel.route_capacity_bonus.get(route_id, 0))
 
 
 def route_between(kernel, origin: EntityId, destination: EntityId):

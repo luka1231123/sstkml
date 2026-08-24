@@ -476,7 +476,7 @@ def _land(world, perr: int) -> dict:
             "canal_condition": None,
             # The crown's own field hands, head count (spec 6.4).
             "hands": field.people if field is not None else 0,
-            "extent": site.extent,
+            "extent": F.extent(kernel, site_id),
             "capacity": site.capacity,
             "under_crop": F.under_crop(kernel, site_id),
             "seed": F.held(kernel.book, controller, F.SEED, seat),
@@ -486,7 +486,8 @@ def _land(world, perr: int) -> dict:
 
     now = world.date.absolute
     sown = sum(e["under_crop"] for e in estates)
-    open_ground = max(0, (site.extent if site is not None else 0) - sown)
+    open_ground = max(0, (F.extent(kernel, site_id) if site is not None else 0)
+                      - sown)
     standing = sum(e["standing"] for e in estates)
     stage = _grain_stage(kernel, kernel.date.fortnight)
 
@@ -505,7 +506,7 @@ def _land(world, perr: int) -> dict:
     ask = asks[stage]
 
     hands = kernel.labour(seat)
-    committed = seat_door.corvee_days(world)
+    called = seat_door.corvee_days(world)
     reading = transcribe(gauge(world), world.seed, now, f"gauge:{now}", perr)
     return {
         "estates": estates,
@@ -523,12 +524,15 @@ def _land(world, perr: int) -> dict:
         "seed_recommended": open_ground,
         "standing": standing,
         "hands_to_the_fields": list(seat_door.at_harvest(world)),
-        "corvee_days": committed,
+        "corvee_days": called,
         "works_days": court.works_days,
         "labour_days_this_turn": hands,
         "labour_days_needed": ask,
-        "labour_days_committed": committed,
-        "labour_days_idle": max(0, hands - ask - committed),
+        # Works are confined to low water, whose field ask is zero. Keep the
+        # seasonal levy on its own line instead of pretending it withholds
+        # labour from sowing, tending, or harvest.
+        "labour_days_committed": 0,
+        "labour_days_idle": max(0, hands - ask),
         "labour_days_by_season": asks,
         "rates": {"sow": F.SOW_PER_DAY, "tend": F.TEND_PER_DAY,
                   "reap": F.REAP_PER_DAY,
@@ -593,16 +597,31 @@ def _projects(world) -> list[dict]:
     estimate of when it will be done -- that depends on the corvée he has not
     raised yet and the season he cannot hurry.
     """
+    from engine import works as W
+
     court = world.court
     out = []
     for key in sorted(court.projects):
         p = court.projects[key]
+        plan = world.works_plans.get(p.kind, {})
+        materials = W.material_cost(world, p.kind, p.days_needed)
+        spent = {good: qty for good, qty in p.spent}
         out.append({
             "id": p.id, "what": p.name, "kind": p.kind, "place": p.place,
             "repair": bool(p.institution), "institution": p.institution,
             "days_done": p.days_done, "days_needed": p.days_needed,
             "days_remaining": max(0, p.days_needed - p.days_done),
-            "spent": {good: qty for good, qty in p.spent},
+            "spent": spent,
+            "materials": materials,
+            "materials_remaining": {
+                good: max(0, qty - spent.get(good, 0))
+                for good, qty in materials.items()},
+            "status": W.status(world, p),
+            "category": str(plan.get("category", "WORK")),
+            "effect": str(plan.get("effect", "adds institutional capacity")),
+            "tradeoff": str(plan.get("tradeoff", "uses labour and supplies")),
+            "upkeep": {good: int(qty)
+                       for good, qty in plan.get("upkeep", {}).items()},
             "condition_target": p.condition_target,
             "capacity": p.capacity,
             "started_turn": p.started_turn,
@@ -614,12 +633,24 @@ def _projects(world) -> list[dict]:
 
 def _plans(world) -> list[dict]:
     """What can be put up, and what it would cost. Authored, so exact."""
+    from engine import works as W
+
     out = []
-    for kind in sorted(world.works_plans):
+    for kind in sorted(world.works_plans, key=lambda item: (
+            int(world.works_plans[item].get("order", 999)), item)):
         plan = world.works_plans[kind]
+        days = int(plan["days"])
         out.append({"kind": kind, "name": plan["name"],
-                    "days": int(plan["days"]),
-                    "capacity": int(plan["capacity"])})
+                    "days": days,
+                    "capacity": int(plan["capacity"]),
+                    "category": str(plan.get("category", "WORK")),
+                    "effect": str(plan.get("effect", "adds institutional capacity")),
+                    "tradeoff": str(plan.get("tradeoff", "uses labour and supplies")),
+                    "history": str(plan.get("history", "")),
+                    "upkeep": {good: int(qty)
+                               for good, qty in plan.get("upkeep", {}).items()},
+                    "per_1000_days": W.cost_per_1000(world, kind),
+                    "materials": W.material_cost(world, kind, days)})
     return out
 
 
@@ -1033,7 +1064,10 @@ def _trade(world, perr: int) -> dict:
             "destination": route.destination.split(":", 1)[-1],
             "strength": world.kernel.trade_routes.get(route_id, 0),
             "mode": route.legs[0].mode, "legs": route.fortnights(),
-            "capacity": route.capacity, "risk": route.risk,
+            "capacity": carry.route_capacity(world.kernel, route_id),
+            "base_capacity": route.capacity,
+            "works_bonus": world.kernel.route_capacity_bonus.get(route_id, 0),
+            "risk": route.risk,
             "tolls": list(route.toll_jurisdictions),
             "seasonal": _seasonal(route), "source": "court route tablet",
             "as_of_turn": 0, "certainty": "charted",
@@ -1089,10 +1123,12 @@ def _forecast_basis(world, land: dict, institutions: list[dict],
                * max(0, item.get("entitlement", 0)) for item in groups)
     roof = systems.granary_capacity_for(owed, working)
 
-    harbour = next((item for item in institutions
-                    if item.get("kind") == "harbour"), None)
-    assessment = (() if harbour is None else R.harbour_assessment(
-        world, max(0, harbour.get("effective", 0))))
+    harbours = [item for item in institutions
+                if item.get("kind") == "harbour"]
+    harbour_output = sum(max(0, item.get("effective", 0))
+                         for item in harbours)
+    assessment = (() if not harbours else R.harbour_assessment(
+        world, harbour_output))
     merchants = sum(1 for actor in world.revenue_merchants
                     if actor in world.relations)
     responses = [item.payload for item in world.schedule
@@ -1121,7 +1157,8 @@ def _forecast_basis(world, land: dict, institutions: list[dict],
             "pending_traffic_loss": sum(
                 max(0, -response.traffic_delta) for response in responses),
             "source": "harbour master's cargo roll",
-            "certainty": (harbour or {}).get("certainty", "reported"),
+            "certainty": (harbours[0] if harbours else {}).get(
+                "certainty", "reported"),
         },
     }
 
@@ -1365,6 +1402,8 @@ def project(world) -> dict:
         },
         "forecast_basis": forecast_basis,
         "works_season": _works_season(world),
+        "works_season_name": world.works_season.replace("_", " "),
+        "works_rate": world.works_rules.get("days_per_fortnight", 400),
         "works_materials": dict(world.works_materials),
         "repair_days_per_point": world.works_rules.get(
             "repair_days_per_point", 3),

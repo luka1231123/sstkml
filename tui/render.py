@@ -394,7 +394,6 @@ def land_screen(b: dict) -> str:
     lines.append(f"    hands  {labour_bar(supplied, needed, land.get('labour_days_committed', 0))}"
                  f"  {supplied:,} person-days in the place")
     lines.append(f"    the season asks {needed:,} · "
-                 f"corvée holds {land.get('labour_days_committed', 0):,} · "
                  f"{land.get('labour_days_idle', 0):,} stand idle")
     if calendar:
         coming = (land.get("labour_days_by_season") or {}).get(
@@ -411,6 +410,7 @@ def land_screen(b: dict) -> str:
         if land.get("works_days"):
             lines.append(f"    of which given to the works: "
                          f"{land['works_days']:,} days")
+        lines.append("    works use those days only at low water, while the fields are idle")
     lines.append("")
     for estate in land["estates"]:
         note = f"   hands {estate['hands'] // 10}%"
