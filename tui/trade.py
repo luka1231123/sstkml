@@ -126,9 +126,6 @@ def compose(b: dict, width: int = 72, height: int = 24,
                 style.FooterAction(">", "due+"),
                     *([style.FooterAction("Enter", "give due")]
                   if due_draft is not None else [])]
-        actions += [style.FooterAction("a", "permit"),
-                    style.FooterAction("o", "offer"),
-                    style.FooterAction("p", "guard")]
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions.append(style.FooterAction("Esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)

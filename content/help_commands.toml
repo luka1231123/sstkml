@@ -108,10 +108,10 @@ verbs = []
 id = "justice_room"
 category = "interface"
 title = "Court of Justice"
-syntax = "[j] Court; number chooses a case; [h] hear; [f/a/s/d] rule"
-answer = "Open the Court with J and choose a petition. H spends one hour to hear claim and counter-claim. F rules for the claimant, A against, S splits the judgement, and D defers it. The truth is never shown at judgement."
-examples = ["How do I hear a petition?", "How do I defer a ruling?"]
-keywords = ["justice", "petition", "case", "claim", "hear", "rule", "verdict", "defer", "split", "claimant"]
+syntax = "[j] Court; number chooses a case; [f/a/s] rules"
+answer = "Open the Court with J and choose a petition. Both arguments and the grain or copper payment and unrest change for every verdict are shown. F rules for the petitioner, A against, and S splits the award. One ruling costs one hour."
+examples = ["What does this judgement cost?", "How do I split a ruling?"]
+keywords = ["justice", "petition", "case", "claim", "payment", "unrest", "rule", "verdict", "split", "claimant"]
 keys = ["f", "d"]
 verbs = []
 
@@ -349,13 +349,13 @@ verbs = ["SEARCH_ARCHIVE"]
 [[command]]
 id = "justice_orders"
 category = "orders"
-title = "Hear and rule on a petition"
-syntax = "hear <case> | rule <case> for | against | split | defer"
-answer = "Hearing a known case costs one hour and reveals both arguments, never the hidden truth. Rule for or against the claimant, split the judgement, or defer it. Giving the verdict itself costs no hour."
-examples = ["hear boundary_ashiranu", "rule boundary_ashiranu split"]
-keywords = ["hear", "rule", "judge", "petition", "case", "justice", "verdict", "for", "against", "split", "defer"]
+title = "Rule on a petition"
+syntax = "rule <verdict> on <case>"
+answer = "The Court shows both arguments and each verdict's exact payment and unrest change. Rule for or against the petitioner, or split the award. A ruling costs one hour."
+examples = ["rule split on debt_shipwright"]
+keywords = ["rule", "judge", "petition", "case", "justice", "verdict", "payment", "unrest", "for", "against", "split"]
 keys = []
-verbs = ["HEAR_PETITION", "RULE_PETITION"]
+verbs = ["RULE_PETITION"]
 
 [[command]]
 id = "trade"

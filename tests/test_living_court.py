@@ -20,14 +20,14 @@ def _belief() -> dict:
             {
                 "id": "boundary", "kind": "boundary",
                 "petitioner": "farmer", "against": "herdsman",
-                "waiting": 3, "heard": False, "present": True,
+                "waiting": 3, "good": "grain", "present": True,
                 "claim_text": "The stone was moved in the night.",
                 "counter_text": "The old channel has always run there.",
             },
             {
                 "id": "debt", "kind": "debt",
                 "petitioner": "merchant", "against": "scribe",
-                "waiting": 1, "heard": True, "present": False,
+                "waiting": 1, "good": "copper", "present": False,
                 "claim_text": "The silver was weighed before witnesses.",
                 "counter_text": "The tablet records barley, not silver.",
             },
@@ -90,7 +90,7 @@ def _hit_count(screen, command: str) -> int:
     return sum(hit.command == command for hit in screen.hits)
 
 
-def test_the_repeated_throne_is_replaced_by_four_compact_room_states() -> None:
+def test_decision_views_use_the_room_only_when_it_helps() -> None:
     b = _belief()
     audience = plain_text(palace.compose(
         b, view="court", width=98, height=36))
@@ -106,7 +106,8 @@ def test_the_repeated_throne_is_replaced_by_four_compact_room_states() -> None:
     assert "AUDIENCE · 1 MATTER PRESENT" in audience
     assert "HOUSEHOLD · 1 AT COURT · 1 AWAY" in household
     assert "ENVOYS · 1 PRESENT · 1 COURT BY TABLET" in envoys
-    assert "OFFICES · 1 VACANCY · 1 HELD" in offices
+    assert "A POST FOR THE KING'S SISTER" in offices
+    assert "reported output now" in offices
     assert len({audience, household, envoys, offices}) == 4
 
 
@@ -141,17 +142,18 @@ def test_selection_moves_the_marker_under_the_selected_figure() -> None:
     assert first_marks and second_marks and first_marks != second_marks
 
 
-def test_vacant_and_held_offices_are_visible_and_selectable_stations() -> None:
+def test_vacant_and_held_offices_are_visible_without_extra_furniture() -> None:
     b = _belief()
     screen = palace.compose(
         b, view="house", choosing="post", person="sister",
         selected="tablet_house", width=98, height=36)
     text = plain_text(screen)
 
-    assert "│  □  │" in text and "│  ■  │" in text
-    assert "VACANT" in text and "HELD" in text
-    assert _hit_count(screen, "pick:tablet_house") == 2
-    assert _hit_count(screen, "pick:granary") == 2
+    assert "vacant" in text and "steward" in text
+    assert "reported output now" in text
+    assert "│  □  │" not in text and "│  ■  │" not in text
+    assert _hit_count(screen, "pick:tablet_house") == 1
+    assert _hit_count(screen, "pick:granary") == 1
 
 
 def test_correspondence_does_not_conjure_a_distant_envoy() -> None:
@@ -207,4 +209,4 @@ def test_the_living_room_keeps_the_public_compose_shape_at_minimum_size() -> Non
         width=68, height=24)
     assert len(screen) == 24
     assert all(len(row) == 68 for row in screen)
-    assert "[h]" in plain_text(screen)
+    assert "[f]" in plain_text(screen)

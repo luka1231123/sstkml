@@ -24,7 +24,7 @@ REQUIRED_ATTENTION = {
     "send_to_harvest": 1, "assign_troops": 1, "raise_corvee": 1,
     "marry_abroad": 2, "consult_diviner": 2,
     "suppress_omen": 2, "defy_omen": 0, "swear_oath": 2, "quarantine": 1,
-    "expiate": 2, "search_archive": 1, "hear_petition": 1, "rule_petition": 0,
+    "expiate": 2, "search_archive": 1, "rule_petition": 1,
     "set_land_due": 0, "set_harbour_due": 0, "place_person": 0,
     "dismiss_person": 0, "name_heir": 0, "begin_build": 1, "begin_repair": 1,
     "abandon_work": 1, "finance_trade": 1, "requisition_trade": 1,

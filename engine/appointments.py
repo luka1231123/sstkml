@@ -148,14 +148,9 @@ def name_heir(world: World, person_id: str) -> tuple[World, list]:
 
     displaced_rank = person.is_heir_rank
     legitimacy = court.legitimacy
-    mood = dict(court.faction_mood)
     if displaced_rank > 1:
-        first = next(p for p in court.house.values()
-                     if p.is_heir_rank == 1)
         legitimacy = max(0, legitimacy - 60)
-        mood[first.faction] = mood.get(first.faction, 0) + 60
     court = dataclasses.replace(
-        court, named_heir=person_id, legitimacy=legitimacy,
-        faction_mood=mood)
+        court, named_heir=person_id, legitimacy=legitimacy)
     return dataclasses.replace(world, court=court), [
         A.HeirNamed(person_id, displaced_rank)]

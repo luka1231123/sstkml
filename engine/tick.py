@@ -114,7 +114,6 @@ def _arrivals(world: World) -> tuple[World, list]:
         events += arrived
     world, fired = drain_schedule(world)
     world, fired = relations.resolve_scheduled(world, fired)
-    world, fired = justice.resolve_scheduled(world, fired)
     world, fired = revenue.resolve_scheduled(world, fired)
     remaining = []
     for payload in fired:

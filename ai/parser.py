@@ -17,7 +17,7 @@ VERBS = {
     "CONSULT_DIVINER", "SWEAR_OATH",
     "BUILD", "REPAIR", "ABANDON_WORK",
     "SUPPRESS_OMEN", "DEFY_OMEN", "QUARANTINE", "LIFT_QUARANTINE",
-    "EXPIATE", "SEARCH_ARCHIVE", "HEAR_PETITION", "RULE_PETITION",
+    "EXPIATE", "SEARCH_ARCHIVE", "RULE_PETITION",
     "SET_LAND_DUE", "SET_HARBOUR_DUE", "PLACE_PERSON", "DISMISS_PERSON",
     "NAME_HEIR",
 }
@@ -219,12 +219,8 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
         return ParseResult(
             (A.SearchArchive(match[1].strip()),), source="preparser")
     match = re.fullmatch(
-        r"(?:hear|listen\s+to)(?:\s+the)?(?:\s+case)?\s+([\w:.-]+)", text)
-    if match and match[1] in _petition_ids(belief):
-        return ParseResult((A.HearPetition(match[1]),), source="preparser")
-    match = re.fullmatch(
         r"(?:rule|judge)(?:\s+the)?(?:\s+case)?\s+([\w:.-]+)"
-        r"\s+(for|against|split|defer)", text)
+        r"\s+(for|against|split)", text)
     if match and match[1] in _petition_ids(belief):
         return ParseResult(
             (A.RulePetition(match[1], match[2]),), source="preparser")
@@ -461,15 +457,10 @@ def _action(item: dict, belief: dict):
         if not isinstance(query, str) or not query.strip():
             raise ValueError("empty archive search")
         return A.SearchArchive(query.strip())
-    if verb == "HEAR_PETITION":
-        petition = args.get("petition")
-        if petition not in _petition_ids(belief):
-            raise ValueError("no such petition")
-        return A.HearPetition(petition)
     if verb == "RULE_PETITION":
         petition, verdict = args.get("petition"), args.get("verdict")
         if petition not in _petition_ids(belief) or verdict not in {
-                "for", "against", "split", "defer"}:
+                "for", "against", "split"}:
             raise ValueError("invalid judgement")
         return A.RulePetition(petition, verdict)
     if verb in ("SET_LAND_DUE", "SET_HARBOUR_DUE"):

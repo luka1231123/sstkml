@@ -74,9 +74,8 @@ def test_the_figures_on_the_floor_are_the_rows_of_the_list() -> None:
     picks = {hit.command.split(":", 1)[1] for hit in screen.hits
              if hit.command.startswith("pick:")}
     assert set(petitions[:1]) <= picks
-    # Each man carries the number his row carries.
     text = plain_text(screen)
-    assert "[1]" in text
+    assert "palace debt" in text
 
 
 def test_the_room_gives_up_its_art_before_it_gives_up_its_list() -> None:
@@ -84,7 +83,7 @@ def test_the_room_gives_up_its_art_before_it_gives_up_its_list() -> None:
     least = (68, 24)
     text = plain_text(palace.compose(b, view="court", hours=8,
                                      width=least[0], height=least[1]))
-    assert "hear" in text.lower() or "Hear" in text
+    assert "STAKES" in text
     for height in (24, 30, 36):
         assert palace.scene_rows(height) <= max(0, height - 12)
 
@@ -95,15 +94,12 @@ def test_every_view_offers_every_order_its_context_claims() -> None:
     for view, context in palace.CONTEXT_OF.items():
         beliefs = [b]
         if view == "court":
-            heard = copy.deepcopy(b)
-            for petition in heard.get("justice", {}).get("petitions", []):
-                petition["heard"] = True
             gate = copy.deepcopy(b)
             gate["cohorts"] = [*gate.get("cohorts", []), {
                 "id": "test_gate", "status": "petitioning",
                 "people": 1, "origin": "place:test",
             }]
-            beliefs.extend((heard, gate))
+            beliefs.append(gate)
         offered = {
             control.action_id
             for belief in beliefs
@@ -131,35 +127,17 @@ def test_every_control_the_room_offers_is_drawn_on_it() -> None:
 
 # --- the court ----------------------------------------------------------------
 
-def test_a_man_must_be_heard_before_he_is_judged() -> None:
+def test_a_case_is_one_ruling_with_no_hearing_step() -> None:
     game = _game()
     petition = project(game.world)["justice"]["petitions"][0]["id"]
     game.palace_state["view"] = "court"
     assert game.palace_pick("court") == petition
     game.on_palace_key(_Key("f"))
     assert not game.log
-    assert game.notices["palace"].kind == registry.REFUSAL
-    assert "hear him" in game.notices["palace"]
-
-    game.on_palace_key(_Key("h"))
-    assert _kinds(game) == ["HearPetition"]
-    game.on_palace_key(_Key("f"))
     assert game.confirm_pending()
-    assert _kinds(game) == ["HearPetition", "RulePetition"]
+    assert _kinds(game) == ["RulePetition"]
     assert game.log[-1]["action"]["verdict"] == "for"
     assert game.log[-1]["action"]["petition_id"] == petition
-
-
-def test_hearing_a_man_twice_is_refused_rather_than_charged() -> None:
-    game = _game()
-    petition = project(game.world)["justice"]["petitions"][0]["id"]
-    game.palace_state["view"] = "court"
-    game.palace_state["pick"]["court"] = petition
-    game.on_palace_key(_Key("h"))
-    before = game.hours
-    game.on_palace_key(_Key("h"))
-    assert game.hours == before
-    assert "already heard" in game.notices["palace"]
 
 
 # --- the house ----------------------------------------------------------------
@@ -175,6 +153,8 @@ def test_appointing_is_two_steps_that_each_say_what_they_are() -> None:
     assert game.palace_state["person"] == person
     text = plain_text(game.compose("palace"))
     assert "A POST FOR" in text, "the heading must name the man"
+    assert "reported output now" in text
+    assert "able heads slow decay" in text
 
     post = game.window_rows("palace")[0]
     game.palace_state["pick"]["post"] = post

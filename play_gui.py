@@ -3106,10 +3106,20 @@ class Game:
             return (
                 f"{action.offering:,} grain has been offered against "
                 f"{action.oath_id.replace('_', ' ')}")
-        if isinstance(action, A.HearPetition):
-            return f"both sides of {action.petition_id.replace('_', ' ')} have been heard"
         if isinstance(action, A.RulePetition):
-            return f"judgement in {action.petition_id.replace('_', ' ')} is {action.verdict}"
+            petition = next((item for item in b.get("justice", {}).get(
+                "petitions", []) if item["id"] == action.petition_id), None)
+            outcome = (petition or {}).get("outcomes", {}).get(action.verdict)
+            if outcome:
+                payment = (render.fmt_good(outcome["good"], outcome["amount"])
+                           if outcome["amount"] else "no payment")
+                unrest = int(outcome["unrest"])
+                sign = "+" if unrest > 0 else ""
+                beneficiary = palace._name(outcome["beneficiary"], b)
+                return (f"rule {action.verdict}: {payment} to {beneficiary}; "
+                        f"unrest {sign}{unrest}")
+            return (f"judgement in {action.petition_id.replace('_', ' ')} "
+                    f"is {action.verdict}")
         if isinstance(action, A.SetLandDue):
             return f"the land due is now {action.rate} in one thousand"
         if isinstance(action, A.SetHarbourDue):
@@ -4027,7 +4037,6 @@ class Game:
     def palace_court(self, command: str, char: str) -> None:
         listing = self.palace_listing()
         petition = self.palace_pick(listing)
-        wanted = command.split(":", 1)[1] if command.startswith("do:") else ""
         if not petition:
             return
         # A band of displaced people stands in the same queue as a lawsuit,
@@ -4040,18 +4049,6 @@ class Game:
                                     window="palace"):
                 self.palace_state["pick"].pop(listing, None)
             return
-        heard = next((p["heard"] for p in
-                      self.belief.get("justice", {}).get("petitions", [])
-                      if p["id"] == petition), False)
-        if char == registry.BY_ID["hear_petition"].mnemonic \
-                or wanted == "hear_petition":
-            if heard:
-                self.notify("you have already heard him.", registry.REFUSAL,
-                            window="palace")
-                self.repaint()
-                return
-            self.do(A.HearPetition(petition), window="palace")
-            return
         verdict = ""
         if command.startswith("verdict:"):
             verdict = command.split(":", 1)[1]
@@ -4059,11 +4056,6 @@ class Game:
             verdict = next((v for key, v, _label in palace.VERDICTS
                             if key == char), "")
         if not verdict:
-            return
-        if not heard:
-            self.notify("hear him before you rule.", registry.REFUSAL,
-                        window="palace")
-            self.repaint()
             return
         if self.do(A.RulePetition(petition, verdict), window="palace"):
             self.palace_state["pick"].pop(listing, None)
@@ -4415,12 +4407,6 @@ class Game:
         elif view in {"movements", "routes"} and char == "c":
             self.command_line = "quarantine "
             self.open_palette()
-        elif view == "dues" and char in {"a", "o", "p"}:
-            relation = next(iter(self.belief.get("relations", ())), None)
-            if relation:
-                self.open_new_letter(relation["other"], relation["place"],
-                                     {"a": "trade_authorization", "o": "trade_offer",
-                                      "p": "trade_protection"}[char])
 
     def on_plague_key(self, event) -> None:
         """Navigate every known place and issue or lift a physical closure."""

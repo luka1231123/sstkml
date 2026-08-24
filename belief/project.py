@@ -687,57 +687,46 @@ def _plans(world) -> list[dict]:
 
 
 def _justice(world) -> dict:
-    """What is knowable in the hall (spec 6.19), with truth kept out.
-
-    Before an audience the king knows who came and what sort of matter it is.
-    `hear` reveals the claim and counter-claim.  It never adds `truth`, a
-    correctness flag, or the legitimacy consequence waiting in the schedule.
-    """
+    """The complete public docket, including the price of every verdict."""
     from engine import justice
+    from engine import seat
 
     petitions = []
+    stores = seat.available(world)
     ordered = sorted(
         world.court.petitions.values(),
         key=lambda petition: (-petition.waiting, petition.arrived_turn,
                               petition.id))
     for petition in ordered:
-        cited = justice.latest_precedent(world, petition.kind)
+        outcomes = {}
+        for verdict in justice.VERDICTS:
+            good, amount, unrest = justice.consequence(petition, verdict)
+            next_unrest = max(0, min(1000, world.court.unrest + unrest))
+            outcomes[verdict] = {
+                "beneficiary": petition.petitioner,
+                "good": good,
+                "amount": amount,
+                "unrest": next_unrest - world.court.unrest,
+                "affordable": amount <= stores.get(good, 0),
+            }
         item = {
             "id": petition.id,
             "petitioner": petition.petitioner,
             "against": petition.against,
             "kind": petition.kind,
             "waiting": petition.waiting,
-            "heard": petition.heard,
-            "faction": petition.faction,
-            "against_faction": petition.against_faction,
-            "unit": petition.unit if petition.heard else "",
-            "claim": dict(petition.claim) if petition.heard else {},
-            "counterclaim": (
-                dict(petition.counterclaim) if petition.heard else {}),
-            "claim_text": petition.claim_text if petition.heard else "",
-            "counter_text": petition.counter_text if petition.heard else "",
-            "precedent": None,
+            "good": petition.good,
+            "unit": petition.unit,
+            "claim": dict(petition.claim),
+            "counterclaim": dict(petition.counterclaim),
+            "claim_text": petition.claim_text,
+            "counter_text": petition.counter_text,
+            "outcomes": outcomes,
             "source": "court docket", "as_of_turn": world.date.absolute,
-            "certainty": "counted" if petition.heard else "reported",
+            "certainty": "counted",
         }
-        if cited is not None:
-            item["precedent"] = {
-                "id": cited.id, "kind": cited.kind, "verdict": cited.verdict,
-                "turn": cited.turn, "document_ref": cited.document_ref,
-                "petitioner": cited.petitioner, "against": cited.against,
-            }
         petitions.append(item)
-    return {
-        "petitions": petitions,
-        "precedents": [
-            {"id": record.id, "petition_id": record.petition_id,
-             "kind": record.kind, "verdict": record.verdict,
-             "turn": record.turn, "document_ref": record.document_ref,
-             "petitioner": record.petitioner, "against": record.against}
-            for record in world.court.precedents
-        ],
-    }
+    return {"petitions": petitions}
 
 
 def _metal(world) -> dict:

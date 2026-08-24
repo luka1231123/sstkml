@@ -36,7 +36,7 @@ C = INDEX
 
 VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
          ("household", "HOUSE"), ("audience", "AUDIENCE"),
-         ("justice", "JUSTICE"), ("advisers", "ADVICE"))
+         ("advisers", "ADVICE"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -44,8 +44,7 @@ CONTEXT_OF = {"court": "justice", "house": "house", "relations": "relations"}
 
 VERDICTS = (("f", "for", "for the petitioner"),
             ("a", "against", "against him"),
-            ("s", "split", "split the difference"),
-            ("d", "defer", "defer it"))
+            ("s", "split", "split the difference"))
 
 GIFT_STEP = 10
 DUE_STEP = 25
@@ -151,11 +150,9 @@ def _scene_caption(b: dict, listing: str, rows: list[workbench.Row],
                    standing: list[tuple[int, workbench.Row]]) -> str:
     present = len(standing)
     if listing == "court":
-        heard = sum(1 for item in b.get("justice", {}).get("petitions", [])
-                    if item.get("heard"))
         advisers = len(_advisers(b))
         return (f"AUDIENCE · {_count(present, 'MATTER')} PRESENT · "
-                f"{heard} HEARD · {_count(advisers, 'ADVISER')}")
+                f"{_count(advisers, 'ADVISER')}")
     if listing == "house":
         vacant = sum(not institution.get("head")
                      for institution in b.get("institutions", []))
@@ -363,9 +360,8 @@ def _court(b: dict) -> list[workbench.Row]:
             item["id"],
             ((item["kind"], "bone"), (parties, "clay"),
              (f"{item['waiting']} fn", "dim"),
-             ("heard" if item["heard"] else "not heard",
-              "barley" if item["heard"] else "flame")),
-            mark="✓" if item["heard"] else ""))
+             (item.get("good", "grain"), "barley")),
+            mark="!"))
     return rows
 
 
@@ -375,11 +371,29 @@ def _court_item(b: dict, chosen: str) -> dict | None:
                  if petition["id"] == chosen), None)
 
 
+def _outcomes(item: dict) -> dict[str, dict]:
+    """Accept old hand-built Belief fixtures without weakening live truth."""
+    if item.get("outcomes"):
+        return item["outcomes"]
+    good = item.get("good", "grain")
+    claim = int(item.get("claim", {}).get("amount", 0))
+    counter = int(item.get("counterclaim", {}).get("amount", 0))
+    amounts = {
+        "for": claim, "against": counter,
+        "split": (claim + counter) // 2,
+    }
+    return {
+        verdict: {"good": good, "amount": amount, "unrest": 0,
+                  "affordable": True}
+        for verdict, amount in amounts.items()
+    }
+
+
 def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
-    """The complete heard claim and answer, compact enough for stacked Court."""
+    """Both arguments and all three prices, before any verdict is live."""
     width = max(12, width)
     lines: list[tuple[str, str]] = [
-        (f"{item['kind']} · heard · waiting {item['waiting']} fn", "bone"),
+        (f"{item['kind']} · waiting {item['waiting']} fn", "bone"),
         (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
     ]
     lines.extend(
@@ -395,6 +409,20 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
             item["counter_text"] or "—", width,
             break_long_words=False, break_on_hyphens=False)
     )
+    outcomes = _outcomes(item)
+    good = str(next(iter(outcomes.values()))["good"])
+    lines.append((f"STAKES · {good} payment / unrest", "gold"))
+    keys = {verdict: key.upper() for key, verdict, _label in VERDICTS}
+    parts = []
+    affordable = True
+    for verdict in ("for", "against", "split"):
+        outcome = outcomes[verdict]
+        unrest = int(outcome["unrest"])
+        sign = "+" if unrest > 0 else ""
+        parts.append(
+            f"[{keys[verdict]}] {int(outcome['amount']):,}/{sign}{unrest}")
+        affordable &= bool(outcome.get("affordable", True))
+    lines.append((" · ".join(parts), "clay" if affordable else "blood"))
     return lines
 
 
@@ -418,19 +446,9 @@ def _court_detail(b: dict, chosen: str,
                  if p["id"] == chosen), None)
     if item is None:
         return [("Nobody waits for a judgement.", "ash")]
-    if item["heard"]:
-        # Evidence comes before commentary, precedent, or room atmosphere.
-        # These are the words the verdict acts upon and may not be below a
-        # clipped detail pane while its keys remain live.
-        lines = _evidence_lines(b, item, width)
-        lines.append(("", "clay"))
-    else:
-        lines = [
-            (f"{item['kind']} · waiting {item['waiting']} fortnights", "bone"),
-            (f"{_name(item['petitioner'], b)} petitions against "
-             f"{_name(item['against'], b)}", "clay"),
-            ("", "clay"),
-        ]
+    # Arguments and consequences come before commentary or room atmosphere.
+    lines = _evidence_lines(b, item, width)
+    lines.append(("", "clay"))
     voice = _adviser_voice(b, chosen)
     if voice:
         name, words, basis = voice
@@ -445,15 +463,6 @@ def _court_detail(b: dict, chosen: str,
         lines.append((f"at the dais: {names}", "gold"))
         lines.append(("They have not yet spoken.", "ash"))
         lines.append(("", "clay"))
-    precedent = item.get("precedent")
-    if precedent:
-        lines.append((f"They cite {precedent['document_ref']}:", "sand"))
-        lines.append((f"in another {precedent['kind']} case you ruled "
-                      f"{precedent['verdict']}.", "sand"))
-        lines.append(("", "clay"))
-    if not item["heard"]:
-        lines.append(("You know their names and the nature of", "ash"))
-        lines.append(("the quarrel. Neither man has been heard.", "ash"))
     return lines
 
 
@@ -477,17 +486,16 @@ def _court_controls(b: dict, chosen: str, hours: int) -> list[workbench.Control]
                  if p["id"] == chosen), None)
     if item is None:
         return []
-    if not item["heard"]:
-        return [workbench.affordable(workbench.Control(
-            "hear_petition", registry.BY_ID["hear_petition"].mnemonic),
-            hours)]
-    # Hearing and ruling are consecutive steps, not a permanent seven-button
-    # toolbar. Once both sides have spoken, refugee controls and a disabled
-    # "Hear" only consume the rows needed to read their words.
-    return [workbench.Control(
-        "rule_petition", key, label=label,
-        command=f"verdict:{verdict}")
-        for key, verdict, label in VERDICTS]
+    controls = []
+    for key, verdict, label in VERDICTS:
+        outcome = _outcomes(item)[verdict]
+        enabled = bool(outcome.get("affordable", True))
+        control = workbench.Control(
+            "rule_petition", key, label=label, enabled=enabled,
+            why="the crown cannot pay it" if not enabled else "",
+            command=f"verdict:{verdict}")
+        controls.append(workbench.affordable(control, hours))
+    return controls
 
 
 def _court_catalog(hours: int) -> list[workbench.Control]:
@@ -496,13 +504,10 @@ def _court_catalog(hours: int) -> list[workbench.Control]:
         "receive_cohort", key, label=label, enabled=False,
         why="choose displaced people", command=f"receive:{decision}"), hours)
         for key, decision, label in RECEPTIONS]
-    controls.append(workbench.Control(
-        "hear_petition", registry.BY_ID["hear_petition"].mnemonic,
-        enabled=False, why="choose an unheard claim"))
     controls.extend(
         workbench.Control(
             "rule_petition", key, label=label, enabled=False,
-            why="choose a heard claim", command=f"verdict:{verdict}")
+            why="choose a claim", command=f"verdict:{verdict}")
         for key, verdict, label in VERDICTS)
     return controls
 
@@ -576,18 +581,37 @@ def _adviser_rows(b: dict) -> list[workbench.Row]:
 
 def _audience(b: dict) -> list[workbench.Row]:
     waiting = {p["id"] for p in b.get("justice", {}).get("petitions", [])
-               if p.get("present", True) and not p.get("heard")}
+               if p.get("present", True)}
+    waiting |= {band["id"] for band in petitioners(b)}
     return [row for row in _court(b) if row.id in waiting]
 
 
-def _post_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
+def _post_detail(b: dict, chosen: str,
+                 person_id: str = "") -> list[tuple[str, str]]:
     post = next((item for item in b.get("institutions", [])
                  if item["id"] == chosen), None)
     if post is None:
         return [("No office is selected.", "ash")]
-    return [(post["name"], "gold"), (post["kind"], "dim"),
-            ("held by " + (_name(post["head"], b) if post["head"] else "nobody"),
-             "clay" if post["head"] else "blood")]
+    lines = [
+        (post["name"], "gold"),
+        (post["kind"], "dim"),
+        ("held by " + (_name(post["head"], b) if post["head"] else "nobody"),
+         "clay" if post["head"] else "blood"),
+        (f"reported output now: {post.get('effective', 0):,}", "sky"),
+    ]
+    person = next((member for member in _people(b)
+                   if member["id"] == person_id), None)
+    if person is not None:
+        lines.extend([
+            ("", "clay"),
+            (f"placing {person['name']}", "bone"),
+            (f"{person.get('competence', 'unknown ability')} · "
+             f"{person.get('loyalty', 'unknown loyalty')}", "clay"),
+            ("able heads slow decay; poor heads hasten it", "ash"),
+        ])
+        if person.get("post") and person["post"] != chosen:
+            lines.append((f"leaves {_post_name(person['post'], b)}", "blood"))
+    return lines
 
 
 def _house_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
@@ -723,7 +747,7 @@ def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
     The no-selection catalog lets the registry guard audit every route. Once a
     matter is selected the screen gets only its current step. A control's
     `command` is what clicking it says, and for several of them that is not
-    `do:<id>` -- four verdicts are one action -- so the action cannot be
+    `do:<id>` -- three verdicts are one action -- so the action cannot be
     recovered from the drawn screen and the guard reads this declaration.
     """
     if view in {"court", "audience", "justice"}:
@@ -809,6 +833,8 @@ def compose(b: dict, view: str = "court", selected: str = "",
     _stacked, detail_width = _detail_geometry(width, widths)
     if view in {"court", "audience", "justice"}:
         detail = _court_detail(b, chosen, detail_width)
+    elif listing == "post":
+        detail = _post_detail(b, chosen, who)
     elif view in {"house", "people", "household", "advisers"}:
         detail = _house_detail(b, who)
     elif view == "offices":
@@ -824,6 +850,10 @@ def compose(b: dict, view: str = "court", selected: str = "",
                                 amount=amount, good=good)
 
     band = scene_rows(height)
+    if choosing == "post":
+        # This is a comparison, not a room portrait. Keep the candidate and
+        # office effects visible instead of spending half the window on stools.
+        band = 0
     queue = rows
     scene_listing = {"people": "house", "household": "house",
                      "advisers": "house", "audience": "court",
@@ -836,13 +866,12 @@ def compose(b: dict, view: str = "court", selected: str = "",
         title = f"THE COURT — A POST FOR {named.upper()}"
         note = "choose a post, or [esc] to think better of it"
 
-    # Once testimony is heard, the room yields architecture before it yields
-    # the words a verdict acts upon. Supported sizes fit ordinary cases in a
-    # compact stacked pane; exceptionally long evidence leaves verdicts
-    # visibly disabled rather than asking the king to judge hidden text.
+    # The room yields architecture before it yields arguments or stakes.
+    # Exceptionally long authored evidence disables verdicts instead of asking
+    # the king to judge text that the pane could not show.
     if view in {"court", "audience", "justice"}:
         petition = _court_item(b, chosen)
-        if petition is not None and petition["heard"]:
+        if petition is not None:
             evidence_rows = len(_evidence_lines(b, petition, detail_width))
             capacity = _detail_capacity(
                 rows, controls, widths, width, height, band, note)

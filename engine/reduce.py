@@ -290,10 +290,6 @@ def apply(world: World, action) -> tuple[World, list]:
         return (replace_court(world, searched=searched),
                 [A.ArchiveSearched(action.query, len(hits))])
 
-    if isinstance(action, A.HearPetition):
-        from engine import justice
-        return justice.hear(world, action.petition_id)
-
     if isinstance(action, A.RulePetition):
         from engine import justice
         return justice.rule(world, action.petition_id, action.verdict)

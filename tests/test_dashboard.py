@@ -98,7 +98,7 @@ def test_preparser_covers_new_dashboard_orders() -> None:
         ("give the smiths of the palace quarter 7000 qa", A.Allocate),
         ("close the routes to ma_hadu", A.Quarantine),
         ("search the archive for oath", A.SearchArchive),
-        ("hear boundary_ashiranu", A.HearPetition),
+        ("rule debt_shipwright split", A.RulePetition),
         ("set the land due to 250", A.SetLandDue),
         ("name niqmaddu heir", A.NameHeir),
     )

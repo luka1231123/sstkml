@@ -48,7 +48,7 @@ DOMAINS = {
                    "ObligationDelivered"),
     "war": ("SeatDefended", "SeatTaken", "SeatFell", "AluFell", "Raid"),
     "court": ("UnrestChanged", "LegitimacyChanged", "RitePerformed",
-              "RiteSkipped", "PetitionHeard", "PetitionRuled", "LandDueSet",
+              "RiteSkipped", "PetitionRuled", "LandDueSet",
               "HarbourDueSet", "PersonPlaced", "PersonDismissed"),
     "world": ("news", "ShockLanded", "consolidated", "observed"),
 }

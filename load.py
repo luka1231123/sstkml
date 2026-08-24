@@ -769,12 +769,13 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
             against=case["against"], kind=case["kind"],
             claim=(("amount", int(case["claim"])),),
             counterclaim=(("amount", int(case["counterclaim"])),),
-            truth=(("amount", int(case["truth"])),),
-            unit=case["unit"], claim_text=case["claim_text"].strip(),
+            good=case["good"], unit=case["unit"],
+            claim_text=case["claim_text"].strip(),
             counter_text=case["counter_text"].strip(),
-            correction=case["correction"].strip(),
-            witness=case["witness"], faction=case["faction"],
-            against_faction=case["against_faction"],
+            unrest_for=int(case["unrest_for"]),
+            unrest_against=int(case["unrest_against"]),
+            unrest_split=int(case["unrest_split"]),
+            unrest_arrival=int(case["unrest_arrival"]),
             arrived_turn=int(case["arrived_turn"]),
         )
         for case in justice_cfg.get("cases", []))
@@ -929,9 +930,6 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
                             "capacity": int(plan["capacity"])}
                      for kind, plan in works_cfg.get("build", {}).items()},
         justice_cases=justice_cases,
-        justice_rules={
-            key: int(value)
-            for key, value in justice_cfg.get("rules", {}).items()},
         revenue_rules={
             **{key: int(value)
                for key, value in revenue_cfg.get("land", {}).items()

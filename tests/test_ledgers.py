@@ -266,6 +266,7 @@ def test_due_drafts_show_the_take_and_the_cost_at_real_window_sizes() -> None:
         assert "2 merchants take offence" in text
         assert "up to −12 in 3–6 fortnights" in text
         assert "finance / requisition" not in text
+        assert "permit" not in text and "offer" not in text and "guard" not in text
 
 
 def test_harbour_due_shows_old_and_new_trade_losses_without_hidden_scores() -> None:

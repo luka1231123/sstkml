@@ -472,8 +472,9 @@ enough for tribute, corvée, trade contracts, and diplomacy. No fifth kind
 without a rule that reads it.
 
 **Decision — justice and religion in 0.7.** Both stay, both stay small.
-Justice is petitions, rulings, and precedent that people remember; it feeds
-legitimacy and grievance and nothing else. Religion is §2.8: rites cost goods
+Justice is a short docket of rulings with visible goods and unrest at stake.
+There is no hearing tax, hidden correct answer, or precedent subsystem.
+Religion is §2.8: rites cost goods
 and days, omens move expectations, oaths are political facts. Neither grows a
 subsystem in 0.7.
 

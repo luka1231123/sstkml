@@ -273,16 +273,10 @@ class SearchArchive:
 
 
 @dataclasses.dataclass(frozen=True)
-class HearPetition:
-    """Spend an audience hour hearing both sides. Truth remains hidden."""
-    petition_id: str
-
-
-@dataclasses.dataclass(frozen=True)
 class RulePetition:
-    """Give one of 6.19's four verdicts, heard or unheard."""
+    """Give one of the Court's three visible verdicts."""
     petition_id: str
-    verdict: str                 # for | against | split | defer
+    verdict: str                 # for | against | split
 
 
 @dataclasses.dataclass(frozen=True)
@@ -826,24 +820,13 @@ class PetitionArrived:
 
 
 @dataclasses.dataclass(frozen=True)
-class PetitionHeard:
-    petition_id: str
-
-
-@dataclasses.dataclass(frozen=True)
 class PetitionRuled:
     petition_id: str
     verdict: str
-    precedent_ref: str = ""
-
-
-@dataclasses.dataclass(frozen=True)
-class JusticeCorrectionDue:
-    """Hidden scheduled payload. Only its witness tablet enters Belief."""
-    petition_id: str
-    witness: str
-    finding: str
-    legitimacy_delta: int
+    beneficiary: str
+    good: str
+    amount: int
+    unrest_delta: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -998,7 +981,7 @@ _TYPES = {
         RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee,
         ReceiveCohort, FinanceTrade, RequisitionTrade,
-        HearPetition, RulePetition,
+        RulePetition,
         SetLandDue, SetHarbourDue, PlacePerson, DismissPerson, NameHeir,
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
@@ -1018,7 +1001,7 @@ _TYPES = {
         PlagueBegan, PlagueSpread, PlagueProgressed, PlagueDeaths,
         ShockLanded, ShockRecovered, OathExpiated,
         QuarantineSet, ArchiveSearched,
-        PetitionArrived, PetitionHeard, PetitionRuled, JusticeCorrectionDue,
+        PetitionArrived, PetitionRuled,
         LandDueSet, HarbourDueSet, LandDueTaken, HarbourDueTaken,
         HarbourCargoLanded, HarbourCargoWithdrawn,
         MerchantResponseDue, MerchantWithdrew, PersonPlaced, PersonDismissed,

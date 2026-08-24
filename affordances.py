@@ -16,7 +16,7 @@ ROMAN = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
 # Closed vocabularies. Fixed by the engine, so constants, not Belief reads.
 TROOP_TASKS = ("garrison", "watch", "harvest", "campaign")
 LEDGERS = ("granary", "seed")
-VERDICTS = ("for", "against", "split", "defer")
+VERDICTS = ("for", "against", "split")
 QUESTIONS = ("harvest", "sickness", "war", "voyage", "death")
 RECEPTIONS = ("accept", "settle", "redirect", "refuse")
 

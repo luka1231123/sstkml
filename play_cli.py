@@ -36,7 +36,7 @@ SEARCH_COST = 1       # spec 6.17: one hour per query, and it is a real hour
 EXPIATE_COST = 2
 QUARANTINE_COST = 1
 SUPPRESS_COST = 2
-HEAR_COST = 1
+RULE_COST = 1
 
 
 def _guard_player_action(action) -> None:
@@ -65,8 +65,7 @@ HELP = """  commands (a leading ':' is optional)
     build <kind> [place]     put something up; it eats corvee and grain (1 hour)
     repair <institution>     make a thing whole; cheaper than building (1 hour)
     abandon <work>           call the men off; what they ate is gone (1 hour)
-    hear <case>              hear claim and counter-claim             (1 hour)
-    rule <case> <verdict>    for | against | split | defer
+    rule <case> <verdict>    for | against | split                  (1 hour)
     landdue <rate>           set the land due per thousand
     harbourdue <rate>        set the harbour due per thousand
     place <person> <post>    institution, governor:<place>,
@@ -418,28 +417,17 @@ def run(chosen_alu: str = "seat", seed: int | None = None) -> None:
                                   f"and what they ate stay spent.")
                     except ValueError as ex:
                         print(f"  {ex}")
-            elif verb == "hear" and len(args) == 1:
-                petitions = b.get("justice", {}).get("petitions", [])
-                petition_id = _resolve_petition(args[0], petitions)
-                if petition_id is None:
-                    print("  no such petition waits in the hall.")
-                elif left < HEAR_COST:
-                    print("  no hour remains to hear both men.")
-                else:
-                    try:
-                        commit(A.HearPetition(petition_id))
-                        spent += HEAR_COST
-                        screen = "justice"
-                    except ValueError as ex:
-                        print(f"  {ex}")
             elif verb == "rule" and len(args) == 2:
                 petitions = b.get("justice", {}).get("petitions", [])
                 petition_id = _resolve_petition(args[0], petitions)
                 if petition_id is None:
                     print("  no such petition waits in the hall.")
+                elif left < RULE_COST:
+                    print("  no hour remains to judge the case.")
                 else:
                     try:
                         commit(A.RulePetition(petition_id, args[1].lower()))
+                        spent += RULE_COST
                         screen = "justice"
                     except ValueError as ex:
                         print(f"  {ex}")

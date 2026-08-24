@@ -230,11 +230,11 @@ class Project:
 
 @dataclasses.dataclass(frozen=True)
 class Petition:
-    """One dispute waiting in the hall (spec 6.19).
+    """One plain choice waiting in the hall.
 
-    The two claims are what the litigants say; `truth` is what was actually so
-    and never crosses the Belief boundary.  The prose is authored because the
-    figures alone do not say whether sixty cubits are a boundary or a debt.
+    Both sides and every consequence are public.  A ruling awards some of the
+    crown's named good to the petitioner and moves public unrest immediately;
+    there is no hidden truth score or precedent mini-game behind it.
     """
     id: str
     petitioner: str
@@ -242,30 +242,16 @@ class Petition:
     kind: str
     claim: tuple[tuple[str, int], ...]
     counterclaim: tuple[tuple[str, int], ...]
-    truth: tuple[tuple[str, int], ...]
+    good: GoodId
     unit: str
     claim_text: str
     counter_text: str
-    correction: str
-    witness: str
-    faction: str
-    against_faction: str
+    unrest_for: int
+    unrest_against: int
+    unrest_split: int
+    unrest_arrival: int
     arrived_turn: int
     waiting: int = 0
-    heard: bool = False
-
-
-@dataclasses.dataclass(frozen=True)
-class Precedent:
-    """A ruling the king made and can be quoted back at him."""
-    id: str
-    petition_id: str
-    kind: str
-    verdict: str
-    turn: int
-    petitioner: str
-    against: str
-    document_ref: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -321,12 +307,8 @@ class Court:
     projects: Mapping[str, "Project"] = dataclasses.field(default_factory=dict)
     works_days: int = 0
     project_seq: int = 0
-    # --- M12: justice (6.19) ---
+    # --- justice ---
     petitions: Mapping[str, Petition] = dataclasses.field(default_factory=dict)
-    precedents: tuple[Precedent, ...] = ()
-    # Mood is the court's memory of which interest the king has favoured. It is
-    # intentionally not advice and does not say which side was truthful.
-    faction_mood: Mapping[str, int] = dataclasses.field(default_factory=dict)
     # --- M12: revenue and placement (6.20, 6.22) ---
     # The share of its own villages' harvest the crown takes, per 1000.
     # Customary is what the granary needs in an ordinary year; above it the
@@ -772,10 +754,9 @@ class World:
         default_factory=dict)
     works_plans: Mapping[str, Mapping[str, object]] = dataclasses.field(
         default_factory=dict)
-    # Authored disputes, including their hidden truth, fixed at load. A case
+    # Authored disputes with public resource stakes, fixed at load. A case
     # enters the hall when its `arrived_turn` comes.
     justice_cases: tuple[Petition, ...] = ()
-    justice_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
     revenue_rules: Mapping[str, int] = dataclasses.field(default_factory=dict)
     revenue_good: GoodId = "oil"
     revenue_merchants: tuple[ActorId, ...] = ()

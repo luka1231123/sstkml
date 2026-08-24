@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from engine.entity import GoodId
+from engine.entity import EntityId, GoodId, mint
 from engine.core import in_range
 from engine.kernel import seat_goods as SG
 from engine.kernel import seat_people as SP
@@ -13,6 +13,50 @@ from engine.state import World
 def held(world: World) -> dict[GoodId, int]:
     """The seat's stores, out of the Book. A fresh mapping, safe to mutate."""
     return SG.in_hand(world.kernel.book, world.kernel.seat_goods)
+
+
+def available(world: World) -> dict[GoodId, int]:
+    """The part of the stores not already promised elsewhere."""
+    return SG.in_hand(
+        world.kernel.book, world.kernel.seat_goods, free_only=True)
+
+
+def pay(world: World, good: GoodId, amount: int, beneficiary: EntityId,
+        *, authority: EntityId = "") -> World:
+    """Move a court good to a named beneficiary, atomically."""
+    if amount < 0:
+        raise ValueError("a payment cannot be negative")
+    if amount == 0:
+        return world
+    view = world.kernel.seat_goods
+    lots = SG.lots(world.kernel.book, view, good)
+    if sum(lot.free for lot in lots) < amount:
+        raise ValueError(f"the crown does not hold {amount:,} {good}")
+    book = world.kernel.book
+    owed = amount
+    ordinal = 12_000
+    for lot in lots:
+        if owed <= 0:
+            break
+        current = book.lots[lot.id]
+        quantity = min(owed, current.free)
+        if quantity <= 0:
+            continue
+        new_id = None
+        if quantity < current.quantity:
+            while mint(view.seat, book.turn, "lot", ordinal) in book.lots:
+                ordinal += 1
+            new_id = mint(view.seat, book.turn, "lot", ordinal)
+            ordinal += 1
+        book = book.give(
+            current.id, quantity, beneficiary, "paid",
+            authority=authority, new_id=new_id)
+        moved = new_id or current.id
+        if book.lots[moved].holder != beneficiary:
+            book = book.hand(moved, beneficiary, "paid", authority)
+        owed -= quantity
+    kernel = dataclasses.replace(world.kernel, book=book)
+    return dataclasses.replace(world, kernel=kernel)
 
 
 def put(world: World, stores: dict[GoodId, int], *,

@@ -72,9 +72,9 @@ def test_a_selection_stops_at_the_ends_rather_than_wrapping() -> None:
 
 def _petitions(count: int) -> dict:
     return {"justice": {"petitions": [
-        {"id": f"p{n}", "kind": f"kind{n}", "waiting": n, "heard": False,
+        {"id": f"p{n}", "kind": f"kind{n}", "waiting": n, "good": "grain",
          "petitioner": "a", "against": "b", "claim_text": "x",
-         "counter_text": "y", "precedent": None}
+         "counter_text": "y"}
         for n in range(count)]}}
 
 

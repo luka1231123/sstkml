@@ -333,18 +333,18 @@ def justice_screen(b: dict) -> str:
             f"  {index + 1}. {actor_name(petition['petitioner'], b.get('house'))}"
             f" against {actor_name(petition['against'], b.get('house'))}"
             f" — {petition['kind']}, {petition['waiting']} fortnights waiting")
-        precedent = petition.get("precedent")
-        if precedent:
+        lines.append(f"     claim: {petition['claim_text']}")
+        lines.append(f"     answer: {petition['counter_text']}")
+        for verdict in ("for", "against", "split"):
+            outcome = petition["outcomes"][verdict]
+            payment = (fmt_good(outcome["good"], outcome["amount"])
+                       if outcome["amount"] else "no payment")
+            sign = "+" if outcome["unrest"] > 0 else ""
             lines.append(
-                f"     cites {precedent['document_ref']}: "
-                f"{precedent['verdict']} in an earlier {precedent['kind']} case")
-        if petition["heard"]:
-            lines.append(f"     claim: {petition['claim_text']}")
-            lines.append(f"     answer: {petition['counter_text']}")
-        else:
-            lines.append("     (neither man has been heard)")
+                f"     {verdict}: {payment}; "
+                f"unrest {sign}{outcome['unrest']}")
     lines.append(
-        "\n  hear <case>  (1 hour)    rule <case> for|against|split|defer")
+        "\n  rule <verdict> on <case>  (for, against, or split; 1 hour)")
     return "\n".join(lines)
 
 

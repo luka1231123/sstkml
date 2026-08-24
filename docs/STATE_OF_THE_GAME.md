@@ -34,8 +34,8 @@ from its own Belief. Sow, tend, reap, set seed aside, share out by
 tenure. Mining (new, uncommitted). Caravans, voyages, sea seasons, loss on road
 and at sea. Spoilage, hunger, displacement, plague, 11 shock kinds, fall.
 
-**Court.** Rations and payroll, arrears, unrest, legitimacy, justice petitions
-and precedent, rites, omens, oaths, institutions with decay and upkeep, works
+**Court.** Rations and payroll, arrears, unrest, legitimacy, resource petitions,
+rites, omens, oaths, institutions with decay and upkeep, works
 and construction, muster, corvée, levy, trade dues, finance, requisition,
 exemption, household, succession, marriage.
 

@@ -147,10 +147,10 @@ claimant, and the claimant remembers.
 - **Officials** — appointment is an allocation of authority. A competent
   official executes orders closer to what was written. An interested one skims
   or reports what flatters him.
-- **Justice** — ruling for one party against another creates precedent that
-  binds later cases. Cheap to hear, expensive to have ruled wrong. [Honestly justice in the current state is very boring, it should only be as pertaining to resources or officials or public unrest and fukcing binds cases later should be removed]
+- **Justice** — one ruling spends visible grain or copper and immediately
+  changes unrest. Both arguments and all three outcomes are on screen first.
 - **Kin and succession** — an heir named, a daughter married abroad, a brother
-  given an office or denied one. [MINIMAL, and appointing offices should be done in an easier way]
+  given an office or denied one.
 - **Temple** — rites cost grain and days and buy legitimacy; skipping them is
   free until it is not. [not until 0.7 is complete]
 

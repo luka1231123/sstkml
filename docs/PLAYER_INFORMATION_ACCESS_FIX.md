@@ -206,9 +206,9 @@ claim, or report has revealed it; known interests and stated intentions remain
 accessible.
 
 Office dossiers show authority, holder, vacancy, institutional link, duties,
-resources controlled, and appointment history. Justice exposes the complete
-heard claim, counterclaim, evidence, wait, parties, precedent, ruling, and
-consequence record; hidden case truth never crosses Belief.
+resources controlled, and appointment history. Justice exposes both claims,
+the parties, wait, and every verdict's exact goods payment and unrest change.
+There is no separate hearing, precedent, or hidden correct answer.
 
 ### 5.8 Shrine
 
