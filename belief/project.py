@@ -942,6 +942,18 @@ def _house(world) -> dict:
     }
 
 
+def _occupation_record(world, place) -> dict:
+    if place.kind != "alu":
+        return {"occupied_by": "", "occupied_turn": -1}
+    settlement = world.kernel.registry.settlements.get(
+        f"settlement:{place.id}")
+    if settlement is None or settlement.occupied_turn < 0:
+        return {"occupied_by": "", "occupied_turn": -1}
+    polity = world.kernel.registry.polities[settlement.owner]
+    return {"occupied_by": polity.name,
+            "occupied_turn": settlement.occupied_turn}
+
+
 def _world_graph(world) -> dict:
     """The inherited route tablet, not live knowledge of foreign places.
 
@@ -978,6 +990,7 @@ def _world_graph(world) -> dict:
                 "kind": place.kind,
                 "alu": place.alu,
                 "harbour": place.harbour,
+                **_occupation_record(world, place),
                 "source": source,
                 "as_of_turn": 0,
                 "age_turns": max(0, now),
@@ -1120,6 +1133,9 @@ def _trade(world, perr: int) -> dict:
         "grain_price": transcribe(
             market["price_grain"], world.seed, world.date.absolute,
             "trade:grain_price", perr),
+        "tin_price": transcribe(
+            market["price_tin"], world.seed, world.date.absolute,
+            "trade:tin_price", perr),
         "cargo": cargo,
         "routes": routes,
         "movements": movements,
@@ -1276,6 +1292,33 @@ def project(world) -> dict:
             "source": "current cohort roll", "as_of_turn": d.absolute,
             "certainty": "reported",
         })
+    threats = []
+    watched_targets = {seat_id} | {
+        f"settlement:{relation.place}" for relation in world.relations.values()
+    }
+    for cohort in sorted(world.kernel.registry.cohorts.values(),
+                         key=lambda item: item.id):
+        if cohort.status != "travelling_raider" or not cohort.path \
+                or cohort.path[-1] not in watched_targets:
+            continue
+        target = cohort.path[-1]
+        origin = cohort.origin
+        org = world.kernel.registry.orgs.get(origin)
+        if org is not None:
+            origin = org.settlement
+        threats.append({
+            "id": cohort.id,
+            "origin": origin.split(":", 1)[-1],
+            "target": target.split(":", 1)[-1],
+            "intent": cohort.task,
+            "people": transcribe(
+                cohort.people, world.seed, d.absolute,
+                f"raid:{cohort.id}", perr),
+            "arrives": cohort.arrives,
+            "remaining": max(0, cohort.arrives - d.absolute),
+            "source": "watch report", "as_of_turn": d.absolute,
+            "certainty": "reported",
+        })
     relations = []
     for actor, relation in sorted(world.relations.items()):
         if relation.place not in world.places:
@@ -1381,6 +1424,7 @@ def project(world) -> dict:
         "ration_grain_left": grain_left,
         "groups": groups,
         "cohorts": cohorts,
+        "threats": threats,
         "relations": relations,
         "oaths": oaths,
         "obligations": obligations,

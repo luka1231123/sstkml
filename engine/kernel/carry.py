@@ -14,10 +14,12 @@ GRAIN = F.GRAIN
 COPPER = "copper"
 TIN = "tin"
 BRONZE = "bronze"
+TRADE_GOODS = (GRAIN, TIN)
 
 # --- price (spec 6.6) ---------------------------------------------------------
 
 BASE_PRICE = 60          # what a thousand qa fetches at an ordinary cover
+BASE_PRICES = {GRAIN: BASE_PRICE, TIN: 9000}
 TARGET_COVER = 12        # fortnights of eating that counts as ordinary
 PRICE_FLOOR = 15
 PRICE_CEILING = 400
@@ -27,12 +29,14 @@ KEEP_FORTNIGHTS = 26
 
 # The cover a council aims at when buying, and so the size of its order.
 COVER_TARGET = 28
+TIN_COVER_TARGET = 8
 
 # The margin a merchant wants on a thousand qa before it is worth crossing.
 CROSSING_MARGIN = 40
 
 # The most one house buys in one fortnight, whatever its purse says.
 LINE_CARGO = 4000
+MIN_TIN_CARGO = 120
 
 # Qa a person loads or discharges in a day.
 LOAD_PER_DAY = 25
@@ -49,13 +53,32 @@ DISPATCH = 100
 
 def price(stores: int, need: int) -> int:
     """What a thousand qa is worth where this much is standing against this need."""
+    return commodity_price(GRAIN, stores, need)
+
+
+def commodity_price(good: str, stores: int, need: int) -> int:
+    """A local scarcity price, in copper per thousand units of `good`."""
+    base = BASE_PRICES[good]
+    floor = max(1, base // 4)
+    ceiling = base * 20 // 3
     if need <= 0:
-        return PRICE_FLOOR
+        return floor
     cover = stores // need
     if cover <= 0:
-        return PRICE_CEILING
-    return max(PRICE_FLOOR, min(PRICE_CEILING,
-                                BASE_PRICE * TARGET_COVER // cover))
+        return ceiling
+    return max(floor, min(ceiling, base * TARGET_COVER // cover))
+
+
+def demand(kernel, settlement: EntityId, good: str) -> int:
+    """What one fortnight locally consumes or needs to replace."""
+    if good == GRAIN:
+        return sum(c.ration() for c in kernel.cohorts_of(settlement))
+    if good == TIN:
+        from engine.kernel import arms
+        bronze_wear = (arms.kit(kernel, settlement) * arms.WEAR_PER_1000
+                       + 999) // 1000
+        return (bronze_wear + arms.PER_BATCH - 1) // arms.PER_BATCH
+    return 0
 
 
 def bulk(good: str, quantity: int) -> int:
@@ -172,12 +195,17 @@ def reachable(kernel, settlement: EntityId) -> tuple[EntityId, ...]:
 
 def readings(kernel, settlement: EntityId) -> dict[str, int]:
     """The market as a person in it would describe it."""
-    need = sum(c.ration() for c in kernel.cohorts_of(settlement))
-    stores = kernel.stores(settlement, GRAIN)
     mine = {settlement, kernel.controller(settlement)}
-    market = sum(lot.free for lot in kernel.book.at(settlement)
-                 if lot.good == GRAIN and lot.owner not in mine)
-    return {"price_grain": price(stores, need), "market_grain": market}
+    found: dict[str, int] = {}
+    for good in TRADE_GOODS:
+        need = demand(kernel, settlement, good)
+        stores = kernel.stores(settlement, good)
+        market = sum(lot.free for lot in kernel.book.at(settlement)
+                     if lot.good == good and lot.owner not in mine)
+        found[f"need_{good}"] = need
+        found[f"price_{good}"] = commodity_price(good, stores, need)
+        found[f"market_{good}"] = market
+    return found
 
 
 # --- policy (spec 10.11): `(actor, belief)`, and never the world --------------
@@ -239,55 +267,102 @@ def buy_shortfall(actor: EntityId, belief: B.Belief,
                     tuple(c.id for c in belief.about(home, "own_grain"))),)
 
 
-def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
-    """A merchant house runs one line: buy at the cheapest end, sell at the dearest."""
+def sell_tin_surplus(actor: EntityId, belief: B.Belief,
+                     home: EntityId) -> tuple[Intent, ...]:
+    """Offer tin beyond the local forge's working reserve."""
+    spare = (belief.value(home, "own_tin", 0)
+             - belief.value(home, "need_tin", 0) * KEEP_FORTNIGHTS)
+    ask = belief.value(home, "price_tin", 0)
+    if spare < MIN_TIN_CARGO or ask <= 0:
+        return ()
+    return (_quote(actor, belief.value(home, "turn", 0), home, TIN, spare, ask),)
+
+
+def buy_tin_shortfall(actor: EntityId, belief: B.Belief,
+                      home: EntityId) -> tuple[Intent, ...]:
+    """Buy a modest forge reserve when a caravan has tin in hand."""
+    deficit = (belief.value(home, "need_tin", 0) * TIN_COVER_TARGET
+               - belief.value(home, "own_tin", 0))
+    offered = belief.value(home, "market_tin", 0)
+    purse = belief.value(home, "own_copper", 0)
+    ceiling = belief.value(home, "price_tin", 0)
+    if deficit <= 0 or offered <= 0 or purse <= 0 or ceiling <= 0:
+        return ()
+    affordable = purse * 1000 // ceiling
+    quantity = min(deficit, offered, affordable)
+    if quantity <= 0:
+        return ()
+    return (_accept(actor, belief.value(home, "turn", 0), home, TIN, quantity,
+                    ceiling + 1,
+                    tuple(c.id for c in belief.about(home, "own_tin"))),)
+
+
+def _trade_good(actor: EntityId, belief: B.Belief,
+                good: str) -> tuple[Intent, ...]:
+    """Buy at home, carry one known leg, then sell where it lands."""
     seat = home(belief)
     if not seat:
         return ()
     turn = belief.value(seat, "turn", 0)
-    prices = {place: belief.value(place, "price_grain", 0)
-              for place in _subjects(belief)
-              if belief.value(place, "price_grain", 0) > 0}
-    if len(prices) < 2:
+    home_price = belief.value(seat, f"price_{good}", 0)
+    neighbours = tuple(
+        place for place in _subjects(belief)
+        if place != seat and belief.value(place, "route", 0)
+        and belief.value(place, f"price_{good}", 0) > 0)
+    if home_price <= 0 or not neighbours:
         return ()
-
-    # Ties by id, and stable: sorting first means `max` and `min` take the lowest-id place among.
-    order = sorted(prices)
-    dearest = max(order, key=lambda p: prices[p])
-    cheapest = min(order, key=lambda p: prices[p])
-    worth_it = (dearest != cheapest
-                and prices[dearest] - prices[cheapest] > CROSSING_MARGIN)
+    dearest = max(sorted(neighbours),
+                  key=lambda p: belief.value(p, f"price_{good}", 0))
+    dear_price = belief.value(dearest, f"price_{good}", 0)
+    margin = (CROSSING_MARGIN if good == GRAIN
+              else max(1, BASE_PRICES[good] // 6))
+    worth_it = dear_price - home_price > margin
 
     intents: list[Intent] = []
-    for place in order:
-        grain = belief.value(place, "own_grain", 0)
+    purse = belief.value(seat, "own_copper", 0)
+    if worth_it and purse > 0:
+        want = min(purse * 1000 // home_price, LINE_CARGO)
+        if want > 0:
+            intents.append(_accept(
+                actor, turn, seat, good, want, home_price,
+                tuple(c.id for c in belief.about(
+                    dearest, f"price_{good}"))))
+
+    stock = belief.value(seat, f"own_{good}", 0)
+    if stock > 0:
+        ready = good != TIN or stock >= MIN_TIN_CARGO
+        intents.append(_ship(actor, turn, seat, dearest, good, stock)
+                       if worth_it and ready else
+                       _quote(actor, turn, seat, good, stock, home_price))
+
+    # Cargo is sold where it lands. It is never bounced home because a newer
+    # report changed which end looked dearer while it was on the road.
+    for place in _subjects(belief):
+        if place == seat:
+            continue
+        stock = belief.value(place, f"own_{good}", 0)
+        local_price = belief.value(place, f"price_{good}", 0)
+        if stock > 0 and local_price > 0:
+            intents.append(_quote(
+                actor, turn, place, good, stock, local_price))
         copper = belief.value(place, "own_copper", 0)
-
-        # Buy where it is cheapest, with the money standing there.
-        if worth_it and place == cheapest and copper > 0:
-            want = min(copper * 1000 // prices[place], LINE_CARGO)
-            if want > 0:
-                intents.append(_accept(
-                    actor, turn, place, GRAIN, want, prices[place],
-                    tuple(c.id for c in belief.about(dearest, "price_grain"))))
-
-        # The next hop toward the dearest market, if the grain here has one.
-        onward = ""
-        if prices[dearest] - prices[place] > CROSSING_MARGIN:
-            onward = dearest if place == seat else seat
-        if grain > 0 and onward:
-            intents.append(_ship(actor, turn, place, onward, GRAIN, grain))
-        elif grain > 0:
-            # No leg worth making: the factor sells where it is standing.
-            intents.append(_quote(actor, turn, place, GRAIN, grain,
-                                  prices[place]))
-
-        # Money goes the other way along the line, to whichever end is buying.
-        if worth_it and place != cheapest and copper > 0:
-            intents.append(_ship(actor, turn, place,
-                                 cheapest if place == seat else seat,
-                                 COPPER, copper))
+        if copper > 0 and belief.value(place, "route", 0):
+            intents.append(_ship(
+                actor, turn, place, seat, COPPER, copper))
     return tuple(i for i in intents if i is not None)
+
+
+def trade(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
+    """Run the two useful regional lines: food and forge tin."""
+    intents: dict[str, Intent] = {}
+    seat = home(belief)
+    goods = ((GRAIN, TIN) if belief.best(seat, "price_tin") else (GRAIN,))
+    for good in goods:
+        for intent in _trade_good(actor, belief, good):
+            # Two opportunities may send the same purse down the same road.
+            # It is one purse and therefore one intent.
+            intents.setdefault(intent.id, intent)
+    return tuple(intents[i] for i in sorted(intents))
 
 
 def home(belief: B.Belief) -> EntityId:
@@ -450,7 +525,7 @@ def movement(kernel, intents: tuple[Intent, ...], allocation: R.Allocation):
             departed=turn, arrives=turn + route.fortnights(),
             mode=route.legs[0].mode,
             cargo=tuple(cargo),
-            news=tuple(sorted(readings(kernel, origin).items())))
+            news=_news(kernel, origin))
         voyages.append(voyage)
         events.append(("sailed" if voyage.mode == "sea" else "caravan_departed",
                        voyage.id, origin, intent.subject,
@@ -481,8 +556,14 @@ def _dispatch(kernel, events: list):
                 destination=destination, departed=turn,
                 arrives=turn + route.fortnights(),
                 mode=route.legs[0].mode,
-                news=tuple(sorted(readings(kernel, origin).items()))))
+                news=_news(kernel, origin)))
     return dataclasses.replace(kernel, voyages=tuple(voyages)), events
+
+
+def _news(kernel, origin: EntityId) -> tuple[tuple[str, int], ...]:
+    """Grain prices travel; tin moves on counted cargo and customary quotes."""
+    return (("price_grain", price(
+        kernel.stores(origin, GRAIN), demand(kernel, origin, GRAIN))),)
 
 
 def _origin_of(resource: EntityId) -> EntityId:

@@ -25,9 +25,10 @@ def test_succession_changes_the_king_not_the_owner():
 def test_capture_changes_the_owner_and_therefore_the_king():
     kernel = load_campaign("seat", 1).kernel
     registry = politics.capture(
-        kernel.registry, "settlement:seat", "polity:hattusa")
+        kernel.registry, "settlement:seat", "polity:hattusa", turn=7)
     changed = dataclasses.replace(kernel, registry=registry)
 
     assert changed.owner("settlement:seat").id == "polity:hattusa"
     assert changed.king("settlement:seat").id == "person:hatti_king"
     assert "settlement:seat" in registry.holdings("polity:hattusa")
+    assert registry.settlements["settlement:seat"].occupied_turn == 7

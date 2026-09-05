@@ -89,8 +89,23 @@ def test_a_bargain_moves_goods_one_way_and_copper_the_other() -> None:
     if not sales:
         return  # no trade in self-sufficient world
     first = sales[0]
-    assert first.good == C.GRAIN and first.pay_good == C.COPPER
+    assert first.good in C.TRADE_GOODS and first.pay_good == C.COPPER
     assert first.quantity > 0 and first.paid > 0
+
+
+def test_tin_moves_beyond_its_mine_and_supplies_a_foreign_forge() -> None:
+    kernel = _world()
+    source = C.readings(kernel, "settlement:emar")["price_tin"]
+    destination = C.readings(kernel, "settlement:carchemish")["price_tin"]
+    assert source < destination, "a producing town is cheaper than an empty forge"
+
+    kernel, _, logs = _run(kernel, turns=14)
+    sales = [contract for log in logs for contract in log.contracts
+             if contract.good == C.TIN
+             and contract.place not in ("settlement:assur", "settlement:emar")]
+    assert sales, "caravans hand tin into the regional market"
+    assert _held(kernel, "org:carchemish_palace", C.BRONZE) > 0, \
+        "the imported tin becomes equipment rather than decorative cargo"
 
 
 def test_a_sale_conserves_and_the_ledger_names_both_sides() -> None:

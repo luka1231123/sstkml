@@ -256,10 +256,14 @@ def _render(actor: EntityId, belief: B.Belief,
 def subsistence(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
     """Feed your people, work your fields, pay what you owe, and trade the rest."""
     home = C.home(belief)
-    return (_farm(actor, belief, home, feeds_town=True)
-            + _render(actor, belief, home)
-            + C.sell_surplus(actor, belief, home)
-            + C.buy_shortfall(actor, belief, home))
+    intents = (_farm(actor, belief, home, feeds_town=True)
+               + _render(actor, belief, home)
+               + C.sell_surplus(actor, belief, home)
+               + C.buy_shortfall(actor, belief, home))
+    if belief.best(home, "price_tin"):
+        intents += (C.sell_tin_surplus(actor, belief, home)
+                    + C.buy_tin_shortfall(actor, belief, home))
+    return intents
 
 
 def cult(actor: EntityId, belief: B.Belief) -> tuple[Intent, ...]:
@@ -286,6 +290,8 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
     world: Kernel = snapshot.world
     beliefs = dict(kernel.beliefs)
     turn = snapshot.turn
+    markets: dict[EntityId, dict[str, int]] = {}
+    neighbours: dict[EntityId, tuple[EntityId, ...]] = {}
     for actor in world.farmers():
         settlement = world.registry.orgs[actor].settlement
         need = sum(c.ration() for c in world.cohorts_of(settlement))
@@ -293,6 +299,9 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
                    if o.party == settlement and o.status in ("due", "part_paid"))
         site_id = _estate_of(world, settlement, actor)
         site = world.registry.sites.get(site_id)
+        if settlement not in markets:
+            markets[settlement] = C.readings(world, settlement)
+        market = markets[settlement]
         readings = {
             "stores_grain": world.stores(settlement),
             "people": world.people(settlement),
@@ -310,8 +319,21 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
             "cover": world.stores(settlement, F.GRAIN) // max(1, need),
             # Which place this is: the actor's own claim about where it stands, so that a policy.
             "home": 1,
-            **C.readings(world, settlement),
+            "price_grain": market["price_grain"],
+            "market_grain": market["market_grain"],
         }
+        # Tin stays out of the belief ledger until it actually reaches a
+        # place. Once counted, zeros continue to be reported so an old caravan
+        # cannot remain a phantom offer forever.
+        old = kernel.beliefs.get(actor, B.Belief(holder=actor))
+        if world.stores(settlement, C.TIN) > 0 \
+                or old.best(settlement, "price_tin"):
+            readings.update({
+                "own_tin": F.held(world.book, actor, C.TIN, settlement),
+                "need_tin": market["need_tin"],
+                "price_tin": market["price_tin"],
+                "market_tin": market["market_tin"],
+            })
         belief = beliefs.get(actor, B.Belief(holder=actor))
         belief = OB.project(
             belief, OB.observe_local(actor, settlement, turn, readings), turn)
@@ -327,32 +349,53 @@ def _observe(kernel: Kernel, snapshot: Snapshot) -> tuple[Kernel, list]:
             B.Claim(id=f"{actor}|{turn}|turn", holder=actor, subject=settlement,
                     attribute="turn", value=turn, source="observed",
                     observed_turn=turn, received_turn=turn))
-        belief = _abroad(world, belief, actor, settlement, turn)
+        if settlement not in neighbours:
+            neighbours[settlement] = C.reachable(world, settlement)
+        belief = _abroad(
+            world, belief, actor, settlement, turn, neighbours[settlement])
         beliefs[actor] = belief
     return dataclasses.replace(kernel, beliefs=beliefs), []
 
 
 def _abroad(world: Kernel, belief: B.Belief, actor: EntityId,
-            home: EntityId, turn: int) -> B.Belief:
+            home: EntityId, turn: int,
+            neighbours: tuple[EntityId, ...]) -> B.Belief:
     """What an actor knows about the places it is not, and how it came to."""
     places = {lot.location for lot in world.book.owned_by(actor)
               if lot.location in world.registry.settlements
               and lot.location != home}
     for place in sorted(places):
-        belief = belief.add(*OB.as_claims(OB.observe_local(actor, place, turn, {
+        market = C.readings(world, place)
+        abroad = {
             "own_grain": F.held(world.book, actor, F.GRAIN, place),
             "own_copper": F.held(world.book, actor, C.COPPER, place),
-            "price_grain": C.readings(world, place)["price_grain"],
-        }), turn))
+            "price_grain": market["price_grain"],
+        }
+        if F.held(world.book, actor, C.TIN, place) > 0:
+            abroad.update({
+                "own_tin": F.held(world.book, actor, C.TIN, place),
+                "price_tin": market["price_tin"],
+            })
+        belief = belief.add(*OB.as_claims(
+            OB.observe_local(actor, place, turn, abroad), turn))
 
-    for place in C.reachable(world, home):
-        if belief.about(place, "price_grain"):
-            continue
-        belief = belief.add(B.Claim(
-            id=f"{actor}|custom|{place}|price_grain", holder=actor,
-            subject=place, attribute="price_grain", value=C.BASE_PRICE,
-            source="assumed", observed_turn=0, received_turn=turn,
-            confidence=100))
+    for place in neighbours:
+        if not belief.best(place, "route"):
+            belief = belief.add(B.Claim(
+                id=f"{actor}|chart|{place}|route", holder=actor,
+                subject=place, attribute="route", value=1, source="assumed",
+                observed_turn=0, received_turn=turn, confidence=1000))
+        for good in C.TRADE_GOODS:
+            attribute = f"price_{good}"
+            if good == C.TIN and not belief.best(home, "price_tin"):
+                continue
+            if belief.best(place, attribute):
+                continue
+            belief = belief.add(B.Claim(
+                id=f"{actor}|custom|{place}|{attribute}", holder=actor,
+                subject=place, attribute=attribute,
+                value=C.BASE_PRICES[good], source="assumed",
+                observed_turn=0, received_turn=turn, confidence=100))
     return belief
 
 

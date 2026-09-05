@@ -537,6 +537,20 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
         ))
         for f in formations
     ]
+    # Keep an approaching raid beside the formations that can answer it.
+    # Garrisons and routine summons may be numerous enough to push an urgent
+    # warning below the first page.
+    for threat in b.get("threats", []):
+        remaining = threat.get("remaining", 0)
+        due = ("NOW" if remaining <= 0 else
+               "next" if remaining == 1 else f"in {remaining}")
+        rows.append(Row(f"threat:{threat['id']}", (
+            (("occupiers · " if threat.get("intent") == "occupy" else
+              "raiders · ") + _spoken(threat.get("origin", "")), "blood"),
+            (f"~{threat.get('people', 0):,}", "blood"),
+            (due, "blood"),
+            (_spoken(threat.get("target", "seat")), "blood"),
+        ), mark="!"))
     for holding, men in sorted(troops.get("garrisons", {}).items()):
         rows.append(Row(f"garrison:{holding}", (
             ("holding " + _spoken(holding), "ash"), (str(men), "ash"),
@@ -552,7 +566,6 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
             (due, "blood" if summons["overdue"] else "dim"),
             (_spoken(summons["oath_id"]), "dim"),
         ), mark="!" if summons["overdue"] else ""))
-
     if not any(row.id == selected for row in rows):
         selected = rows[0].id if rows else ""
     formation = next((f for f in formations if f["id"] == selected), None)
@@ -581,6 +594,14 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
     elif selected.startswith("summons:"):
         detail = [("A SUMMONS", "gold"), ("", "ink"),
                   ("choose a formation above, then send it", "dim")]
+    elif selected.startswith("threat:"):
+        threat = next((item for item in b.get("threats", [])
+                       if f"threat:{item['id']}" == selected), {})
+        target = threat.get("target", b.get("seat", "seat"))
+        answer = ("hold the gate" if target == b.get("seat", "seat") else
+                  f"send a campaign to {_spoken(target)}")
+        detail = [("RAIDERS ON THE ROAD", "blood"), ("", "ink"),
+                  (f"choose a formation, then {answer}", "flame")]
 
     controls = [
         affordable(Control("assign_troops", key_for("assign_troops"),

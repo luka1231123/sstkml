@@ -21,6 +21,13 @@ def _lots(count: int) -> str:
         f"{count} lot{'s' if count != 1 else ''} at the quay")
 
 
+def _cargo_name(cargo: dict) -> str:
+    owner = str(cargo.get("owner_name", "unknown owner"))
+    if owner.startswith("the "):
+        owner = owner[4:]
+    return f"{cargo['good']} · {owner}"
+
+
 def compose(b: dict, width: int = 72, height: int = 24,
             notice: str = "", view: str = "exchange",
             selected: str = "", due_draft: int | None = None,
@@ -37,8 +44,16 @@ def compose(b: dict, width: int = 72, height: int = 24,
         surface.text(3, y, f"grain price  {price:,} copper shekels / 1,000 qa",
                      C["barley"], C["ink"])
         y += 1
+        tin = trade.get("tin_price", 0)
+        surface.text(3, y, f"tin price    {tin:,} copper shekels / 1,000 shekels",
+                     C["gold"], C["ink"])
+        y += 1
+        grain_here = sum(
+            c.get("available", 0) for c in trade.get("cargo", ())
+            if c.get("good") == "grain")
+        one_talent = min(grain_here, 3000 * 1000 // max(1, price))
         surface.text(3, y, f"             one talent buys up to "
-                           f"{3000 * 1000 // max(1, price):,} qa of counted grain",
+                           f"{one_talent:,} qa of counted grain now",
                      C["dim"], C["ink"])
         y += 1
         surface.text(3, y, "requisition: take cargo now; unrest rises with value",
@@ -52,17 +67,20 @@ def compose(b: dict, width: int = 72, height: int = 24,
                                  f"{len(movements) - len(carrying)} couriers"
                                  if movements else "nothing is moving"),
                 ("next arrival", _due(soonest, b.get("turn", 0))),
-                ("routes you know", f"{len(trade.get('routes', ()))} usable"),
-                ("cargo in hand", _lots(len(trade.get("cargo", ()))))]
+                ("routes you know", f"{len(trade.get('routes', ()))} charted"),
+                ("cargo at the quay", _lots(len(trade.get("cargo", ()))))]
     elif view == "cargo":
-        rows = [(c["good"], f"{c.get('available', 0):,} available")
-                for c in trade.get("cargo", ())]
+        rows = [(_cargo_name(c), f"{c.get('available', 0):,} available")
+            for c in trade.get("cargo", ())]
     elif view == "movements":
         rows = [(f"{m['origin']} > {m['destination']}",
-                 f"{'cargo' if m.get('cargo') else 'news'} · due {m['arrives']}")
+                 f"{'cargo' if m.get('cargo') else 'news'} · "
+                 f"{_due(m.get('arrives'), b.get('turn', 0))}")
                 for m in trade.get("movements", ())]
     elif view == "routes":
-        rows = [(r["name"], f"{r['mode']} · {r['strength']}")
+        rows = [(r["name"],
+                 f"{r['mode']} · cap {r.get('capacity', 0):,} · "
+                 f"loss {r.get('risk', 0)}/1000")
                 for r in trade.get("routes", ())]
     else:
         rate = b.get("revenue", {}).get("harbour_rate", 0)
@@ -104,23 +122,23 @@ def compose(b: dict, width: int = 72, height: int = 24,
         y += 1
     style.notice(surface, 3, height - 4, width - 6, notice)
     nav = [style.FooterAction("Tab", "view")]
-    if view in {"cargo", "movements", "routes"}:
+    if view in {"cargo", "movements", "routes"} and ids:
         nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
                 style.FooterAction("Enter", "open")]
     actions = []
-    if view in {"exchange", "cargo"}:
-        actions.append(style.FooterAction("f", "finance"))
-        if view == "cargo":
-            cargo = next((item for item in trade.get("cargo", ())
-                          if str(item.get("id")) == selected), None)
-            actions.append(style.FooterAction(
-                "r", "requisition selected",
-                enabled=bool(cargo and cargo.get("available", 0))))
-    elif view == "movements":
-        actions += [style.FooterAction("g", "escort"),
-                    style.FooterAction("c", "close route")]
-    elif view == "routes":
-        actions.append(style.FooterAction("c", "close route"))
+    if view == "exchange":
+        grain = sum(c.get("available", 0) for c in trade.get("cargo", ())
+                    if c.get("good") == "grain")
+        copper = b.get("stores", {}).get("copper", 0)
+        actions.append(style.FooterAction(
+            "f", "buy grain · 1 talent", enabled=grain > 0 and copper >= 3000,
+            command="trade:finance"))
+    elif view == "cargo":
+        cargo = next((item for item in trade.get("cargo", ())
+                      if str(item.get("id")) == selected), None)
+        actions.append(style.FooterAction(
+            "r", "requisition selected",
+            enabled=bool(cargo and cargo.get("available", 0))))
     elif view == "dues":
         nav += [style.FooterAction("<", "due−"),
                 style.FooterAction(">", "due+"),

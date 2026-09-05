@@ -21,6 +21,7 @@ not corrected in place.
 from __future__ import annotations
 
 import dataclasses
+from functools import cached_property
 
 from engine.entity import EntityId
 
@@ -102,6 +103,18 @@ class Belief:
                      if c.subject == subject
                      and (not attribute or c.attribute == attribute))
 
+    @cached_property
+    def _best(self) -> dict[tuple[EntityId, str], Claim]:
+        """Latest usable claims, cached outside the dataclass state."""
+        found: dict[tuple[EntityId, str], Claim] = {}
+        for claim in self.claims:
+            key = (claim.subject, claim.attribute)
+            old = found.get(key)
+            if old is None or (claim.observed_turn, claim.confidence, claim.id) \
+                    > (old.observed_turn, old.confidence, old.id):
+                found[key] = claim
+        return found
+
     def best(self, subject: EntityId, attribute: str) -> Claim | None:
         """The claim this actor would act on: freshest, then most confident.
 
@@ -109,11 +122,7 @@ class Belief:
         claim id so that two equally fresh, equally trusted reports resolve the
         same way on every machine.
         """
-        candidates = self.about(subject, attribute)
-        if not candidates:
-            return None
-        return max(candidates,
-                   key=lambda c: (c.observed_turn, c.confidence, c.id))
+        return self._best.get((subject, attribute))
 
     def value(self, subject: EntityId, attribute: str,
               default: int = 0) -> int:

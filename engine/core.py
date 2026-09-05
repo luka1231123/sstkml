@@ -31,6 +31,7 @@ DOMAINS: frozenset[str] = frozenset({
     "rivals",
     "displacement",
     "world.shock",
+    "world.raid",
     "relations.patron_notice",
     "report.bias",
     "house.mortality",

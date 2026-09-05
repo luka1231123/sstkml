@@ -249,7 +249,7 @@ def compose(b: dict, selected: str = "", width: int = 82,
         away = land.get("corvee_call_opens_in", 0)
         opens = (f"opens in {away} fortnight{'s' if away != 1 else ''}"
                  if away else "opens before low water")
-        surface.text(4, y + 3, "new crews cannot be called now",
+        surface.text(4, y + 3, "call window closed",
                      C["ash"], C["ink"])
         surface.text(34, y + 3, opens, C["ash"], C["ink"])
     elif corvee_draft:
@@ -315,7 +315,7 @@ def compose(b: dict, selected: str = "", width: int = 82,
 
     if buildable.partial and y < height - 2:
         paging = (
-            f"shift+↑↓ plans {buildable.label()}" if buildable.room
+            f"↑↓ plans {buildable.label()}" if buildable.room
             else "plans do not fit · enlarge this window")
         edge = divider if wide else width - 2
         surface.text(8, y, paging[:max(0, edge - 8)], C["dim"], C["ink"])

@@ -199,6 +199,7 @@ class Settlement:
     population: int = 0        # authored opening size
     fell_turn: int = -1
     fall_cause: str = ""
+    occupied_turn: int = -1
 
     @property
     def fallen(self) -> bool:

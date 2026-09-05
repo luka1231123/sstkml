@@ -41,7 +41,10 @@ def test_minimum_works_wraps_complete_costs_and_names_visible_keys() -> None:
     assert "108 copper, 9,000 grain" in text
     assert "[1-2] inspect" in text
     assert "[1-9] inspect" not in text
-    assert "shift+↑↓ plans 1–2 OF 9" in text
+    assert "↑↓ plans 1–2 OF 9" in text
+    assert "shift+↑↓" not in text
+    assert "call window closed" in text
+    assert "closedopens" not in text
 
 
 def test_minimum_active_work_keeps_every_panel_border_intact() -> None:
@@ -87,8 +90,9 @@ def test_minimum_works_cannot_commission_a_plan_it_does_not_show() -> None:
     game.on_works_key(Key(keysym="Return"))
     assert ordered and ordered[0].kind == game.belief["plans"][1]["kind"]
 
-    # The printed Shift+Down instruction scrolls the plan list, not MEN OUT.
-    game.on_works_key(Key(keysym="Down", state=1))
+    # With no work selected, ordinary arrows browse plans. The player should
+    # not need a modifier merely because MEN OUT happens to be above them.
+    game.on_works_key(Key(keysym="Down"))
     assert game.works_plan_scroll == 1
     assert game.works_scroll == 0
 

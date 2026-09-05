@@ -116,6 +116,11 @@ SITE_OUTPUT = {
     "tin": 800,
 }
 
+# Existing court balance: these are productive capacities, not opening stores.
+# Tin's opening heap remains half the 800-year output; its mine works at 700.
+SITE_CAPACITY = {"tin": 700}
+SEAT_GROVES = {"oil": 390, "wine": 280}
+
 # Opening store of the good a site draws, as a share of its yearly output.
 METAL_STORE_SHARE = 0.5
 
@@ -198,10 +203,24 @@ def build():
         raw = tomllib.load(fh)
     reg = mint_from_scenario(raw)
     places = {p["id"]: p for p in raw["places"] if p.get("kind") == "alu"}
-    # A port is a place a sea route reaches. Taken off the routes rather than
-    # authored again, so a map that gains a crossing gains the house with it.
     ports = {end for route in raw.get("routes", []) if route.get("mode") == "sea"
              for end in (route["a"], route["b"]) if end in places}
+    tin_sources = {
+        site.settlement.split(":", 1)[1] for site in reg.sites.values()
+        if site.function == "tin"}
+    source_neighbours = {
+        end for route in raw.get("routes", [])
+        if tin_sources.intersection((route["a"], route["b"]))
+        for end in (route["a"], route["b"]) if end in places}
+    port_neighbours = {
+        end for route in raw.get("routes", [])
+        if ports.intersection((route["a"], route["b"]))
+        for end in (route["a"], route["b"]) if end in places}
+    # Only the first junctions that actually hand inland tin into the existing
+    # port network need a new house. Other towns still buy from passing cargo;
+    # giving every road-end its own actor adds work, not strategy.
+    tin_relays = source_neighbours & port_neighbours
+    trade_hubs = ports | tin_sources | tin_relays
 
     sites, cohorts, stores, orgs, obligations = [], [], [], [], []
 
@@ -260,12 +279,23 @@ def build():
                 1, sum(1 for s in draws if s.function == site.function))
             sites.append({
                 "id": site.id, "settlement": sid, "region": f"region:{region}",
-                "function": site.function, "capacity": out, "extent": 0,
+                "function": site.function,
+                "capacity": SITE_CAPACITY.get(site.function, out), "extent": 0,
             })
             drawn[site.function] = drawn.get(site.function, 0) + out
         for good in sorted(drawn):
             stores.append({"settlement": sid, "good": good,
                            "quantity": int(drawn[good] * METAL_STORE_SHARE)})
+
+        if sid == SEAT:
+            for site in mine:
+                if site.function in SEAT_GROVES:
+                    sites.append({
+                        "id": site.id, "settlement": sid,
+                        "region": f"region:{region}",
+                        "function": site.function,
+                        "capacity": SEAT_GROVES[site.function], "extent": 0,
+                    })
 
         # The one minted cohort becomes three.
         base = reg.cohorts[f"cohort:{slug}_people"]
@@ -311,9 +341,9 @@ def build():
             "policy": ORG_POLICY[rank], "authority": ORG_AUTHORITY[rank],
         })
 
-        # The house at the quay, and the copper it works with. Its own org, so
-        # it decides by its own policy and its purse is not the palace's.
-        if slug in ports:
+        # The house at the quay or caravan source, and the copper it works
+        # with. Its own org decides with its own purse.
+        if slug in trade_hubs:
             where = place.get("name") or slug
             orgs.append({
                 "id": f"org:{slug}_merchants",

@@ -49,7 +49,8 @@ def _counts(b: dict) -> dict[str, int]:
         "palace": len(b.get("justice", {}).get("petitions", ())) + sum(
             c.get("status") == "petitioning" for c in b.get("cohorts", ())),
         "altar": sum(bool(o.get("lapsed")) for o in b.get("oaths", ())),
-        "world": int(bool(plague.get("sickness_at_seat"))),
+        "world": (int(bool(plague.get("sickness_at_seat")))
+                  + len(b.get("threats", ()))),
     }
 
 

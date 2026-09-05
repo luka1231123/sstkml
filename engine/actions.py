@@ -574,6 +574,47 @@ class CohortReceived:
 
 
 @dataclasses.dataclass(frozen=True)
+class RaidLaunched:
+    origin: str
+    target: str
+    attackers: int
+    arrives: int
+    travel: int = 0
+    intent: str = "raid"
+
+
+@dataclasses.dataclass(frozen=True)
+class RaidDefeated:
+    origin: str
+    target: str
+    attackers: int
+    defenders: int
+    dead: int
+    grain: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class RaidSucceeded:
+    origin: str
+    target: str
+    attackers: int
+    defenders: int
+    grain: int
+    tin: int
+    copper: int
+    dead: int
+    damaged: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class AluOccupied:
+    alu: str
+    former_polity: str
+    occupying_polity: str
+    garrison: int
+
+
+@dataclasses.dataclass(frozen=True)
 class TradeFinanced:
     good: str
     quantity: int
@@ -986,6 +1027,7 @@ _TYPES = {
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
         CohortDisplaced, CohortReceived,
+        RaidLaunched, RaidDefeated, RaidSucceeded, AluOccupied,
         TradeFinanced, TradeRequisitioned,
         SeatDefended, SeatTaken, SeatFell, AluFell,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,

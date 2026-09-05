@@ -59,12 +59,46 @@ def test_finance_palette_defaults_to_copper_without_extra_typing() -> None:
 
 
 def test_trade_screen_names_the_return_and_requisition_cost() -> None:
-    text = plain_text(trade.compose(
-        project(load_campaign("seat", SEED)), width=66, height=22))
+    belief = project(load_campaign("seat", SEED))
+    text = plain_text(trade.compose(belief, width=66, height=22))
 
     assert "buys up to" in text and "counted grain" in text
+    assert "tin price" in text
     assert "requisition: take cargo now" in text
     assert "unrest rises with value" in text
+    assert "buy grain · 1 talent" in text
+
+    cargo = plain_text(trade.compose(
+        belief, width=66, height=22, view="cargo"))
+    assert "grain · craft" in cargo
+    assert "grain · field labour" in cargo
+    assert "finance" not in cargo
+
+    routes = plain_text(trade.compose(
+        belief, width=66, height=22, view="routes"))
+    assert "cap 6,000" in routes and "loss 75/1000" in routes
+    assert "close route" not in routes
+
+    movements = plain_text(trade.compose(
+        belief, width=66, height=22, view="movements"))
+    assert "none reported" in movements
+    assert "choose" not in movements and "Enter" not in movements
+    assert "escort" not in movements and "close route" not in movements
+
+
+def test_trade_finances_one_talent_without_opening_a_typed_command() -> None:
+    game = _game(load_campaign("seat", SEED))
+    game.trade_view = "exchange"
+    game.trade_pick = ""
+
+    game.on_trade_key(_Key("f"))
+
+    action, _cost, window = game.pending_action
+    assert action == A.FinanceTrade("copper", 3000)
+    assert window == "trade"
+    assert "buy up to 75,000 grain" in str(game.notices["trade"])
+    assert "Enter confirms" in str(game.notices["trade"])
+    assert not game.log
 
 
 def test_requisition_takes_the_visible_cargo_and_charges_unrest() -> None:

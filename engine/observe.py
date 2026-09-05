@@ -36,8 +36,9 @@ from engine.entity import EntityId
 LOCAL = ("stores_grain", "people", "labour",
          "extent", "under_crop",          # the ground, and how much of it is sown
          "own_grain", "own_seed", "own_standing",
-         "own_copper",                    # the purse, counted like any other store
-         "price_grain", "market_grain",   # what it costs, and what is on the quay
+         "own_copper", "own_tin",         # purse and forge metal in hand
+         "price_grain", "market_grain", "need_grain",
+         "price_tin", "market_tin", "need_tin",
          "season",                        # which moment of the farming year
          "cover",                         # how long the grain in the yard feeds the roll
          "home")                          # and that this is where the actor is

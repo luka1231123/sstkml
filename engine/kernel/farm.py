@@ -67,8 +67,8 @@ def code_for(seasons, fortnight: int) -> int:
     return NO_SEASON
 
 # Ordinal blocks, so that two steps minting lots at the same parent on the same turn cannot collide.
-BLOCKS = {"sow": 200, "reap": 400, "seed": 1000, "mine": 1400, "share": 1200,
-          "forge": 1600}
+BLOCKS = {"sow": 200, "reap": 400, "seed": 1000, "share_seed": 1100,
+          "share": 1200, "mine": 1400, "forge": 1600}
 
 # What a household keeps of the crop it worked, where the land is held that way (`entity.TENURES`.
 HOUSEHOLD_SHARE_PER_1000 = 850
@@ -461,7 +461,7 @@ def divide(kernel, book=None, crop=None):
                     "expended", authority=council)
                 if taken > 0:
                     book = book.create(
-                        _mint(settlement, turn, "seed", index), SEED, taken,
+                        _mint(settlement, turn, "share_seed", index), SEED, taken,
                         owner=council, holder=council, location=settlement,
                         reason="produced", from_lots=from_lots)
                     index += 1

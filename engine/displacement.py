@@ -43,18 +43,27 @@ def arrivals(world: World) -> tuple[World, list]:
     changed = False
     for cohort_id in sorted(cohorts):
         cohort = cohorts[cohort_id]
-        if cohort.status not in {"travelling_displaced", "travelling_raider"}:
+        if cohort.status not in {
+                "travelling_displaced", "travelling_raider",
+                "travelling_return"}:
             continue
         if cohort.arrives > world.date.absolute:
             continue
         destination = cohort.path[-1]
-        status = "attacker" if cohort.status == "travelling_raider" else (
-            "petitioning" if destination == f"settlement:{world.chosen_alu}"
-            else "displaced")
-        cohorts[cohort_id] = dataclasses.replace(
-            cohort, settlement=destination, status=status, path=(),
-            arrives=world.date.absolute,
-            task="")
+        if cohort.status == "travelling_return":
+            returned = dataclasses.replace(
+                cohort, settlement=destination, status="household",
+                armed=False, path=(), arrives=-1, task="")
+            _settle(cohorts, returned, armed=False, path=(), arrives=-1,
+                    task="")
+        else:
+            status = "attacker" if cohort.status == "travelling_raider" else (
+                "petitioning" if destination == f"settlement:{world.chosen_alu}"
+                else "displaced")
+            cohorts[cohort_id] = dataclasses.replace(
+                cohort, settlement=destination, status=status, path=(),
+                arrives=world.date.absolute,
+                task=cohort.task if status == "attacker" else "")
         changed = True
     if not changed:
         return world, []

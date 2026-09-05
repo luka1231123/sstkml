@@ -23,7 +23,9 @@ def bring_down(world: World, settlement: str, cause: str) -> tuple[World, A.AluF
     persons = dict(registry.persons)
     elites = []
     ruler = persons.get(polity.ruler)
-    if ruler and ruler.alive:
+    # An occupied polity can hold several Alus. Losing an outlying town does
+    # not kill a ruler who sits somewhere else.
+    if settlement == polity.seat and ruler and ruler.alive:
         persons[ruler.id] = dataclasses.replace(ruler, alive=False, died_turn=now)
         elites.append(ruler.id)
     settlements = dict(registry.settlements)

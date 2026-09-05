@@ -3067,7 +3067,15 @@ class Game:
             days = min(action.days, works_engine.useful_call_days(self.world))
             return f"{days:,} days of corvée have been called"
         if isinstance(action, A.FinanceTrade):
-            return f"{action.quantity:,} copper will finance counted grain"
+            trade = b.get("trade", {})
+            price = max(1, int(trade.get("grain_price", 0)))
+            available = sum(
+                max(0, int(item.get("available", 0)))
+                for item in trade.get("cargo", ())
+                if item.get("good") == "grain")
+            bought = min(available, action.quantity * 1000 // price)
+            return (f"buy up to {bought:,} grain with at most "
+                    f"{action.quantity:,} copper")
         if isinstance(action, A.RequisitionTrade):
             from engine import trade_policy
 
@@ -3559,11 +3567,11 @@ class Game:
             return
 
         if event.keysym in self.STEPS:
-            # Two lists in one window: the men out scroll, and shifted arrows
-            # take the plans below them.
+            # Arrow keys follow the section the player last chose. With no
+            # work selected they browse plans, which is the common opening
+            # case; selecting a lettered work gives the arrows back to MEN OUT.
             step = self.STEPS[event.keysym]
-            shifted = bool(getattr(event, "state", 0) & 1)
-            if shifted:
+            if not self.works_pick:
                 moved = bool(plan_page.room) and self.scrolled(
                     "works_plan_scroll", len(plans), plan_page.room, step)
                 if moved:
@@ -4381,9 +4389,25 @@ class Game:
             here = ids.index(picked) if picked in ids else 0
             self.open_focus(view.rstrip("s"), source[here])
             return
-        if view in {"exchange", "cargo"} and char == "f":
-            self.command_line = "finance "
-            self.open_palette()
+        if view == "exchange" and (
+                char == "f" or command == "trade:finance"):
+            grain = sum(
+                max(0, int(item.get("available", 0)))
+                for item in self.belief.get("trade", {}).get("cargo", ())
+                if item.get("good") == "grain")
+            copper = int(self.belief.get("stores", {}).get("copper", 0))
+            if grain <= 0:
+                self.notify("no grain cargo is waiting at the quay.",
+                            registry.REFUSAL, window="trade")
+                self.repaint()
+                return
+            if copper < 3000:
+                self.notify(
+                    f"one talent is 3,000 copper; only {copper:,} is free.",
+                    registry.REFUSAL, window="trade")
+                self.repaint()
+                return
+            self.do(A.FinanceTrade("copper", 3000), window="trade")
         elif view == "cargo" and char == "r":
             picked = getattr(self, "trade_pick", "")
             item = next((item for item, ref in zip(source, ids)
@@ -4401,12 +4425,6 @@ class Game:
             self._draft_due("harbour", -25 if char == "<" else 25)
         elif view == "dues" and event.keysym == "Return":
             self._commit_due("harbour", "trade")
-        elif view == "movements" and char == "g":
-            self.command_line = "assign "
-            self.open_palette()
-        elif view in {"movements", "routes"} and char == "c":
-            self.command_line = "quarantine "
-            self.open_palette()
 
     def on_plague_key(self, event) -> None:
         """Navigate every known place and issue or lift a physical closure."""

@@ -7,3 +7,5 @@ saves/**/autosave.json
 saves/**/ai_cache/
 saves/screens.txt
 .DS_Store
+output/
+tmp/

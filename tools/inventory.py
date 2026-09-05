@@ -37,7 +37,7 @@ EVENT_SUFFIXES = (
     "Abandoned", "Fled", "Sought", "Applied", "Violated", "Threshed",
     "Sown", "Harvested", "Raised", "Spoiled", "Grumbling",
     "Conceived", "Revolt", "Landed",
-    "Displaced", "Defended", "Fell", "Recovered",
+    "Displaced", "Defended", "Defeated", "Launched", "Occupied", "Fell", "Recovered",
     "Financed", "Requisitioned",
 )
 

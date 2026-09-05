@@ -893,6 +893,9 @@ def _describe(b: dict, place: str, room: int) -> list[tuple[str, str]]:
     lines.append((standing[:room],
                   "flame" if place == seat
                   else atlas.POWER_TONE.get(power, "clay")))
+    occupied_by = _spoken(entry.get("occupied_by", ""))
+    if occupied_by:
+        lines.append((f"occupied by {occupied_by}"[:room], "blood"))
     role = _spoken(entry.get("role", ""))
     for line in _wrap(role, room, 2) if role else []:
         lines.append((line, "dim"))

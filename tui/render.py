@@ -746,6 +746,38 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.AluFell):
             out.append(f"  {e.alu} has fallen through {e.cause}. "
                        f"{len(e.elites)} of its ruling house are dead.")
+        elif isinstance(e, A.RaidLaunched) and e.target.endswith(
+                ":" + court.seat):
+            due = ("next fortnight" if e.travel == 1 else
+                   f"in {e.travel} fortnights")
+            who = "An occupying force" if e.intent == "occupy" else "Raiders"
+            out.append(
+                f"  {who} from {e.origin.split(':')[-1]} are coming: "
+                f"{e.attackers:,} people, due {due}.")
+        elif isinstance(e, A.RaidDefeated):
+            out.append(
+                f"  Word comes from {e.target.split(':')[-1]}: "
+                f"the raid from {e.origin.split(':')[-1]} was beaten.")
+        elif isinstance(e, A.RaidSucceeded):
+            loot = ", ".join(
+                f"{quantity:,} {good}" for good, quantity in (
+                    ("grain", e.grain), ("tin", e.tin),
+                    ("copper", e.copper)) if quantity) or "no counted cargo"
+            out.append(
+                f"  Word comes from {e.target.split(':')[-1]}: raiders from "
+                f"{e.origin.split(':')[-1]} carried off {loot}.")
+        elif isinstance(e, A.AluOccupied):
+            out.append(
+                f"  {e.alu} is occupied by {e.occupying_polity.split(':')[-1]}; "
+                f"{e.garrison:,} armed settlers remain there.")
+        elif isinstance(e, A.SeatDefended):
+            out.append(
+                f"  The gate held against {e.attackers:,} raiders; "
+                f"{e.dead:,} of them fell.")
+        elif isinstance(e, A.SeatTaken):
+            out.append(
+                f"  The gate was taken. Raiders carried off "
+                f"{fmt_good('grain', e.grain)}.")
         elif isinstance(e, A.OmenLeaked):
             out.append("  What the diviner said is being repeated in the "
                        "lower town, and not as you told it.")

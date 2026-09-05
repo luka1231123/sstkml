@@ -121,6 +121,39 @@ def _summons(b: dict) -> Concern | None:
         "counsel", prompt, speaker=speaker, basis=basis)
 
 
+def _raids(b: dict) -> Concern | None:
+    threats = list(b.get("threats", ()))
+    if not threats:
+        return None
+    threat = min(threats, key=lambda item: (
+        item.get("remaining", 10**9), item.get("id", "")))
+    remaining = threat.get("remaining", 0)
+    due = ("next fortnight" if remaining == 1 else
+           "now" if remaining <= 0 else f"in {remaining} fortnights")
+    formation = max(
+        b.get("troops", {}).get("formations", []),
+        key=lambda item: item["strength"], default=None)
+    target = threat.get("target", b.get("seat", "seat"))
+    own_gate = target == b.get("seat", "seat")
+    occupying = threat.get("intent") == "occupy"
+    task = "garrison" if own_gate else "campaign"
+    prompt = (
+        f"Assign {formation['id']} to {task} at {target}."
+        if formation else "Which men can hold the gate?")
+    speaker, basis = _from(
+        b, "garrison",
+        "his watch counted the band on the road",
+        "no one holds the garrison; the road watch brought the count")
+    return Concern(
+        "raid", 10, "An occupying force is coming" if occupying else
+        "Raiders are coming",
+        f"About {threat.get('people', 0):,} from "
+        f"{threat.get('origin', 'abroad')} are due at {target} {due}.",
+        ("put a formation on garrison duty before they arrive." if own_gate
+         else f"send a formation on campaign to {target} before they arrive."),
+        "muster", prompt, speaker=speaker, basis=basis)
+
+
 def _petitions(b: dict) -> Concern | None:
     petitions = b.get("justice", {}).get("petitions", [])
     if not petitions:
@@ -239,7 +272,7 @@ def _plague(b: dict) -> Concern | None:
 
 
 RULES = (
-    _plague, _summons, _arrears, _petitions, _unread, _grain, _oaths,
+    _raids, _plague, _summons, _arrears, _petitions, _unread, _grain, _oaths,
     _offices, _institutions,
 )
 
