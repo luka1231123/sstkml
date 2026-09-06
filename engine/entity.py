@@ -316,7 +316,7 @@ TENURES = ("pooled", "redistributive", "subsistence", "prebendal")
 # counter meant recovery took as many fortnights as the famine lasted.
 HUNGER_MAX = 10
 # The least of a body's strength hunger may take. See `Cohort.labour`.
-HUNGER_FLOOR = 200
+HUNGER_FLOOR = 600
 
 
 @dataclasses.dataclass(frozen=True)

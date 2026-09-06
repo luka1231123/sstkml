@@ -439,7 +439,9 @@ def _defend_region(world: World, target: str, origin: str,
     killed = max(1, (attack - defence) // 3)
     world = _hurt_residents(
         world, target, {cohort.id for cohort in attackers}, killed)
-    occupying = any(cohort.task == "occupy" for cohort in attackers)
+    # A burned Alu has no gate left to hold, so the body loots and goes home.
+    occupying = (any(cohort.task == "occupy" for cohort in attackers)
+                 and not world.kernel.registry.settlements[target].fallen)
     if occupying:
         world, _damaged = _damage_site(world, target)
         world, occupied = _occupy(world, target, origin, attackers)

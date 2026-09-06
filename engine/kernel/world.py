@@ -574,6 +574,12 @@ def _consume(kernel: Kernel) -> tuple[Kernel, list]:
     return feed(kernel, _mouths(kernel))
 
 
+# What a starving roll gains in grievance a fortnight, and what a fed one
+# sheds. Anger has to be able to fall or every Alu ends in revolt.
+ANGER_PER_FORTNIGHT = 4
+CALM_PER_FORTNIGHT = 4
+
+
 def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
          *, starve: bool = True) -> tuple[Kernel, list]:
     """The meal itself, for a named body of people."""
@@ -604,8 +610,14 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
             book = book.consume(current.id, take, "consumed")
             got += take
         if got >= want:
+            # Anger at a house that feeds you again fades, but one meal does
+            # not call off a revolt already under way. Only the seat had any
+            # decay, through `systems._resent`, so every other Alu ratcheted to
+            # maximum unrest and fell whatever it did.
             cohorts[cohort.id] = dataclasses.replace(
                 cohort, hunger=max(0, cohort.hunger - 1),
+                grievance=(cohort.grievance if cohort.grievance >= 1000
+                           else max(0, cohort.grievance - CALM_PER_FORTNIGHT)),
                 shortfall=max(0, cohort.shortfall + want - got))
             continue
 
@@ -622,7 +634,7 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
             households=min(cohort.households, cohort.people - lost),
             shortfall=max(0, cohort.shortfall + want - got),
             grievance=cohort.grievance if not starve
-            else min(1000, cohort.grievance + 4))
+            else min(1000, cohort.grievance + ANGER_PER_FORTNIGHT))
         events.append(("hungry", cohort.id, want - got, lost))
 
     registry = dataclasses.replace(kernel.registry, cohorts=cohorts)
