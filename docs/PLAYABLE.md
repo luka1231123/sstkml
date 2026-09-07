@@ -70,12 +70,20 @@ checks pass; authority, inventory, information and corpus audits are clean.
 The 96-turn benchmark took 8.55 seconds, with a 44.48 MB canonical state and
 0.78-second hash. A turn-by-turn cohort audit passed 240 campaign turns on seed 1.
 
-### The player has verbs but no questions
+### Ration orders show their price; other allocations still need it
 
-Every allocation is reachable and nothing states its price at the point of
-order. The player can set a ration order, but no screen says which cohort goes
-to the bottom of the queue or what that costs next harvest. Until that is on
-screen the 33 actions are a menu, not a set of decisions.
+The ration queue now shows before/after payments, each group's shortfall in qa,
+old and resulting arrears, work capacity with the same people, grain spent and
+remaining, and the arithmetic for full-roll food coverage. All are estimates
+from the dated granary and payroll records; coverage excludes arrivals,
+spoilage and other uses. Oversized allowances stop at the engine's actual
+claim, including at most one old ration. Zero rations can be drafted and
+confirmed; Escape cancels, and Enter gives the displayed order.
+
+Allocation and queue drafts are reviewed separately so an unconfirmed change
+cannot affect the price of another order. The standalone Roll now has the same
+minimum space as Storehouse so its confirmation figures remain visible.
+Costs for other allocations and the harvest deadline comparison still need work.
 
 ## 2. The loop
 
@@ -212,10 +220,11 @@ slice is drawn in the Hall, the Land ledger and the Alu, with Help topics
 
 1. Calm-world stability verified for three seeds over thirty years, per
    `SPEC.md` 6.4. Keep this separate from campaign shock and recovery tuning.
-2. Put the price beside every allocation: what it takes, what is left and for
-   how many fortnights, and who does not get it.
+2. Ration allocation prices completed: what is spent and left, full-roll food
+   coverage, who goes short and by how much. Extend this to other allocations.
 3. Add `pay_arrears`, then `import_grain` through the letter path.
-4. Ration priority as a visible queue with its harvest consequence.
+4. Ration queue and immediate work-capacity consequences completed. Compare
+   field capacity against the seasonal harvest deadline with item 7.
 5. Land due and harbour due shown as this year against next year.
 6. Works with their payback arithmetic, competing with harvest labour.
 7. Levy, corvée and escort priced against the harvest deadline at the order.

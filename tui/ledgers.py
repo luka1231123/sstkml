@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import registry
 from belief import project
+from belief.rations import plan as ration_plan
 from tui import dues as due_text
 from tui import render, style
 from tui.grid import INDEX as C
@@ -179,82 +180,51 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
 # --- the roll -----------------------------------------------------------------
 
 def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
-         scroll: int = 0, amount: int = 0, priority: tuple = (),
+         scroll: int = 0, amount: int | None = None, priority: tuple = (),
          notice: str = "", hours: int = 0,
          room: bool = False) -> InteractiveScreen:
-    groups = list(b.get("groups", []))
-    active = tuple(b.get("priority", ()))
-    order = priority or active
-    order += tuple(group["id"] for group in groups
-                   if group["id"] not in order)
-    by_id = {group["id"]: dict(group) for group in groups}
-    if selected not in by_id:
-        selected = order[0] if order else ""
-    if amount > 0 and selected in by_id:
-        # Preview the proposed ration in the queue before the order is given.
-        by_id[selected]["allocated"] = amount
-    grain = b.get("stores", {}).get("grain", 0)
-    for rank, gid in enumerate(order, 1):
-        group = by_id[gid]
-        paid = min(grain, group["allocated"])
-        grain -= paid
-        owed = group["size"] * group["entitlement"]
-        group["priority"] = rank
-        group["next_paid"] = paid
-        group["next_short"] = max(0, owed - paid)
-        group["next_status"] = (
-            "full" if paid >= owed else "none" if paid <= 0 else "short")
-    groups = [by_id[gid] for gid in order]
+    before = ration_plan(b)
+    old = {g["id"]: g for g in before["groups"]}
+    if selected not in old:
+        selected = next(iter(old), "")
+    draft = ration_plan(b, selected, amount, priority)
+    groups = draft["groups"]
+    order = [g["id"] for g in groups]
     rows = []
     for group in groups:
-        status = group["next_status"]
+        paid, previous = group["next_paid"], old[group["id"]]["next_paid"]
         rows.append(Row(group["id"], (
             (group["name"], "clay"),
-            (f"{group['allocated']:,}", "dim"),
-            (status, "blood" if status == "none" else
-             "flame" if status == "short" else "barley"),
+            (f"{previous:,}→{paid:,}" if paid != previous else f"{paid:,}", "sand"),
+            (f"{group['next_short']:,}", "blood" if group["next_short"] else "barley"),
             (RATION_STAKES.get(group.get("function", ""), "unrest"), "dim"),
         ), mark=str(group["priority"])))
     group = next((g for g in groups if g["id"] == selected), None)
-
-    detail: list[tuple[str, str]] = []
+    detail = []
     if group is not None:
-        weeks = group["arrears_weeks"]
         owed = group["size"] * group["entitlement"]
-        repayment = min(group.get("arrears_qa", 0),
-                        max(0, group["next_paid"] - owed))
         detail = [
-            (group["name"], "gold"),
-            (f"queue {group['priority']} · "
-             f"{RATION_STAKES.get(group.get('function', ''), 'unrest')} at stake",
-             "sand"),
-            ((f"gets {owed:,} current + {repayment:,} arrears"
-              if repayment else
-              f"gets {group['next_paid']:,} of {owed:,} qa"), "clay"),
-            (f"{group['next_status']} with the grain now",
-             "blood" if group["next_status"] == "none" else
-             "flame" if group["next_status"] == "short" else "barley"),
-            (f"already unpaid {weeks} fortnight{'s' if weeks != 1 else ''}"
-             if weeks else "no old arrears",
-             "blood" if weeks >= 4 else ("flame" if weeks else "dim")),
+            ((f"DRAFT · allocate {amount:,} qa · Enter/[a] gives; Esc cancels"
+              if amount is not None else "QUEUE DRAFT · Enter gives; Esc cancels" if priority
+              else "QUEUE IN FORCE · [ ] draft ration"), "flame"),
+            (f"{group['name']}: gets {group['next_paid']:,} of {owed:,} qa", "clay"),
+            (f"arrears {group.get('arrears_qa', 0):,}→{group['next_arrears']:,} qa", "sand"),
+            (f"spent {before['spent']:,}→{draft['spent']:,} qa; "
+             f"left {before['remaining']:,}→{draft['remaining']:,} qa", "clay"),
+            ((f"{draft['remaining']:,} / {draft['need']:,} qa = "
+              f"{draft['coverage']} full-roll fortnights" if draft["need"]
+              else "coverage unknown: no ration demand recorded"), "dim"),
+            ("Current grain only; excludes arrivals, spoilage and other uses.", "dim"),
         ]
-        if amount > 0:
-            detail += [
-                (f"allocate {amount:,} qa", "flame"),
-                ("DRAFT · [a] gives this ration", "flame"),
-            ]
-        else:
-            detail.append(("[ ] draft a different ration", "dim"))
-        detail.append(("QUEUE DRAFT · Enter gives the order" if priority
-                       else "QUEUE IN FORCE",
-                       "flame" if priority else "dim"))
-
+        if group.get("next_labour") is not None:
+            label = "field work" if group.get("at_fields") or group.get("function") == "field_labour" else "work"
+            detail.insert(3, (f"{label} {group['labour_now']:,}→{group['next_labour']:,} person-days "
+                              "(same people)", "sand"))
     here = order.index(selected) if selected in order else -1
     controls = []
-    if group is not None and amount > 0:
+    if group is not None and amount is not None:
         controls.append(affordable(Control(
-            "allocate", key_for("allocate"),
-            label=f"allocate {amount:,} qa"), hours))
+            "allocate", key_for("allocate"), label=f"allocate {amount:,} qa"), hours))
     controls += [
         Control("set_priority", "←", label="feed earlier",
                 enabled=here > 0, why="already first"),
@@ -263,23 +233,21 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
                 command="ration:later"),
         affordable(Control("send_to_harvest", key_for("send_to_harvest"),
                            label=("recall from fields" if group is not None
-                                  and group.get("at_fields")
-                                  else "send to fields"),
+                                  and group.get("at_fields") else "send to fields"),
                            enabled=group is not None), hours),
     ]
     if priority:
-        controls.insert(-1, Control(
+        controls.insert(-1, affordable(Control(
             "set_priority", "Enter", label="give ration order",
-            command="ration:commit"))
+            command="ration:commit"), hours))
     return compose(
-        ("THE STOREHOUSE — LABOUR AND RATIONS" if room else
-         "RATIONS — who eats first"),
-        ("group", "ration qa", "next", "at stake"),
-        (25, -10, -6, 12),
-        rows, selected, detail, controls, hours, width, height, scroll,
-        notice, empty="nobody is on the roll.",
-        note=(f"grain now {b.get('stores', {}).get('grain', 0):,} qa · "
-              f"after this queue {grain:,} qa"),
+        ("THE STOREHOUSE — LABOUR AND RATIONS" if room else "RATIONS — who eats first"),
+        ("group", "gets qa old→new", "short qa", "at stake"),
+        (20, -19, -9, 12), rows, selected, detail, controls, hours,
+        width, height, scroll, notice, empty="nobody is on the roll.",
+        note=("Estimate · " + ("granary inspection" if "granary" in b.get("inspected", ())
+                               else "granary report")
+              + f" + payroll · turn {b.get('turn', '?')}"),
         views=STOREHOUSE_VIEWS if room else (), view="roll", list_min=7)
 
 

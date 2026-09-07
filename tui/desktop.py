@@ -94,7 +94,7 @@ WINDOWS: dict[str, WindowSpec] = {
         _spec("palace", "The Court", "workbench", (74, 25), (68, 24)),
         _spec("works", "Works", "ledger", (66, 23), (62, 21)),
         _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
-        _spec("roll", "The Roll", "ledger", (66, 23), (62, 21)),
+        _spec("roll", "The Roll", "ledger", (84, 29), (82, 28)),
         # The Land carries the year band and the full estate dossier -- season,
         # hands, gauge, crop, due, ground. Eighty-two by twenty-eight is the
         # measured floor at which none of it is cut, now that the pane lays its

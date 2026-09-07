@@ -2298,7 +2298,8 @@ class Game:
                 room=True)
             if view == "roll":
                 return ledger_page.roll(
-                    b, amount=state["amount"],
+                    b, amount=(state["amount"] if state.get("ration_draft")
+                               or state["amount"] else None),
                     priority=tuple(state["priority"]), **common)
             if view == "land":
                 return ledger_page.land(
@@ -2314,7 +2315,8 @@ class Game:
                       scroll=state["scroll"], notice=notice, hours=self.hours)
         if key == "roll":
             return ledger_page.roll(
-                b, amount=state["amount"],
+                b, amount=(state["amount"] if state.get("ration_draft")
+                           or state["amount"] else None),
                 priority=tuple(state["priority"]), **common)
         if key == "land":
             return ledger_page.land(
@@ -2564,6 +2566,11 @@ class Game:
 
     def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
+        if event.keysym == "Escape" and (
+                state.get("ration_draft") or state["amount"] or state["priority"]):
+            state.update(amount=0, ration_draft=False, priority=[])
+            self.repaint()
+            return
         active = list(self.belief.get("priority", ()))
         if state["pick"] not in active:
             state["pick"] = active[0] if active else ""
@@ -2576,16 +2583,23 @@ class Game:
         ration_step = max(
             ledger_page.STEPS["roll"],
             (group["size"] * group["entitlement"] // 4) if group else 0)
-        if (event.char or "") in {"[", "]"} and not state["amount"] \
-                and group is not None:
+        if (event.char or "") in {"[", "]"} and state["priority"]:
+            self.notify("confirm the queue with Enter or cancel with Escape first.",
+                        registry.REFUSAL, window=window)
+            self.repaint()
+            return
+        if (event.char or "") in {"[", "]"} and group is not None:
             # Brackets adjust the ration shown on the row. Starting at zero
             # made the first decrease a no-op and several increases necessary
             # just to reach today's ration.
             state["pick"] = pick
-            state["amount"] = group["allocated"]
+            if not state.get("ration_draft") and not state["amount"]:
+                state["amount"] = group["allocated"]
+            state["ration_draft"] = True
         if self.ledger_key("roll", event, ration_step, window):
             if state["pick"] != before_pick:
                 state["amount"] = 0
+                state["ration_draft"] = False
                 self.repaint()
             return
         char = (event.char or "").lower()
@@ -2599,6 +2613,11 @@ class Game:
             else 1 if event.keysym == "Right" or command == "ration:later"
             else -1 if char == _key("set_priority") else 0)
         if direction and pick in order:
+            if state.get("ration_draft") or state["amount"]:
+                self.notify("confirm the ration with Enter or cancel with Escape first.",
+                            registry.REFUSAL, window=window)
+                self.repaint()
+                return
             here = order.index(pick)
             there = max(0, min(len(order) - 1, here + direction))
             if there != here:
@@ -2607,14 +2626,17 @@ class Game:
             state["pick"] = pick
             self.repaint()
             return
-        if char == _key("allocate") or wanted == "allocate":
-            if not pick or state["amount"] <= 0:
+        if (char == _key("allocate") or wanted == "allocate"
+                or event.keysym == "Return" and (
+                    state.get("ration_draft") or state["amount"])):
+            if not pick or not (state.get("ration_draft") or state["amount"]):
                 self.notify("choose a group and an amount.",
                             registry.REFUSAL, window=window)
                 self.repaint()
                 return
             if self.do(A.Allocate(pick, state["amount"]), window=window):
                 state["amount"] = 0
+                state["ration_draft"] = False
         elif event.keysym == "Return" or command == "ration:commit":
             if not state["priority"]:
                 item = next((g for g in self.belief.get("groups", ())

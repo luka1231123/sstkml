@@ -79,6 +79,9 @@ LABELS = {
     "married_to_court": "married at", "is_queen_mother": "queen mother",
 }
 
+UNITS.update({key: "person-days" for key in (
+    "labour_now", "labour_if_fed", "labour_if_short", "next_labour")})
+
 
 def label(key: str) -> str:
     return LABELS.get(key, key.replace("_", " "))

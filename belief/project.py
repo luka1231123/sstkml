@@ -12,6 +12,7 @@ import tomllib
 from pathlib import Path
 
 from belief.distortion import p_error, transcribe
+from belief.rations import plan as ration_plan
 from engine import seat as seat_door
 from engine.state import marks, lines
 from engine.systems import attention_available, sea_open
@@ -1226,8 +1227,11 @@ def project(world) -> dict:
     allowances = seat_door.allowances(world)
     groups = []
     roll = seat_door.groups(world)
+    roll_cohorts = {cohort.roll_id: cohort
+                    for cohort in world.kernel.registry.cohorts.values() if cohort.roll_id}
     for gid in sorted(roll):
         g = roll[gid]
+        cohort = roll_cohorts[gid]
         owed = g.size * g.entitlement
         ordinary_claim = owed + min(g.arrears, owed)
         groups.append({
@@ -1243,6 +1247,11 @@ def project(world) -> dict:
             "output_modifier": g.output_modifier,
             "revolting": g.revolting,
             "at_fields": g.at_fields,
+            "labour_now": cohort.labour(),
+            "labour_if_fed": dataclasses.replace(
+                cohort, hunger=max(0, cohort.hunger - 1)).labour(),
+            "labour_if_short": dataclasses.replace(
+                cohort, hunger=cohort.hunger + 1).labour(),
             "member_name": g.member_name,
             "source": "palace labour roll", "as_of_turn": d.absolute,
             "certainty": "counted",
@@ -1375,20 +1384,10 @@ def project(world) -> dict:
             obligations.append(item)
     stores = _stores(world, perr)
     priority = list(seat_door.order_of_payment(world))
-    by_group = {group["id"]: group for group in groups}
-    grain_left = stores.get("grain", 0)
-    for rank, gid in enumerate(priority, 1):
-        group = by_group[gid]
-        paid = min(grain_left, group["allocated"])
-        grain_left -= paid
-        owed = group["size"] * group["entitlement"]
-        group.update(
-            priority=rank,
-            next_paid=paid,
-            next_short=max(0, owed - paid),
-            next_status=("full" if paid >= owed else
-                         "none" if paid <= 0 else "short"),
-        )
+    ration = ration_plan({"groups": groups, "stores": stores,
+                         "priority": priority})
+    groups = ration["groups"]
+    grain_left = ration["remaining"]
     graph = _world_graph(world)
     by_place = {relation["place"]: relation for relation in relations}
     for place in graph["places"]:
