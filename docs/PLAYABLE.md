@@ -1,46 +1,74 @@
 # What is left to make the game playable
 
 - Status: working document, subordinate to `SPEC.md`
-- Measured: 2026-09-07, at commit `dcc0fe8`
+- Measured: 2026-09-07; original campaign figures at `dcc0fe8`, calm-world
+  verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
 ## 1. Where it stands
 
-The simulation is real, conserved, deterministic and inspectable. 630 tests
-pass in 19 seconds. `tools/inventory.py` reports 33 player actions, 23 charged,
+The simulation is real, conserved, deterministic and inspectable. At `dcc0fe8`,
+630 tests passed in 19 seconds. `tools/inventory.py` reports 33 player actions, 23 charged,
 19 contexts, no faults. `authority_audit`, `information_audit` and
 `corpus_lint` have no findings. All nine rooms of `SPEC.md` 3.3 exist and own
 their verbs.
 
 The gap is the game, not the simulation.
 
-### The world does not hold
+### The calm world holds; the campaign collapses
 
-An idle 30-year campaign, no player action:
+An idle campaign, up to thirty years, with authored climate and shocks,
+after the population-health repairs below:
 
-| Seed | Seat | Alu alive at year 30 |
+| Seed | Seat | Alu alive when the run stops |
 |---|---|---|
 | 1 | survives | 1 of 55 |
-| 42 | falls year 16.1 | 18 of 55 |
-| 7 | falls year 13.2 | 29 of 55 |
+| 42 | falls turn 341, year 14.2 | 31 of 55 |
+| 7 | falls turn 532, year 22.2 | 5 of 55 |
 
-World population goes from 9.50M to 5.63M. Fall causes on seed 1: 23 maximum
-unrest, 20 population collapse, 11 raids.
+World population on seed 1 goes from 9,495,000 to 5,709,857. All three runs
+pass the final cohort, fallen-ruler, map and terminal-state checks.
 
 `SPEC.md` 6.4 sets two targets here. The seat's own fall is close to the first:
-the band is year 15 to 30 unaided, seed 42 lands at 16.1, seed 7 is early at
-13.2, and seed 1 does not fall at all. The second target, "an unshocked world
-stays mostly stable", fails outright. Fifty-four of 55 Alu die on seed 1 with
-no player and no authored catastrophe, so a player who does everything right
-still inherits an empty map.
+the band is year 15 to 30 unaided, seed 7 lands at 22.2, seed 42 is early at
+14.2, and seed 1 does not fall at all. The second target needs a separate
+calm-world run: an idle player does not disable climate, shocks, plague or
+raids.
 
-The cause is a food deficit that compounds. The seat's harvest falls from 4.9M
+The calm-world probe now keeps ordinary population and unrest falls enabled.
+Previously `baseline=True` suppressed those falls along with the shocks, so
+counting surviving settlement marks alone could hide a failed economy.
+
+`tools/gameplay_probe.py 3 720 --baseline --policy passive` reports the same
+result for seeds 1, 7 and 42: all 55 Alu survive thirty years, world population
+grows from 9,495,000 to 9,781,914, no settlement drops below its opening
+population, and peak whole-Alu unrest is 43/1000. Seat grain ends at 6,678,565 qa,
+with zero whole-Alu unrest. No impossible states are reported. The unshocked
+stability requirement is met on these seeds without changing yields or rations.
+
+In the campaign, a food deficit compounds. The seat's harvest falls from 4.9M
 qa in year 1 to 0.2M by year 8 while consumption stays near 1.5M. Sowing is
 capped by work days, and work days fall with hunger, so a bad year makes the
 next year worse. `dcc0fe8` raised `HUNGER_FLOOR` from 200 to 600 and gave a fed
 roll a way to shed grievance, which moved seed 1 from year 9.7 to surviving.
-The remaining deficit is a balance job: yield per person-day, ration size, or
-both.
+The remaining balance work is shock severity, recovery and the unaided fall
+window. The calm-world measurement does not justify raising yields or cutting
+rations across the whole world.
+
+The stricter cohort audit also found negative populations hidden by positive
+settlement totals: starvation, battle losses and desertion left disease counts
+larger than their surviving cohorts, and later plague deaths subtracted those
+already lost. Casualties and departures now reduce disease compartments;
+splits allocate recovered people only into space left by infected people.
+The probe checks population and health bounds, and terminal cause/date. Losing
+an occupied town does not require its distant occupying ruler to die.
+These simulation changes advance the save format to 27; older logs are rejected
+instead of replaying with different outcomes.
+
+Current validation: targeted kernel, seat, conflict, plague, save and screen
+checks pass; authority, inventory, information and corpus audits are clean.
+The 96-turn benchmark took 8.55 seconds, with a 44.48 MB canonical state and
+0.78-second hash. A turn-by-turn cohort audit passed 240 campaign turns on seed 1.
 
 ### The player has verbs but no questions
 
@@ -165,10 +193,11 @@ the developer inspector both read this list.
 else. The Hall's trade badge now counts cargo rather than every courier, which
 was the older defect.
 
-**Broken surfaces.** `tools/screens.py all` crashes with `ValueError: hands can
-only be sent just before or during harvest`; the README advertises it as
-`./run.sh --screens all`. Four screens print `[esc] close═╝` over the frame
-border.
+**Screen repairs completed.** `tools/screens.py all` now prepares harvest
+orders only when they are legal. Its documented space-separated `--seed` and
+`--turns` options work, as do `--seed=...` and `--turns=...`. Panel close
+controls occupy a status bar instead of overprinting the frame border. All
+screens rendered at the default turn 6 and at seed 42, turn 12 during harvest.
 
 **`play_gui.py` is 4,944 lines** and grew again in the last two commits. One
 `Game` class owns the desktop, every room's key handler, the writing desk, the
@@ -181,9 +210,8 @@ slice is drawn in the Hall, the Land ledger and the Alu, with Help topics
 
 ## 5. Order of work
 
-1. Make an unaided world stay mostly stable, per `SPEC.md` 6.4. Nothing below
-   is a decision until food is a constraint the player can lose to and then
-   recover from.
+1. Calm-world stability verified for three seeds over thirty years, per
+   `SPEC.md` 6.4. Keep this separate from campaign shock and recovery tuning.
 2. Put the price beside every allocation: what it takes, what is left and for
    how many fortnights, and who does not get it.
 3. Add `pay_arrears`, then `import_grain` through the letter path.
@@ -196,7 +224,7 @@ slice is drawn in the Hall, the Land ledger and the Alu, with Help topics
    diverge further than they do now.
 10. Save a state hash and snapshot instead of replaying the log.
 11. Fold `hungry`, `spoiled`, `withered` and `news` into per-turn totals.
-12. Fix `tools/screens.py all` and the footer overprint.
+12. Done: fix `tools/screens.py all` and the footer overprint.
 13. Split `play_gui.py` by room.
 
 ## 6. Units

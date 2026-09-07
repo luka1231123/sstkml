@@ -393,6 +393,15 @@ class Cohort:
     def ration(self) -> int:
         return self.people * self.ration_per_head
 
+    def lose(self, count: int, **changes) -> Cohort:
+        lost = min(self.people, max(0, count))
+        people = self.people - lost
+        return dataclasses.replace(
+            self, people=people, households=min(self.households, people),
+            infected=self.infected * people // max(1, self.people),
+            recovered=self.recovered * people // max(1, self.people),
+            dead=self.dead + lost, **changes)
+
     @property
     def susceptible(self) -> int:
         return max(0, self.people - self.infected - self.recovered)

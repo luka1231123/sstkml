@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
+import dataclasses
 import sys
 from collections import Counter
 from pathlib import Path
@@ -71,14 +73,15 @@ def _act(policy: str, world) -> tuple:
     return world, made
 
 
-def run(policy: str, seed: int, turns: int = 120) -> dict:
-    world = load_campaign("seat", seed)
+def run(policy: str, seed: int, turns: int = 120, *, baseline: bool = False) -> dict:
+    world = dataclasses.replace(load_campaign("seat", seed), baseline=baseline)
     opening = {sid: max(1, s.population or world.kernel.people(sid))
                for sid, s in world.kernel.registry.settlements.items()}
     low = dict(opening)
     high_unrest = {sid: 0 for sid in opening}
     events = Counter()
     falls = []
+    invalid_cohorts = {}
 
     for _ in range(turns):
         world, made = advance(world)
@@ -89,6 +92,12 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
         if policy in {"austerity", "stewardship"} and not world.ended:
             world, made = _act(policy, world)
             events.update(event_name(event) for event in made)
+        for cohort in world.kernel.registry.cohorts.values():
+            if (min(cohort.people, cohort.households, cohort.infected,
+                    cohort.recovered, cohort.dead) < 0
+                    or cohort.households > cohort.people
+                    or cohort.infected + cohort.recovered > cohort.people):
+                invalid_cohorts.setdefault(cohort.id, world.date.absolute)
         for sid in opening:
             low[sid] = min(low[sid], world.kernel.people(sid))
             cohorts = tuple(c for c in world.kernel.cohorts_of(sid)
@@ -103,7 +112,9 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
     settlements = world.kernel.registry.settlements
     seat_id = "settlement:seat"
     mapped = {row["id"] for row in project(world)["world_graph"]["places"]}
-    outcomes, errors = set(), []
+    outcomes = set()
+    errors = [f"{cid}: invalid population/health at turn {turn}"
+              for cid, turn in sorted(invalid_cohorts.items())]
     for sid, start in opening.items():
         alu = sid.split(":", 1)[1]
         row = settlements[sid]
@@ -113,7 +124,8 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
             outcomes.add("fall:" + getattr(row, "fall_cause", "unknown"))
             if alu in mapped:
                 errors.append(f"{alu}: fallen but still mapped")
-            if world.kernel.king(sid) is not None:
+            if (world.kernel.owner(sid).seat == sid
+                    and world.kernel.king(sid) is not None):
                 errors.append(f"{alu}: fallen with a living ruler")
         elif ratio <= fall.POPULATION_FLOOR:
             outcomes.add("unresolved population collapse")
@@ -124,19 +136,26 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
             outcomes.add("population crisis")
         else:
             outcomes.add("survived")
-        if world.kernel.people(sid) < 0:
-            errors.append(f"{alu}: negative population")
+    player = settlements[seat_id]
+    if world.ended != player.fallen:
+        errors.append("player fall and terminal state disagree")
+    if player.fallen and (world.ended_turn != player.fell_turn
+                          or world.end_reason != f"the Alu fell through {player.fall_cause}"):
+        errors.append("player fall and terminal cause/date disagree")
     if world.ended:
         outcomes.add("game over")
     outcomes.update("shock:" + shock.kind for shock in world.shocks)
     return {
-        "policy": policy, "seed": seed, "turn": world.date.absolute,
+        "policy": policy, "seed": seed, "baseline": baseline,
+        "turn": world.date.absolute,
         "ended": world.ended, "cause": world.end_reason,
         "outcomes": sorted(outcomes), "errors": errors,
         "events": dict(sorted(events.items())),
         "falls": falls,
         "population_ratio_min": min(
             low[sid] * 1000 // opening[sid] for sid in opening),
+        "population": sum(world.kernel.people(sid) for sid in opening),
+        "population_opening": sum(opening.values()),
         "seat_population_ratio": world.kernel.people(seat_id) * 1000
         // opening[seat_id],
         "seat_unrest": fall.unrest(world, seat_id),
@@ -148,21 +167,34 @@ def run(policy: str, seed: int, turns: int = 120) -> dict:
 
 
 def main(argv: list[str]) -> int:
-    count = int(argv[1]) if len(argv) > 1 else 4
-    turns = int(argv[2]) if len(argv) > 2 else 120
-    rows = [run(policy, seed, turns)
-            for policy in POLICIES for seed in SEEDS[:count]]
-    for policy, meaning in POLICIES.items():
-        print(f"{policy}: {meaning}")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("count", nargs="?", type=int, default=4)
+    parser.add_argument("turns", nargs="?", type=int, default=120)
+    parser.add_argument("--baseline", action="store_true",
+                        help="ordinary climate, no shocks, plague, raids or displacement; falls still resolve")
+    parser.add_argument("--policy", choices=POLICIES, action="append")
+    args = parser.parse_args(argv[1:])
+    if not 1 <= args.count <= len(SEEDS) or args.turns < 1:
+        parser.error(f"count must be 1..{len(SEEDS)} and turns must be positive")
+    policies = args.policy or tuple(POLICIES)
+    for policy in policies:
+        print(f"{policy}: {POLICIES[policy]}", flush=True)
+    print("baseline: ordinary climate, abnormal shocks disabled, falls enabled"
+          if args.baseline else "campaign: authored climate and shocks enabled", flush=True)
     all_events = Counter()
-    for row in rows:
+    failed = False
+    for policy, seed in ((p, s) for p in policies for s in SEEDS[:args.count]):
+        row = run(policy, seed, args.turns, baseline=args.baseline)
+        failed |= bool(row["errors"])
         all_events.update(row["events"])
         print(f"{row['policy']:>7} {row['seed']:>10} t={row['turn']:>3} "
               f"pop={row['population_ratio_min']:>4}‰ "
               f"seat={row['seat_population_ratio']:>4}‰/{row['seat_unrest']:>4} "
               f"grain={row['seat_grain']:>7} unrest={row['unrest_peak']:>4} "
               f"alus={row['active_alus']:>2} "
-              f"{' | '.join(row['outcomes'])}")
+              f"{' | '.join(row['outcomes'])}", flush=True)
+        print(f"  world population {row['population_opening']:,} -> {row['population']:,}",
+              flush=True)
         if row["falls"]:
             print("  falls", ", ".join(
                 f"t{turn}:{alu}:{cause}" for turn, alu, cause, _, _ in row["falls"]))
@@ -170,7 +202,7 @@ def main(argv: list[str]) -> int:
             print("  ERROR", error)
     print("\nevents:", ", ".join(
         f"{name}={count}" for name, count in sorted(all_events.items())))
-    return int(any(row["errors"] for row in rows))
+    return int(failed)
 
 
 if __name__ == "__main__":

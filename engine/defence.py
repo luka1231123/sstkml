@@ -245,9 +245,8 @@ def _defend_seat(world: World, seat: str, attackers: list) -> tuple[World, list]
     for cohort in sorted(attackers, key=lambda item: item.id):
         lost = min(left, cohort.people)
         people = cohort.people - lost
-        cohorts[cohort.id] = dataclasses.replace(
-            cohort, people=people, households=min(cohort.households, people),
-            dead=cohort.dead + lost, status="displaced" if people else "defeated",
+        cohorts[cohort.id] = cohort.lose(
+            lost, status="displaced" if people else "defeated",
             armed=bool(people))
         left -= lost
         if not left:
@@ -284,27 +283,22 @@ def _return_attackers(world: World, attackers: list, dead: int) -> World:
         people = cohort.people - lost
         left -= lost
         if not people:
-            cohorts[cohort.id] = dataclasses.replace(
-                cohort, people=0, households=0,
-                dead=cohort.dead + lost, status="defeated", armed=False,
+            cohorts[cohort.id] = cohort.lose(
+                lost, status="defeated", armed=False,
                 task="", path=(), arrives=-1)
             continue
         home = _home(world, cohort)
         path = _road(world, cohort.settlement, home) if home else ()
         if path:
-            cohorts[cohort.id] = dataclasses.replace(
-                cohort, people=people,
-                households=min(cohort.households, people),
-                dead=cohort.dead + lost, status="travelling_return",
+            cohorts[cohort.id] = cohort.lose(
+                lost, status="travelling_return",
                 armed=True, task="return", path=path,
                 arrives=world.date.absolute + travel.latency(
                     world.kernel.registry.routes, cohort.settlement, home,
                     world.season, world.date.fortnight))
         else:
-            cohorts[cohort.id] = dataclasses.replace(
-                cohort, people=people,
-                households=min(cohort.households, people),
-                dead=cohort.dead + lost, status="displaced", armed=False,
+            cohorts[cohort.id] = cohort.lose(
+                lost, status="displaced", armed=False,
                 task="", path=(), arrives=-1)
     registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
     return dataclasses.replace(
@@ -396,10 +390,8 @@ def _hurt_residents(world: World, target: str,
         if cohort.id in attackers or left <= 0:
             continue
         lost = min(left, max(0, cohort.people - 1))
-        people = cohort.people - lost
-        cohorts[cohort.id] = dataclasses.replace(
-            cohort, people=people, households=min(cohort.households, people),
-            dead=cohort.dead + lost,
+        cohorts[cohort.id] = cohort.lose(
+            lost,
             grievance=min(1000, cohort.grievance + 80))
         left -= lost
     registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
@@ -496,10 +488,8 @@ def _sacked(world: World, seat: str, attack: int, defence: int,
                 cohort, status="displaced", armed=False)
             continue
         lost = min(left, max(0, cohort.people - 1))
-        people = cohort.people - lost
-        cohorts[cohort.id] = dataclasses.replace(
-            cohort, people=people, households=min(cohort.households, people),
-            dead=cohort.dead + lost, grievance=min(1000, cohort.grievance + 80))
+        cohorts[cohort.id] = cohort.lose(
+            lost, grievance=min(1000, cohort.grievance + 80))
         left -= lost
     registry = dataclasses.replace(world.kernel.registry, cohorts=cohorts)
     court = dataclasses.replace(

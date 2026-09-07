@@ -629,9 +629,8 @@ def feed(kernel: Kernel, mouths: tuple[Cohort, ...],
                          cohort.id)
             lost = min(cohort.people,
                        1 + rng.int(max(1, cohort.people // 320)))
-        cohorts[cohort.id] = dataclasses.replace(
-            cohort, hunger=hunger, people=cohort.people - lost,
-            households=min(cohort.households, cohort.people - lost),
+        cohorts[cohort.id] = cohort.lose(
+            lost, hunger=hunger,
             shortfall=max(0, cohort.shortfall + want - got),
             grievance=cohort.grievance if not starve
             else min(1000, cohort.grievance + ANGER_PER_FORTNIGHT))

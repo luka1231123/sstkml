@@ -293,6 +293,8 @@ def settle_payroll(world: World, before=None) -> tuple[World, list]:
         world = _amend(
             world, cohort.id, people=size,
             households=min(cohort.households, size),
+            infected=cohort.infected * size // max(1, cohort.people),
+            recovered=cohort.recovered * size // max(1, cohort.people),
             grievance=SP.grievance_of(loyalty))
 
         # What the fortnight cost, read off the debt rather than off a payment:
@@ -336,9 +338,10 @@ def bury(world: World, group: str, dead: int) -> World:
     cohort = kernel.registry.cohorts.get(entry.cohort)
     if cohort is None:
         return world
-    people = max(0, cohort.people - dead)
-    return _amend(world, cohort.id, people=people,
-                  households=min(cohort.households, people))
+    remaining = cohort.lose(dead)
+    return _amend(world, cohort.id, people=remaining.people,
+                  households=remaining.households, infected=remaining.infected,
+                  recovered=remaining.recovered, dead=remaining.dead)
 
 
 def allow(world: World, group: str, qa: int) -> World:

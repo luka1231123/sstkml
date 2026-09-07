@@ -105,12 +105,10 @@ def panel(surface: Surface, x: int, y: int, width: int, height: int,
         label = f" {title} "[: max(0, width - 4)]
         bar(surface, x + 2, y, len(label), label, fg=C["bone"], bg=C["lapis"])
     if note:
-        room = width - 4
-        note = note[:room]
-        surface.text(x + width - 2 - len(note), y + height - 1, note,
-                     C["dim"], C["ink"])
-        _link_tokens(surface, x + width - 2 - len(note),
-                     y + height - 1, note)
+        label = " " + note[:max(0, width - 4)]
+        bar(surface, x + 1, y + height - 1, max(0, width - 2), label,
+            fg=C["clay"], bg=C["lapis"])
+        _link_tokens(surface, x + 2, y + height - 1, label[1:])
 
 
 def bar(surface: Surface, x: int, y: int, width: int, text: str,

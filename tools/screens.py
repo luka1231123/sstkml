@@ -20,6 +20,7 @@ in this tool. `--colour` puts it back if you want to look.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -28,6 +29,7 @@ sys.path.insert(0, str(ROOT))
 
 from belief.project import project              # noqa: E402
 from engine import actions as A                 # noqa: E402
+from engine.core import in_range                # noqa: E402
 from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_campaign                  # noqa: E402
@@ -157,9 +159,11 @@ _LOG: list[dict] = []
 def _give_orders(world):
     b = project(world)
     said = [A.Quarantine(b["world_graph"]["places"][1]["id"], False),
-            A.SendToHarvest(b["groups"][0]["id"], True),
             A.InspectLedger("granary"),
             A.SetLandDue(400)]
+    harvest = tuple(world.season.get("harvest") or ())
+    if b["groups"] and harvest and in_range(world.date.advance().fortnight, harvest):
+        said.insert(1, A.SendToHarvest(b["groups"][0]["id"], True))
     _LOG.clear()
     for action in said:
         world, _ = apply(world, action)
@@ -200,27 +204,28 @@ def live() -> int:
 
 
 def main(argv: list[str]) -> int:
-    flags = {a for a in argv[1:] if a.startswith("--")}
-    words = [a for a in argv[1:] if not a.startswith("--")]
-
-    def option(name: str, fallback: int) -> int:
-        for flag in flags:
-            if flag.startswith(f"--{name}="):
-                return int(flag.split("=", 1)[1])
-        return fallback
-
-    which = words[0] if words else "all"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("screen", nargs="?", default="all")
+    parser.add_argument("index", nargs="?", type=int, default=1)
+    parser.add_argument("--turns", type=int, default=6)
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--colour", action="store_true")
+    parser.add_argument("--ascii", action="store_true")
+    args = parser.parse_args(argv[1:])
+    if args.turns < 0 or args.index < 1:
+        parser.error("turns must be nonnegative and tablet index must be positive")
+    which = args.screen
     if which == "list":
         print("\n".join(sorted(SCREENS) + ["letter <n>", "all", "live"]))
         return 0
     if which == "live":
         return live()
 
-    colour, ascii_only = "--colour" in flags, "--ascii" in flags
-    turns, seed = option("turns", 6), option("seed", SEED)
+    colour, ascii_only = args.colour, args.ascii
+    turns, seed = args.turns, args.seed
 
     if which == "letter":
-        index = int(words[1]) - 1 if len(words) > 1 else 0
+        index = args.index - 1
         world, letter_id = read_nth(state(seed=seed, turns=turns), index)
         if letter_id is None:
             count = len(project(world)["stack"])

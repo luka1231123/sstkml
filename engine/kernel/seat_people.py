@@ -231,7 +231,8 @@ def split(cohort: Cohort, shares: Mapping[str, int],
     caps = {key: heads for key, heads in weights}
     houses = _apportion(cohort.households, weights, caps)
     infected = _apportion(cohort.infected, weights, caps)
-    recovered = _apportion(cohort.recovered, weights, caps)
+    recovered = _apportion(cohort.recovered, weights,
+                           {key: caps[key] - infected[key] for key in caps})
     dead = _apportion(cohort.dead, weights, {})
 
     parts = [dataclasses.replace(

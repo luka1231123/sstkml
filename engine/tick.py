@@ -180,7 +180,7 @@ def _politics(world: World) -> tuple[World, list]:
         world, produced = defence.launch(world); events += produced
         world, produced = displacement.step(world); events += produced
         world, produced = defence.step(world); events += produced
-        world, produced = fall.step(world); events += produced
+    world, produced = fall.step(world); events += produced
     return world, events
 
 
