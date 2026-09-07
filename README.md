@@ -4,7 +4,7 @@ Information-constrained rulership sim. Fragile Late Bronze Age world.
 
 People, households, institutions, goods, labour, obligations, journeys, disease, and foreign courts are simulated deterministically. The player holds the Seat through fallible people and delayed, interested information. No omniscient strategy layer.
 
-[`SPEC.md`](SPEC.md) is the sole product authority. Superseded plans live in [`docs/archive`](docs/archive/README.md) as history only.
+[`SPEC.md`](SPEC.md) is the sole product authority. [`docs/PLAYABLE.md`](docs/PLAYABLE.md) records what the game measures today and what is left before it plays.
 
 ## What is here now
 
@@ -25,7 +25,7 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 ```sh
 ./run.sh                  # windowed game
 ./run.sh --check          # interpreter, Tk, display, Ollama, and model
-./run.sh --screens all    # render every screen as text
+./run.sh --screens         # render one screen as text
 ./run.sh --probe          # live Tk probe
 ```
 
@@ -83,6 +83,6 @@ tui/             character-cell screens and Tk/terminal backends
 content/         scenarios, people, goods, formulae, and correspondence
 tools/           audit, benchmark, balance, inspection, screens, and probes
 tests/           deterministic engine, controller, UI, and AI contracts
-docs/            live design docs; docs/archive/ is retired material
+docs/            PLAYABLE.md: measured state and the work left
 SPEC.md          sole current product specification
 ```

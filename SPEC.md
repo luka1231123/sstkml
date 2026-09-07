@@ -7,15 +7,11 @@
 - Current release: 0.5.2
 
 This is the only current design specification. Code and tests describe
-implementation detail; archived documents describe how the design evolved.
-Neither may quietly expand the release beyond this document.
+implementation detail. Neither may quietly expand the release beyond this
+document. `docs/PLAYABLE.md` records the measured state and the work left; it
+is subordinate to this file.
 
-The full pre-consolidation specifications are preserved under
-[`docs/archive/2026-07-30-pre-consolidation`](docs/archive/2026-07-30-pre-consolidation/README.md).
-Ideas intentionally postponed until after 1.0 are listed under
-[`docs/archive/post-1.0`](docs/archive/post-1.0/README.md).
-
-Older source comments sometimes cite numbered sections of the archived
+Older source comments sometimes cite numbered sections of superseded
 specifications. Those are historical implementation citations, not additional
 requirements. New work should cite this specification by named contract rather
 than revive the old milestone numbering.
@@ -109,6 +105,22 @@ Every fact the court does know must be reachable in the interface. A fact may
 be absent only because the court has no evidence for it; in that case the
 relevant dossier says that it is unknown, why, and what report, inspection, or
 event could reveal it. Uncertainty limits precision, not access.
+
+Every simulated data point is one of four kinds, and each kind has one access
+rule:
+
+| Kind | Player access |
+|---|---|
+| Court record | Exact, dated, sourced, always reachable |
+| Observation or report | Value or range, with date, source, and confidence |
+| Derivation | Inputs, unit, and the short arithmetic |
+| Unobserved truth | Shown as unknown, with the reason and a way to learn it |
+
+`certainty` has four player-facing values: `counted`, `reported`, `estimated`,
+`unknown`. `belief/catalog.py` holds the classification and
+`tools/information_audit.py` fails on a missing path. Showing a number without
+its unit, a changed value without its previous value, or a blank cell where the
+value is unknown are all defects.
 
 ### 2.5 Orders act through people and institutions
 
@@ -434,7 +446,7 @@ Only these workstreams may define scope. Ordered.
 Done. Stores, ordinary people, labour, land, geography, foreign actor belief,
 seed, and date have one kernel authority. Court-facing records are projections,
 and one phase runner advances the world. `tools/authority_audit.py` reports no
-findings. The completion record is `docs/archive/TASK_2_TODO.md`.
+findings.
 
 ### 6.2 Finish the correspondence vertical slice
 
