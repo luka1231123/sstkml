@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import textwrap
 
-from tui import render, style
+from tui import render, style, collection
 from tui.grid import INDEX, Screen, Surface, sparkline
 
 C = INDEX
@@ -313,7 +313,7 @@ def _clause(clause: dict) -> str:
 
 
 def fortnight(b: dict, lines: list[str], width: int = 66,
-              height: int = 18) -> Screen:
+              height: int = 18, scroll: int = 0) -> Screen:
     """The turn boundary: what happened while you were not looking.
 
     A fortnight passing is the heaviest thing that happens in this game and it
@@ -326,7 +326,7 @@ def fortnight(b: dict, lines: list[str], width: int = 66,
     """
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height,
-                title="THE FORTNIGHT TURNS", note="[space] on  ·  [esc] close",
+                title="THE FORTNIGHT TURNS", note="↑↓/PgUp/PgDn read · space/Esc close",
                 focus=True, drop=False)
     surface.text(3, 2, b["date"], C["sky"], C["ink"])
     surface.text(3, 3, "─" * (width - 6), C["faint"], C["ink"])
@@ -335,13 +335,18 @@ def fortnight(b: dict, lines: list[str], width: int = 66,
         surface.text(3, y, "Nothing was reported. That is not the same as",
                      C["ash"], C["ink"])
         surface.text(3, y + 1, "nothing having happened.", C["ash"], C["ink"])
-    for line in lines:
-        for wrapped in textwrap.wrap(line.strip(), width - 8) or [""]:
-            if y >= height - 2:
-                break
-            surface.text(4, y, wrapped, C["clay"], C["ink"])
-            y += 1
+    wrapped = fortnight_rows(lines, width)
+    page = collection.page(len(wrapped), max(1, height - 7), scroll)
+    for row, line in enumerate(page.slice(wrapped), 5):
+        surface.text(4, row, line, C["clay"], C["ink"])
+    if page.partial:
+        surface.text(4, height - 2, page.label(), C["dim"], C["ink"])
     return surface.interactive()
+
+
+def fortnight_rows(lines: list[str], width: int) -> list[str]:
+    return [row for line in lines
+            for row in (textwrap.wrap(line.strip(), max(1, width - 8)) or [""])]
 
 
 def oaths(b: dict, width: int = 76, height: int = 28) -> Screen:

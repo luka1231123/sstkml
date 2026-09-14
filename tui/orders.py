@@ -72,6 +72,7 @@ SLOTS: dict[str, Slot] = {
     "SetLandDue": Slot("the land due"),
     "SetHarbourDue": Slot("the harbour due"),
     "SetPriority": Slot("the ration order"),
+    "Allocate": Slot("this ration", ("group_id",)),
     "NameHeir": Slot("the succession"),
 }
 
@@ -91,6 +92,7 @@ class Order:
     turn: int
     action: dict
     state: str
+    receipt: tuple[str, ...] = ()
 
     @property
     def id(self) -> str:
@@ -117,7 +119,7 @@ def _in_force(action: dict, slot: Slot) -> bool:
     return bool(action.get(slot.flag)) is slot.in_force
 
 
-def history(log: list[dict]) -> list[Order]:
+def history(log: list[dict], belief: dict | None = None) -> list[Order]:
     """Every order given, newest first, each knowing whether it still stands.
 
     Slot occupancy is computed from the log alone, which is the point: the log
@@ -143,7 +145,13 @@ def history(log: list[dict]) -> list[Order]:
             state = STANDING
         else:
             state = SUPERSEDED
-        orders.append(Order(index, int(record.get("turn", 0)), action, state))
+        if belief is not None and state == STANDING and action.get("_t") == "SendToHarvest":
+            group = next((g for g in belief.get("groups", ())
+                          if g["id"] == action.get("group_id")), None)
+            if group is not None and not group.get("at_fields"):
+                state = GIVEN
+        orders.append(Order(index, int(record.get("turn", 0)), action, state,
+                            tuple(record.get("receipt", ()))))
     orders.reverse()
     return orders
 
@@ -231,7 +239,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
             view: str = "standing", selected: str = "", scroll: int = 0,
             notice: str = "", width: int = 88,
             height: int = 30) -> InteractiveScreen:
-    orders = visible(history(log), view, now)
+    orders = visible(history(log, belief), view, now)
     chosen = next((order for order in orders if order.id == selected),
                   orders[0] if orders else None)
 
@@ -297,6 +305,15 @@ def _detail(order: Order, belief: dict, now: int) -> list[tuple[str, str]]:
             ("", "clay"),
             (f"given {when(order, now)}", "sky"),
         ]
+    if order.receipt:
+        lines += [(text, "sand") for text in order.receipt]
+    action = order.action
+    if action.get("_t") == "SendToHarvest":
+        group = next((g for g in belief.get("groups", ())
+                      if g["id"] == action.get("group_id")), {})
+        if group:
+            lines.append((f"Roll now: {'at fields' if group.get('at_fields') else 'ordinary duties'}"
+                          f" · turn {belief.get('turn', '?')}", "sky"))
     if descriptor is not None and descriptor.cost:
         unit = "hour" if descriptor.cost == 1 else "hours"
         lines.append((f"it cost {descriptor.cost} {unit}", "dim"))

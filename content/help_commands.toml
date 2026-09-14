@@ -208,7 +208,7 @@ id = "harvest_labour"
 category = "orders"
 title = "Send or recall workers from the harvest"
 syntax = "harvest <group> | recall <group>"
-answer = "Open Storehouse, then Rations or Land. Choose a group and press H on the eve of harvest or during it to send them; press H again to recall them. The extra hands raise the harvest, but that group stops doing its usual work while it is away. Either move costs one hour."
+answer = "Open Storehouse, then Rations or Land. Choose a group and press H on the eve of harvest or during it. Review remaining working fortnights, shared crop and the labour shortfall before the deadline; Enter gives the order and Escape cancels. H also drafts a recall. Extra hands leave their ordinary duties; unchanged strength and crop are estimates, not promised yields. Either move costs one hour."
 examples = ["send the palace dependents to the fields", "recall the garrison from harvest"]
 keywords = ["harvest", "field", "labour", "workers", "send", "recall", "return", "hands", "group"]
 keys = []
@@ -486,5 +486,38 @@ syntax = "Every quantity is printed with its unit"
 answer = "Grain, seed and standing crop are counted in qa. Metal is counted in shekels, and sixty shekels of copper stow like one qa of grain. People are heads, and households where the roll records them. Labour is person-days, ten to twelve per head per fortnight. A ration is ten to eleven qa per head per fortnight. An estate's extent is the qa of seed the ground takes in a year, and its capacity is the qa returned per thousand qa sown, so 7500 is a sevenfold return. Every rate and share is per thousand: 940 per thousand is ninety-four in the hundred. Condition, grievance, loyalty and legitimacy are all out of a thousand."
 examples = ["What is a qa?", "What does capacity 7500 mean?"]
 keywords = ["unit", "units", "qa", "shekel", "parisu", "talent", "head", "heads", "household", "person-day", "extent", "capacity", "per", "thousand", "measure", "glossary"]
+keys = []
+verbs = []
+
+[[command]]
+id = "pay_arrears"
+category = "stores"
+title = "Pay ration arrears"
+syntax = "pay arrears <group> <qa>"
+answer = "In Storehouse, open Rations and choose a group. R drafts a payment from unreserved grain; brackets adjust it. The preview shows debt, grain left and the next ration queue. Enter pays once; Escape cancels. Payment costs one hour and does not change the standing ration or immediately erase hunger and grievance."
+examples = ["pay arrears palace_dependents 12000"]
+keywords = ["arrears", "debt", "unpaid", "repayment", "rations"]
+keys = ["r"]
+verbs = ["PAY_ARREARS"]
+
+[[command]]
+id = "grain_relief"
+category = "correspondence"
+title = "Request grain abroad"
+syntax = "Trade → Grain relief → choose court → Enter"
+answer = "In Trade, press G from Exchange or select Relief. Choose a known court and adjust the quantity with brackets. Enter prepares an editable grain request in Scribes. Review its parsed request and seal it. Drafting is free; sealing uses the displayed court hours. The route gives an estimated reply date, not a guaranteed arrival. A court may send less, refuse, delay or stay silent. Track the sent tablet in Scribes and its changes in the fortnight report."
+examples = ["Send me 100000 qa of grain."]
+keywords = ["grain", "import", "relief", "request", "foreign", "food", "trade"]
+keys = []
+verbs = []
+
+[[command]]
+id = "first_year"
+category = "interface"
+title = "Get through the first harvest"
+syntax = "Hall → Storehouse → Trade → Scribes → Hall"
+answer = "Read grain coverage and the season in Hall. In Storehouse, compare the ration queue and repay arrears only after reviewing grain left. Trade's Relief view prepares a foreign grain request; Scribes lets you edit and seal it. Before harvest, H on a chosen labour group shows capacity against the deadline. Enter confirms an order; Escape cancels. End the fortnight in Hall, read the whole report with arrows or Page Down, and compare what was expected with the new records."
+examples = ["How do I get through the first year?"]
+keywords = ["start", "first", "year", "play", "tutorial", "harvest", "relief"]
 keys = []
 verbs = []

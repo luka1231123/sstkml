@@ -1,10 +1,11 @@
-from tui import collection
+from tui import collection, relief
 from tui import dues as due_text
 from tui import style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
-VIEWS = ("exchange", "cargo", "routes", "movements", "dues")
+VIEWS = ("exchange", "cargo", "routes", "movements", "dues", "relief")
+LABELS = {"movements": "Trips"}
 
 
 def _due(arrives: int | None, now: int) -> str:
@@ -31,12 +32,16 @@ def _cargo_name(cargo: dict) -> str:
 def compose(b: dict, width: int = 72, height: int = 24,
             notice: str = "", view: str = "exchange",
             selected: str = "", due_draft: int | None = None,
-            scroll: int = 0,
+            scroll: int = 0, relief_quantity: int | None = None, hours: int = 0,
             ) -> InteractiveScreen:
+    if view == "relief":
+        return relief.compose(b, width, height, selected,
+                              relief.ration(b) if relief_quantity is None else relief_quantity,
+                              scroll, notice, hours, VIEWS)
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="TRADE", drop=False)
     workbench.tabs(surface, 2, 2, width,
-                   tuple((name, name.title()) for name in VIEWS), view)
+                   tuple((name, LABELS.get(name, name.title())) for name in VIEWS), view)
     trade = b.get("trade", {})
     y = 5
     if view == "exchange":
@@ -52,8 +57,7 @@ def compose(b: dict, width: int = 72, height: int = 24,
             c.get("available", 0) for c in trade.get("cargo", ())
             if c.get("good") == "grain")
         one_talent = min(grain_here, 3000 * 1000 // max(1, price))
-        surface.text(3, y, f"             one talent buys up to "
-                           f"{one_talent:,} qa of counted grain now",
+        surface.text(3, y, f"1 talent buys up to {one_talent:,} qa counted grain",
                      C["dim"], C["ink"])
         y += 1
         surface.text(3, y, "requisition: take cargo now; unrest rises with value",
@@ -122,11 +126,14 @@ def compose(b: dict, width: int = 72, height: int = 24,
         y += 1
     style.notice(surface, 3, height - 4, width - 6, notice)
     nav = [style.FooterAction("Tab", "view")]
+    if view == "exchange":
+        nav.append(style.FooterAction("Esc", "close"))
     if view in {"cargo", "movements", "routes"} and ids:
         nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
                 style.FooterAction("Enter", "open")]
     actions = []
     if view == "exchange":
+        actions.append(style.FooterAction("g", "request grain abroad", command="tab:relief"))
         grain = sum(c.get("available", 0) for c in trade.get("cargo", ())
                     if c.get("good") == "grain")
         copper = b.get("stores", {}).get("copper", 0)
@@ -145,6 +152,7 @@ def compose(b: dict, width: int = 72, height: int = 24,
                     *([style.FooterAction("Enter", "give due")]
                   if due_draft is not None else [])]
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
-    actions.append(style.FooterAction("Esc", "close"))
+    if view != "exchange":
+        actions.append(style.FooterAction("Esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive(tuple(ids))

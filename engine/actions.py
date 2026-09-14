@@ -23,6 +23,12 @@ class Allocate:
 
 
 @dataclasses.dataclass(frozen=True)
+class PayArrears:
+    group_id: str
+    qa: int
+
+
+@dataclasses.dataclass(frozen=True)
 class SetPriority:
     order: tuple[str, ...]   # group ids, pay-down order
 
@@ -383,6 +389,13 @@ class Grumbling:
 class AllocationSet:
     group_id: str
     qa: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ArrearsPaid:
+    group_id: str
+    qa: int
+    remaining: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1017,7 +1030,7 @@ class OfferingConsumed:
 
 _TYPES = {
     c.__name__: c for c in (
-        EndTurn, Allocate, SetPriority, ReadLetter, ArchiveLetter,
+        EndTurn, Allocate, PayArrears, SetPriority, ReadLetter, ArchiveLetter,
         DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
         RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee,
@@ -1050,7 +1063,7 @@ _TYPES = {
         HeirNamed,
         TurnAdvanced, Spoiled, RationsPaid, DependentsDeparted,
         DependentsDied, GroupRevoltChanged, RitePerformed,
-        RiteSkipped, UnrestChanged, Grumbling, AllocationSet,
+        RiteSkipped, UnrestChanged, Grumbling, AllocationSet, ArrearsPaid,
         PrioritySet, LetterArrived, LetterDelivered, LetterSent,
         LetterIntercepted, LetterRead, LetterArchived, LetterDelegated,
         LedgerInspected, GiftSent, GiftArrived,

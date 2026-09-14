@@ -416,6 +416,8 @@ The developer's causal inspector may read World. It is never player-facing.
 - Loading does not rerun the language model.
 - Incompatible semantic versions fail with a direct explanation.
 - UI-only state may be restored separately but cannot affect replay.
+- The last court report and dated order receipts may be saved as UI records;
+  replay still uses only the confirmed actions.
 
 ### 5.4 Performance and scale
 

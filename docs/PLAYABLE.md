@@ -5,6 +5,51 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
+## First-year slice — 2026-09-13
+
+Arrears payment is now connected to the Roll: R drafts, brackets adjust, Enter
+pays once and Escape cancels. The preview excludes reserved grain and shows
+remaining debt and the next queue. A payment does not instantly erase grievance.
+
+Trade's Relief view prepares a grain request to a known court, with quantity,
+route and reply-time estimate. The normal Scribes workflow edits and seals it.
+It is a request, not a priced purchase or guaranteed import. Parsed written
+requests now become dispatched terms; conflicting attached quantities stop
+sealing. Reopening the same draft preserves the writing.
+
+Foreign replies had been looking up local counts under place names instead of
+settlement IDs, causing repeated delay. The policy now uses the corresponding
+settlement's believed own goods and food requirement. Acceptance still passes
+through the real granary and physical cargo path. This semantic repair advances
+saves to version 28; version 27 logs cannot replay under the changed rules.
+
+Harvest orders now require review of the future working fortnights, shared
+standing crop, labour capacity and deadline shortfall. Estimates hold crop and
+strength fixed; they do not promise allocation or yield. Orders retain a dated
+receipt. The fortnight report compares queue estimates with recorded arrears,
+compares standing crop counts, reports cargo receipts and changes in letter
+status. All report lines scroll, and the last report survives save/load.
+
+`tools/first_year.py` compares a passive year with a simple policy whose choices
+read only player Belief. On seed 8814402919, both reach turn 24 with zero ration
+arrears. Reported closing grain is 3,664,173 qa for waiting and 3,720,566 qa for
+recovery. Recovery gives three orders (request, field assignment, reading the
+reply); its request is accepted. Neither run has an action refusal. This is a
+reproducible end-to-end exercise, not evidence that campaign balance is finished
+or that the policy is optimal. The original long campaign figures below remain
+historical measurements and need a new run before release.
+
+Validation: 127 targeted regression checks pass, including controller flows,
+physical relief cargo, ration conservation, save/replay and unread-answer
+boundaries. Authority, information, inventory and corpus audits are clean.
+All standard screens render; the new flows were inspected at minimum sizes.
+The existing 240-turn benchmark passes at 149.316 ms per turn, with a
+1.899-second state hash and 101,507.7 KiB canonical state. Tk, display, Ollama
+and the supported local model pass the startup check. No human playtest has
+been recorded for this slice.
+
+See `docs/FIRST_YEAR.md` for the playable route through these decisions.
+
 ## 1. Where it stands
 
 The simulation is real, conserved, deterministic and inspectable. At `dcc0fe8`,
@@ -176,9 +221,9 @@ There are no factions and no faction scores. Rites and legitimacy wait until
 
 ## 4. What is missing, in evidence
 
-**Verbs that do not exist.** `import_grain`, `pay_arrears`, `standing_order`,
-`commission_report`. Arrears drive the unrest that ends the campaign and there
-is no way to clear them. Without standing orders the king re-decides the same
+**Remaining verbs.** `standing_order` and `commission_report`. `pay_arrears`
+now clears ration debt, and the Relief view uses existing goods-request letters
+for foreign grain. There is no separate instant-import action. Without standing orders the king re-decides the same
 thing every fortnight, so attention goes on repetition instead of judgement.
 
 **Letter kinds.** `engine/letter_terms.py` implements `gift`, `request_good`,
@@ -197,9 +242,9 @@ to hash at 240 turns.
 `kernel:withered` 14,580 against `kernel:sown` 4,195. The fortnight window and
 the developer inspector both read this list.
 
-**Trade is one price line.** The Exchange shows the grain price and nothing
-else. The Hall's trade badge now counts cargo rather than every courier, which
-was the older defect.
+**Trade.** Exchange shows grain and tin prices and local grain purchasing.
+Relief now exposes foreign grain requests and reply estimates. Priced bilateral
+barter and richer negotiation remain outside this first-year slice.
 
 **Screen repairs completed.** `tools/screens.py all` now prepares harvest
 orders only when they are legal. Its documented space-separated `--seed` and
@@ -222,12 +267,13 @@ slice is drawn in the Hall, the Land ledger and the Alu, with Help topics
    `SPEC.md` 6.4. Keep this separate from campaign shock and recovery tuning.
 2. Ration allocation prices completed: what is spent and left, full-roll food
    coverage, who goes short and by how much. Extend this to other allocations.
-3. Add `pay_arrears`, then `import_grain` through the letter path.
+3. Done in the first-year slice: `pay_arrears` and grain requests through letters.
 4. Ration queue and immediate work-capacity consequences completed. Compare
    field capacity against the seasonal harvest deadline with item 7.
 5. Land due and harbour due shown as this year against next year.
 6. Works with their payback arithmetic, competing with harvest labour.
-7. Levy, corvée and escort priced against the harvest deadline at the order.
+7. Harvest send/recall now shows deadline arithmetic. Levy, corvée and escort
+   still need their own comparisons where they compete with field work.
 8. The remaining letter kinds from `SPEC.md` 6.2.
 9. `standing_order`, then re-run `tools/gameplay_probe.py`. The policies must
    diverge further than they do now.

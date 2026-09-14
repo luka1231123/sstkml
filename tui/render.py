@@ -705,6 +705,9 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.Threshed):
             out.append(
                 f"  The harvest comes in: {fmt_good('grain', e.qa)}.")
+        elif isinstance(e, A.CargoLanded):
+            out.append(f"  Cargo received from {actor_name(e.sender)}: "
+                       f"{fmt_good(e.good, e.quantity)} · receipt {e.record_id}.")
         elif isinstance(e, A.LandDueTaken):
             out.append(
                 f"  At {e.rate} in a thousand, the due brings "

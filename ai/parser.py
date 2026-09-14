@@ -11,7 +11,7 @@ from ai.numeric_guard import extract_numerals_and_number_words, guard
 from engine import actions as A
 
 VERBS = {
-    "READ_FULL", "ALLOCATE", "SET_PRIORITY", "DICTATE",
+    "READ_FULL", "ALLOCATE", "PAY_ARREARS", "SET_PRIORITY", "DICTATE",
     "INSPECT_LEDGER", "END_TURN",
     "SEND_TO_HARVEST", "RECALL_FROM_HARVEST", "RAISE_CORVEE", "ASSIGN_TROOPS",
     "CONSULT_DIVINER", "SWEAR_OATH",
@@ -131,6 +131,9 @@ def preparse(line: str, belief: dict) -> ParseResult | None:
     if redirected is not None:
         return redirected
     groups = {g["id"] for g in belief["groups"]}
+    match = re.fullmatch(r"pay\s+arrears\s+(.+?)\s+(\d+)(?:\s+qa)?", text)
+    if match and (group := _resolve_group(match[1], belief)):
+        return ParseResult((A.PayArrears(group, int(match[2])),), source="preparser")
     match = re.fullmatch(
         r"(?:allocate|give|pay)\s+(.+?)\s+(\d+)(?:\s+qa)?", text)
     if match and (group := _resolve_group(match[1], belief)):
@@ -374,11 +377,11 @@ def _action(item: dict, belief: dict):
         if not letter:
             raise ValueError("unknown letter")
         return A.ReadLetter(letter)
-    if verb == "ALLOCATE":
+    if verb in {"ALLOCATE", "PAY_ARREARS"}:
         group, qa = args.get("group"), args.get("qa")
         if group not in groups or type(qa) is not int:
             raise ValueError("invalid allocation")
-        return A.Allocate(group, qa)
+        return (A.PayArrears if verb == "PAY_ARREARS" else A.Allocate)(group, qa)
     if verb == "SET_PRIORITY":
         order = args.get("order")
         if not isinstance(order, list) or any(group not in groups for group in order):

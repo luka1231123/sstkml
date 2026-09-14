@@ -344,6 +344,22 @@ def bury(world: World, group: str, dead: int) -> World:
                   recovered=remaining.recovered, dead=remaining.dead)
 
 
+def pay_arrears(world: World, group: str, qa: int) -> World:
+    if group not in groups(world):
+        raise ValueError(f"unknown group: {group}")
+    if type(qa) is not int or qa <= 0:
+        raise ValueError("arrears payment must be a positive number of qa")
+    cohort = world.kernel.registry.cohorts[SP.placement(group).cohort]
+    if qa > cohort.shortfall:
+        raise ValueError(f"only {cohort.shortfall:,} qa of arrears are owed")
+    if qa > available(world).get("grain", 0):
+        raise ValueError(f"only {available(world).get('grain', 0):,} qa of unreserved grain remain")
+    stores = held(world)
+    stores["grain"] -= qa
+    world = put(world, stores, reason_down="consumed", authority=cohort.id)
+    return _amend(world, cohort.id, shortfall=cohort.shortfall - qa)
+
+
 def allow(world: World, group: str, qa: int) -> World:
     """What the crown will hand this group per fortnight, said to the kernel.
 

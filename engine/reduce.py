@@ -27,6 +27,11 @@ def apply(world: World, action) -> tuple[World, list]:
         world = seat.allow(world, action.group_id, qa)
         return world, [A.AllocationSet(action.group_id, qa)]
 
+    if isinstance(action, A.PayArrears):
+        world = seat.pay_arrears(world, action.group_id, action.qa)
+        return world, [A.ArrearsPaid(
+            action.group_id, action.qa, seat.groups(world)[action.group_id].arrears)]
+
     if isinstance(action, A.SetPriority):
         if not action.order:
             raise ValueError("the ration order is empty")

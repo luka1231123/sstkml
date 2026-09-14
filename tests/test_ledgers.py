@@ -172,12 +172,16 @@ def test_the_roll_toggles_hands_in_and_out_of_the_fields() -> None:
     game = _game()
     game.ledger_state["roll"]["pick"] = "palace_dependents"
     game.on_roll_key(_Key("h"))
+    assert game.pending_action is not None
+    game.confirm_pending()
     assert _kinds(game) == ["SendToHarvest"]
     assert game.log[-1]["action"]["to_fields"] is True
     assert "recall from fields" in plain_text(game.compose_ledger(
         "roll", game.belief, 82, 28, ""))
 
     game.on_roll_key(_Key("h"))
+    assert game.pending_action is not None
+    game.confirm_pending()
     assert _kinds(game) == ["SendToHarvest", "SendToHarvest"]
     assert game.log[-1]["action"]["to_fields"] is False
 
@@ -313,6 +317,7 @@ def test_the_land_sends_a_chosen_group_to_the_fields() -> None:
     game.on_land_key(_Key("g"))
     assert game.ledger_state["land"]["group"]
     game.on_land_key(_Key("h"))
+    game.confirm_pending()
     assert _kinds(game) == ["SendToHarvest"]
 
 

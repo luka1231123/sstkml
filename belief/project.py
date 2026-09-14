@@ -504,6 +504,8 @@ def _land(world, perr: int) -> dict:
     }
     ask = asks[stage]
 
+    field_sites = {s.id for s in kernel.registry.sites.values()
+                   if s.settlement == seat and s.function in ("estate", "food")}
     hands = kernel.labour(seat)
     called = seat_door.corvee_days(world)
     corvee_max = world.land_rules.get("corvee_max_days", 6000)
@@ -527,6 +529,9 @@ def _land(world, perr: int) -> dict:
         "seed_in_ground": sown,
         "seed_recommended": open_ground,
         "standing": standing,
+        "harvest_pool_standing": sum(
+            lot.quantity for lot in kernel.book.lots.values()
+            if lot.good == F.STANDING and lot.location in field_sites),
         "hands_to_the_fields": list(seat_door.at_harvest(world)),
         "corvee_days": called,
         "corvee_max_days": corvee_max,
@@ -1384,8 +1389,10 @@ def project(world) -> dict:
             obligations.append(item)
     stores = _stores(world, perr)
     priority = list(seat_door.order_of_payment(world))
+    ration_reserved = (seat_door.held(world).get("grain", 0)
+                       - seat_door.available(world).get("grain", 0))
     ration = ration_plan({"groups": groups, "stores": stores,
-                         "priority": priority})
+                         "priority": priority, "ration_reserved": ration_reserved})
     groups = ration["groups"]
     grain_left = ration["remaining"]
     graph = _world_graph(world)
@@ -1421,6 +1428,7 @@ def project(world) -> dict:
         "stores": stores,
         "priority": priority,
         "ration_grain_left": grain_left,
+        "ration_reserved": ration_reserved,
         "groups": groups,
         "cohorts": cohorts,
         "threats": threats,

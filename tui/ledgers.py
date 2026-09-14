@@ -20,6 +20,7 @@ from __future__ import annotations
 import registry
 from belief import project
 from belief.rations import plan as ration_plan
+from belief.rations import repayment
 from tui import dues as due_text
 from tui import render, style
 from tui.grid import INDEX as C
@@ -182,12 +183,15 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
 def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
          scroll: int = 0, amount: int | None = None, priority: tuple = (),
          notice: str = "", hours: int = 0,
-         room: bool = False) -> InteractiveScreen:
+         room: bool = False, arrears: int | None = None) -> InteractiveScreen:
     before = ration_plan(b)
     old = {g["id"]: g for g in before["groups"]}
     if selected not in old:
         selected = next(iter(old), "")
     draft = ration_plan(b, selected, amount, priority)
+    payment = repayment(b, selected, arrears) if arrears is not None else None
+    if payment is not None:
+        draft = payment["queue"]
     groups = draft["groups"]
     order = [g["id"] for g in groups]
     rows = []
@@ -240,6 +244,27 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
         controls.insert(-1, affordable(Control(
             "set_priority", "Enter", label="give ration order",
             command="ration:commit"), hours))
+    if payment is not None:
+        detail = [
+            (f"PAYMENT DRAFT · {arrears:,} qa · Enter gives; Esc cancels", "flame"),
+            ((group or {}).get("name", "choose a group"), "gold"),
+            (f"arrears {payment['owed']:,}→{payment['remaining_debt']:,} qa", "sand"),
+            (f"unreserved grain {payment['free']:,}→{payment['remaining_grain']:,} qa", "clay"),
+            (f"after next queue: {draft['remaining']:,} qa / {draft['need']:,} qa"
+             + (f" = {draft['coverage']} fortnights" if draft['need'] else " · no ration demand"), "dim"),
+            (payment["refusal"] or "Keeper pays now; standing ration stays unchanged.",
+             "blood" if payment["refusal"] else "dim"),
+            ("Next meals exclude arrivals, spoilage and other uses.", "dim"),
+        ]
+        controls = [affordable(Control(
+            "pay_arrears", "Enter", label=f"pay {arrears:,} qa arrears",
+            command="arrears:commit", enabled=not payment["refusal"],
+            why=payment["refusal"]), hours)]
+    else:
+        controls.insert(0, affordable(Control(
+            "pay_arrears", key_for("pay_arrears"), label="settle arrears",
+            enabled=bool(group and group.get("arrears_qa", 0) and amount is None and not priority),
+            why="finish the ration draft" if amount is not None or priority else "no arrears"), hours))
     return compose(
         ("THE STOREHOUSE — LABOUR AND RATIONS" if room else "RATIONS — who eats first"),
         ("group", "gets qa old→new", "short qa", "at stake"),
@@ -706,3 +731,36 @@ def obligations(b: dict, selected: str = "", width: int = 78,
         views=tuple((name, name.title()) for name in
                     ("rites", "offerings", "oaths", "obligations")),
         view="obligations")
+
+
+def harvest_order(b: dict, group_id: str, to_fields: bool, hours: int,
+                  width: int, height: int) -> InteractiveScreen:
+    from belief import harvest
+
+    group = next((g for g in b.get("groups", ()) if g["id"] == group_id), {})
+    p = harvest.plan(b, group_id, to_fields)
+    verb = "Send to fields" if to_fields else "Recall from fields"
+    detail = [(verb + " · " + group.get("name", group_id), "gold")]
+    detail += [(line, "clay") for line in harvest.lines(b, group_id, to_fields)]
+    if p["change"] > 0:
+        detail.append((f"{p['change']:,} days/fortnight leave this group's ordinary duties.", "flame"))
+    elif not p["change"]:
+        detail.append(("This order adds no field labour.", "flame"))
+    detail.append(("Harvest assignments expire after the harvest window.", "dim"))
+    import textwrap
+    from tui.grid import INDEX, Surface
+
+    surface = Surface(width, height)
+    style.panel(surface, 0, 0, width, height, title="HARVEST ORDER — review", drop=False)
+    row = 2
+    for text, tone in detail:
+        for line in textwrap.wrap(text, max(1, width - 6)):
+            if row < height - 3:
+                surface.text(3, row, line, INDEX[tone], INDEX["ink"])
+                row += 1
+    cost = registry.BY_ID["send_to_harvest"].cost
+    style.footer(surface, [style.FooterAction("Enter", f"give order · {cost} hour",
+                                             enabled=not p["refusal"] and hours >= cost),
+                           style.FooterAction("Esc", "cancel")],
+                 y=height - 2, x=2, width=width - 4)
+    return surface.interactive()

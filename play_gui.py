@@ -31,6 +31,8 @@ if sys.version_info < (3, 12):
 import affordances
 import registry
 from belief.project import project
+from belief import harvest
+from belief.rations import repayment
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
@@ -39,7 +41,7 @@ from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 help_agent, librarian, parser as ai_parser,
                 voicer as ai_voicer)
-from tui import advice, collection, palace
+from tui import advice, collection, palace, aftermath, relief
 from tui import object as object_page
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -531,8 +533,18 @@ class Game:
                     cost, self.hours, missing=str(error))
             else:
                 self.hours -= cost
+                receipt = []
+                if isinstance(action, A.PayArrears):
+                    group = next(g for g in self.belief["groups"] if g["id"] == action.group_id)
+                    receipt = [f"Keeper paid {action.qa:,} qa; arrears left {group['arrears_qa']:,} qa."]
+                elif isinstance(action, A.SendToHarvest):
+                    p = harvest.plan(self.belief)
+                    if p["need"] is not None and p["remaining"]:
+                        receipt = [f"At order: {p['remaining']} harvest fortnights left.",
+                                   f"Roll: {p['before']:,} person-days/fortnight.",
+                                   f"Estimated deadline shortfall: {p['short_before']:,} days."]
                 self.log.append({"turn": self.world.date.absolute,
-                                 "action": A.to_dict(action)})
+                                 "action": A.to_dict(action), "receipt": receipt})
                 self.load_armed = False
                 result = registry.ActionResult(
                     registry.SUCCESS, action_id,
@@ -573,7 +585,7 @@ class Game:
             save_session(
                 self.save_path, self.seed, self.chosen_alu,
                 self.world.date.absolute, self.log, self.world,
-                hours_left=self.hours)
+                hours_left=self.hours, court_report=self.events)
         except (OSError, ValueError, TypeError) as error:
             self.session_notice = f"The campaign could not be saved: {error}."
             self.repaint()
@@ -620,7 +632,8 @@ class Game:
         self.works_corvee_draft = 0
         self.pending_action = None
         self.command_line = ""
-        self.events = []
+        self.events = list(data.get("court_report", ()))
+        self.fortnight_scroll = 0
         self.desk = None
         self.desk_drafts.clear()
         self.counsel_pending = None
@@ -670,6 +683,7 @@ class Game:
             self.counsel_said.append((
                 "scribe",
                 "The unconfirmed draft lapsed when the fortnight ended."))
+        before = self.belief
         self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
         self.works_corvee_draft = 0
@@ -689,7 +703,9 @@ class Game:
         # The fortnight gets its own window rather than a silent redraw. It is
         # the only moment in the game the player does not control, and it
         # should feel like one.
-        self.events = render.events_lines(events, self.world.court)
+        self.events = (aftermath.lines(before, self.belief)
+                       + render.events_lines(events, self.world.court))
+        self.fortnight_scroll = 0
         self.save_current(automatic=True)
         window = self.app.window(
             "fortnight", "The fortnight turns", 66, 18,
@@ -782,7 +798,8 @@ class Game:
                 self.switcher_entries(), self.switcher_pick, width, height,
                 notice=notice)
         if key == "fortnight":
-            return document.fortnight(b, self.events, width, height)
+            return document.fortnight(b, self.events, width, height,
+                                      scroll=getattr(self, "fortnight_scroll", 0))
         if key == "world":
             return worldmap.compose(
                 b, width, height, self.world_route_scroll,
@@ -794,6 +811,8 @@ class Game:
                                       view=getattr(self, "trade_view", trade_page.VIEWS[0]),
                                       selected=getattr(self, "trade_pick", ""),
                                       scroll=getattr(self, "trade_scroll", 0),
+                                      relief_quantity=getattr(self, "relief_quantity", None),
+                                      hours=self.hours,
                                       due_draft=self.ledger_state["dues"]
                                       .setdefault("rates", {}).get("harbour"))
         if key == "alu":
@@ -1362,8 +1381,7 @@ class Game:
             return
         draft_key = reply_to or f"new:{recipient}"
         active_desk = getattr(self, "desk", None)
-        if active_desk is not None and \
-                active_desk.get("draft_key") != draft_key:
+        if active_desk is not None:
             self._store_active_desk()
         self.inbox_notice = ""
         saved = getattr(self, "desk_drafts", {}).get(draft_key)
@@ -1542,6 +1560,18 @@ class Game:
             return ()
         return commitments.read(self.desk.get("matter", ""), self.belief)
 
+    def _desk_effective_terms(self) -> tuple:
+        explicit = list((self.desk or {}).get("terms", ()))
+        for parsed in commitments.as_terms(self._desk_commitments()):
+            matching = [term for term in explicit
+                        if (term.kind, term.good, term.person_id, term.destination)
+                        == (parsed.kind, parsed.good, parsed.person_id, parsed.destination)]
+            if matching and any(term.quantity != parsed.quantity for term in matching):
+                raise ValueError("The written quantity conflicts with an attached term; edit one before sealing.")
+            if not matching:
+                explicit.append(parsed)
+        return tuple(explicit)
+
     def _desk_bound(self) -> tuple[str, ...]:
         orders = self._desk_commitments()
         matter = self.desk.get("matter", "") if self.desk else ""
@@ -1552,7 +1582,12 @@ class Game:
         tone = ("emphatic" if any(word in lower for word in ("must", "shall", "will not", "at once"))
                 else "hedged" if any(word in lower for word in ("perhaps", "may", "if you can"))
                 else "plain")
-        return (tuple("order · " + item.describe() for item in orders)
+        try:
+            terms = tuple("order · " + composer.term_summary(term)
+                          for term in self._desk_effective_terms())
+        except ValueError as error:
+            terms = ("Cannot seal · " + str(error),)
+        return (terms
                 + ("tone · " + tone,)
                 + tuple("unparsed · " + line for line in prose))
 
@@ -2063,17 +2098,23 @@ class Game:
             draft_key = str(
                 desk.get("draft_key") or desk.get("letter_id")
                 or f"new:{recipient}")
+            try:
+                terms = self._desk_effective_terms()
+            except ValueError as error:
+                self.notify(str(error), registry.REFUSAL, window="stack")
+                self.repaint()
+                return
             action = A.DispatchLetter(
                 recipient=recipient,
                 reply_to=str(desk.get("reply_to") or ""),
                 text=draft.text,
                 profile=draft.profile,
-                terms=tuple(desk.get("terms", ())),
+                terms=terms,
                 scribe_id=str(desk.get("scribe_id") or "yabninu"),
                 seal=seal,
                 courier_id=str(desk.get("courier_id") or "iliya"),
                 path=path,
-                orders=tuple(item.describe() for item in self._desk_commitments()),
+                orders=tuple(composer.term_summary(term) for term in terms),
                 tone=next((line.split(" · ", 1)[1] for line in self._desk_bound()
                            if line.startswith("tone · ")), "plain"),
                 unparsed=tuple(line.split(" · ", 1)[1] for line in self._desk_bound()
@@ -2212,7 +2253,7 @@ class Game:
     def chosen_order(self):
         state = self.orders_state
         given = orders_page.visible(
-            orders_page.history(self.log), state["view"],
+            orders_page.history(self.log, self.belief), state["view"],
             self.world.date.absolute)
         return next((order for order in given if order.id == state["pick"]),
                     given[0] if given else None)
@@ -2289,6 +2330,11 @@ class Game:
 
     def compose_ledger(self, key: str, b: dict, width: int, height: int,
                        notice) -> Screen:
+        pending = getattr(self, "pending_action", None)
+        if pending and pending[2] == key and isinstance(pending[0], A.SendToHarvest):
+            action = pending[0]
+            return ledger_page.harvest_order(b, action.group_id, action.to_fields,
+                                            self.hours, width, height)
         if key == "stores":
             view = self.storehouse_view
             state = self.ledger_state[view]
@@ -2300,7 +2346,8 @@ class Game:
                 return ledger_page.roll(
                     b, amount=(state["amount"] if state.get("ration_draft")
                                or state["amount"] else None),
-                    priority=tuple(state["priority"]), **common)
+                    priority=tuple(state["priority"]),
+                    arrears=state.get("arrears_draft"), **common)
             if view == "land":
                 return ledger_page.land(
                     b, days=state["amount"],
@@ -2317,7 +2364,8 @@ class Game:
             return ledger_page.roll(
                 b, amount=(state["amount"] if state.get("ration_draft")
                            or state["amount"] else None),
-                priority=tuple(state["priority"]), **common)
+                priority=tuple(state["priority"]),
+                    arrears=state.get("arrears_draft"), **common)
         if key == "land":
             return ledger_page.land(
                 b, days=state["amount"],
@@ -2566,6 +2614,45 @@ class Game:
 
     def on_roll_key(self, event, window: str = "roll") -> None:
         state = self.ledger_state["roll"]
+        char = (event.char or "").lower()
+        command = getattr(event, "command", "")
+        if state.get("arrears_draft") is not None:
+            if event.keysym == "Escape":
+                state.pop("arrears_draft", None)
+            elif char in {"[", "]"}:
+                group = next((g for g in self.belief.get("groups", ())
+                              if g["id"] == state["pick"]), {})
+                step = max(ledger_page.STEPS["roll"],
+                           group.get("size", 0) * group.get("entitlement", 0) // 4)
+                state["arrears_draft"] = max(0, state["arrears_draft"]
+                                              + (step if char == "]" else -step))
+            elif event.keysym == "Return" or command == "arrears:commit":
+                amount = state["arrears_draft"]
+                preview = repayment(self.belief, state["pick"], amount)
+                if preview["refusal"]:
+                    self.notify(preview["refusal"], registry.REFUSAL, window=window)
+                elif self.do(A.PayArrears(state["pick"], amount),
+                             window=window, confirmed=True):
+                    state.pop("arrears_draft", None)
+            self.repaint()
+            return
+        if char == _key("pay_arrears") or command == "do:pay_arrears":
+            if state.get("ration_draft") or state["amount"] or state["priority"]:
+                self.notify("Confirm or cancel the ration draft first.",
+                            registry.REFUSAL, window=window)
+            else:
+                group = next((g for g in self.belief.get("groups", ())
+                              if g["id"] == state["pick"]),
+                             next(iter(self.belief.get("groups", ())), {}))
+                if group.get("arrears_qa", 0):
+                    state["pick"] = group["id"]
+                    free = repayment(self.belief, group["id"], 1)["free"]
+                    state["arrears_draft"] = min(group["arrears_qa"], free)
+                else:
+                    self.notify("No arrears are owed to this group.",
+                                registry.REFUSAL, window=window)
+            self.repaint()
+            return
         if event.keysym == "Escape" and (
                 state.get("ration_draft") or state["amount"] or state["priority"]):
             state.update(amount=0, ration_draft=False, priority=[])
@@ -3054,6 +3141,13 @@ class Game:
             group = next((g["name"] for g in b["groups"]
                           if g["id"] == action.group_id), action.group_id)
             return f"{group} will be allocated {render.fmt_good('grain', action.qa)}"
+        if isinstance(action, A.PayArrears):
+            p = repayment(b, action.group_id, action.qa)
+            return (f"pay {action.qa:,} qa arrears to "
+                    f"{affordances.name_in('group', action.group_id, b)}; "
+                    f"debt {p['owed']:,}→{p['remaining_debt']:,} qa; "
+                    f"free grain {p['free']:,}→{p['remaining_grain']:,} qa"
+                    + (f"; {p['refusal']}" if p["refusal"] else ""))
         if isinstance(action, A.SetPriority):
             return "the pay-down order has been changed"
         if isinstance(action, A.ReadLetter):
@@ -3076,7 +3170,8 @@ class Game:
         if isinstance(action, A.SendToHarvest):
             group = next((g["name"] for g in b["groups"]
                           if g["id"] == action.group_id), action.group_id)
-            return f"{group} will {'go to the fields' if action.to_fields else 'return from the fields'}"
+            return (f"{group} will {'go to the fields' if action.to_fields else 'return from the fields'}. "
+                    + " ".join(harvest.lines(b, action.group_id, action.to_fields)))
         if isinstance(action, A.AssignTroops):
             formation = next((f["name"] for f in b.get("troops", {}).get(
                 "formations", []) if f["id"] == action.formation_id),
@@ -4379,6 +4474,14 @@ class Game:
             self.trade_scroll = 0
             self.repaint()
             return
+        if view == "exchange" and char == "g":
+            self.trade_view = "relief"
+            self.trade_pick = ""
+            self.repaint()
+            return
+        if view == "relief":
+            self.on_relief_key(event)
+            return
         source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
                   "movements": self.belief.get("trade", {}).get("movements", ()),
                   "routes": self.belief.get("trade", {}).get("routes", ())}.get(view, ())
@@ -4447,6 +4550,45 @@ class Game:
             self._draft_due("harbour", -25 if char == "<" else 25)
         elif view == "dues" and event.keysym == "Return":
             self._commit_due("harbour", "trade")
+
+    def on_relief_key(self, event) -> None:
+        b = self.belief
+        known = relief.courts(b)
+        if not known:
+            return
+        ids = [c["id"] for c in known]
+        picked = getattr(self, "trade_pick", "")
+        index = ids.index(picked) if picked in ids else 0
+        command = getattr(event, "command", "")
+        if command.startswith("pick:") and command[5:] in ids:
+            index = ids.index(command[5:])
+        elif event.keysym in {"Up", "Down"}:
+            index = collection.step(len(ids), index, 1 if event.keysym == "Down" else -1)
+        chosen = known[index]
+        self.trade_pick = chosen["id"]
+        step = max(1, relief.ration(b))
+        quantity = getattr(self, "relief_quantity", step)
+        if (event.char or "") in {"[", "]"}:
+            quantity = max(0, quantity + (step if event.char == "]" else -step))
+        self.relief_quantity = quantity
+        if event.keysym == "Return" or command == "relief:draft":
+            if not chosen["path"] or quantity <= 0:
+                self.notify("Choose a reachable court and a positive amount.",
+                            registry.REFUSAL, window="trade")
+            else:
+                key = f"new:{chosen['id']}"
+                existing = ((getattr(self, "desk", None) or {}).get("draft_key") == key
+                            or key in getattr(self, "desk_drafts", {}))
+                self._open_letter_desk(chosen["id"], target_place=chosen["place"],
+                                       preset_kind="request_good")
+                if getattr(self, "desk", None) and self.desk.get("draft_key") == key and not existing:
+                    matter = f"Send me {quantity} qa of grain."
+                    self.desk.update(matter=matter, buffer=matter, cursor=len(matter))
+                    self._regrade()
+                elif existing:
+                    self.notify("Your existing letter draft has been reopened.",
+                                registry.PREVIEW, window="stack")
+        self.repaint()
 
     def on_plague_key(self, event) -> None:
         """Navigate every known place and issue or lift a physical closure."""
@@ -4863,6 +5005,16 @@ class Game:
         """
         if event.keysym == "Escape":
             self.app.close(key)
+            return
+        if key == "fortnight" and event.keysym in {"Up", "Down", "Prior", "Next", "Home", "End"}:
+            width, height = self._size("fortnight")
+            count = len(document.fortnight_rows(self.events, width))
+            room = max(1, height - 7)
+            limit = max(0, count - room)
+            step = {"Up": -1, "Down": 1, "Prior": -room, "Next": room,
+                    "Home": -count, "End": count}[event.keysym]
+            self.fortnight_scroll = max(0, min(limit, getattr(self, "fortnight_scroll", 0) + step))
+            self.repaint()
             return
         if key == "fortnight" and event.keysym == "space":
             # Space in this window means "I have read it", not "again".

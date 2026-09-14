@@ -137,10 +137,12 @@ def _reckon(belief: Belief, home: str, good: str, wanted: int, due: int,
     means to keep eating, plus once more for every fortnight since it counted.
     Old news is not treated as current news (spec 2.4).
     """
-    stores = belief.best(home, f"stores_{good}")
+    stores = belief.best(home, f"own_{good}") or belief.best(home, f"stores_{good}")
     if stores is None:
         return Reckoning(good, wanted, due, 0, 0, counted=False)
     draw = belief.best(home, f"need_{good}")
+    if draw is None and good == "grain":
+        draw = belief.best(home, "need")
     floor = belief.best(home, f"floor_{good}")
     read = tuple(claim for claim in (stores, draw, floor) if claim is not None)
     age = stores.age(turn)
@@ -413,7 +415,9 @@ def step(world: World) -> tuple[World, list]:
                 case, decision="ignore", decided_turn=now, delay_until=0)
             continue
         belief = foreign_belief.belief_of(world, case.actor)
-        decision = decide(case.actor, belief, case, now)
+        policy_case = dataclasses.replace(
+            case, place=foreign_belief.settlement_of(world, case.actor))
+        decision = decide(case.actor, belief, policy_case, now)
         decision = _affordable(world, case.actor, decision)
         decided = _decided(case, decision, now)
         if decision.kind in {"accept", "refuse", "counter"}:

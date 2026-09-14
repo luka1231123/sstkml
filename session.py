@@ -25,7 +25,7 @@ def new_seed() -> int:
     return secrets.randbits(48)
 
 
-SAVE_VERSION = 27
+SAVE_VERSION = 28
 
 
 def play(seed: int, chosen_alu: str, script: list[list]) -> tuple[object, list, list]:
@@ -47,7 +47,8 @@ def play(seed: int, chosen_alu: str, script: list[list]) -> tuple[object, list, 
 
 def save(path: str | Path, seed: int, chosen_alu: str, turns: int,
          log: list, world, ai_log: list | None = None,
-         hours_left: int | None = None) -> None:
+         hours_left: int | None = None,
+         court_report: list[str] | None = None) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps({
@@ -60,6 +61,7 @@ def save(path: str | Path, seed: int, chosen_alu: str, turns: int,
         # Questions and other information work can spend attention without
         # changing World, so a GUI save must carry the remainder explicitly.
         "hours_left": hours_left,
+        "court_report": court_report or [],
     }, indent=2)
     # A campaign save should never be a half-written JSON file after an
     # interrupted process.  Replace a sibling temporary file atomically.
