@@ -24,6 +24,12 @@ def ration(b: dict) -> int:
     return sum(g["size"] * g["entitlement"] for g in b.get("groups", ()))
 
 
+def horizon(b: dict) -> int:
+    """Planning reserve includes court handling and a margin for cargo."""
+    route = next((court for court in courts(b) if court['travel'] is not None), None)
+    return 2 * route['travel'] + 4 if route else 6
+
+
 def compose(b: dict, width: int, height: int, selected: str, quantity: int,
             scroll: int, notice, hours: int, views):
     known = courts(b)

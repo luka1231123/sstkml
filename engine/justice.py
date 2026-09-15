@@ -10,7 +10,7 @@ import dataclasses
 
 from engine import actions as A
 from engine import seat
-from engine.state import Petition, World
+from engine.state import Petition, Ruling, World
 
 VERDICTS = ("for", "against", "split")
 
@@ -51,8 +51,11 @@ def rule(world: World, petition_id: str, verdict: str) -> tuple[World, list]:
 
     before = world.court.unrest
     unrest = max(0, min(1000, before + unrest_delta))
+    rulings = dict(world.court.rulings)
+    rulings[petition.id] = Ruling(petition.id, petition.petitioner, verdict,
+                                good, amount, world.date.absolute)
     court = dataclasses.replace(
-        world.court, petitions=petitions, unrest=unrest)
+        world.court, petitions=petitions, rulings=rulings, unrest=unrest)
     world = dataclasses.replace(world, court=court)
     events: list = [A.PetitionRuled(
         petition.id, verdict, petition.petitioner, good, amount,
@@ -70,9 +73,22 @@ def step(world: World) -> tuple[World, list]:
         key: dataclasses.replace(value, waiting=value.waiting + 1)
         for key, value in world.court.petitions.items()}
     events: list = []
-    arrival_unrest = 0
+    arrival_unrest = sum(p.waiting_unrest for p in petitions.values()
+                        if p.waiting > p.grace)
     for case in world.justice_cases:
-        if case.arrived_turn != now or case.id in petitions:
+        if case.id in petitions or case.id in world.court.rulings:
+            continue
+        if case.after_case:
+            prior = world.court.rulings.get(case.after_case)
+            if prior is None or now != prior.turn + case.delay:
+                continue
+            if not case.award_min <= prior.amount <= case.award_max:
+                continue
+            amount = max(0, _amount(case.claim) - prior.amount) if case.deduct_award else _amount(case.claim)
+            case = dataclasses.replace(
+                case, arrived_turn=now, claim=(("amount", amount),),
+                claim_text=case.claim_text.format(paid=prior.amount, balance=amount, turn=prior.turn))
+        elif case.arrived_turn != now:
             continue
         petitions[case.id] = case
         arrival_unrest += case.unrest_arrival
@@ -84,5 +100,5 @@ def step(world: World) -> tuple[World, list]:
         world.court, petitions=petitions, unrest=unrest)
     if unrest != before:
         events.append(A.UnrestChanged(
-            unrest - before, "an unresolved petition reaches Court"))
+            unrest - before, "petitions arriving or waiting beyond their grace period"))
     return dataclasses.replace(world, court=court), events

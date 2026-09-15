@@ -36,7 +36,7 @@ def choices(b: dict, requested: bool) -> list:
         if amount:
             actions.append(A.PayArrears(group["id"], amount))
             spare -= amount
-    if not requested and need and grain < 4 * need:
+    if not requested and need and grain <= relief.horizon(b) * need:
         court = next((c for c in relief.courts(b) if c["path"]), None)
         if court:
             matter = f"Send me {need} qa of grain."
@@ -45,6 +45,9 @@ def choices(b: dict, requested: bool) -> list:
                 recipient=court["id"], reply_to="", text=draft.text,
                 profile=draft.profile, terms=commitments.as_terms(commitments.read(matter, b)),
                 scribe_id="yabninu", seal="royal", courier_id="iliya", path=court["path"]))
+    for case in b.get("justice", {}).get("petitions", ()):
+        if case["outcomes"]["for"]["affordable"]:
+            actions.append(A.RulePetition(case["id"], "for"))
     return actions
 
 
@@ -53,10 +56,16 @@ def run(seed: int, active: bool, directory: Path) -> dict:
     log, reports, failures = [], [], []
     requested = False
     hours = 0
+    peak_arrears = 0
+    shortage_turns = []
     for _ in range(24):
         before = project(world)
         world, events = advance(world)
         b = project(world)
+        debt = sum(g["arrears_qa"] for g in b["groups"])
+        peak_arrears = max(peak_arrears, debt)
+        if debt:
+            shortage_turns.append(b["turn"])
         last_report = aftermath.lines(before, b) + render.events_lines(events, world.court)
         reports += last_report
         if world.ended:
@@ -82,6 +91,10 @@ def run(seed: int, active: bool, directory: Path) -> dict:
     (directory / f"{name}.txt").write_text("\n".join(reports) + "\n")
     return {"policy": name, "turn": b["turn"], "grain_report_qa": b["stores"].get("grain", 0),
             "arrears_qa": sum(g["arrears_qa"] for g in b["groups"]),
+            "peak_arrears_qa": peak_arrears, "shortage_turns": shortage_turns,
+            "court_unrest": world.court.unrest,
+            "rulings": len(b["justice"]["rulings"]),
+            "waiting_claims": len(b["justice"]["petitions"]),
             "orders": len(log), "replies": [l["status"] for l in b.get("outbox", ())],
             "refusals": failures}
 

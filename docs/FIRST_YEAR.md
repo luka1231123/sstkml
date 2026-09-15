@@ -2,7 +2,10 @@
 
 Start a reproducible campaign with `./run.sh seat 8814402919`.
 The normal local language service is still required. This starts a new game;
-version 27 saves cannot be loaded after the correspondence repair.
+version 28 and earlier saves cannot be loaded under the new court rules.
+For a fresh playtest with a separate autosave, use
+`./run.sh --playtest seat 8814402919`. F8 captures multiline notes with the
+current turn, seed and screen. Escape cancels a note without spending time.
 
 Your first objective is to reach the next sowing with food, seed and a working
 court. No score or scripted success screen is attached to this objective.
@@ -16,6 +19,17 @@ cancelled; a confirmed judgement produces a receipt naming who was paid.
 
 Tab in Hall switches to the full palace; Tab again returns to the briefing.
 Neither view requires you to clear the list before ending a fortnight.
+
+The opening reserve now leaves a small gap before harvest if you simply wait.
+The Hall raises relief using courier travel estimates and a planning margin;
+help can still be delayed or refused. The granary steward and master smith
+disagree about reserves and workers' needs. Choose whose cost to bear.
+
+Abdi-Anu returns three fortnights after your first ruling. A partial settlement
+leaves a disputed copper balance; a full settlement leads to a separate grain
+request. Every return permits a zero-payment refusal. Some unresolved claims
+add the displayed unrest after two waiting fortnights. The annual report at
+turn 24 recalls actual payments and those still waiting; play continues.
 
 1. In Hall, read the granary coverage and the season. Open Storehouse and inspect
    the grain count if you want to spend an hour improving that record.

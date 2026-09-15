@@ -4,6 +4,7 @@ __pycache__/
 .claude/
 saves/*.json
 saves/**/autosave.json
+saves/**/notes.jsonl
 saves/**/ai_cache/
 saves/screens.txt
 .DS_Store

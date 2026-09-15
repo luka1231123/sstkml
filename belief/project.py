@@ -721,6 +721,9 @@ def _justice(world) -> dict:
             "against": petition.against,
             "kind": petition.kind,
             "waiting": petition.waiting,
+            "waiting_unrest": petition.waiting_unrest,
+            "grace": petition.grace,
+            "after_case": petition.after_case,
             "good": petition.good,
             "unit": petition.unit,
             "claim": dict(petition.claim),
@@ -732,7 +735,10 @@ def _justice(world) -> dict:
             "certainty": "counted",
         }
         petitions.append(item)
-    return {"petitions": petitions}
+    return {"petitions": petitions, "rulings": [
+        {"case_id": r.case_id, "petitioner": r.petitioner, "verdict": r.verdict,
+         "good": r.good, "amount": r.amount, "turn": r.turn}
+        for r in sorted(world.court.rulings.values(), key=lambda r: (r.turn, r.case_id))]}
 
 
 def _metal(world) -> dict:

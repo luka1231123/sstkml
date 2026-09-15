@@ -159,6 +159,7 @@ def test_uncommitted_corvee_drafts_lapse_with_the_fortnight() -> None:
     game.repaint = lambda: None
     game.save_current = lambda automatic=False: True
     game.works_corvee_draft = 400
+    game.log = []
     game.ledger_state["land"]["amount"] = 400
 
     game.end_fortnight()

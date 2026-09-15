@@ -5,6 +5,36 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
+## Returning characters and playtest — 2026-09-15
+
+Rulings now retain the actual award, recipient and turn in authoritative state.
+Three fortnights after the shipwright's first ruling, he returns either over the
+unpaid copper balance or with a separate household grain request after full
+settlement. Both allow zero-payment refusal. No repaired ship or workshop
+output is fabricated. Some waiting claims add a disclosed, small unrest cost
+after two fortnights; this remains court pressure, not whole-Alu collapse.
+
+The Hall gives the granary steward and master smith competing priorities.
+The year-end report names actual awards and outstanding claims; it does not
+declare victory. The opening reserve is 700,000 qa. Relief prompts now consider
+known route time plus a handling/cargo margin, still without guaranteeing help.
+
+Six complete first-year runs (waiting and recovery policies on seeds 8814402919,
+42 and 1) reached turn 24 without action refusals. Waiting incurred 65,290 qa
+peak arrears on turn 7, then recovered at harvest; it left three claims and
+court unrest 19. The generous recovery policy incurred 83,075 qa peak arrears,
+resolved four claims and ended at court unrest zero. Its grain request received
+an accepted answer on two seeds; seed 42 remained unanswered. Paying everyone
+is not an optimal food policy. Both policies ended without ration debt; the
+post-harvest economy remains forgiving and needs human feedback.
+
+Targeted engine, replay, controller, compact-screen and desktop checks passed,
+as did authority, information, inventory and corpus gates. A real Tk smoke run
+opened the Hall and saved a multiline F8 note with seed, turn and screen while
+preserving the world hash. Save version 29 reflects changed court behavior and
+opening goods. `--playtest` creates a separate autosave folder; notes remain
+local and ignored by Git. Human fun/clarity feedback is the next gate.
+
 ## Beginner's opening — 2026-09-15
 
 New campaigns open a guided Hall with the ruler's identity, food coverage,

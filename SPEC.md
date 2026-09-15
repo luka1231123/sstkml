@@ -496,6 +496,11 @@ without a rule that reads it.
 **Decision — justice and religion in 0.7.** Both stay, both stay small.
 Justice is a short docket of rulings with visible goods and unrest at stake.
 There is no hearing tax, hidden correct answer, or precedent subsystem.
+Public ruling receipts persist with the actual beneficiary, good, amount and
+turn. Authored return claims may depend on that receipt and elapsed time;
+their payments still transfer existing goods. Dockets disclose any unrest
+charged after a waiting grace period. The annual reckoning reads those records
+and current reports without awarding a hidden success score.
 Religion is §2.8: rites cost goods
 and days, omens move expectations, oaths are political facts. Neither grows a
 subsystem in 0.7.

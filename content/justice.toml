@@ -17,6 +17,7 @@ unrest_for = -12
 unrest_against = 18
 unrest_split = 4
 unrest_arrival = 12
+waiting_unrest = 2
 
 [[cases]]
 id = "injury_quarry"
@@ -34,6 +35,7 @@ unrest_for = -10
 unrest_against = 16
 unrest_split = 3
 unrest_arrival = 10
+waiting_unrest = 2
 
 [[cases]]
 id = "widows_ration"
@@ -51,3 +53,48 @@ unrest_for = -18
 unrest_against = 24
 unrest_split = 5
 unrest_arrival = 18
+waiting_unrest = 3
+
+[[cases]]
+id = "shipwright_balance"
+arrived_turn = 0
+after_case = "debt_shipwright"
+delay = 3
+award_min = 0
+award_max = 8999
+deduct_award = true
+petitioner = "abdi_anu_shipwright"
+against = "kuppiya_factor"
+kind = "returned debt claim"
+good = "copper"
+unit = "shekels of copper"
+claim = 9000
+counterclaim = 0
+claim_text = "Paid {paid:,} on turn {turn}; Abdi-Anu asks for {balance:,} more."
+counter_text = "Kuppiya: keep the first settlement. Pay no more."
+unrest_for = -8
+unrest_against = 8
+unrest_split = 0
+unrest_arrival = 0
+waiting_unrest = 1
+
+[[cases]]
+id = "shipwright_bread"
+arrived_turn = 0
+after_case = "debt_shipwright"
+delay = 3
+award_min = 9000
+award_max = 9000
+petitioner = "abdi_anu_shipwright"
+against = "kuppiya_factor"
+kind = "a settled creditor returns"
+good = "grain"
+unit = "qa of grain"
+claim = 18000
+counterclaim = 0
+claim_text = "The {paid:,} copper settled it. Now Abdi-Anu asks 18,000 qa for his household."
+counter_text = "Kuppiya: he has his copper. Keep grain for the roll."
+unrest_for = -4
+unrest_against = 0
+unrest_split = -2
+unrest_arrival = 0

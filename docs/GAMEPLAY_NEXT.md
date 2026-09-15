@@ -3,6 +3,14 @@
 Assessment: 2026-09-15. These are design conclusions from the current code and
 the linked games' official descriptions, not a comparative human playtest.
 
+Playtest update: the first returning-character slice is now implemented as a
+continued debt dispute or a household grain request, selected by the original
+award. It moves real goods and allows refusal; it does not yet simulate a
+workshop commission. The Hall now includes conflicting institutional advice,
+an annual reckoning and earlier relief prompts. Opening reserves are tighter,
+and F8 captures playtest notes in a separate campaign folder. The larger
+workshop arc and sensory polish below remain future work, guided by this test.
+
 ## What the comparisons expose
 
 - [Yes, Your Grace](https://store.steampowered.com/app/1115690/Yes_Your_Grace/)

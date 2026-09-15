@@ -40,17 +40,15 @@ priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_
 competence = 800
 fatigue = 500
 
-# Opening stores. Grain is roughly ten fortnights of what the granary owes: the
-# named roll and the nine thousand of the palace sector, who eat from the store
-# and not off the land. So the granary is visibly falling from turn one and the
-# inherited harvest is a genuine relief rather than a formality.
+# Opening grain leaves a small gap before harvest. Ration choices can bridge
+# it; foreign help is uncertain. Waiting incurs recoverable arrears.
 #
 # seed_grain opens at NOUGHT, and that is not an oversight: the game begins at
 # fortnight 1, mid-growing-season, so the predecessor's seed is already in the
 # ground. The store refills during harvest and empties into the fields again at
 # 19. Between them, seed is visible capital kept apart from ordinary rations.
 [stores]
-grain = 1070000
+grain = 700000
 seed_grain = 0
 oil = 4000
 wine = 3000

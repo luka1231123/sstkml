@@ -393,7 +393,9 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     """Both arguments and all three prices, before any verdict is live."""
     width = max(12, width)
     lines: list[tuple[str, str]] = [
-        (f"{item['kind']} · waiting {item['waiting']} fn", "bone"),
+        (f"{item['kind']} · waiting {item['waiting']} fn" +
+         (f" · +{item['waiting_unrest']}/fn after {item['grace']} fn"
+          if item.get('waiting_unrest') else ""), "bone"),
         (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
     ]
     lines.extend(

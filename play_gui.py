@@ -15,10 +15,12 @@ than dying with a traceback about a display name.
 from __future__ import annotations
 
 import os
+import json
 import queue
 import sys
 import threading
 from pathlib import Path
+from datetime import datetime
 
 if sys.version_info < (3, 12):
     # Apple's /usr/bin/python3 is old enough to lack tomllib, and the failure
@@ -41,7 +43,7 @@ from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 help_agent, librarian, parser as ai_parser,
                 voicer as ai_voicer)
-from tui import advice, collection, palace, aftermath, relief, briefing
+from tui import advice, collection, palace, aftermath, relief, briefing, reckoning
 from tui import object as object_page
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -154,13 +156,17 @@ class Game:
     altar_notice = _window_notice("altar")
     switcher_notice = _window_notice("switcher")
 
-    def __init__(self, chosen_alu: str = "seat", seed: int | None = None) -> None:
+    def __init__(self, chosen_alu: str = "seat", seed: int | None = None,
+                 *, playtest: bool = False) -> None:
         from tui.backend_tk import App
 
         self.seed = new_seed() if seed is None else seed
         seed = self.seed
         self.chosen_alu = chosen_alu
         self.save_path = Path(__file__).parent / "saves" / chosen_alu / "autosave.json"
+        if playtest:
+            run = datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+            self.save_path = self.save_path.parent / f"playtest-{run}" / "autosave.json"
         self.session_notice = ""
         self.load_armed = False
         self.world = load_campaign(chosen_alu, seed)
@@ -288,6 +294,10 @@ class Game:
         # A Tk program launched from a terminal opens *behind* the terminal on
         # macOS, which is indistinguishable from nothing having happened.
         self.hall_window.present()
+        if playtest:
+            self.save_current(automatic=True)
+            self.session_notice = "Playtest: F8 records a note. Your campaign has its own autosave."
+            self.repaint()
 
     # --- state ---------------------------------------------------------------
 
@@ -716,6 +726,8 @@ class Game:
         # should feel like one.
         self.events = (aftermath.lines(before, self.belief, self.log)
                        + render.events_lines(events, self.world.court))
+        if self.world.date.absolute % 24 == 0:
+            self.events = reckoning.lines(self.belief, self.world.date.absolute // 24) + self.events
         self.fortnight_scroll = 0
         self.briefing_pick = ""
         self.save_current(automatic=True)
@@ -968,6 +980,7 @@ class Game:
             return wrapped
 
         bindings = {
+            "<F8>": bind(self.playtest_note),
             "<colon>": guarded(self.open_palette),
             "<grave>": guarded(self.open_palette),
             "<question>": guarded(self.open_help),
@@ -5008,6 +5021,16 @@ class Game:
         self.briefing_pick = matter.id
         target = matter.destination
         hint = "Read the record and the displayed costs. Ctrl-H returns to Hall."
+        if target == "year":
+            self.events = reckoning.lines(self.belief)
+            self.fortnight_scroll = 0
+            window = self.app.window(
+                "fortnight", "The first year's reckoning", 66, 18,
+                on_key=lambda e: self.on_tablet_key(e, "fortnight"),
+                on_close=lambda: self.app.close("fortnight"))
+            self.repaint()
+            window.focus()
+            return
         if target == "stores":
             self.storehouse_view = matter.view or "stores"
             state = self.ledger_state[self.storehouse_view]
@@ -5174,6 +5197,42 @@ class Game:
             self.app.close("fortnight")
         self.on_key(event)
 
+    def playtest_note(self) -> None:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        existing = getattr(self, "note_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.lift()
+            return
+        context = {"seed": self.seed, "turn": self.world.date.absolute,
+                   "window": self.active_window(), "hours": self.hours,
+                   "orders": len(self.log)}
+        panel = self.note_window = tk.Toplevel(self.app.root())
+        panel.title(f"Playtest note · turn {context['turn']}")
+        tk.Label(panel, text="What confused you, broke, or felt good? Any format is fine.").pack(padx=12, pady=8)
+        entry = tk.Text(panel, width=70, height=12, wrap="word", undo=True)
+        entry.pack(padx=12, pady=8, fill="both", expand=True)
+        def record():
+            note = entry.get("1.0", "end").strip()
+            if not note:
+                return
+            try:
+                path = self.save_path.with_name("notes.jsonl")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("a") as stream:
+                    stream.write(json.dumps({**context, "note": note}) + "\n")
+            except OSError as error:
+                messagebox.showerror("Could not save note", str(error), parent=panel)
+                return
+            panel.destroy()
+            self.session_notice = "Playtest note saved. Keep going whenever you like."
+            self.repaint()
+        tk.Button(panel, text="Save note and continue", command=record).pack(pady=8)
+        panel.bind("<Escape>", lambda _event: panel.destroy())
+        entry.focus_set()
+        panel.lift()
+
     def quit(self) -> None:
         """The hall owns the session; every other window closes freely (D33)."""
         self.save_current(automatic=True)
@@ -5225,7 +5284,7 @@ def main(argv: list[str]) -> int:
     seed = int(args[1]) if len(args) > 1 else new_seed()
     print(f"seed {seed} — pass it back to play this same world again:\n"
           f"  ./run.sh {chosen_alu} {seed}")
-    Game(chosen_alu, seed).run()
+    Game(chosen_alu, seed, playtest="--playtest" in argv).run()
     return 0
 
 

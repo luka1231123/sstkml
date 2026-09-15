@@ -252,6 +252,23 @@ class Petition:
     unrest_arrival: int
     arrived_turn: int
     waiting: int = 0
+    after_case: str = ""
+    delay: int = 0
+    award_min: int = 0
+    award_max: int = 0
+    deduct_award: bool = False
+    waiting_unrest: int = 0
+    grace: int = 2
+
+
+@dataclasses.dataclass(frozen=True)
+class Ruling:
+    case_id: str
+    petitioner: str
+    verdict: str
+    good: GoodId
+    amount: int
+    turn: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -309,6 +326,7 @@ class Court:
     project_seq: int = 0
     # --- justice ---
     petitions: Mapping[str, Petition] = dataclasses.field(default_factory=dict)
+    rulings: Mapping[str, Ruling] = dataclasses.field(default_factory=dict)
     # --- M12: revenue and placement (6.20, 6.22) ---
     # The share of its own villages' harvest the crown takes, per 1000.
     # Customary is what the granary needs in an ordinary year; above it the

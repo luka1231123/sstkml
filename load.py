@@ -777,6 +777,11 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
             unrest_split=int(case["unrest_split"]),
             unrest_arrival=int(case["unrest_arrival"]),
             arrived_turn=int(case["arrived_turn"]),
+            after_case=case.get("after_case", ""), delay=int(case.get("delay", 0)),
+            award_min=int(case.get("award_min", 0)), award_max=int(case.get("award_max", 0)),
+            deduct_award=bool(case.get("deduct_award", False)),
+            waiting_unrest=int(case.get("waiting_unrest", 0)),
+            grace=int(case.get("grace", 2)),
         )
         for case in justice_cfg.get("cases", []))
 

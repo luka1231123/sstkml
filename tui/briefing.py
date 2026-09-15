@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import textwrap
 
 from belief.harvest import plan as harvest_plan
-from tui import advice, collection, render, style
+from tui import advice, collection, render, style, relief
 from tui.grid import INDEX as C, Surface
 
 
@@ -48,6 +48,13 @@ def agenda(b: dict, log=()) -> list[Matter]:
                    else "I would inspect the grain before changing who eats."),
         source="granary and payroll", view="roll" if inspected else "stores",
         selected="" if inspected else "grain")]
+    if 24 <= b.get("turn", 0) <= 26:
+        found.append(Matter(
+            "year", 10, "Your first year: who was paid, who still waits?",
+            "The scribe has gathered your rulings, the ration roll and the sent tablets.",
+            "The second year inherits the people and obligations you leave waiting.",
+            "year", "I would look back before making the next promise.",
+            source="dated rulings and current court records"))
     hp = harvest_plan(b)
     if hp["remaining"] and hp["need"] is not None:
         found.append(Matter(
@@ -82,9 +89,9 @@ def agenda(b: dict, log=()) -> list[Matter]:
             "stack", "I would read the reply." if reply else "I would check the sent copy before writing again.",
             source="sent tablet and received post", view="all" if reply else "outbox",
             selected=reply or pending["id"]))
-    elif coverage is not None and coverage < 4:
+    elif coverage is not None and coverage <= relief.horizon(b):
         found.append(Matter(
-            "relief", 7, "Ask another court for grain?",
+            "relief", 6, "Ask another court for grain?",
             f"The reported stores cover {coverage} full fortnights, before losses and other uses.",
             "A courier costs time. Another ruler may refuse or send less; a request guarantees no food.",
             "trade", "I would compare the known routes before asking for help.",
@@ -95,9 +102,12 @@ def agenda(b: dict, log=()) -> list[Matter]:
         who = render.actor_name(petition["petitioner"], b.get("house"))
         found.append(Matter(
             "justice", min(9, 7 + petition.get("waiting", 0)),
-            f"{who} asks for judgement",
+            f"{who} {'returns' if petition.get('after_case') else 'asks for judgement'}",
             petition.get("claim_text", "A claim awaits judgement.") + " " + petition.get("counter_text", ""),
-            "Both parties want your seal. Paying one claim spends supplies; refusing it has a price too.",
+            (f"Waiting beyond {petition.get('grace', 2)} fortnights adds "
+             f"{petition['waiting_unrest']} city unrest each fortnight. A verdict ends the wait."
+             if petition.get('waiting_unrest') else
+             "Paying this claim uses supplies. Compare the price of refusing it too."),
             "palace", "I would hear both accounts before giving judgement.",
             source=petition.get("source", "court docket"), selected=petition["id"]))
     for concern in advice.concerns(b, 20):
@@ -118,6 +128,22 @@ def agenda(b: dict, log=()) -> list[Matter]:
             }.get(concern.id, "Read the record before committing the court."),
             destination, concern.suggestion, concern.speaker, concern.basis))
     return sorted(found, key=lambda m: -m.priority)
+
+
+def arguments(b: dict, matter: str) -> list[str]:
+    if matter not in {"food", "harvest", "arrears", "relief"}:
+        return []
+    keeper, held = advice.speaker_for(b, "granary")
+    smith, staffed = advice.speaker_for(b, "workshop")
+    if not held or not staffed or keeper == smith:
+        return []
+    sides = {
+        "food": ("Keep a grain reserve for the next meal.", "Keep the workers' rations whole."),
+        "harvest": ("Send extra hands before the harvest closes.", "Leave craftsmen at their ordinary work."),
+        "arrears": ("Keep grain for the coming ration queue.", "Pay the workers what is already owed."),
+        "relief": ("Ask for grain before our reserve runs low.", "A reply may be late; review local rations too."),
+    }[matter]
+    return [f"{keeper.split(',')[0]}: {sides[0]}", f"{smith.split(',')[0]}: {sides[1]}"]
 
 
 def response(log: list[dict], now: int) -> str:
@@ -155,7 +181,7 @@ def compose(b: dict, log: list[dict], width=84, height=28, *, hours=0,
     line(2, f"{b.get('date', '')} · {hours} court hours left", "sky")
     line(3, (f"You are {render.actor_name(b.get('actor', 'the king'), b.get('house'))}. You rule through orders and letters."
              if b.get("turn", 0) <= 2 else
-             "My lord, these are the people and accounts I would put before you."), "sand")
+             "This year: feed the roll, bring in harvest, answer the people who wait."), "sand")
     _, _, cover = food(b)
     season = str(b.get("calendar", {}).get("stage", "unknown season")).replace("_", " ")
     line(4, (f"Food: about {cover} full fortnights" if cover is not None else "Food coverage: unknown")
@@ -178,7 +204,12 @@ def compose(b: dict, log: list[dict], width=84, height=28, *, hours=0,
         wrap(11, f"{matter.speaker}: {matter.next_step}", "sky")
         wrap(14, matter.fact, "bone")
         wrap(17, matter.stake, "sand")
-        wrap(20, response(log, b.get("turn", 0)), "barley")
+        debate = arguments(b, matter.id)
+        if debate:
+            for offset, words in enumerate(debate):
+                line(20 + offset, words, "sky" if offset == 0 else "wine")
+        else:
+            wrap(20, response(log, b.get("turn", 0)), "barley")
         line(height - 5, f"Turn {b.get('turn', '?')} · basis: {matter.source}", "dim")
     style.notice(surface, 3, height - 4, width - 6, notice)
     line(height - 3, "Fortnight = two weeks · qa = grain measure · you may leave matters waiting", "dim")

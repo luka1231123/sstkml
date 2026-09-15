@@ -26,6 +26,7 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 
 ```sh
 ./run.sh                  # windowed game
+./run.sh --playtest       # fresh campaign with its own autosave; F8 records notes
 ./run.sh --check          # interpreter, Tk, display, Ollama, and model
 ./run.sh --screens         # render one screen as text
 ./run.sh --probe          # live Tk probe
@@ -38,6 +39,13 @@ Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter
 New games open Yabninu's briefing. Press `Enter` to follow the first matter;
 each destination explains its next control. `Ctrl-H` returns to the briefing,
 and `Tab` in Hall reveals the full palace. You may leave matters waiting.
+
+Abdi-Anu can return with a claim shaped by your earlier payment. The granary
+steward and master smith offer competing priorities, and the first year ends
+with a reckoning of rulings and remaining obligations. In the playtest build,
+F8 opens a multiline note pad; notes include the seed, turn and current screen.
+Saves use version 29; older campaigns remain on disk but cannot replay under
+the new court and opening-supply rules.
 
 ## Required local language model
 
