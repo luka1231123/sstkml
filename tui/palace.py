@@ -411,18 +411,17 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     )
     outcomes = _outcomes(item)
     good = str(next(iter(outcomes.values()))["good"])
-    lines.append((f"STAKES · {good} payment / unrest", "gold"))
+    lines.append(("STAKES · payments and city unrest", "gold"))
     keys = {verdict: key.upper() for key, verdict, _label in VERDICTS}
-    parts = []
-    affordable = True
+    labels = {"for": "Pay the claim", "against": "Pay the counterclaim", "split": "Split the claim"}
     for verdict in ("for", "against", "split"):
         outcome = outcomes[verdict]
         unrest = int(outcome["unrest"])
-        sign = "+" if unrest > 0 else ""
-        parts.append(
-            f"[{keys[verdict]}] {int(outcome['amount']):,}/{sign}{unrest}")
-        affordable &= bool(outcome.get("affordable", True))
-    lines.append((" · ".join(parts), "clay" if affordable else "blood"))
+        text = (f"[{keys[verdict]}] {labels[verdict]}: {int(outcome['amount']):,} {good}; "
+                f"unrest {unrest:+}")
+        lines.extend((row, "clay" if outcome.get("affordable", True) else "blood")
+                     for row in textwrap.wrap(text, width))
+    lines.append(("Lower unrest means a calmer city.", "dim"))
     return lines
 
 
@@ -810,6 +809,7 @@ def _detail_capacity(rows: list[workbench.Row],
     available = height - top - 4 - footer_rows - (2 if note else 0)
     if stacked:
         room = max(1, min(available - 4, max(available // 3, 5)))
+        room = min(room, max(1, len(rows)))
         return max(0, available - room - 1)
     detail_floor = height - 2 - footer_rows - (1 if note else 0)
     return max(0, detail_floor - (top + 1))

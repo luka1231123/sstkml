@@ -521,3 +521,14 @@ examples = ["How do I get through the first year?"]
 keywords = ["start", "first", "year", "play", "tutorial", "harvest", "relief"]
 keys = []
 verbs = []
+
+[[command]]
+id = "hall_briefing"
+category = "interface"
+title = "Your first audience"
+syntax = "Hall → arrows choose → Enter opens"
+answer = "Yabninu's briefing shows known matters, their stakes, and where to act. Enter opens the selected record without spending time. On your first turn, inspect the grain with I in Storehouse, then use Ctrl-H to return. A named court dispute is an early opportunity to compare real choices. Read both accounts and the labeled costs, then preview a verdict; Enter confirms and Escape cancels. Tab in Hall switches to the full palace. Space in Hall ends the fortnight; you may leave matters waiting."
+examples = ["What do I do on my first turn?", "How do I return to the briefing?"]
+keywords = ["beginner", "start", "first", "turn", "audience", "briefing", "tutorial", "play", "controls"]
+keys = ["Tab", "Return", "Up", "Down"]
+verbs = []

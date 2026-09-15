@@ -35,6 +35,10 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 
 Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter` opens or confirms, `Space` toggles, and `Escape` cancels or closes. In Hall, `Space` ends the fortnight. `Ctrl-H` raises Hall, `Ctrl-G` opens the switcher, `Ctrl-Tab` cycles windows, `Ctrl-S` saves, `Ctrl-O` asks before reload, `:` opens Command, and `?` opens grounded Help.
 
+New games open Yabninu's briefing. Press `Enter` to follow the first matter;
+each destination explains its next control. `Ctrl-H` returns to the briefing,
+and `Tab` in Hall reveals the full palace. You may leave matters waiting.
+
 ## Required local language model
 
 Supported baseline:

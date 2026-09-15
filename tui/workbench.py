@@ -182,6 +182,7 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
         # already are.
         room = max(1, min(
             available - 4, max(available // 3, list_min)))
+        room = min(room, max(1, len(rows)))
         detail = detail[:max(0, available - room - 1)]
     else:
         room = max(1, available)

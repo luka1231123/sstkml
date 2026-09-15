@@ -5,6 +5,33 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
+## Beginner's opening — 2026-09-15
+
+New campaigns open a guided Hall with the ruler's identity, food coverage,
+plain units, the next seasonal change and three visible matters at a time.
+All remaining matters are reachable with arrows. Each selection names a
+speaker, the known facts, the competing cost and a direct route to a record.
+Enter opens the correct ledger or tablet without giving an order. Tab returns
+to the full palace; the choice survives saves without changing replay.
+
+The first inspection leads into a named, state-backed court dispute. Court
+payments and unrest are written out separately, and a confirmed judgement
+returns a receipt naming its recipient. The Hall explains the last action's
+result and makes clear that matters may wait. No new crisis or tutorial reward
+is fabricated. Reopening received post preserves an unfinished letter draft.
+
+The next fortnight carries named judgement receipts and still-waiting claimants
+forward. Recent ration, repayment and field orders appear beside the new roll.
+Receipts are not repeated on subsequent turns. The report distinguishes these
+records from a causal explanation of every change.
+
+Validation: 120 distinct targeted checks passed (119 in the broader run, then
+15 focused checks including one new continuity check). Authority and information
+audits are clean, all standard screens render, and the startup check finds Tk,
+the display and the supported model ready. A human beginner playtest remains.
+See [the comparison and remaining work](GAMEPLAY_NEXT.md) for the next milestone:
+a returning character whose situation materially depends on an earlier ruling.
+
 ## First-year slice — 2026-09-13
 
 Arrears payment is now connected to the Roll: R drafts, brackets adjust, Enter

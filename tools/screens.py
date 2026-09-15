@@ -34,7 +34,7 @@ from engine.reduce import apply                 # noqa: E402
 from engine.tick import advance                 # noqa: E402
 from load import load_campaign                  # noqa: E402
 from tui import desktop, inbox, ledgers, orders, palace, trade, works
-from tui import (altar, archive, alu, composer, counsel, document, hall,   # noqa: E402
+from tui import (altar, archive, alu, briefing, composer, counsel, document, hall,   # noqa: E402
                  help as help_page, worldmap)                       # noqa: E402
 from tui.backend_term import to_ansi            # noqa: E402
 from tui.grid import Screen, plain_text, pure_ascii   # noqa: E402
@@ -52,6 +52,8 @@ def _ledger(key: str) -> dict:
 # `play_gui.TABLETS` opens the real windows at, so the wrapping read here is
 # the wrapping the player gets.
 SCREENS = {
+    "briefing": ("YABNINU'S BRIEFING", lambda b: briefing.compose(
+        b, [], *desktop.default_size("hall"), hours=b.get("attention", 0))),
     "hall": ("THE HALL", lambda b: hall.compose(
         b, *desktop.default_size("hall"))),
     "stack": ("THE TABLET HOUSE", lambda b: inbox.compose(

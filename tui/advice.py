@@ -118,7 +118,7 @@ def _summons(b: dict) -> Concern | None:
         "summons", 10, "A muster is not answered",
         f"{short} of the requested {required} men have not gone.",
         "assign a formation in the Muster before the summons falls due.",
-        "counsel", prompt, speaker=speaker, basis=basis)
+        "muster", prompt, speaker=speaker, basis=basis)
 
 
 def _raids(b: dict) -> Concern | None:
@@ -182,7 +182,7 @@ def _arrears(b: dict) -> Concern | None:
     return Concern(
         "arrears", min(9, 4 + weeks), f"{len(owing)} groups are unpaid",
         f"{worst['name']} have waited {weeks} fortnights.",
-        "change an allocation in the Roll.", "counsel",
+        "compare the ration queue and a repayment in the Roll.", "roll",
         "Who is in arrears, and how should the grain allocations change?",
         speaker=speaker, basis=basis)
 
@@ -202,7 +202,7 @@ def _grain(b: dict) -> Concern | None:
         "grain", 6, "The granary is falling",
         f"It has lost {render.fmt_good('grain', fall)} in three fortnights.",
         "look at the Stores, and change a ration in the Roll.",
-        "counsel", "How should our grain allocations change?",
+        "stores", "How should our grain allocations change?",
         speaker=speaker, basis=basis)
 
 
@@ -267,7 +267,7 @@ def _plague(b: dict) -> Concern | None:
     return Concern(
         "plague", 10, "Sickness is in the lower town", fact,
         "close a road or a harbour from Sickness, or from the World.",
-        "counsel", "Which roads or harbours should be quarantined?",
+        "plague", "Which roads or harbours should be quarantined?",
         speaker=speaker, basis=basis)
 
 

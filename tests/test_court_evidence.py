@@ -38,8 +38,9 @@ def test_supported_sizes_show_both_sides_and_all_stakes_before_controls() -> Non
         text = _prose(screen)
         assert petition["claim_text"] in text
         assert petition["counter_text"] in text
-        assert "STAKES · copper payment / unrest" in text
-        assert "[F] 9,000/-12" in text and "[A] 3,000/+18" in text
+        assert "STAKES · payments and city unrest" in text
+        assert "[F] Pay the claim: 9,000 copper; unrest -12" in text
+        assert "[A] Pay the counterclaim: 3,000 copper; unrest +18" in text
         assert len(_verdicts(screen)) == 3
         assert all(hit.enabled for hit in _verdicts(screen))
 

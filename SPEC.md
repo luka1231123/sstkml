@@ -381,6 +381,14 @@ The Hall is an exception docket, not a second copy of every ledger. It answers:
 who or what has reached the king, what changed, and where the evidence is.
 Rooms show working state.
 
+New campaigns open the Hall's guided briefing. It introduces the ruler and
+units, keeps food coverage and the next season visible, and presents a small
+selection from the court's known matters. Advice names its speaker and basis;
+it states a tradeoff and opens the relevant record without giving an order.
+Tab switches between this briefing and the full palace view at no court-time
+cost. The preference is saved as UI state. Guidance is optional: no tutorial
+completion gates, invented crises, or rewards for clearing the docket.
+
 ---
 
 ## 5. Technical

@@ -41,7 +41,7 @@ from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 help_agent, librarian, parser as ai_parser,
                 voicer as ai_voicer)
-from tui import advice, collection, palace, aftermath, relief
+from tui import advice, collection, palace, aftermath, relief, briefing
 from tui import object as object_page
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -167,6 +167,8 @@ class Game:
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
         self.log: list[dict] = []
+        self.hall_guided = True
+        self.briefing_pick = ""
         # Presentation is remembered between runs; the world is not. A broken
         # settings file yields defaults rather than refusing to start.
         self.settings_path = Path(__file__).parent / "saves" / "settings.json"
@@ -525,7 +527,7 @@ class Game:
                 cost, self.hours, missing="attention")
         else:
             try:
-                self.world, _ = apply(self.world, action)
+                self.world, events = apply(self.world, action)
             except (ValueError, TypeError, KeyError) as error:
                 result = registry.ActionResult(
                     registry.REFUSAL, action_id,
@@ -537,6 +539,11 @@ class Game:
                 if isinstance(action, A.PayArrears):
                     group = next(g for g in self.belief["groups"] if g["id"] == action.group_id)
                     receipt = [f"Keeper paid {action.qa:,} qa; arrears left {group['arrears_qa']:,} qa."]
+                elif isinstance(action, A.RulePetition):
+                    ruled = next(e for e in events if isinstance(e, A.PetitionRuled))
+                    who = palace._name(ruled.beneficiary, self.belief)
+                    receipt = [f"{who} received {ruled.amount:,} {ruled.good}. The case is closed.",
+                               f"City unrest changed {ruled.unrest_delta:+}."]
                 elif isinstance(action, A.SendToHarvest):
                     p = harvest.plan(self.belief)
                     if p["need"] is not None and p["remaining"]:
@@ -546,6 +553,7 @@ class Game:
                 self.log.append({"turn": self.world.date.absolute,
                                  "action": A.to_dict(action), "receipt": receipt})
                 self.load_armed = False
+                self.briefing_pick = ""
                 result = registry.ActionResult(
                     registry.SUCCESS, action_id,
                     "Entered: " + description + ".",
@@ -585,7 +593,8 @@ class Game:
             save_session(
                 self.save_path, self.seed, self.chosen_alu,
                 self.world.date.absolute, self.log, self.world,
-                hours_left=self.hours, court_report=self.events)
+                hours_left=self.hours, court_report=self.events,
+                hall_guided=getattr(self, "hall_guided", True))
         except (OSError, ValueError, TypeError) as error:
             self.session_notice = f"The campaign could not be saved: {error}."
             self.repaint()
@@ -614,6 +623,8 @@ class Game:
         self.seed = int(data["seed"])
         self.chosen_alu = str(data["chosen_alu"])
         self.log = list(data["log"])
+        self.hall_guided = data.get("hall_guided", True) is not False
+        self.briefing_pick = ""
         saved_hours = data.get("hours_left")
         attention = self.belief["attention"]
         if saved_hours is None:
@@ -703,9 +714,10 @@ class Game:
         # The fortnight gets its own window rather than a silent redraw. It is
         # the only moment in the game the player does not control, and it
         # should feel like one.
-        self.events = (aftermath.lines(before, self.belief)
+        self.events = (aftermath.lines(before, self.belief, self.log)
                        + render.events_lines(events, self.world.court))
         self.fortnight_scroll = 0
+        self.briefing_pick = ""
         self.save_current(automatic=True)
         window = self.app.window(
             "fortnight", "The fortnight turns", 66, 18,
@@ -737,6 +749,9 @@ class Game:
         # One lookup rather than a differently-named attribute per window.
         notice = self.notice_for(key)
         if key == "hall":
+            if getattr(self, "hall_guided", True) and not b.get("ended"):
+                return briefing.compose(b, self.log, width, height, hours=self.hours,
+                                        selected=getattr(self, "briefing_pick", ""), notice=notice)
             return hall.compose(
                 b, width, height, hours_left=self.hours, notice=notice)
         if key == "stack":
@@ -4936,8 +4951,17 @@ class Game:
         if concern.destination == "orders":
             self.open_orders()
             return
+        if concern.destination == "stores":
+            self.storehouse_view = "stores"
+            self.ledger_state["stores"]["pick"] = "grain"
+            self.open_ledger("t")
+            return
         if concern.destination in {"roll", "land"}:
             self.storehouse_view = concern.destination
+            if concern.id == "arrears":
+                group = max(self.belief.get("groups", ()), key=lambda g: g.get("arrears_qa", 0), default=None)
+                if group:
+                    self.ledger_state["roll"]["pick"] = group["id"]
             self.open_ledger("t")
             return
         if concern.destination == "archive":
@@ -4953,6 +4977,92 @@ class Game:
         elif door in ROOMS:
             self.open_room(door)
 
+    def on_briefing_key(self, event) -> bool:
+        command = getattr(event, "command", "")
+        char = event.char or ""
+        if event.keysym not in {"Up", "Down", "Return", "Home", "End"} and not (
+                char.isdigit() and char != "0") and not command.startswith("briefing:open:"):
+            return False
+        matters = briefing.agenda(self.belief, self.log)
+        if not matters:
+            return True
+        index = next((i for i, m in enumerate(matters)
+                      if m.id == getattr(self, "briefing_pick", "")), 0)
+        if event.keysym in {"Up", "Down", "Home", "End"}:
+            index = (0 if event.keysym == "Home" else len(matters) - 1 if event.keysym == "End"
+                     else collection.step(len(matters), index, -1 if event.keysym == "Up" else 1))
+            self.briefing_pick = matters[index].id
+            self.repaint()
+        else:
+            selected = (command.split(":", 2)[2] if command.startswith("briefing:open:")
+                        else matters[int(char) - 1].id if char.isdigit() and 0 < int(char) <= len(matters)
+                        else matters[index].id if event.keysym == "Return" else "")
+            if selected:
+                self.open_briefing_matter(selected)
+        return True
+
+    def open_briefing_matter(self, matter_id: str) -> None:
+        matter = next((m for m in briefing.agenda(self.belief, self.log) if m.id == matter_id), None)
+        if matter is None:
+            return
+        self.briefing_pick = matter.id
+        target = matter.destination
+        hint = "Read the record and the displayed costs. Ctrl-H returns to Hall."
+        if target == "stores":
+            self.storehouse_view = matter.view or "stores"
+            state = self.ledger_state[self.storehouse_view]
+            if matter.selected:
+                state["pick"] = matter.selected
+            if matter.id == "food":
+                hint = ("[ ] drafts rations; arrows reorder the queue. Enter gives it. Ctrl-H: Hall."
+                        if self.storehouse_view == "roll" else
+                        "Press I to count grain (1 hour). Tab changes ledger; Ctrl-H returns to Hall.")
+            elif matter.id == "arrears":
+                hint = "R previews repayment. Enter gives the draft; Escape cancels. Ctrl-H: Hall."
+            elif matter.id == "harvest":
+                state["group"] = next((g["id"] for g in self.belief["groups"]
+                                       if g["id"] == "palace_dependents"), "")
+                hint = "G chooses hands; H previews the field order. Ctrl-H returns to Hall."
+            self.open_ledger("t")
+        elif target == "stack":
+            if getattr(self, "desk", None):
+                self._store_active_desk()
+                self.desk = None
+            self.inbox_filter = matter.view or "unread"
+            self.inbox_pane = "rack"
+            self.inbox_scroll = 0
+            self.inbox_body_scroll = 0
+            self.inbox_pick = matter.selected or next((l["id"] for l in sorted(
+                self.belief.get("stack", ()), key=lambda l: -l.get("age", 0)) if not l["read"]), "")
+            hint = ("Enter reads the selected seal; the displayed hours are spent. Ctrl-H: Hall."
+                    if self.inbox_filter != "outbox" else
+                    "This is your sent copy; Enter opens it. Ctrl-H returns to Hall.")
+            self.open_tablet("s")
+        elif target == "trade":
+            self.trade_view = matter.view or "exchange"
+            self.trade_pick = ""
+            self.trade_scroll = 0
+            self.open_room("x")
+            hint = "Choose a court; Enter drafts a letter. No grain is promised. Ctrl-H: Hall."
+        elif target == "plague":
+            self.open_plague()
+        elif target == "oaths":
+            self.open_oaths()
+        else:
+            if target == "palace":
+                self.palace_state.update(view="audience", choosing="", scroll=0)
+                petitions = self.belief.get("justice", {}).get("petitions", ())
+                if petitions:
+                    oldest = max(petitions, key=lambda p: p.get("waiting", 0))
+                    self.palace_state["pick"]["audience"] = oldest["id"]
+                hint = "Read both claims; the verdict controls preview the price. Ctrl-H: Hall."
+            door = next((k for k, _label, destination in hall.DOORS if destination == target), "")
+            if not door:
+                return
+            self.open_door(door)
+        self.notify(hint, "info", window=target)
+        self.repaint()
+
     def on_key(self, event) -> None:
         char = (event.char or "").lower()
         control = bool(getattr(event, "state", 0) & 4)
@@ -4960,8 +5070,13 @@ class Game:
             self.save_current()
         elif control and event.keysym.lower() == "o":
             self.request_load()
+        elif event.keysym in {"Tab", "ISO_Left_Tab"}:
+            self.hall_guided = not getattr(self, "hall_guided", True)
+            self.repaint()
         elif event.keysym == "space":
             self.end_fortnight()
+        elif getattr(self, "hall_guided", True) and self.on_briefing_key(event):
+            return
         elif getattr(event, "command", "").startswith("concern:"):
             self.activate_concern(int(event.command.split(":", 1)[1]))
         elif char.isdigit() and char != "0":

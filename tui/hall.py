@@ -262,5 +262,6 @@ def compose(b: dict, width: int = 84, height: int = 28,
     _matters(surface, b, rx + 2, width - rx - 5, height)
     style.footer(surface, (
         style.FooterAction("SPACE", "end the fortnight", command="space"),
+        style.FooterAction("Tab", "briefing"),
         style.FooterAction(":", "command"), style.FooterAction("?", "help")))
     return surface.interactive()

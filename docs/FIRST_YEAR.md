@@ -7,6 +7,16 @@ version 27 saves cannot be loaded after the correspondence repair.
 Your first objective is to reach the next sowing with food, seed and a working
 court. No score or scripted success screen is attached to this objective.
 
+New games open Yabninu's briefing. Enter opens his selected matter without
+spending time; arrows choose another. Start with the grain count, then return
+with Ctrl-H. The briefing responds to your orders and brings a named court
+dispute forward after that first inspection. In Court, read both accounts and
+the three labeled payments before choosing a verdict. A preview can be
+cancelled; a confirmed judgement produces a receipt naming who was paid.
+
+Tab in Hall switches to the full palace; Tab again returns to the briefing.
+Neither view requires you to clear the list before ending a fortnight.
+
 1. In Hall, read the granary coverage and the season. Open Storehouse and inspect
    the grain count if you want to spend an hour improving that record.
 2. In Storehouse → Rations, inspect who goes short. Brackets draft a ration;
