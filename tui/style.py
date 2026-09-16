@@ -225,6 +225,7 @@ def notice(surface: Surface, x: int, y: int, width: int,
     surface.fill(x, y, width, 1, " ", C["clay"], C["ink"])
     surface.text(x, y, mark, C[colour], C["ink"])
     room = width - 2
+    text = " ".join(text.split())
     body = text if len(text) <= room else text[:max(0, room - 1)] + "…"
     surface.text(x + 2, y, body, C[colour], C["ink"])
 

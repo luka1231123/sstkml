@@ -86,7 +86,8 @@ def test_counsel_is_an_always_ready_clickable_order_line() -> None:
     assert "YOU SAY OR GIVE AN ORDER" in text
     assert "[enter] tell him" in text
     commands = {hit.command for hit in view.hits if hit.enabled}
-    assert {"Return", "Control-u", "Escape", "F1"} <= commands
+    assert {"Return", "Control-u", "Escape", "suggest:0"} <= commands
+    assert "[ctrl-1]" in text
 
 
 def test_preparser_covers_new_dashboard_orders() -> None:

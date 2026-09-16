@@ -43,6 +43,9 @@ last report. `Ctrl-H` returns here. `?` opens free help, which is one of the
 game's own screens with Manual and Ask halves; `Ctrl-Shift-R` resets window sizes.
 Claims are heard only in Court; the Palace holds people, offices and envoys.
 `F8` records a playtest note. Last report is available without opening another window.
+Hall `o` opens Orders and receipts. Long Stores/Muster/Orders details and order
+reviews use left/right; Counsel uses Page Up/Page Down. Notes now attach the
+originating screen automatically. See [the playtest route](docs/PLAYTEST_DECISIONS.md).
 
 Version 29 saves still load. `--playtest` starts a separate autosave folder.
 

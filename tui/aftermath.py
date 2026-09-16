@@ -16,6 +16,15 @@ def follow_through(before: dict, after: dict, log=()) -> list[str]:
         group = groups.get(action.get('group_id'))
         if kind == 'RulePetition':
             out.extend(record.get('receipt', ()))
+        elif kind == 'FinanceTrade':
+            out.extend(record.get('receipt', ()))
+        elif kind == 'AssignTroops':
+            out.extend(record.get('receipt', ()))
+            formation = next((f for f in after.get('troops', {}).get('formations', ())
+                              if f['id'] == action.get('formation_id')), None)
+            if formation:
+                out.append(f"New muster roll: {formation['name']}, {formation['strength']:,} men, "
+                           f"{formation['task']} at {formation['place'].replace('_', ' ')}.")
         elif kind in {'Allocate', 'PayArrears', 'SendToHarvest'} and group:
             label = {'Allocate': 'Ration order', 'PayArrears': 'Debt payment',
                      'SendToHarvest': 'Field order'}[kind]

@@ -79,7 +79,8 @@ SCREENS = {
         height=desktop.default_size("palace")[1])),
     "help": ("FIELD MANUAL", lambda b: help_page.compose(*desktop.default_size("help"))),
     "alu": ("THE ALU", lambda b: alu.compose(b, None, *desktop.default_size("alu"))),
-    "trade": ("TRADE", lambda b: trade.compose(b, *desktop.default_size("trade"))),
+    "trade": ("TRADE", lambda b: trade.compose(b, *desktop.default_size("trade"),
+                                               hours=b.get("attention", 0))),
     "works": ("THE WORKS", lambda b: works.compose(b, "", *desktop.default_size("works"))),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, *desktop.default_size("world"))),
     "counsel": ("COUNSEL", lambda b: counsel.compose(

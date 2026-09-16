@@ -369,7 +369,7 @@ the active mode and otherwise closes; `:` opens Command and `?` opens Help.
 Ctrl-H raises Hall, Ctrl-G opens the window switcher, Ctrl-Tab and
 Ctrl-Shift-Tab cycle windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-S
 saves, Ctrl-O reloads, and Ctrl-+/Ctrl--/Ctrl-0 change type size. Function keys
-are not part of the interface.
+are not gameplay controls; F8 is reserved for optional local playtest notes.
 
 Every screen works with the keyboard alone. Mouse is an alternative, never the
 only path.
@@ -377,9 +377,8 @@ only path.
 Every action states its cost before confirmation and its refusal in plain
 words. Destructive or irreversible orders confirm explicitly.
 
-The Hall is an exception docket, not a second copy of every ledger. It answers:
-who or what has reached the king, what changed, and where the evidence is.
-Rooms show working state.
+The Hall summarizes what changed, what needs attention and where the evidence
+is. Rooms retain the detailed working records and allocation controls.
 
 New campaigns and each fortnight open directly in Court. One petitioner,
 messenger or urgent matter is presented at a time, with its immediate actions.
@@ -390,7 +389,8 @@ The Hall is the second half of the fortnight and opens with Tab, once Court is
 done. It is a dashboard: the grain year, stores and their change, standing and
 temper, rations promised against work days, the matters before the king, what is
 still waiting, what is in motion, and the doors to every working room. SPACE
-there ends the fortnight; L shows the last report. Court contains no generic
+there ends the fortnight; L shows the last report and O opens Orders and its
+receipts. Court contains no generic
 advice feed and no duplicate resource dashboard; the Hall contains no audiences.
 Judgements exist in one room only: the Palace holds people, offices, the house
 and foreign courts, and hears nothing. Every window prints its controls the

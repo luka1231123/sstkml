@@ -166,7 +166,7 @@ DESCRIPTORS: tuple[ActionDescriptor, ...] = (
        ("assign <formation> to <task> at <place>",), 1,
        (Field("formation", "formation"), Field("task", "task"),
         Field("place", "place", optional=True)),
-       mnemonic="a", help_topic="assign_troops"),
+       mnemonic="a", help_topic="assign_troops", confirm=True),
      _d("raise_corvee", A.RaiseCorvee, "Raise corvée", "Corvée",
         ("land", "works"), ("raise corvee <days>",), 1,
         (Field("days", "quantity"),), mnemonic="c", help_topic="corvee"),

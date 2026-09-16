@@ -130,6 +130,11 @@ appointment picker, Help and the end of a fortnight.
 
 ## Still open
 
+See [the AI-led next plan](AI_NEXT_PLAN.md) for the current assessment,
+priorities and acceptance criteria.
+The subsequent [decision-review build and playtest route](PLAYTEST_DECISIONS.md)
+addresses the screen gaps below; this list records the original pass's handoff.
+
 - The turn-82 finding: passive play still survives. Nothing here touches it.
 - Storehouse and Trade wording is untouched.
 - The Counsel portrait still takes nine rows of a 62-column window.

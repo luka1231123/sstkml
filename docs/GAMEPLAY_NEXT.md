@@ -1,5 +1,12 @@
 # From working court to compelling reign
 
+Current handoff, 2026-09-16: [playtest the decision-review build](PLAYTEST_DECISIONS.md).
+The sections below retain the earlier assessment. The guided Hall has since been
+retired; the returning debt/household-grain claim and competing advice already
+exist. Do not reimplement them from this historical proposal. Follow
+[AI_NEXT_PLAN.md](AI_NEXT_PLAN.md) for current priorities; a larger workshop arc
+remains deferred until the existing loop is understood and worth playing.
+
 Assessment: 2026-09-15. These are design conclusions from the current code and
 the linked games' official descriptions, not a comparative human playtest.
 

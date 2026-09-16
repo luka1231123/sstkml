@@ -21,6 +21,7 @@ Nothing in this module knows what a granary is. It lays out rows and controls;
 from __future__ import annotations
 
 import dataclasses
+import textwrap
 
 import registry
 from tui import collection, style
@@ -129,7 +130,8 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
             note: str = "",
             views: tuple[tuple[str, str], ...] = (),
             view: str = "", scene=None, scene_rows: int = 0,
-            detail_min: int = 18, list_min: int = 5) -> InteractiveScreen:
+            detail_min: int = 18, list_min: int = 5,
+            detail_page: int | None = None) -> InteractiveScreen:
     """The whole screen: list left, detail right, controls along the bottom.
 
     `scene` is a band across the top for a window that is a room rather than a
@@ -183,7 +185,8 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
         room = max(1, min(
             available - 4, max(available // 3, list_min)))
         room = min(room, max(1, len(rows)))
-        detail = detail[:max(0, available - room - 1)]
+        if detail_page is None:
+            detail = detail[:max(0, available - room - 1)]
     else:
         room = max(1, available)
     body = room
@@ -214,6 +217,17 @@ def compose(title: str, headers: tuple[str, ...], widths: tuple[int, ...],
     # print over it, so the line explaining the screen vanished on exactly the
     # screens with enough in them to need explaining.
     detail_floor = height - 2 - footer_rows - (1 if note else 0)
+    if detail_page is not None:
+        wrapped = [(line, tone) for text, tone in detail
+                   for line in (textwrap.wrap(text, max(1, detail_room)) or [""])]
+        capacity = max(1, detail_floor - detail_y - 1)
+        pages = max(1, (len(wrapped) + capacity - 1) // capacity)
+        page_number = detail_page % pages
+        detail = wrapped[page_number * capacity:(page_number + 1) * capacity]
+        if pages > 1:
+            label = f"[←/→] detail {page_number + 1}/{pages}"
+            surface.text(detail_x, detail_floor - 1, label[:detail_room], C["sand"], C["ink"])
+            surface.link(detail_x, detail_floor - 1, min(len(label), detail_room), 1, "detail:next")
     for offset, (text, tone) in enumerate(detail):
         if detail_y + offset >= detail_floor:
             break

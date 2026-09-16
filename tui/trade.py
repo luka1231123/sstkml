@@ -2,6 +2,7 @@ from tui import collection, relief
 from tui import dues as due_text
 from tui import style, workbench
 from tui.grid import INDEX, InteractiveScreen, Surface
+from belief.trade import purchase
 
 C = INDEX
 VIEWS = ("exchange", "cargo", "routes", "movements", "dues", "relief")
@@ -45,24 +46,22 @@ def compose(b: dict, width: int = 72, height: int = 24,
     trade = b.get("trade", {})
     y = 5
     if view == "exchange":
-        price = trade.get("grain_price", 0)
-        surface.text(3, y, f"grain price  {price:,} copper shekels / 1,000 qa",
-                     C["barley"], C["ink"])
+        p = purchase(b)
+        facts = [
+            f"LOCAL QUAY · counted turn {b.get('turn', '?')}",
+            f"grain price: {p['price']:,} copper shekels per 1,000 qa",
+            f"tin price: {trade.get('tin_price', 0):,} copper per 1,000 shekels",
+            "1 talent = 3,000 copper shekels; this is the purse limit",
+            f"Estimate: {p['grain']:,} qa grain for {p['paid']:,} copper shekels",
+            p["refusal"] or f"Copper left: {p['remaining']:,} shekels; unused purse kept",
+            "Requisition takes cargo without payment; court unrest rises.",
+            "Abroad: request by letter; acceptance and arrival uncertain.",
+        ]
+        y = 4
+        for line in facts:
+            surface.text(3, y, line[:width - 6], C["sand"] if y == 4 else C["clay"], C["ink"])
+            y += 1
         y += 1
-        tin = trade.get("tin_price", 0)
-        surface.text(3, y, f"tin price    {tin:,} copper shekels / 1,000 shekels",
-                     C["gold"], C["ink"])
-        y += 1
-        grain_here = sum(
-            c.get("available", 0) for c in trade.get("cargo", ())
-            if c.get("good") == "grain")
-        one_talent = min(grain_here, 3000 * 1000 // max(1, price))
-        surface.text(3, y, f"1 talent buys up to {one_talent:,} qa counted grain",
-                     C["dim"], C["ink"])
-        y += 1
-        surface.text(3, y, "requisition: take cargo now; unrest rises with value",
-                     C["flame"], C["ink"])
-        y += 2
         movements = trade.get("movements", ())
         carrying = [m for m in movements if m.get("cargo")]
         soonest = min((m["arrives"] for m in movements), default=None)
@@ -120,7 +119,7 @@ def compose(b: dict, width: int = 72, height: int = 24,
             surface.link(2, y, width - 4, 1, f"trade:open:{view}:{index}")
         elif view == "exchange":
             jump = {"on the water": "movements", "next arrival": "movements",
-                    "routes you know": "routes", "cargo in hand": "cargo"}.get(name)
+                    "routes you know": "routes", "cargo at the quay": "cargo"}.get(name)
             if jump:
                 surface.link(2, y, width - 4, 1, f"tab:{jump}")
         y += 1
@@ -138,7 +137,7 @@ def compose(b: dict, width: int = 72, height: int = 24,
                     if c.get("good") == "grain")
         copper = b.get("stores", {}).get("copper", 0)
         actions.append(style.FooterAction(
-            "f", "buy grain · 1 talent", enabled=grain > 0 and copper >= 3000,
+            "f", "review local purchase · 1h", enabled=not purchase(b)["refusal"] and hours >= 1,
             command="trade:finance"))
     elif view == "cargo":
         cargo = next((item for item in trade.get("cargo", ())

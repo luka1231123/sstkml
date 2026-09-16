@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import registry
 from belief import project
+from belief import muster as muster_preview
 from belief.rations import plan as ration_plan
 from belief.rations import repayment
 from tui import dues as due_text
@@ -78,7 +79,8 @@ STOREHOUSE_VIEWS = (
 
 def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
            scroll: int = 0, amount: int = 0, notice: str = "",
-           hours: int = 0, room: bool = False) -> InteractiveScreen:
+           hours: int = 0, room: bool = False,
+           detail_page: int = 0) -> InteractiveScreen:
     goods = sorted(b.get("stores", {}).items())
     rows = [
         Row(good, (
@@ -117,11 +119,16 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
         detail.append(
             ("your inspected count" if ledger in inspected
              else "keeper's count", "dim"))
+        detail.append((f"record at turn {b.get('turn', '?')}", "dim"))
+        if selected == "grain":
+            reserved = b.get("ration_reserved", 0)
+            detail += [(f"reserved {reserved:,} qa", "sand"),
+                       (f"available estimate {max(0, held - reserved):,} qa", "barley")]
         history = b.get("store_history", {}).get(selected, [])
         if history:
             detail += [
                 ("", "ink"),
-                ("RECENT COUNTS", "gold"),
+                (f"LAST {len(history)} READINGS", "gold"),
                 (sparkline(history, min(18, width)), "dim"),
             ]
             if len(history) > 1:
@@ -130,6 +137,8 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
                     ("+" if change >= 0 else "−")
                     + render.fmt_good(selected, abs(change)),
                     "barley" if change >= 0 else "blood"))
+                detail.append(("change from first to last reading", "dim"))
+            detail.append(("Closing counts; orders since then may change stores.", "dim"))
     if ledger:
         detail += [("", "ink"), (f"[i] count the {ledger} yourself", "sand")]
     if selected == "seed_grain":
@@ -164,8 +173,8 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
     if ledger:
         controls.append(affordable(
             Control("inspect_ledger", key_for("inspect_ledger")), hours))
-    note = ("tab view   ↑↓ choose   Enter record   [ ] amount" if room
-            else "↑↓ choose   Enter record   [ ] amount")
+    note = ("[tab] view   ↑↓ choose   [enter] record" if room
+            else "↑↓ choose   [enter] record")
     return compose(
         "THE STOREHOUSE" if room else "THE STORES",
         # One unit to a quantity means the counted column no longer has to
@@ -175,7 +184,8 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="the storehouse is empty.",
         note=note,
-        views=STOREHOUSE_VIEWS if room else (), view="stores")
+        views=STOREHOUSE_VIEWS if room else (), view="stores",
+        detail_page=detail_page)
 
 
 # --- the roll -----------------------------------------------------------------
@@ -533,7 +543,8 @@ def storehouse_account(b: dict, view: str, selected: str = "",
 
 def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
            scroll: int = 0, task: str = "garrison", place: str = "",
-           notice: str = "", hours: int = 0) -> InteractiveScreen:
+           notice: str = "", hours: int = 0,
+           detail_page: int = 0) -> InteractiveScreen:
     troops = b.get("troops", {})
     formations = list(troops.get("formations", []))
     rows = [
@@ -580,25 +591,12 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
 
     detail: list[tuple[str, str]] = []
     if formation is not None:
-        detail = [
-            (formation["name"][:30], "gold"),
-            ("        ╱╲", "sand"),
-            ("    ◉──╫════▷", "gold"),
-            ("   ╱█╲ ║", "clay"),
-            ("   ╱ ╲ ╨", "sand"),
-            (" SPEAR FORMATION", "dim"),
-            ("", "ink"),
-            (f"{formation['strength']} men", "clay"),
-            (f"now {formation['task']} at {_spoken(formation['place'])}",
-             "clay"),
-            ("", "ink"),
-            ("SEND THEM", "gold"),
-            (f"task   {task}", "flame"),
-            (f"place  {_spoken(place) or 'choose one'}",
-             "flame" if place else "ash"),
-            ("[t] next task   [l] next place", "dim"),
-            ("[a] gives the order", "dim"),
-        ]
+        detail = [(f"DRAFT: {task} at {_spoken(place) or 'choose a place with [l]'}", "flame")]
+        facts = muster_preview.lines(b, formation["id"], task, place)
+        if not place:
+            facts = facts[:2] + ["Choose a destination with [l] to compare the assignment.",
+                                "No new men or goods are taken when you reassign troops."]
+        detail += [(line, "clay") for line in facts]
     elif selected.startswith("summons:"):
         detail = [("A SUMMONS", "gold"), ("", "ink"),
                   ("choose a formation above, then send it", "dim")]
@@ -613,8 +611,7 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
 
     controls = [
         affordable(Control("assign_troops", key_for("assign_troops"),
-                           label=f"send to {task}"
-                                 + (f" at {_spoken(place)}" if place else ""),
+                           label="review assignment",
                            enabled=formation is not None and bool(place),
                            why="choose a formation and a place"), hours),
         Control("place_person", key_for("place_person"), label="give command",
@@ -628,7 +625,8 @@ def muster(b: dict, selected: str = "", width: int = 80, height: int = 27,
         (24, -5, 10, 14),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="no formations are recorded.",
-        note="↑↓ choose   Enter open")
+        note="↑↓ choose  [t] task  [l] place  [enter] record",
+        list_min=3, detail_page=detail_page)
 
 
 # --- the oaths ----------------------------------------------------------------

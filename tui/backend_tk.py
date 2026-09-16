@@ -161,6 +161,7 @@ class GridWindow:
         self.root.protocol(
             "WM_DELETE_WINDOW", on_close or self.close)
         self.text.bind("<Configure>", self._configured)
+        self.root.bind("<FocusIn>", lambda _event: app.note_focus(self.key))
 
         # Desktop-level keys -- tile, cascade, switch, font size -- belong to
         # every window, not to whichever one happens to own the keyboard. Bound
@@ -337,6 +338,7 @@ class GridWindow:
         self.text.configure(state="disabled")
 
     def focus(self) -> None:
+        self.app.note_focus(self.key)
         self.root.lift()
         self.root.focus_force()
 

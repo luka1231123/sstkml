@@ -62,11 +62,11 @@ def test_trade_screen_names_the_return_and_requisition_cost() -> None:
     belief = project(load_campaign("seat", SEED))
     text = plain_text(trade.compose(belief, width=66, height=22))
 
-    assert "buys up to" in text and "counted grain" in text
+    assert "Estimate:" in text and "qa grain for" in text
     assert "tin price" in text
-    assert "requisition: take cargo now" in text
-    assert "unrest rises with value" in text
-    assert "buy grain · 1 talent" in text
+    assert "Requisition takes cargo without payment" in text
+    assert "court unrest rises" in text
+    assert "review local purchase" in text
 
     cargo = plain_text(trade.compose(
         belief, width=66, height=22, view="cargo"))
@@ -96,7 +96,7 @@ def test_trade_finances_one_talent_without_opening_a_typed_command() -> None:
     action, _cost, window = game.pending_action
     assert action == A.FinanceTrade("copper", 3000)
     assert window == "trade"
-    assert "buy up to 75,000 grain" in str(game.notices["trade"])
+    assert "Estimated receipt: 75,000 qa" in str(game.notices["trade"])
     assert "Enter confirms" in str(game.notices["trade"])
     assert not game.log
 

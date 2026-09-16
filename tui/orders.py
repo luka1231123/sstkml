@@ -238,7 +238,7 @@ def visible(orders: list[Order], view: str, now: int) -> list[Order]:
 def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
             view: str = "standing", selected: str = "", scroll: int = 0,
             notice: str = "", width: int = 88,
-            height: int = 30) -> InteractiveScreen:
+            height: int = 30, detail_page: int = 0) -> InteractiveScreen:
     orders = visible(history(log, belief), view, now)
     chosen = next((order for order in orders if order.id == selected),
                   orders[0] if orders else None)
@@ -265,7 +265,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
                 slot.undo, "u", label=slot.undo_label), hours))
         if chosen.descriptor is not None:
             controls.append(workbench.Control(
-                "open", "Enter", label="open where it was given"))
+                "open", "enter", label="open where it was given"))
     if not any(control.key == "u" for control in controls):
         controls.append(workbench.Control(
             "countermand", "u", label="countermand", enabled=False,
@@ -276,7 +276,8 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
         rows, chosen.id if chosen else "", detail, controls, hours,
         width, height, scroll, notice,
         empty=_empty(view), views=VIEWS, view=view,
-        note="tab / shift-tab view   ↑↓ choose   Enter open")
+        note="[tab] view   ↑↓ choose   [enter] open",
+        detail_page=detail_page, list_min=3)
 
 
 def _empty(view: str) -> str:
@@ -314,6 +315,12 @@ def _detail(order: Order, belief: dict, now: int) -> list[tuple[str, str]]:
         if group:
             lines.append((f"Roll now: {'at fields' if group.get('at_fields') else 'ordinary duties'}"
                           f" · turn {belief.get('turn', '?')}", "sky"))
+    if action.get("_t") == "AssignTroops":
+        formation = next((f for f in belief.get("troops", {}).get("formations", ())
+                          if f["id"] == action.get("formation_id")), {})
+        if formation:
+            lines.append((f"Roll now: {formation['task']} at {formation['place'].replace('_', ' ')}"
+                          f" · turn {formation.get('as_of_turn', '?')}", "sky"))
     if descriptor is not None and descriptor.cost:
         unit = "hour" if descriptor.cost == 1 else "hours"
         lines.append((f"it cost {descriptor.cost} {unit}", "dim"))

@@ -5,6 +5,22 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
+## Current handoff — 2026-09-16
+
+The decision-review implementation is ready for a human playtest. See
+[the route and note instructions](PLAYTEST_DECISIONS.md). Muster's controls,
+grounded defence comparison and confirmation are implemented; local purchases
+show estimates and actual receipts; Stores, Orders, Counsel and long reviews
+have reachable overflow. Hall O opens Orders. F8 notes attach the originating
+screen and wrap long text. Help describes the new controls.
+
+The earlier dated sections below are historical measurements and proposals.
+In particular, the guided Hall is retired and the returning shipwright is already
+implemented. Neither should be rebuilt from those paragraphs. The current work
+queue is [AI_NEXT_PLAN.md](AI_NEXT_PLAN.md). Human comprehension, long-run policy
+divergence and campaign balance remain open. Troop harvest duty currently adds
+no kernel farm labour; use the working Land/Rations allocation path.
+
 ## Court first, then the Hall — playtest revision
 
 The primary screen is now Court. Each fortnight brings a single petition,

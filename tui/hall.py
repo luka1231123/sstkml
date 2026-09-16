@@ -236,6 +236,7 @@ def compose(b: dict, width: int = 84, height: int = 28,
     _doors(surface, b, height)
     style.footer(surface, (
         style.FooterAction("space", "end the fortnight", command="space"),
-        style.FooterAction("l", "last report", command="home:report"),
+        style.FooterAction("l", "report", command="home:report"),
+        style.FooterAction("o", "orders", command="home:orders"),
         style.FooterAction(":", "command"), style.FooterAction("?", "help")))
     return surface.interactive()

@@ -92,7 +92,7 @@ ROOMS: dict[str, tuple[str, str, str]] = {
     "w": ("world", "The Known World", "on_world_key"),
     "v": ("altar", "The Shrine", "on_altar_key"),
     "y": ("alu", "The Alu", "on_alu_key"),
-    "j": ("palace", "The Court", "on_palace_key"),
+    "j": ("palace", "The Palace", "on_palace_key"),
     "x": ("trade", "Trade", "on_trade_key"),
 }
 
@@ -522,6 +522,13 @@ class Game:
         if cost is None:
             cost = registry.cost_of(action)
         target = self.active_window() if window is None else window
+        if getattr(self, "pending_action", None) is not None and not confirmed:
+            result = registry.ActionResult(
+                registry.REFUSAL, action_id,
+                "Finish or cancel the order already under review.", 0, self.hours)
+            self.notify(result.message, result.status, window=target)
+            self.repaint()
+            return result
         description = self._describe_order(action)
         if descriptor and descriptor.confirm and not confirmed:
             self.pending_action = (action, cost, target)
@@ -558,13 +565,23 @@ class Game:
                     ruled = next(e for e in events if isinstance(e, A.PetitionRuled))
                     who = palace._name(ruled.beneficiary, self.belief)
                     receipt = [f"{who} received {ruled.amount:,} {ruled.good}. The case is closed.",
-                               f"City unrest changed {ruled.unrest_delta:+}."]
+                               f"Court unrest changed {ruled.unrest_delta:+}."]
                 elif isinstance(action, A.SendToHarvest):
                     p = harvest.plan(self.belief)
                     if p["need"] is not None and p["remaining"]:
                         receipt = [f"At order: {p['remaining']} harvest fortnights left.",
                                    f"Roll: {p['before']:,} person-days/fortnight.",
                                    f"Estimated deadline shortfall: {p['short_before']:,} days."]
+                elif isinstance(action, A.AssignTroops):
+                    formation = next(f for f in self.belief["troops"]["formations"]
+                                     if f["id"] == action.formation_id)
+                    receipt = [f"{formation['name']}: {formation['strength']:,} men assigned "
+                               f"to {formation['task']} at {formation['place'].replace('_', ' ')}.",
+                               "No new men called; no goods paid on assignment."]
+                elif isinstance(action, A.FinanceTrade):
+                    bought = next(e for e in events if isinstance(e, A.TradeFinanced))
+                    receipt = [f"Received {bought.received_quantity:,} qa grain from cargo at the quay; "
+                               f"paid {bought.quantity:,} copper shekels."]
                 self.log.append({"turn": self.world.date.absolute,
                                  "action": A.to_dict(action), "receipt": receipt})
                 self.load_armed = False
@@ -577,6 +594,7 @@ class Game:
         return result
 
     def show_confirmation(self, description: str, cost: int) -> None:
+        self.confirm_page = 0
         if not hasattr(getattr(self, "app", None), "root"):
             return
         self.confirm_text = (description, cost)
@@ -591,7 +609,11 @@ class Game:
     def on_confirm_key(self, event) -> None:
         command, key = getattr(event, "command", ""), event.keysym
         char = (event.char or "").lower()
-        if command == "confirm" or key == "Return" or char == "y":
+        if key in {"Left", "Right", "Prior", "Next"} or command == "detail:next":
+            self.confirm_page = getattr(self, "confirm_page", 0) + (
+                -1 if key in {"Left", "Prior"} else 1)
+            self.repaint()
+        elif command == "confirm" or key == "Return" or char == "y":
             self.confirm_pending()
         elif command == "cancel" or key == "Escape" or char in {"n", "1", "2"}:
             self.cancel_pending()
@@ -922,7 +944,10 @@ class Game:
                                    self.counsel_typed, self.counsel_typing,
                                    width, height, suggestions,
                                    (self.counsel_pending["descriptions"]
-                                    if self.counsel_pending else None))
+                                    if self.counsel_pending else None),
+                                   page=getattr(self, "counsel_page", 0),
+                                   pending_cost=(self.counsel_pending.get("cost", 0)
+                                                 if self.counsel_pending else 0))
         if key == "palette":
             return command_page.compose(
                 self.command_line,
@@ -932,10 +957,10 @@ class Game:
         if key == "confirm":
             description, cost = getattr(self, "confirm_text", ("", 0))
             return dialog.compose(
-                "CONFIRM ORDER", [description,
-                    f"Cost: {cost} court hour{'s' if cost != 1 else ''}."
-                    " Nothing has been ordered yet."],
+                "CONFIRM ORDER", [f"Cost: {cost} court hour{'s' if cost != 1 else ''}. "
+                    "Nothing has been ordered yet.", *description.splitlines()],
                 width=width, height=height,
+                page=getattr(self, "confirm_page", 0),
                 footer=(style.FooterAction("enter", "confirm order", command="confirm"),
                         style.FooterAction("esc", "cancel", command="cancel")))
         if key == "appoint":
@@ -952,7 +977,8 @@ class Game:
         if key == "note":
             return dialog.compose(
                 "PLAYTEST NOTE",
-                ["What confused you, broke, or felt good? Any format is fine."],
+                ["What did you expect? What happened? What would you try next?",
+                 "The screen, turn and recent orders are attached automatically."],
                 typed=getattr(self, "note_typed", ""),
                 width=width, height=height,
                 footer=(style.FooterAction("ctrl-enter", "save note", command="save"),
@@ -999,7 +1025,8 @@ class Game:
                 b, self.log, self.world.date.absolute, self.hours,
                 view=state["view"], selected=state["pick"],
                 scroll=state["scroll"], notice=notice,
-                width=width, height=height)
+                width=width, height=height,
+                detail_page=state.get("detail_page", 0))
         if key in ({w for w, _t, _h in LEDGERS.values()}
                    | {"roll", "land", "oaths"}):
             return self.compose_ledger(key, b, width, height, notice)
@@ -1034,11 +1061,12 @@ class Game:
 
         def guarded(handler):
             def wrapped(_event=None):
-                active = self.active_window()
+                live = self.app.live()
+                active = live[0] if live else "hall"
                 typing = ((active == "stack" and self.desk and self.desk.get("dictating"))
                           or (active == "counsel" and self.counsel_typing)
                           or (active in {"stack", "archive"} and self.archive_typing)
-                          or active == "palette")
+                          or active in {"palette", "note", "help"})
                 if typing:
                     return None
                 handler()
@@ -2293,6 +2321,11 @@ class Game:
         state = self.orders_state
         command = getattr(event, "command", "")
         char = (event.char or "").lower()
+        if event.keysym in {"Left", "Right"} or command == "detail:next":
+            state["detail_page"] = state.get("detail_page", 0) + (-1 if event.keysym == "Left" else 1)
+            self.repaint()
+            return
+        state["detail_page"] = 0
         if event.keysym == "Escape":
             self.app.close("orders")
             return
@@ -2452,7 +2485,7 @@ class Game:
                 return ledger_page.storehouse_account(
                     b, view, drafts=state.setdefault("rates", {}), **common)
             return ledger_page.stores(
-                b, amount=state["amount"], **common)
+                b, amount=state["amount"], detail_page=state.get("detail_page", 0), **common)
         state = self.ledger_state[key]
         common = dict(selected=state["pick"], width=width, height=height,
                       scroll=state["scroll"], notice=notice, hours=self.hours)
@@ -2469,6 +2502,7 @@ class Game:
         if key == "muster":
             return ledger_page.muster(b, task=state["task"],
                                       place=state["place"],
+                                      detail_page=state.get("detail_page", 0),
                                       **common)
         return ledger_page.oaths(b, amount=state["amount"], **common)
 
@@ -2540,12 +2574,22 @@ class Game:
         only the orders that are actually its own.
         """
         state = self.ledger_state[key]
+        if getattr(self, "pending_action", None) is not None:
+            self.on_confirm_key(event)
+            return True
         if event.keysym == "Escape":
             self.app.close(window or key)
             return True
         command = getattr(event, "command", "")
+        if key in {"stores", "muster"} and (
+                event.keysym in {"Left", "Right"} or command == "detail:next"):
+            state["detail_page"] = state.get("detail_page", 0) + (
+                -1 if event.keysym == "Left" else 1)
+            self.repaint()
+            return True
         if command.startswith("pick:"):
             state["pick"] = command.split(":", 1)[1]
+            state["detail_page"] = 0
             self.repaint()
             return True
         rows = self.window_rows(window or key)
@@ -2555,6 +2599,7 @@ class Game:
         if rows and state["pick"] not in rows:
             state["pick"] = rows[0]
         if event.keysym in ("Up", "Down"):
+            state["detail_page"] = 0
             if rows:
                 here = rows.index(state["pick"])
                 state["pick"] = rows[collection.step(
@@ -2563,6 +2608,7 @@ class Game:
                 self.repaint()
             return True
         if event.keysym in ("Prior", "Next", "Home", "End"):
+            state["detail_page"] = 0
             if rows:
                 screen = self.compose(window or key)
                 visible: list[str] = []
@@ -2941,11 +2987,13 @@ class Game:
             tasks = ledger_page.TASKS
             state["task"] = tasks[
                 (tasks.index(state["task"]) + 1) % len(tasks)]
+            state["detail_page"] = 0
             self.repaint()
         elif char == "l" and places:
             here = places.index(state["place"]) if state["place"] in places \
                 else -1
             state["place"] = places[(here + 1) % len(places)]
+            state["detail_page"] = 0
             self.repaint()
         elif char == _key("assign_troops") or wanted == "assign_troops":
             if formation is None or not state["place"]:
@@ -2960,10 +3008,8 @@ class Game:
                 or wanted in ("place_person", "dismiss_person"):
             # A formation's command is a post like any other, and the House is
             # where the people to fill it are. Say so rather than refusing.
-            self.notify(
-                "a commander is appointed in the House, where the people are.",
-                registry.PREVIEW, window="muster")
-            self.repaint()
+            self.palace_state.update(view="people", choosing="", scroll=0)
+            self.open_room("j")
 
     def on_oaths_key(self, event, window: str = "oaths") -> None:
         state = self.ledger_state["oaths"]
@@ -3201,6 +3247,7 @@ class Game:
         hours are session state (attention is derived — see `hall.compose`). So
         nothing goes in the log and a replay is unaffected.
         """
+        self.counsel_page = 0
         question = question.strip()
         if not question:
             self.counsel_said.append((
@@ -3238,6 +3285,7 @@ class Game:
         def done(result, error) -> None:
             text = authored if error is not None or result is None else result[0]
             self.counsel_said.append(("scribe", text))
+            self.counsel_page = 0
             self.repaint()
 
         if self.client is None:
@@ -3305,26 +3353,16 @@ class Game:
             return (f"{group} will {'go to the fields' if action.to_fields else 'return from the fields'}. "
                     + " ".join(harvest.lines(b, action.group_id, action.to_fields)))
         if isinstance(action, A.AssignTroops):
-            formation = next((f["name"] for f in b.get("troops", {}).get(
-                "formations", []) if f["id"] == action.formation_id),
-                action.formation_id)
-            place = f" at {action.place}" if action.place else ""
-            return f"{formation} will {action.task}{place}"
+            from belief import muster
+            return "\n".join(muster.lines(b, action.formation_id, action.task, action.place))
         if isinstance(action, A.RaiseCorvee):
             from engine import works as works_engine
 
             days = min(action.days, works_engine.useful_call_days(self.world))
             return f"{days:,} days of corvée have been called"
         if isinstance(action, A.FinanceTrade):
-            trade = b.get("trade", {})
-            price = max(1, int(trade.get("grain_price", 0)))
-            available = sum(
-                max(0, int(item.get("available", 0)))
-                for item in trade.get("cargo", ())
-                if item.get("good") == "grain")
-            bought = min(available, action.quantity * 1000 // price)
-            return (f"buy up to {bought:,} grain with at most "
-                    f"{action.quantity:,} copper")
+            from belief import trade
+            return "\n".join(trade.lines(b, action.quantity))
         if isinstance(action, A.RequisitionTrade):
             from engine import trade_policy
 
@@ -3441,10 +3479,10 @@ class Game:
 
         descriptions = [self._describe_order(action) for action in actions]
         for action, cost in zip(actions, costs):
-            self.world, _events = apply(self.world, action)
-            self.hours -= cost
-            self.log.append({"turn": self.world.date.absolute,
-                             "action": A.to_dict(action)})
+            result = self.do(action, cost, window="counsel", confirmed=True)
+            if not result:
+                self.counsel_said.append(("scribe", result.message))
+                return
         self.counsel_said.append((
             "scribe", "It is done: " + "; ".join(descriptions) + "."))
         self.repaint()
@@ -3501,7 +3539,9 @@ class Game:
         self.counsel_pending = {
             "actions": tuple(actions),
             "descriptions": descriptions,
+            "cost": total,
         }
+        self.counsel_page = 0
         cost_words = (
             "It costs no audience hours"
             if total == 0 else
@@ -3522,6 +3562,7 @@ class Game:
         self.execute_counsel_actions(actions)
 
     def cancel_counsel_order(self) -> None:
+        self.counsel_page = 0
         if self.counsel_pending is None:
             return
         self.counsel_pending = None
@@ -3529,6 +3570,7 @@ class Game:
         self.repaint()
 
     def submit_counsel(self, text: str) -> None:
+        self.counsel_page = 0
         text = text.strip()
         if not text:
             self.counsel_said.append((
@@ -3596,6 +3638,21 @@ class Game:
             self.repaint()
 
     def on_counsel_key(self, event) -> None:
+        command = getattr(event, "command", "")
+        pending = self.counsel_pending["descriptions"] if self.counsel_pending else None
+        if event.keysym in {"Prior", "Next", "Home", "End"} or command == "counsel:page":
+            pages = counsel.page_count(self.counsel_said, *self._size("counsel"), pending)
+            page = getattr(self, "counsel_page", 0)
+            if event.keysym in {"Home", "End"}:
+                page = (0 if pending else pages - 1) if event.keysym == "Home" else (pages - 1 if pending else 0)
+            else:
+                forward = event.keysym == "Next" or command == "counsel:page"
+                page += (1 if forward else -1) * (1 if pending else -1)
+                if command == "counsel:page":
+                    page = (getattr(self, "counsel_page", 0) + 1) % pages
+            self.counsel_page = max(0, min(pages - 1, page))
+            self.repaint()
+            return
         if event.keysym == "Escape":
             if self.counsel_pending is not None:
                 self.cancel_counsel_order()
@@ -3613,6 +3670,15 @@ class Game:
         if self.counsel_pending is not None:
             if event.keysym == "Return":
                 self.confirm_counsel_order()
+            return
+        if command.startswith("suggest:") or (
+                getattr(event, "state", 0) & 4 and event.keysym in {"1", "2"}):
+            index = int(command.split(":")[1]) if command else int(event.keysym) - 1
+            suggestions = [c.order_prompt or c.suggestion for c in advice.concerns(self.belief, 3)
+                           if c.destination == "counsel"]
+            if 0 <= index < len(suggestions):
+                self.counsel_typed = suggestions[index]
+            self.repaint()
             return
         if event.keysym in ("BackSpace", "Delete"):
             self.counsel_typed = self.counsel_typed[:-1]
@@ -4577,6 +4643,9 @@ class Game:
         self.repaint()
 
     def on_trade_key(self, event) -> None:
+        if getattr(self, "pending_action", None) is not None:
+            self.on_confirm_key(event)
+            return
         if event.keysym == "Escape":
             self.app.close("trade")
             return
@@ -5118,6 +5187,9 @@ class Game:
             self.home_scroll = 0
         elif command == "home:help" or char == "?":
             self.open_help()
+        elif view == "hall" and (char == "o" or command == "home:orders"):
+            self.open_orders()
+            return True
         elif view == "hall":
             # The hall is the planning half of the fortnight: doors, the last
             # report, and the one control that ends the turn.
@@ -5304,6 +5376,17 @@ class Game:
     def playtest_note(self) -> None:
         """A note, written on the game's own grid, saved beside the campaign."""
         self.note_typed = getattr(self, "note_typed", "")
+        live = self.app.live()
+        origin = live[0] if live else "hall"
+        if origin != "note":
+            from tui.grid import plain_text
+            screen = self.compose(origin)
+            self.note_context = {"seed": self.seed, "turn": self.world.date.absolute,
+                                 "window": origin, "hours": self.hours,
+                                 "orders": len(self.log),
+                                 "screen": plain_text(screen.screen) if screen else "",
+                                 "home_view": getattr(self, "home_view", ""),
+                                 "recent_orders": self.log[-3:]}
         window = self.app.window(
             "note", "Playtest note", 72, 20,
             on_key=self.on_note_key, on_resize=self.on_resize,
@@ -5315,9 +5398,9 @@ class Game:
         note = getattr(self, "note_typed", "").strip()
         if not note:
             return
-        context = {"seed": self.seed, "turn": self.world.date.absolute,
-                   "window": self.active_window(), "hours": self.hours,
-                   "orders": len(self.log)}
+        context = getattr(self, "note_context", {
+            "seed": self.seed, "turn": self.world.date.absolute,
+            "window": self.active_window(), "hours": self.hours, "orders": len(self.log)})
         try:
             path = self.save_path.with_name("notes.jsonl")
             path.parent.mkdir(parents=True, exist_ok=True)

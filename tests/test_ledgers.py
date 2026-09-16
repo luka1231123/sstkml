@@ -335,8 +335,8 @@ def test_the_muster_keeps_formation_orders_together() -> None:
 
     assert "THE MUSTER — FORMATIONS" in text
     assert formation["name"] in text
-    assert "SPEAR FORMATION" in text
-    assert "════▷" in text
+    assert "[t] task" in text and "[l] place" in text
+    assert "DRAFT: garrison" in text
     assert "do:assign_troops" in actions
 
 def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
@@ -352,6 +352,8 @@ def test_the_muster_sends_a_formation_to_a_task_and_a_place() -> None:
     game.on_muster_key(_Key("l"))
     assert state["place"]
     game.on_muster_key(_Key("a"))
+    assert not game.log
+    game.confirm_pending()
     assert _kinds(game) == ["AssignTroops"]
     assert game.log[0]["action"]["task"] == state["task"]
 

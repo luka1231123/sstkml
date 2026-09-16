@@ -238,105 +238,79 @@ def recommend(b: dict, topic: str) -> str:
     return "I have no immediate order to urge on you, my lord."
 
 
+def reading(said, width: int, height: int, pending=None):
+    portrait = width >= 80 and height >= 30 and not pending
+    left = 21 if portrait else 3
+    capacity = max(1, height - (8 if pending else 12))
+    lines = []
+    if pending:
+        for index, text in enumerate(pending, 1):
+            lines.extend((line, "bone") for line in textwrap.wrap(
+                f"{index}. {text}", width - left - 3))
+            lines.append(("", "clay"))
+    else:
+        for who, what in said:
+            label = "you" if who == "king" else "Yabninu"
+            lines.extend((line, "clay" if who == "king" else "bone")
+                         for line in textwrap.wrap(f"{label}: {what}", width - left - 3))
+            lines.append(("", "clay"))
+    return left, capacity, lines
+
+
+def page_count(said, width: int, height: int, pending=None) -> int:
+    _, capacity, lines = reading(said, width, height, pending)
+    return max(1, (len(lines) + capacity - 1) // capacity)
+
+
 def compose(b: dict, said: list[tuple[str, str]], hours_left: int,
             typed: str = "", typing: bool = False,
             width: int = 92, height: int = 36,
             suggestions: list[str] | None = None,
-            pending: list[str] | None = None) -> InteractiveScreen:
-    """The prime minister's room: conversation and an always-ready order line.
-
-    `said` is the conversation so far — `(who, what)`, oldest first. It is
-    session state and not world state: a conversation is not a fact about the
-    kingdom, and nothing here is written into the log.
-    """
+            pending: list[str] | None = None, page: int = 0,
+            pending_cost: int = 0) -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="COUNSEL", drop=False)
-
-    art.draw(surface, 3, 2, art.SCRIBE, lit=C["bone"], mid=C["dim"],
-             dark=C["faint"])
-    surface.text(3, 12, "Yabninu", C["clay"], C["ink"])
-    surface.text(3, 13, "your scribe", C["ash"], C["ink"])
-    surface.text(3, 15, f"{hours_left} hours", C["flame"], C["ink"])
-    for row in range(2, height - 8):
-        surface.put(18, row, "│", C["faint"], C["ink"])
-
-    left = 21
-    room = width - left - 3
-    foot = height - 8
-    y = 2
-    if not said:
-        for line in textwrap.wrap(
-                "He is standing where he always stands, a little behind the "
-                "chair, with a tablet he has not been asked for.", room):
-            surface.text(left, y, line, C["ash"], C["ink"])
-            y += 1
-    dialogue: list[tuple[int, str, int]] = []
-    for who, what in said:
-        speaker = "you" if who == "king" else "Yabninu"
-        dialogue.append((
-            0, f"{speaker}:",
-            C["flame"] if who == "king" else C["sky"]))
-        for line in textwrap.wrap(what, room - 2):
-            dialogue.append((
-                2, line, C["clay"] if who == "king" else C["bone"]))
-        dialogue.append((0, "", C["clay"]))
-
-    # The conversation used to stop rendering at the first screenful, hiding
-    # the order or answer the player had just submitted. Keep the tail: the
-    # latest exchange is the one that determines what Enter will do next.
-    available = max(0, foot - y - 1)
-    clipped = len(dialogue) > available
-    visible_dialogue = dialogue[-available:] if available else []
-    if clipped and visible_dialogue:
-        offset, line, colour = visible_dialogue[0]
-        visible_dialogue[0] = (
-            offset, ("… " + line)[:room - offset], colour)
-    for offset, line, colour in visible_dialogue:
-        surface.text(left + offset, y, line[:room - offset], colour, C["ink"])
-        y += 1
-
-    # --- what you tell him ---------------------------------------------------
-    title = (
-        " ORDER AWAITING CONFIRMATION" if pending
-        else " YOU SAY OR GIVE AN ORDER")
-    style.bar(surface, 2, foot, width - 4, title,
-              fg=C["bone"],
-              bg=C["faint"])
-    field_width = width - 8
-    visible = typed[-(field_width - 2):]
+    left, capacity, lines = reading(said, width, height, pending)
+    if left == 21:
+        art.draw(surface, 3, 3, art.SCRIBE, lit=C["bone"], mid=C["dim"], dark=C["faint"])
+        surface.text(3, 13, "Yabninu", C["clay"], C["ink"])
+        for row in range(3, height - 8):
+            surface.put(18, row, "│", C["faint"], C["ink"])
+    title = (f"ORDER REVIEW · {pending_cost}h · {hours_left}h left" if pending else
+             f"Yabninu · {hours_left}h left · questions cost 1h")
+    surface.text(3, 2, title[:width - 6], C["sand"], C["ink"])
+    pages = page_count(said, width, height, pending)
+    current = max(0, min(page, pages - 1))
     if pending:
-        visible = "; ".join(pending)
-    style.bar(surface, 3, foot + 1, width - 6, " " + visible,
-              fg=C["bone"], bg=C["faint"])
-    if pending:
-        surface.text(5, foot + 2,
-                     "Enter commits exactly this order; Ctrl-U cancels it.",
-                     C["flame"], C["ink"])
-    elif typed:
-        cursor = 4 + min(len(visible), field_width - 2)
-        surface.put(cursor, foot + 1, "█", C["flame"], C["faint"])
+        visible = lines[current * capacity:(current + 1) * capacity]
     else:
-        surface.text(5, foot + 1, "[/] speak, or just type a question or an order",
-                     C["ash"], C["faint"])
-    surface.link(3, foot + 1, width - 6, 1, "focus")
+        end = max(0, len(lines) - current * capacity)
+        visible = lines[max(0, end - capacity):end]
+    if not lines:
+        visible = [("Ask about the records, or draft an order.", "ash")]
+    for offset, (line, tone) in enumerate(visible):
+        surface.text(left, 4 + offset, line[:width - left - 3], C[tone], C["ink"])
+    nav_y = 4 + capacity
+    if pages > 1:
+        label = (f"[pgup/pgdn] order {current + 1}/{pages}" if pending else
+                 f"[pgup/pgdn] history {pages - current}/{pages}")
+        surface.text(3, nav_y, label[:width - 6], C["sand"], C["ink"])
+        surface.link(3, nav_y, min(len(label), width - 6), 1, "counsel:page")
     if not pending:
-        surface.text(3, foot + 2,
-                     "orders cost as shown; questions cost 1h",
-                     C["ash"], C["ink"])
-
-    suggestions = suggestions or []
-    if not pending:
-        surface.text(3, foot + 3, "YABNINU HAS THESE WORDS READY",
-                     C["dim"], C["ink"])
-        for index, suggestion in enumerate(suggestions[:2]):
-            style.keycap(surface, 3, foot + 4 + index, f"F{index + 1}",
-                         suggestion[:width - 12], command=f"F{index + 1}")
-
+        foot = height - 7
+        style.bar(surface, 2, foot, width - 4, " YOU SAY OR GIVE AN ORDER · [ctrl-u] clear", fg=C["bone"], bg=C["faint"])
+        surface.link(29, foot, 14, 1, "Control-u")
+        visible_typed = typed[-(width - 9):]
+        style.bar(surface, 3, foot + 1, width - 6, " " + visible_typed, fg=C["bone"], bg=C["faint"])
+        surface.put(4 + len(visible_typed), foot + 1, "█", C["flame"], C["faint"])
+        surface.link(3, foot + 1, width - 6, 1, "focus")
+        for index, suggestion in enumerate((suggestions or [])[:2]):
+            style.keycap(surface, 3, foot + 2 + index, f"ctrl-{index + 1}",
+                         suggestion[:width - 17], command=f"suggest:{index}")
+    else:
+        surface.text(3, height - 3, "Read every page; nothing ordered yet.", C["ash"], C["ink"])
     style.footer(surface, [
-        style.FooterAction(
-            "enter", "confirm order" if pending else "tell him"),
-        style.FooterAction("ctrl-u", "cancel" if pending else "clear"),
-        style.FooterAction(
-            "esc", "cancel order" if pending else "return to Hall"),
+        style.FooterAction("enter", "confirm" if pending else "tell him"),
+        style.FooterAction("esc", "cancel" if pending else "close"),
     ], y=height - 2, x=2, width=width - 4)
     return surface.interactive()
