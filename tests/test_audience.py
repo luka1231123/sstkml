@@ -27,7 +27,7 @@ def test_campaign_opens_with_the_petition_and_reviewable_actions():
     assert not any(i['kind'] == 'case' for i in audience.queue(game.belief))
 
 
-def test_defer_and_planning_do_not_spend_hours_or_resolve_claims():
+def test_defer_and_the_hall_do_not_spend_hours_or_resolve_claims():
     game = _game(turns=1)
     before, hours = game.world, game.hours
     game.on_key(_Key('d'))
@@ -35,11 +35,7 @@ def test_defer_and_planning_do_not_spend_hours_or_resolve_claims():
     game.on_key(_Key('r'))
     assert audience.current(game.belief, game.audience_deferred)
     game.on_key(_Key(keysym='Tab'))
-    assert game.home_view == 'planning'
-    game.on_key(_Key(keysym='Tab'))
-    assert game.home_view == 'court'
-    game.on_key(_Key(keysym='space'))
-    assert game.home_view == 'planning'
+    assert game.home_view == 'hall'
     assert game.world is before and game.hours == hours
 
 
@@ -74,12 +70,12 @@ def test_new_fortnight_returns_to_court_without_opening_report_window():
     assert game.events and game.world.date.absolute == 2
 
 
-def test_large_letter_scroll_and_empty_court_keep_planning_available():
+def test_large_letter_scroll_and_empty_court_keep_the_hall_reachable():
     b = _game(turns=1).belief
     b['justice']['petitions'] = []
     b['stack'] = [{'id': 'L', 'sender': 'ammurapi', 'read': True,
                    'body': ' '.join(['a long letter'] * 500), 'received_turn': b['turn']}]
     text = plain_text(audience.compose(b, selected='letter:L', scroll=100000, hours=7))
-    assert 'reply' in text and 'planning' in text
+    assert 'reply' in text and 'leave court' in text
     empty = plain_text(audience.compose(b, deferred={'letter:L'}))
-    assert 'Recall' in empty and 'Planning' in empty
+    assert 'Recall' in empty and 'hall' in empty

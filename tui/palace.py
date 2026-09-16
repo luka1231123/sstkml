@@ -39,7 +39,7 @@ VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
-CONTEXT_OF = {"court": "justice", "house": "house", "relations": "relations"}
+CONTEXT_OF = {"house": "house", "relations": "relations"}
 
 VERDICTS = (("f", "for", "for the petitioner"),
             ("a", "against", "against him"),
@@ -391,10 +391,9 @@ def _outcomes(item: dict) -> dict[str, dict]:
 def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     """Both arguments and all three prices, before any verdict is live."""
     width = max(12, width)
+    # The case first, then the pressure it is under: a man reads what is being
+    # claimed before he reads what waiting costs him.
     lines: list[tuple[str, str]] = [
-        (f"Waiting {item['waiting']} fortnights" +
-         (f" · unrest +{item['waiting_unrest']} per fortnight after {item['grace']}"
-          if item.get('waiting_unrest') else ""), "bone"),
         (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
     ]
     lines.extend(
@@ -410,6 +409,11 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
             item["counter_text"] or "—", width,
             break_long_words=False, break_on_hyphens=False)
     )
+    waited = item["waiting"]
+    lines.append((f"Waiting {waited} fortnight{'s' if waited != 1 else ''}" +
+                  (f" · unrest +{item['waiting_unrest']} a fortnight"
+                   f" after {item['grace']}" if item.get("waiting_unrest") else ""),
+                  "bone"))
     outcomes = _outcomes(item)
     good = str(next(iter(outcomes.values()))["good"])
     lines.append(("STAKES · payments and city unrest", "gold"))
@@ -472,43 +476,6 @@ def _wrapped(text: str, rows: int, width: int = 44) -> list[tuple[str, str]]:
 
 RECEPTIONS = (("t", "settle", "take them in"),
               ("y", "refuse", "turn them away"))
-
-
-def _court_controls(b: dict, chosen: str, hours: int) -> list[workbench.Control]:
-    band = next((c for c in petitioners(b) if c["id"] == chosen), None)
-    if band is not None:
-        return [workbench.affordable(workbench.Control(
-            "receive_cohort", key, label=label,
-            command=f"receive:{decision}"), hours)
-            for key, decision, label in RECEPTIONS]
-    item = next((p for p in b.get("justice", {}).get("petitions", [])
-                 if p["id"] == chosen), None)
-    if item is None:
-        return []
-    controls = []
-    for key, verdict, label in VERDICTS:
-        outcome = _outcomes(item)[verdict]
-        enabled = bool(outcome.get("affordable", True))
-        control = workbench.Control(
-            "rule_petition", key, label=label, enabled=enabled,
-            why="the crown cannot pay it" if not enabled else "",
-            command=f"verdict:{verdict}")
-        controls.append(workbench.affordable(control, hours))
-    return controls
-
-
-def _court_catalog(hours: int) -> list[workbench.Control]:
-    """All Court routes for the registry audit, outside a selected matter."""
-    controls = [workbench.affordable(workbench.Control(
-        "receive_cohort", key, label=label, enabled=False,
-        why="choose displaced people", command=f"receive:{decision}"), hours)
-        for key, decision, label in RECEPTIONS]
-    controls.extend(
-        workbench.Control(
-            "rule_petition", key, label=label, enabled=False,
-            why="choose a claim", command=f"verdict:{verdict}")
-        for key, verdict, label in VERDICTS)
-    return controls
 
 
 # --- the house ----------------------------------------------------------------
@@ -761,9 +728,6 @@ def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
     `do:<id>` -- three verdicts are one action -- so the action cannot be
     recovered from the drawn screen and the guard reads this declaration.
     """
-    if view in {"court", "audience", "justice"}:
-        return (_court_controls(b, chosen, hours) if chosen
-                else _court_catalog(hours))
     if view in {"house", "people", "household", "advisers"}:
         return _house_controls(b, person or chosen, hours, choosing)
     if view == "offices":
@@ -773,7 +737,7 @@ def controls_for(b: dict, view: str, chosen: str = "", hours: int = 0,
 
 HEADERS = {
     "court": (("matter", "the parties", "waiting", "state"), (11, 26, 6, 8)),
-    "house": (("name", "they are", "post", "claim"), (17, 10, 16, 7)),
+    "house": (("name", "they are", "post", "claim"), (26, 10, 16, 7)),
     "relations": (("court", "regard", "letters", "owed"), (19, 10, 12, 9)),
     "post": (("post", "kind", "who holds it", ""), (21, 10, 17, 2)),
 }
@@ -827,13 +791,19 @@ def _detail_capacity(rows: list[workbench.Row],
     return max(0, detail_floor - (top + 1))
 
 
-def compose(b: dict, view: str = "court", selected: str = "",
+def compose(b: dict, view: str = "people", selected: str = "",
             scroll: int = 0, hours: int = 0, choosing: str = "",
             person: str = "", amount: int = 0, good: str = "copper",
             notice: str = "", width: int = 96,
             height: int = 34) -> InteractiveScreen:
     """`selected` is the row of whatever is listed; `person` is the man being
-    placed, which is a different thing the moment the list turns to posts."""
+    placed, which is a different thing the moment the list turns to posts.
+
+    Judgements left this room for the Court at the top of the fortnight, so a
+    caller asking for the old court view gets the people instead."""
+    if view not in {"people", "offices", "household", "house", "advisers",
+                    "relations"}:
+        view = "people"
     listing = "post" if (view in {"house", "people", "household", "advisers"}
                           and choosing == "post") else view
     rows = listing_rows(b, listing)
@@ -843,9 +813,7 @@ def compose(b: dict, view: str = "court", selected: str = "",
     who = person if choosing == "post" else chosen
     headers, widths = HEADERS[listing]
     _stacked, detail_width = _detail_geometry(width, widths)
-    if view in {"court", "audience", "justice"}:
-        detail = _court_detail(b, chosen, detail_width)
-    elif listing == "post":
+    if listing == "post":
         detail = _post_detail(b, chosen, who)
     elif view in {"house", "people", "household", "advisers"}:
         detail = _house_detail(b, who)
@@ -853,13 +821,8 @@ def compose(b: dict, view: str = "court", selected: str = "",
         detail = _post_detail(b, chosen)
     else:
         detail = _relations_detail(b, chosen, amount, good)
-    if view in {"court", "audience", "justice"}:
-        # A blank Court also has no toolbar. `controls_for` without a selected
-        # matter returns the full route catalog for the registry audit.
-        controls = _court_controls(b, chosen, hours)
-    else:
-        controls = controls_for(b, view, chosen, hours, choosing, person=who,
-                                amount=amount, good=good)
+    controls = controls_for(b, view, chosen, hours, choosing, person=who,
+                            amount=amount, good=good)
 
     band = scene_rows(height)
     if choosing == "post":
@@ -868,37 +831,14 @@ def compose(b: dict, view: str = "court", selected: str = "",
         band = 0
     queue = rows
     scene_listing = {"people": "house", "household": "house",
-                     "advisers": "house", "audience": "court",
-                     "justice": "court", "offices": "post"}.get(listing, listing)
+                     "advisers": "house", "offices": "post"}.get(listing, listing)
 
-    title = "THE COURT — RELATIONS" if view == "relations" else "THE COURT"
+    title = "THE PALACE — RELATIONS" if view == "relations" else "THE PALACE"
     note = "↑↓ choose   Enter open   Tab view   [c] counsel"
     if choosing == "post":
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
-        title = f"THE COURT — A POST FOR {named.upper()}"
+        title = f"THE PALACE — A POST FOR {named.upper()}"
         note = "choose a post, or [esc] to think better of it"
-
-    # The room yields architecture before it yields arguments or stakes.
-    # Exceptionally long authored evidence disables verdicts instead of asking
-    # the king to judge text that the pane could not show.
-    if view in {"court", "audience", "justice"}:
-        petition = _court_item(b, chosen)
-        if petition is not None:
-            evidence_rows = len(_evidence_lines(b, petition, detail_width))
-            capacity = _detail_capacity(
-                rows, controls, widths, width, height, band, note)
-            if band and evidence_rows > capacity:
-                band = 0
-                capacity = _detail_capacity(
-                    rows, controls, widths, width, height, band, note)
-            if evidence_rows > capacity:
-                controls = [
-                    dataclasses.replace(
-                        control, enabled=False,
-                        why="enlarge the Court to see all evidence")
-                    if control.action_id == "rule_petition" else control
-                    for control in controls
-                ]
 
     def draw(surface, x, y, room, rows_available):
         _draw_scene(surface, x, y, room, rows_available, view, queue, chosen,

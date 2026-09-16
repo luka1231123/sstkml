@@ -386,9 +386,15 @@ messenger or urgent matter is presented at a time, with its immediate actions.
 Judgements and reading happen there; replying opens the writing desk. Deferring
 does not resolve a matter or stop its engine consequences. Deferred matters
 return next fortnight and can be recalled during the current audience.
-Planning is a separate tab for proactive correspondence, allocations, staffing
-and long-term decisions. The last report is another tab, not an automatic
-window. Court contains no generic advice feed or duplicate resource dashboard.
+The Hall is the second half of the fortnight and opens with Tab, once Court is
+done. It is a dashboard: the grain year, stores and their change, standing and
+temper, rations promised against work days, the matters before the king, what is
+still waiting, what is in motion, and the doors to every working room. SPACE
+there ends the fortnight; L shows the last report. Court contains no generic
+advice feed and no duplicate resource dashboard; the Hall contains no audiences.
+Judgements exist in one room only: the Palace holds people, offices, the house
+and foreign courts, and hears nothing. Every window prints its controls the
+same way: `[esc]`, `[enter]`, `[tab]`, `[space]`, and lower-case letters.
 There are no tutorial gates, invented crises, or rewards for clearing the docket.
 
 ---

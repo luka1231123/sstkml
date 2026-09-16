@@ -1,4 +1,4 @@
-"""The Hall: standing, passages, and matters physically before the king."""
+"""The Hall: the dashboard the ruler plans from, between audiences."""
 from __future__ import annotations
 
 from tui import advice, render, style
@@ -11,26 +11,17 @@ DOORS = (
     ("x", "Trade", "trade"),
     ("t", "Storehouse", "stores"),
     ("m", "Muster", "muster"),
-    ("j", "Court", "palace"),
+    ("j", "Palace", "palace"),
     ("v", "Shrine", "altar"),
     ("w", "World", "world"),
 )
 BUILT = frozenset(target for _key, _label, target in DOORS)
-GROUPS = (
-    ("KINGDOM", DOORS[1:5]),
-    ("COURT", (DOORS[0],) + DOORS[5:]),
-)
 MARKS = {"stack": "▤", "alu": "▩", "trade": "◇", "stores": "▥",
          "muster": "⚑", "palace": "♚", "altar": "△", "world": "◉"}
-PALACE = ("◢▄◣▀◤▄◥▀", "  ╲▟█▙╱", "  ╔╩█╩╗", "  ▟███▙", "  ▚·▩▤")
 
 
 def _fit(text: str, width: int) -> str:
     return text if len(text) <= width else text[:max(0, width - 1)] + "…"
-
-
-def _cut(text: str, width: int) -> str:
-    return text[:max(0, width)]
 
 
 def _counts(b: dict) -> dict[str, int]:
@@ -45,7 +36,6 @@ def _counts(b: dict) -> dict[str, int]:
             for move in b.get("trade", {}).get("movements", ())),
         "stores": sum(bool(g.get("arrears_weeks")) for g in b.get("groups", ())),
         "muster": len(b.get("troops", {}).get("summons", ())),
-        # A band at the gate waits in the same queue as a lawsuit.
         "palace": len(b.get("justice", {}).get("petitions", ())) + sum(
             c.get("status") == "petitioning" for c in b.get("cohorts", ())),
         "altar": sum(bool(o.get("lapsed")) for o in b.get("oaths", ())),
@@ -55,57 +45,55 @@ def _counts(b: dict) -> dict[str, int]:
 
 
 def waiting(b: dict) -> list[dict]:
-    people = []
+    """What is unresolved, worst first. Court hears people; the Hall counts them."""
+    rows = []
     for group in b.get("groups", ()):
         weeks = group.get("arrears_weeks", 0)
         if weeks:
-            people.append({"who": group.get("member_name") or group["name"],
-                           "for": group["name"],
-                           "fact": f"{weeks} fortnight{'s' if weeks != 1 else ''} unpaid",
-                           "weight": weeks})
-    for item in b.get("stack", ()):
-        if item.get("read"):
-            continue
-        age = item.get("age", 0)
-        people.append({
-            "who": "courier from " + render.actor_name(
-                item.get("sender", ""), b.get("house")),
-            "for": render.letter_summary(item.get("topic", "message")),
-            "fact": "unread, newly come" if age == 0 else f"unread {age} fortnights",
-            "weight": age + 2})
+            rows.append({"say": f"{group['name']} unpaid {weeks} fortnight"
+                                f"{'s' if weeks != 1 else ''}", "weight": weeks})
     for summons in b.get("troops", {}).get("summons", ()):
-        people.append({"who": "herald of the muster",
-                       "for": f"{summons['required']} men at {summons['place']}",
-                       "fact": f"{summons['mustered']} have gone", "weight": 6})
+        rows.append({"say": f"muster at {summons['place']}: "
+                            f"{summons['mustered']} of {summons['required']} men",
+                     "weight": 6})
     for petition in b.get("justice", {}).get("petitions", ()):
-        people.append({"who": render.actor_name(
-                           petition["petitioner"], b.get("house")),
-                       "for": f"{petition['kind']} claim",
-                       "fact": f"{petition['waiting']} fortnights waiting",
-                       "weight": petition["waiting"]})
+        waits = petition["waiting"]
+        rows.append({"say": f"{render.actor_name(petition['petitioner'], b.get('house'))}"
+                            f" waits {waits} fortnight{'s' if waits != 1 else ''}",
+                     "weight": waits})
+    for item in b.get("stack", ()):
+        if not item.get("read"):
+            age = item.get("age", 0)
+            rows.append({"say": f"unread from "
+                                f"{render.actor_name(item.get('sender', ''), b.get('house'))}"
+                                + (f" · {age}f old" if age else " · new"),
+                         "weight": age + 2})
     for bad in b.get("calamities", ()):
-        people.append({"who": "the whole city knows", "for": bad["say"],
-                       "fact": f"since fortnight {bad['began']}", "weight": 9})
+        rows.append({"say": f"{bad['say']} since fortnight {bad['began']}", "weight": 9})
     plague = b.get("plague", {})
     if plague.get("sickness_at_seat"):
-        people.append({"who": "the physician", "for": "sickness in the lower town",
-                       "fact": f"{plague.get('burials_at_seat', 0)} buried",
-                       "weight": 8})
+        rows.append({"say": f"sickness in the lower town, {plague.get('burials_at_seat', 0)} buried",
+                     "weight": 8})
     for oath in b.get("oaths", ()):
         if oath.get("lapsed"):
-            people.append({"who": "an oath messenger", "for": "the lapsed oath",
-                           "fact": "nobody is bound", "weight": 5})
-    return sorted(people, key=lambda row: (-row["weight"], row["who"]))
+            rows.append({"say": "the lapsed oath binds nobody", "weight": 5})
+    for institution in b.get("institutions", ()):
+        if not institution.get("head"):
+            rows.append({"say": f"{institution.get('name', institution.get('id'))} has no head",
+                         "weight": 4})
+    return sorted(rows, key=lambda row: (-row["weight"], row["say"]))
 
 
 def _motion(b: dict) -> list[str]:
     rows = [f"{move['origin']} > {move['destination']} · due {move['arrives']}"
             for move in b.get("trade", {}).get("movements", ())
             if move.get("cargo")]
-    rows += [f"{item.get('id', 'order')} · "
+    rows += [f"{item.get('id', 'order')} · awaiting reply from "
              f"{item.get('at_node') or item.get('recipient') or 'unknown'}"
              for item in b.get("outbox", ())
              if not item.get("answered") and item.get("sent_turn", -1) >= 0]
+    rows += [f"{p.get('name', p.get('id'))} · {p.get('progress', 0)}% built"
+             for p in b.get("projects", ())]
     return rows
 
 
@@ -113,127 +101,118 @@ def _header(surface: Surface, b: dict, hours: int) -> None:
     width = surface.width
     title = f" {render.actor_name(b['actor'], b.get('house')).upper()} OF {b['scenario'].upper()}"
     style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
-    # The month name is how the court says it; the fortnight number is how the
-    # seasons, the deadlines, and every rate in the game are actually counted.
     when = f"{b['date']} · fortnight {b.get('fortnight', 0)} of 24"
     surface.text(max(3, width - 2 - len(when)), 0, when, C["sky"], C["lapis"])
-    surface.text(3, 2, f"{hours} of {b['attention_base']} hours remain",
-                 C["clay"], C["ink"])
+    surface.text(3, 2, f"{hours} of {b['attention_base']} hours remain", C["clay"], C["ink"])
     sea = "the sea is open" if b.get("sea_open") else "the sea is shut"
     surface.text(width - 3 - len(sea), 2, sea, C["sky"], C["ink"])
-    grain = render.fmt_good("grain", b.get("stores", {}).get("grain", 0))
     said = render.granary_line(b)
-    left = f"granary {grain}"
     if said:
-        left += f" · {said}"
-    surface.text(3, 3, left, C["barley"], C["ink"])
-    right = width - 3
-    mood = (f"city {render.temper(b.get('unrest', 0))}"
-            f" · king {render.standing(b.get('legitimacy', 0))}")
-    # The mood is dropped only when it would actually run into the granary,
-    # not when it comes within an arbitrary five columns of it. The margin was
-    # costing the row its third signal at sizes where all three fit.
-    if right - len(mood) > 3 + len(left):
-        surface.text(right - len(mood), 3, mood, C["clay"], C["ink"])
-        right -= len(mood) + 2
-    series = b.get("store_history", {}).get("grain", ())
-    if series and width > 82:
-        line = sparkline(series, min(14, width - 81))
-        if right - len(line) > 3 + len(left):
-            surface.text(right - len(line), 3, line, C["barley"], C["ink"])
+        surface.text(3, 3, f"granary · {said}", C["barley"], C["ink"])
 
 
-def _standing(surface: Surface, b: dict, x: int, width: int,
-              height: int) -> None:
-    surface.text(x, 5, "BELIEVED STANDING", C["gold"], C["ink"])
-    for y, good in zip((7, 11, 15), ("grain", "copper", "tin")):
+def _year(surface: Surface, b: dict, width: int) -> None:
+    """The year gets the full width: it is the fact every plan is made against."""
+    calendar = b.get("calendar") or {}
+    surface.text(3, 5, "THE YEAR", C["gold"], C["ink"])
+    for index, (glyph, colour, now) in enumerate(render.year_wheel(calendar)):
+        surface.put(13 + index, 5, glyph, C["flame"] if now else C[colour], C["ink"])
+    surface.text(3, 6, _fit(render.year_says(calendar, width - 6), width - 6),
+                 C["clay"], C["ink"])
+
+
+def _standing(surface: Surface, b: dict, x: int, width: int, height: int) -> int:
+    surface.text(x, 8, "STORES", C["gold"], C["ink"])
+    for y, good in enumerate(("grain", "copper", "tin"), 9):
         values = b.get("store_history", {}).get(good, ())
         value = b.get("stores", {}).get(good, 0)
-        before = values[-2] if len(values) > 1 else value
-        delta = value - before
-        surface.text(x, y, good.upper(), C["gold"], C["ink"])
-        surface.text(x, y + 1, _cut(render.fmt_good(good, value), width),
-                     C["bone"], C["ink"])
-        change = render.fmt_good(good, abs(delta))
-        surface.text(x, y + 2, _cut(f"Δ{'+' if delta >= 0 else '−'}{change}", width),
-                     C["dim"], C["ink"])
-    surface.text(x, 19, "LEGITIMACY", C["gold"], C["ink"])
-    surface.text(x, 20, _cut(f"{b.get('legitimacy', 0)} of 1000", width),
-                 C["bone"], C["ink"])
-    surface.text(x, 21, _fit("what the court will bear", width),
-                 C["dim"], C["ink"])
-    if height >= 28:
-        _year(surface, b, x, width)
-
-
-def _year(surface: Surface, b: dict, x: int, width: int) -> None:
-    """The grain year, drawn. Twenty-four cells, and one of them is now.
-
-    The king has always known what month it is. The interface did not say so,
-    which left the Land ledger's numbers unplannable: an ask he cannot meet is
-    a different thing when the asking has two fortnights left in it.
-    """
-    calendar = b.get("calendar")
-    if not calendar:
-        return
-    surface.text(x, 23, "THE YEAR", C["gold"], C["ink"])
-    mark = f"fn {calendar.get('fortnight', 0)}"
-    surface.text(x + width - len(mark), 23, mark, C["bone"], C["ink"])
-    for index, (glyph, colour, now) in enumerate(render.year_wheel(calendar)):
-        surface.put(x + index, 24, glyph,
-                    C["flame"] if now else C[colour], C["ink"])
-    surface.text(x, 25, render.year_says(calendar, width), C["clay"], C["ink"])
-
-
-def _passages(surface: Surface, b: dict, x: int, width: int) -> None:
-    for row, line in enumerate(PALACE, 5):
-        surface.text(x + max(0, (width - len(line)) // 2), row, line,
-                     C["sand"] if row < 9 else C["gold"], C["ink"])
-    surface.text(x + max(0, (width - 21) // 2), 10, "wait beyond the doors",
-                 C["ash"], C["ink"])
-    counts = _counts(b)
-    y = 12
-    for heading, doors in GROUPS:
-        surface.text(x, y, "╞ " + heading, C["gold"], C["ink"])
-        y += 1
-        for key, label, target in doors:
-            count = counts.get(target, 0)
-            tail = f"  {count}" if count else ""
-            text = _fit(f"[{key}] {label} {MARKS[target]}{tail}", width)
-            surface.text(x + 1, y, text, C["bone"], C["ink"])
-            surface.link(x + 1, y, len(text), 1, key)
-            y += 1
+        delta = value - (values[-2] if len(values) > 1 else value)
+        line = f"{good:<7}{render.fmt_good(good, value)}"
+        surface.text(x, y, _fit(line, width), C["bone"], C["ink"])
+        mark = f"Δ{'+' if delta >= 0 else '−'}{render.fmt_good(good, abs(delta))}"
+        if width - len(mark) > len(line) + 1:
+            surface.text(x + width - len(mark), y, mark,
+                         C["dim"] if not delta else C["barley"] if delta > 0 else C["blood"],
+                         C["ink"])
+        series = b.get("store_history", {}).get(good, ())
+        if len(series) > 2 and width > 44:
+            surface.text(x + width - len(mark) - 9, y, sparkline(series, 8), C["faint"], C["ink"])
+    surface.text(x, 13, "STANDING", C["gold"], C["ink"])
+    surface.text(x, 14, _fit(f"king {render.standing(b.get('legitimacy', 0))}"
+                             f" · {b.get('legitimacy', 0)} of 1000", width), C["bone"], C["ink"])
+    surface.text(x, 15, _fit(f"city {render.temper(b.get('unrest', 0))}"
+                             f" · {b.get('unrest', 0)} of 1000", width), C["bone"], C["ink"])
+    groups = b.get("groups", ())
+    if not groups or height < 28:
+        return 18
+    # What the next fortnight already owes, and what underfeeding costs in work.
+    promised = sum(g.get("allocated", 0) for g in groups)
+    need = sum(g.get("size", 0) * g.get("entitlement", 0) for g in groups)
+    now = sum(g.get("labour_now", 0) for g in groups)
+    fed = sum(g.get("labour_if_fed", 0) for g in groups)
+    arrears = sum(g.get("arrears_qa", 0) for g in groups)
+    surface.text(x, 17, "RATIONS AND LABOUR", C["gold"], C["ink"])
+    # A number against an identical number tells the king nothing. Say the
+    # shortfall when there is one, and say it is met when there is not.
+    said = [(f"rations {need - promised:,} qa short of {need:,}" if promised < need
+             else f"rations paid in full · {need:,} qa",
+             "blood" if promised < need else "bone"),
+            (f"{fed - now:,} work days lost to hunger" if fed > now
+             else f"work in full · {fed:,} days", "blood" if fed > now else "bone")]
+    reserved, free = b.get("ration_reserved", 0), b.get("ration_grain_left", 0)
+    if reserved or free:
+        said.append((f"reserved {reserved:,} qa · unspent {free:,} qa", "clay"))
+    if arrears:
+        said.append((f"arrears {arrears:,} qa", "blood"))
+    season = b.get("works_season_name")
+    if season:
+        said.append((f"works: {season} · {b.get('works_rate', 0)} men-days a point", "dim"))
+    for offset, (line, tone) in enumerate(said[:max(0, height - 26)], 18):
+        surface.text(x, offset, _fit(line, width), C[tone], C["ink"])
+    return 25
 
 
 def _matters(surface: Surface, b: dict, x: int, width: int, height: int) -> None:
-    surface.text(x, 5, "MATTERS BEFORE THE KING", C["gold"], C["ink"])
-    concerns = advice.concerns(b, 2)
-    y = 6
-    for index, concern in enumerate(concerns, 1):
-        surface.text(x, y, _cut(f"[{index}] {concern.speaker}:", width),
+    """Three matters, then what is unresolved, then what is on the road."""
+    surface.text(x, 8, "MATTERS BEFORE THE KING", C["gold"], C["ink"])
+    y = 9
+    # One row a matter, speaker first: the advice still comes out of a mouth,
+    # and the rows it saves go to what is actually still waiting.
+    for index, concern in enumerate(advice.concerns(b, 3), 1):
+        surface.text(x, y, _fit(f"[{index}] {concern.speaker}: {concern.title}", width),
                      C["sky"], C["ink"])
-        surface.text(x, y + 1, _fit(concern.title, width), C["clay"], C["ink"])
-        surface.link(x, y, width, 2, f"concern:{index - 1}")
-        y += 2
-    audience_y = y + 1
-    surface.text(x, audience_y, "AUDIENCE FLOOR", C["dim"], C["ink"])
-    people = waiting(b)
-    room = 3 if height >= 30 else 2
-    if not people:
-        surface.text(x, audience_y + 2, "the floor is empty", C["ash"], C["ink"])
-    for index, person in enumerate(people[:room]):
-        y = audience_y + 1 + index * 3
-        who = person["who"].removeprefix("courier from ")
-        surface.text(x, y, _fit(who, width), C["clay"], C["ink"])
-        surface.text(x, y + 1, _fit(person["fact"], width), C["blood"], C["ink"])
-        surface.text(x, y + 2, _fit(person["for"], width), C["dim"], C["ink"])
-    motion_y = min(height - 6, audience_y + 2 + room * 3)
-    surface.text(x, motion_y, "IN MOTION", C["gold"], C["ink"])
-    motion = _motion(b)
-    if not motion:
-        surface.text(x, motion_y + 2, "nothing reported", C["ash"], C["ink"])
-    for offset, line in enumerate(motion[:max(0, height - motion_y - 4)], 2):
-        surface.text(x, motion_y + offset, _fit(line, width), C["sky"], C["ink"])
+        surface.link(x, y, width, 1, f"concern:{index - 1}")
+        y += 1
+    floor = height - 8
+    waiting_rows, motion_rows = waiting(b), _motion(b)
+    spare = max(0, floor - y - 4)
+    for_waiting = min(len(waiting_rows) or 1, max(1, spare - min(len(motion_rows) or 1, 3)))
+    y += 1
+    surface.text(x, y, "STILL WAITING", C["gold"], C["ink"])
+    if not waiting_rows:
+        surface.text(x, y + 1, "nothing is left hanging", C["ash"], C["ink"])
+    for offset, row in enumerate(waiting_rows[:for_waiting], 1):
+        surface.text(x, y + offset, _fit(row["say"], width), C["blood"], C["ink"])
+    y += 1 + max(1, min(for_waiting, len(waiting_rows))) + 1
+    if y >= floor:
+        return
+    surface.text(x, y, "IN MOTION", C["gold"], C["ink"])
+    if not motion_rows:
+        surface.text(x, y + 1, "nothing is on the road", C["ash"], C["ink"])
+    for offset, line in enumerate(motion_rows[:max(0, floor - y - 1)], 1):
+        surface.text(x, y + offset, _fit(line, width), C["sky"], C["ink"])
+
+
+def _doors(surface: Surface, b: dict, height: int) -> None:
+    counts, width = _counts(b), surface.width
+    cell = max(16, (width - 6) // 4)
+    surface.text(3, height - 6, "THE DOORS", C["gold"], C["ink"])
+    for index, (key, label, target) in enumerate(DOORS):
+        x, y = 3 + (index % 4) * cell, height - 5 + index // 4
+        count = counts.get(target, 0)
+        text = _fit(f"[{key}] {label}" + (f" ({count})" if count else ""), cell - 2)
+        surface.text(x, y, text, C["bone"], C["ink"])
+        surface.link(x, y, len(text), 1, key)
 
 
 def compose(b: dict, width: int = 84, height: int = 28,
@@ -246,22 +225,17 @@ def compose(b: dict, width: int = 84, height: int = 28,
         surface.text(3, 7, "THE ALU HAS FALLEN", C["blood"], C["ink"])
         surface.text(3, 9, _fit(b.get("end_reason", "the reign is ended"), width - 6),
                      C["bone"], C["ink"])
-        style.footer(surface, (style.FooterAction("Escape", "close"),))
+        style.footer(surface, (style.FooterAction("esc", "close"),))
         return surface.interactive()
-
-    left = centre = 28
-    cx, rx = left, left + centre
-    for divider in (cx, rx):
-        for y in range(5, height - 2):
-            surface.put(divider, y, "│", C["faint"], C["ink"])
-    # The column runs from x to the divider, less one for the gap. It was
-    # costed at six and so lost two columns it owned -- enough to cut the last
-    # word off "what the court will bear" at every window size there is.
-    _standing(surface, b, 3, cx - 4, height)
-    _passages(surface, b, cx + 2, centre - 4)
-    _matters(surface, b, rx + 2, width - rx - 5, height)
+    _year(surface, b, width)
+    split = max(30, (width - 9) // 2)
+    for y in range(8, height - 7):
+        surface.put(split + 3, y, "│", C["faint"], C["ink"])
+    _standing(surface, b, 3, split - 1, height)
+    _matters(surface, b, split + 5, width - split - 8, height)
+    _doors(surface, b, height)
     style.footer(surface, (
-        style.FooterAction("SPACE", "end the fortnight", command="space"),
-        style.FooterAction("Tab", "briefing"),
+        style.FooterAction("space", "end the fortnight", command="space"),
+        style.FooterAction("l", "last report", command="home:report"),
         style.FooterAction(":", "command"), style.FooterAction("?", "help")))
     return surface.interactive()

@@ -59,33 +59,13 @@ def _kinds(game) -> list[str]:
 
 def test_the_room_is_drawn_and_still_reads_as_plain_ascii() -> None:
     b = project(_world())
-    screen = palace.compose(b, view="court", hours=8, width=98, height=36)
+    screen = palace.compose(b, view="people", hours=8, width=98, height=36)
     assert len(screen) == 36 and all(len(row) == 98 for row in screen)
     text = plain_text(pure_ascii(screen))
     assert all(ord(character) < 128 for character in text)
-    assert "THE COURT" in text
+    assert "THE PALACE" in text
 
 
-def test_the_figures_on_the_floor_are_the_rows_of_the_list() -> None:
-    """The picture is the queue, so a man is selectable and numbered."""
-    b = project(_world())
-    screen = palace.compose(b, view="court", hours=8, width=98, height=36)
-    petitions = [p["id"] for p in b["justice"]["petitions"]]
-    picks = {hit.command.split(":", 1)[1] for hit in screen.hits
-             if hit.command.startswith("pick:")}
-    assert set(petitions[:1]) <= picks
-    text = plain_text(screen)
-    assert "palace debt" in text
-
-
-def test_the_room_gives_up_its_art_before_it_gives_up_its_list() -> None:
-    b = project(_world())
-    least = (68, 24)
-    text = plain_text(palace.compose(b, view="court", hours=8,
-                                     width=least[0], height=least[1]))
-    assert "STAKES" in text
-    for height in (24, 30, 36):
-        assert palace.scene_rows(height) <= max(0, height - 12)
 
 
 def test_every_view_offers_every_order_its_context_claims() -> None:
@@ -126,19 +106,6 @@ def test_every_control_the_room_offers_is_drawn_on_it() -> None:
 
 
 # --- the court ----------------------------------------------------------------
-
-def test_a_case_is_one_ruling_with_no_hearing_step() -> None:
-    game = _game()
-    petition = project(game.world)["justice"]["petitions"][0]["id"]
-    game.palace_state["view"] = "court"
-    assert game.palace_pick("court") == petition
-    game.on_palace_key(_Key("f"))
-    assert not game.log
-    assert game.confirm_pending()
-    assert _kinds(game) == ["RulePetition"]
-    assert game.log[-1]["action"]["verdict"] == "for"
-    assert game.log[-1]["action"]["petition_id"] == petition
-
 
 # --- the house ----------------------------------------------------------------
 
@@ -275,7 +242,7 @@ def test_the_arrows_reach_every_person_not_only_the_ones_on_the_floor() -> None:
     clickable. Counting both made Down cycle among the few who fit in the room
     and never reach the rest, which is a list the player cannot get to the end
     of."""
-    for view in ("court", "house", "relations"):
+    for view in ("people", "household", "relations"):
         game = _game()
         game.palace_state["view"] = view
         everyone = [row.id for row in palace.listing_rows(game.belief, view)]

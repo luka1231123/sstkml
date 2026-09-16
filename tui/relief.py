@@ -68,12 +68,12 @@ def compose(b: dict, width: int, height: int, selected: str, quantity: int,
     cost = registry.BY_ID["dispatch_letter"].cost
     line(y + 7, f"Draft: free · sealing: {cost} hours · you have {hours}.", "dim")
     style.notice(surface, 3, height - 4, width - 6, notice)
-    style.footer(surface, [style.FooterAction("Tab", "view"),
+    style.footer(surface, [style.FooterAction("tab", "view"),
                            style.FooterAction("↑↓", "court"),
                            style.FooterAction("[ ]", "amount")],
                  y=height - 3, x=2, width=width - 4)
-    style.footer(surface, [style.FooterAction("Enter", "draft grain request",
+    style.footer(surface, [style.FooterAction("enter", "draft grain request",
                             command="relief:draft", enabled=bool(chosen and chosen["path"] and quantity > 0)),
-                           style.FooterAction("Esc", "close")],
+                           style.FooterAction("esc", "close")],
                  y=height - 2, x=2, width=width - 4)
     return surface.interactive(tuple(c["id"] for c in known))

@@ -44,7 +44,7 @@ def _screens(world, b):
             b, w, h, 0, world.court.seat),
         "alu": lambda w, h: alu.compose(b, None, w, h),
         "works": lambda w, h: works.compose(b, "", w, h),
-        "palace": lambda w, h: palace.compose(b, view="court", width=w,
+        "palace": lambda w, h: palace.compose(b, view="people", width=w,
                                               height=h),
         "orders": lambda w, h: orders.compose(b, [], 0, width=w, height=h),
         "plague": lambda w, h: plague.compose(b, "", w, h),

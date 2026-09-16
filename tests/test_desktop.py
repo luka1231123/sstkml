@@ -35,8 +35,8 @@ def test_a_window_refuses_to_shrink_below_its_minimum_rather_than_clipping():
 def test_an_entity_window_takes_its_size_from_its_kind():
     assert desktop.family("letter:tablet_12") == "letter:"
     assert desktop.family("hall") == "hall"
-    assert desktop.default_size("letter:tablet_12") == (50, 20)
-    assert desktop.default_size("institution:tablet_house") == (50, 19)
+    assert desktop.default_size("letter:tablet_12") == (62, 26)
+    assert desktop.default_size("institution:tablet_house") == (60, 24)
 
 
 def test_an_unknown_window_is_treated_as_a_document():

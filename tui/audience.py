@@ -1,8 +1,8 @@
-"""One audience at a time, with planning available separately."""
+"""One audience at a time. The fortnight starts here and leaves for the Hall."""
 import textwrap
 import registry
 
-from tui import advice, hall, palace, render, style
+from tui import advice, palace, render, style
 from tui.grid import Surface, INDEX as C
 
 
@@ -54,29 +54,14 @@ def content(b, item, width):
 def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
             deferred=(), scroll=0, report=(), notice=""):
     surface = Surface(width, height)
-    style.panel(surface, 0, 0, width, height, title="THE COURT", drop=False)
+    style.panel(surface, 0, 0, width, height,
+                title="THE LAST REPORT" if view == "report" else "THE COURT", drop=False)
     def line(y, text, tone="clay"):
         surface.text(3, y, text[:width - 6], C[tone], C["ink"])
-    for x, label, key in ((3, "Court", "court"), (18, "Planning", "planning"), (36, "Last report", "report")):
-        surface.text(x, 2, f"[{label}]" if key == view else label, C["bone" if key == view else "dim"], C["ink"])
-        surface.link(x, 2, len(label) + 2, 1, "home:" + key)
     surface.text(width - 10, 2, "? Help", C["sky"], C["ink"])
     surface.link(width - 10, 2, 7, 1, "home:help")
-    line(4, f"{b.get('date', '')} · {hours} hours", "dim")
-    if view == "planning":
-        line(6, "What would you like to work on?", "bone")
-        labels = {"s": "Letters — write, read and review correspondence",
-                  "y": "Institutions — staff and buildings", "x": "Trade — goods and routes",
-                  "t": "Food and labour — rations, harvest and reserves",
-                  "m": "Defence — troops and summons", "j": "People and offices",
-                  "v": "Shrine — rites and oaths", "w": "World — places and reports"}
-        for n, (key, _, _) in enumerate(hall.DOORS):
-            line(8 + n, f"[{key.upper()}] {labels[key]}")
-            surface.link(3, 8 + n, width - 6, 1, "home:door:" + key)
-        line(height - 7, "[Enter] End fortnight", "gold")
-        surface.link(3, height - 7, width - 6, 1, "home:end")
-        style.footer(surface, [style.FooterAction("Tab", "court"), style.FooterAction("?", "help")], y=height - 2)
-    elif view == "report":
+    line(2, f"{b.get('date', '')} · {hours} hours", "dim")
+    if view == "report":
         rows = [r for p in report for r in (textwrap.wrap(p, width - 6) or [""])]
         room = height - 12
         start = max(0, min(scroll, max(0, len(rows) - room)))
@@ -84,14 +69,14 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
             line(y, row)
         if not rows:
             line(7, "No fortnight report yet.")
-        style.footer(surface, [style.FooterAction("↑↓", "scroll"), style.FooterAction("Tab", "court")], y=height - 2)
+        style.footer(surface, [style.FooterAction("↑↓", "scroll"), style.FooterAction("esc", "back to the hall", command="home:hall")], y=height - 2)
     else:
         item = current(b, deferred, selected)
         items = [i for i in queue(b, selected) if i["id"] not in deferred]
         if item:
             title, rows = content(b, item, width - 6)
             line(6, title, "bone")
-            line(7, f"{items.index(item) + 1} of {len(items)} audiences · {len(deferred)} deferred", "dim")
+            line(4, f"{items.index(item) + 1} of {len(items)} audiences · {len(deferred)} deferred", "dim")
             room = height - (17 if item["kind"] == "case" else 15)
             start = max(0, min(scroll, max(0, len(rows) - room)))
             for y, (text, tone) in enumerate(rows[start:start + room], 9):
@@ -105,31 +90,31 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
                     outcome = item["case"]["outcomes"][verdict]
                     label = {"for": "pay claim", "against": "pay counterclaim", "split": "split"}[verdict]
                     label += f" · {outcome['amount']:,} {outcome['good']} · unrest {outcome['unrest']:+} · 1 hour"
-                    style.footer(surface, [style.FooterAction(key.upper(), label, command="home:verdict:" + verdict,
+                    style.footer(surface, [style.FooterAction(key, label, command="home:verdict:" + verdict,
                         enabled=visible and hours >= 1 and outcome["affordable"])],
                         x=3, y=height - 7 + len(actions), width=width - 6)
                     actions.append(verdict)
                 actions = []
             elif item["kind"] == "letter":
-                actions = ([style.FooterAction("B", "reply", command="home:reply")]
+                actions = ([style.FooterAction("b", "reply", command="home:reply")]
                            if item["letter"].get("read") else
-                           [style.FooterAction("Enter", f"read · {registry.BY_ID['read_letter'].cost} hours",
+                           [style.FooterAction("enter", f"read · {registry.BY_ID['read_letter'].cost} hours",
                                                command="home:read", enabled=hours >= registry.BY_ID['read_letter'].cost)])
             elif item["kind"] == "band":
-                actions = [style.FooterAction("F", "admit", command="home:receive:settle"),
-                           style.FooterAction("A", "refuse", command="home:receive:refuse")]
+                actions = [style.FooterAction("f", "admit", command="home:receive:settle"),
+                           style.FooterAction("a", "refuse", command="home:receive:refuse")]
             else:
-                actions = [style.FooterAction("Enter", "respond", command="home:respond")]
+                actions = [style.FooterAction("enter", "respond", command="home:respond")]
             if actions:
                 style.footer(surface, actions, x=3, y=height - 5, width=width - 6)
         else:
             line(8, "No one else waits for this audience.", "bone")
-            line(10, "Open Planning to work on the kingdom or end the fortnight.")
+            line(10, "Enter the hall to plan, and to end the fortnight.")
             if deferred:
                 line(12, f"[R] Recall {len(deferred)} deferred matters", "sky")
                 surface.link(3, 12, width - 6, 1, "home:recall")
         style.footer(surface, [style.FooterAction("←→", "audience"),
-            style.FooterAction("D", "defer", command="home:defer", enabled=bool(item)),
-            style.FooterAction("Tab", "planning")], x=3, y=height - 2, width=width - 6)
+            style.FooterAction("d", "defer", command="home:defer", enabled=bool(item)),
+            style.FooterAction("tab", "leave court", command="home:hall")], x=3, y=height - 2, width=width - 6)
     style.notice(surface, 3, height - 3, width - 6, notice)
     return surface.interactive()

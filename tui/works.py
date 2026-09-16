@@ -101,8 +101,8 @@ def _detail_rows(plan: dict, b: dict, width: int) -> list[tuple[str, int]]:
         rows.extend((line, colour) for line in wrapped)
 
     rows.append((plan.get("category", "WORK"), C["bone"]))
-    add("RETURN", plan.get("effect", "adds institutional capacity"), C["sky"])
-    add("WAGER", plan.get("tradeoff", "uses labour and supplies"), C["flame"])
+    add("GIVES YOU", plan.get("effect", "more institutional capacity"), C["sky"])
+    add("COSTS YOU", plan.get("tradeoff", "labour and supplies"), C["flame"])
     rate = b.get("works_rate", 400)
     season = b.get("works_season_name", "low water") or "low water"
     add("LABOUR", f"{plan['days']:,} corvée days; at most {rate:,} each fortnight in {season}", C["clay"])
@@ -172,10 +172,11 @@ def compose(b: dict, selected: str = "", width: int = 82,
                 note="[esc] close", drop=False)
     surface.text(2, 1, art.frieze(width - 4), C["faint"], C["ink"])
     style.notice(surface, 2, 1, width - 4, notice)
-    brief = (
-        "CORVÉE, NOT COIN · LOW WATER · STORE-FED CREWS · NEW WORK OPENS HEADLESS"
-        if width >= 76 else
-        "CORVÉE, NOT COIN · LOW WATER · STORE-FED CREWS")
+    # One sentence saying how building is paid for, instead of four slogans.
+    season = b.get("works_season_name", "low water") or "low water"
+    brief = (f"Paid in called-up men and stored goods, not silver · {season}"
+             if width >= 70 else
+             "Paid in men and stored goods, not silver")
     surface.text(3, 2, brief[:max(0, width - 6)], C["dim"], C["ink"])
 
     projects = b.get("projects") or []
@@ -188,7 +189,7 @@ def compose(b: dict, selected: str = "", width: int = 82,
     corvee_draft = min(max(0, corvee_draft), remaining)
     draft_unrest = corvee_unrest(b, corvee_draft)
 
-    style.bar(surface, 2, 3, width - 4, "  MEN OUT", fg=C["bone"],
+    style.bar(surface, 2, 3, width - 4, "  WHAT IS BEING BUILT", fg=C["bone"],
               bg=C["faint"])
     y = 5
     if not projects:

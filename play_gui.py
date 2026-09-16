@@ -43,7 +43,7 @@ from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 help_agent, librarian, parser as ai_parser,
                 voicer as ai_voicer)
-from tui import advice, collection, palace, aftermath, relief, reckoning, audience
+from tui import advice, collection, palace, aftermath, relief, reckoning, audience, dialog
 from tui import object as object_page
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -112,7 +112,7 @@ assert {target for _k, _l, target in hall.DOORS if target in hall.BUILT} == (
 # Windows that manage the game rather than the kingdom. An order given while
 # one of these has focus belongs to the window underneath it, so they are never
 # the target of an outcome (UI/UX spec 5, "utilities").
-UTILITIES = frozenset({"help", "switcher", "palette"})
+UTILITIES = frozenset({"help", "switcher", "palette", "confirm", "appoint", "note"})
 
 
 def _key(action_id: str) -> str:
@@ -173,7 +173,6 @@ class Game:
         self.world, _ = advance(self.world)
         self.hours = project(self.world)["attention"]
         self.log: list[dict] = []
-        self.hall_guided = True
         self.home_view = "court"
         self.audience_pick = ""
         self.audience_deferred = set()
@@ -202,7 +201,7 @@ class Game:
         self.desk: dict | None = None
         self.desk_drafts: dict[str, dict] = {}
         self.works_pick = ""          # a work in hand, awaiting [x]
-        self.works_plan_pick = ""     # a plan read before [Enter] commissions it
+        self.works_plan_pick = ""     # a plan read before [enter] commissions it
         self.works_corvee_draft = 0    # days considered; one [c] raises them
         self.inbox_pick = ""
         self.inbox_filter = "all"
@@ -251,6 +250,8 @@ class Game:
         self.help_query = ""
         self.help_pick = ""
         self.help_screen = "hall"
+        self.help_view, self.help_typed, self.help_said = "manual", "", []
+        self.help_thinking = False
         self.altar_readings: list[str] = []
         self.altar_question = "harvest"
         self.altar_offering: tuple[str, int] | None = None
@@ -289,7 +290,7 @@ class Game:
 
         hall_width, hall_height = desktop.default_size("hall")
         self.hall_window = self.app.window(
-            "hall", f"Court — Say to the King, my lord — seed {seed}",
+            "hall", f"Court and Hall — seed {seed}",
             hall_width, hall_height,
             on_key=self.on_key, on_close=self.quit,
             on_resize=self.on_resize)
@@ -578,27 +579,26 @@ class Game:
     def show_confirmation(self, description: str, cost: int) -> None:
         if not hasattr(getattr(self, "app", None), "root"):
             return
-        import tkinter as tk
-        self.close_confirmation()
-        panel = self.confirmation_window = tk.Toplevel(self.app.root())
-        panel.title("Confirm order")
-        tk.Label(panel, text=description, wraplength=440, justify="left").pack(padx=20, pady=15)
-        tk.Label(panel, text=f"Cost: {cost} court hours. Nothing has been ordered yet.").pack(padx=20)
-        buttons = tk.Frame(panel)
-        buttons.pack(pady=15)
-        tk.Button(buttons, text="Confirm order", command=self.confirm_pending).pack(side="left", padx=8)
-        tk.Button(buttons, text="Cancel", command=self.cancel_pending).pack(side="left", padx=8)
-        panel.protocol("WM_DELETE_WINDOW", self.cancel_pending)
-        panel.bind("<Return>", lambda _e: self.confirm_pending())
-        panel.bind("<Escape>", lambda _e: self.cancel_pending())
-        panel.grab_set()
-        panel.focus_force()
+        self.confirm_text = (description, cost)
+        window = self.app.window(
+            "confirm", "Confirm order", 64, 14,
+            on_key=self.on_confirm_key, on_resize=self.on_resize,
+            on_close=self.cancel_pending)
+        self.confirmation_window = window.root
+        self.repaint()
+        window.focus()
+
+    def on_confirm_key(self, event) -> None:
+        command, key = getattr(event, "command", ""), event.keysym
+        char = (event.char or "").lower()
+        if command == "confirm" or key == "Return" or char == "y":
+            self.confirm_pending()
+        elif command == "cancel" or key == "Escape" or char in {"n", "1", "2"}:
+            self.cancel_pending()
 
     def close_confirmation(self) -> None:
-        panel = getattr(self, "confirmation_window", None)
-        if panel is not None and panel.winfo_exists():
-            panel.grab_release()
-            panel.destroy()
+        if hasattr(getattr(self, "app", None), "close"):
+            self.app.close("confirm")
         self.confirmation_window = None
 
     def confirm_pending(self) -> bool:
@@ -638,8 +638,7 @@ class Game:
             save_session(
                 self.save_path, self.seed, self.chosen_alu,
                 self.world.date.absolute, self.log, self.world,
-                hours_left=self.hours, court_report=self.events,
-                hall_guided=getattr(self, "hall_guided", True))
+                hours_left=self.hours, court_report=self.events)
         except (OSError, ValueError, TypeError) as error:
             self.session_notice = f"The campaign could not be saved: {error}."
             self.repaint()
@@ -668,7 +667,6 @@ class Game:
         self.seed = int(data["seed"])
         self.chosen_alu = str(data["chosen_alu"])
         self.log = list(data["log"])
-        self.hall_guided = data.get("hall_guided", True) is not False
         self.home_view, self.audience_pick, self.home_scroll = "court", "", 0
         self.audience_deferred = set()
         saved_hours = data.get("hours_left")
@@ -798,7 +796,7 @@ class Game:
         # One lookup rather than a differently-named attribute per window.
         notice = self.notice_for(key)
         if key == "hall":
-            if b.get("ended"):
+            if b.get("ended") or getattr(self, "home_view", "court") == "hall":
                 return hall.compose(b, width, height, hours_left=self.hours, notice=notice)
             return audience.compose(b, width, height, hours=self.hours,
                 view=getattr(self, "home_view", "court"), selected=getattr(self, "audience_pick", ""),
@@ -931,10 +929,40 @@ class Game:
                 command_palette.parse(self.command_line, b),
                 self.hours, width, height,
                 tuple(self.command_history), notice=notice)
+        if key == "confirm":
+            description, cost = getattr(self, "confirm_text", ("", 0))
+            return dialog.compose(
+                "CONFIRM ORDER", [description,
+                    f"Cost: {cost} court hour{'s' if cost != 1 else ''}."
+                    " Nothing has been ordered yet."],
+                width=width, height=height,
+                footer=(style.FooterAction("enter", "confirm order", command="confirm"),
+                        style.FooterAction("esc", "cancel", command="cancel")))
+        if key == "appoint":
+            people = self.appointable()
+            return dialog.compose(
+                "CHOOSE AN OFFICEHOLDER",
+                ["The order is reviewed before the appointment is made."],
+                [(f"pick:{person['id']}", person["name"]
+                  + (f" — holds {person['post']}" if person.get("post") else ""))
+                 for person in people],
+                width=width, height=height,
+                footer=(style.FooterAction("1-9", "choose"),
+                        style.FooterAction("esc", "cancel")))
+        if key == "note":
+            return dialog.compose(
+                "PLAYTEST NOTE",
+                ["What confused you, broke, or felt good? Any format is fine."],
+                typed=getattr(self, "note_typed", ""),
+                width=width, height=height,
+                footer=(style.FooterAction("ctrl-enter", "save note", command="save"),
+                        style.FooterAction("esc", "close")))
         if key == "help":
             return help_page.compose(
                 width, height, self.help_query, self.help_pick,
-                self.help_screen)
+                self.help_screen, view=getattr(self, "help_view", "manual"),
+                said=getattr(self, "help_said", ()), typed=getattr(self, "help_typed", ""),
+                thinking=getattr(self, "help_thinking", False))
         if key == "altar":
             shrine_view = getattr(self, "shrine_view", "rites")
             if shrine_view == "oaths":
@@ -1021,7 +1049,7 @@ class Game:
             "<F8>": bind(self.playtest_note),
             "<colon>": guarded(self.open_palette),
             "<grave>": guarded(self.open_palette),
-            "<question>": guarded(self.open_play_help),
+            "<question>": guarded(self.open_help),
             "<Control-Tab>": bind(self.cycle_windows),
             "<Control-Shift-Tab>": bind(lambda: self.cycle_windows(True)),
         }
@@ -3081,56 +3109,25 @@ class Game:
         window.focus()
 
     def open_play_help(self) -> None:
-        import tkinter as tk
-        from tkinter import ttk
-        from tkinter.scrolledtext import ScrolledText
-        existing = getattr(self, "play_help_window", None)
-        if existing is not None and existing.winfo_exists():
-            existing.lift()
+        self.help_view = "ask"
+        self.open_help()
+
+    def ask_help(self) -> None:
+        """Put the typed question to the scribe. Free, and it gives no orders."""
+        text = self.help_typed.strip()
+        if not text or getattr(self, "help_thinking", False):
             return
-        panel = self.play_help_window = tk.Toplevel(self.app.root())
-        panel.title("Help — ask about the game")
-        tabs = ttk.Notebook(panel)
-        tabs.pack(fill="both", expand=True, padx=8, pady=8)
-        ask, controls = ttk.Frame(tabs), ttk.Frame(tabs)
-        tabs.add(ask, text="Ask")
-        tabs.add(controls, text="Controls")
-        output = ScrolledText(ask, width=72, height=18, wrap="word", state="disabled")
-        output.pack(fill="both", expand=True)
-        question = tk.Entry(ask)
-        question.pack(fill="x", pady=8)
-        history = []
-        def append(text):
-            output.configure(state="normal")
-            output.insert("end", text + "\n\n")
-            output.configure(state="disabled")
-            output.see("end")
-        def submit(_event=None):
-            text = question.get().strip()
-            if not text or str(send['state']) == 'disabled':
-                return
-            question.delete(0, 'end')
-            append("You: " + text)
-            send.configure(state='disabled')
-            b, turn = self.belief, self.world.date.absolute
-            def done(result, error):
-                if not panel.winfo_exists():
-                    return
-                answer = result[0] if result else 'The assistant could not answer. The Controls tab is still available.'
-                append(answer)
-                history.extend([('player', text), ('tutor', answer)])
-                send.configure(state='normal')
-            self._run_model(lambda: help_agent.speak(text, list(history), b, self.seed, turn, self.client), done)
-        send = tk.Button(ask, text="Ask — free, no orders issued", command=submit)
-        send.pack(pady=5)
-        question.bind('<Return>', submit)
-        manual_text = ScrolledText(controls, width=72, height=22, wrap='word')
-        manual_text.pack(fill='both', expand=True)
-        manual_text.insert('end', 'Court: F/A/S reviews a judgement; Enter reads a letter; B replies.\nD defers; R recalls; Tab opens Planning. In Planning, Enter ends the fortnight.\nCtrl-H returns to Court. Ctrl-Shift-R resets window sizes. F8 saves a playtest note.\n\n')
-        manual_text.insert('end', '\n\n'.join(doc.passage for doc in help_agent.DOCS))
-        manual_text.configure(state='disabled')
-        append('Ask how to use a control or understand a record. This does not spend court time.')
-        question.focus_set()
+        self.help_typed = ""
+        self.help_said = list(getattr(self, "help_said", ())) + [("player", text)]
+        self.help_thinking = True
+        said, b, turn = list(self.help_said[:-1]), self.belief, self.world.date.absolute
+        def done(result, error):
+            self.help_thinking = False
+            self.help_said.append(("tutor", result[0] if result else
+                "The scribe could not answer. The manual is on the other tab."))
+            self.repaint()
+        self._run_model(lambda: help_agent.speak(text, said, b, self.seed, turn, self.client), done)
+        self.repaint()
 
     def _focused_screen(self) -> str:
         """Whichever window the player was last in, for Help's context."""
@@ -3155,7 +3152,19 @@ class Game:
             self.app.close("help")
             return
         if keysym == "Tab":
-            self.open_play_help()
+            self.help_view = "manual" if getattr(self, "help_view", "manual") == "ask" else "ask"
+            self.repaint()
+            return
+        if getattr(self, "help_view", "manual") == "ask":
+            if keysym == "Return":
+                self.ask_help()
+            elif keysym in ("BackSpace", "Delete"):
+                self.help_typed = getattr(self, "help_typed", "")[:-1]
+            elif char.isprintable() and char:
+                self.help_typed = getattr(self, "help_typed", "") + char
+            else:
+                return
+            self.repaint()
             return
         command = getattr(event, "command", "")
         if command.startswith("topic:"):
@@ -3880,19 +3889,37 @@ class Game:
             self.appoint_institution(institution)
 
     def appoint_institution(self, institution: str) -> None:
-        import tkinter as tk
-        candidates = [p for p in self.belief.get("house", {}).get("members", ())
-                      if p["alive"] and p["age_years"] >= 15 and p["id"] != self.belief["house"]["ruler"]]
-        panel = tk.Toplevel(self.app.root())
-        panel.title("Choose an officeholder")
-        tk.Label(panel, text="Choose a person. The order is reviewed before appointment.").pack(padx=15, pady=10)
-        def choose(person):
-            panel.destroy()
-            self.do(A.PlacePerson(person, institution), window=f"institution:{institution}")
-        for person in candidates:
-            tk.Button(panel, text=person["name"] + (f" — holds {person['post']}" if person.get("post") else ""),
-                      command=lambda p=person["id"]: choose(p)).pack(fill="x", padx=15, pady=3)
-        tk.Button(panel, text="Cancel", command=panel.destroy).pack(pady=10)
+        """Choose an officeholder from the house. The order is still reviewed."""
+        self.appointing = institution
+        window = self.app.window(
+            "appoint", "Choose an officeholder", 60, 16,
+            on_key=self.on_appoint_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("appoint"))
+        self.repaint()
+        window.focus()
+
+    def appointable(self) -> list[dict]:
+        house = self.belief.get("house", {})
+        return [p for p in house.get("members", ())
+                if p["alive"] and p["age_years"] >= 15 and p["id"] != house.get("ruler")]
+
+    def on_appoint_key(self, event) -> None:
+        command, char = getattr(event, "command", ""), (event.char or "")
+        people = self.appointable()
+        if event.keysym == "Escape":
+            self.app.close("appoint")
+            return
+        chosen = ""
+        if command.startswith("pick:"):
+            chosen = command.split(":", 1)[1]
+        elif char.isdigit() and char != "0" and int(char) <= len(people):
+            chosen = people[int(char) - 1]["id"]
+        if chosen:
+            institution = self.appointing
+            self.app.close("appoint")
+            self.do(A.PlacePerson(chosen, institution),
+                    window=f"institution:{institution}")
+        self.repaint()
 
     def order(self, action, window: str | None = None) -> None:
         """Issue one direct order and leave a visible receipt or refusal."""
@@ -4250,7 +4277,6 @@ class Game:
             if item:
                 kind = ("person" if listing in {"house", "people", "household", "advisers"}
                         else "institution" if listing in {"post", "offices"}
-                        else "petition" if listing in {"court", "audience", "justice"}
                         else listing)
                 self.open_focus(kind, item)
             return
@@ -4293,38 +4319,10 @@ class Game:
         if state["choosing"] == "post":
             self.palace_place(command, event.keysym, lower)
             return
-        if state["view"] in {"court", "audience", "justice"}:
-            self.palace_court(command, lower)
-        elif state["view"] in {"house", "people", "household", "advisers"}:
+        if state["view"] in {"house", "people", "household", "advisers"}:
             self.palace_house(command, lower)
         elif state["view"] == "relations":
             self.palace_relations(command, char)
-
-    def palace_court(self, command: str, char: str) -> None:
-        listing = self.palace_listing()
-        petition = self.palace_pick(listing)
-        if not petition:
-            return
-        # A band of displaced people stands in the same queue as a lawsuit,
-        # because to the king it is the same queue.
-        if any(c["id"] == petition for c in palace.petitioners(self.belief)):
-            decision = (command.split(":", 1)[1] if command.startswith("receive:")
-                        else next((d for key, d, _ in palace.RECEPTIONS
-                                   if key == char), ""))
-            if decision and self.do(A.ReceiveCohort(petition, decision),
-                                    window="palace"):
-                self.palace_state["pick"].pop(listing, None)
-            return
-        verdict = ""
-        if command.startswith("verdict:"):
-            verdict = command.split(":", 1)[1]
-        else:
-            verdict = next((v for key, v, _label in palace.VERDICTS
-                            if key == char), "")
-        if not verdict:
-            return
-        if self.do(A.RulePetition(petition, verdict), window="palace"):
-            self.palace_state["pick"].pop(listing, None)
 
     def palace_house(self, command: str, char: str) -> None:
         state = self.palace_state
@@ -5106,26 +5104,41 @@ class Game:
     def on_audience_key(self, event) -> bool:
         command = getattr(event, "command", "")
         key, char = event.keysym, (event.char or "").lower()
+        # A review is modal in effect: while one waits, the keys that answer it
+        # answer it from whichever window has the focus.
+        if getattr(self, "pending_action", None) is not None:
+            self.on_confirm_key(event)
+            return True
         view = getattr(self, "home_view", "court")
         deferred = self.__dict__.setdefault("audience_deferred", set())
         b = self.belief
         item = audience.current(b, deferred, getattr(self, "audience_pick", ""))
-        if command in {"home:court", "home:planning", "home:report"} or key in {"Tab", "ISO_Left_Tab"}:
-            self.home_view = command.split(":")[1] if command else "planning" if view == "court" else "court"
+        if command in {"home:court", "home:hall", "home:report"}:
+            self.home_view = command.split(":")[1]
             self.home_scroll = 0
-        elif command == "home:help":
-            self.open_play_help()
-        elif view == "planning":
-            if command == "home:end" or key == "Return":
+        elif command == "home:help" or char == "?":
+            self.open_help()
+        elif view == "hall":
+            # The hall is the planning half of the fortnight: doors, the last
+            # report, and the one control that ends the turn.
+            if command == "space" or key in {"space", "Return"}:
                 self.end_fortnight()
                 return True
-            door = command.split(":")[-1] if command.startswith("home:door:") else char
-            if door in {k for k, _, _ in hall.DOORS}:
+            if char == "l":
+                self.home_view, self.home_scroll = "report", 0
+            elif command.startswith("concern:") or (char.isdigit() and char != "0"):
+                self.activate_concern(int(command.split(":")[1]) if command else int(char) - 1)
+            elif (command or char) in {k for k, _, _ in hall.DOORS}:
+                door = command or char
                 if door == "j":
                     self.palace_state.update(view="people", choosing="", scroll=0)
                 self.open_door(door)
             else:
                 return False
+        elif key in {"Tab", "ISO_Left_Tab"}:
+            self.home_view, self.home_scroll = "hall", 0
+        elif view == "report" and key == "Escape":
+            self.home_view, self.home_scroll = "hall", 0
         elif key in {"Up", "Down", "Prior", "Next", "Home", "End"}:
             step = {"Up": -1, "Down": 1, "Prior": -8, "Next": 8, "Home": -100000, "End": 100000}[key]
             width, height = self._size("hall")
@@ -5153,7 +5166,7 @@ class Game:
                 self.home_scroll = 0
                 self.notify("Deferred until next fortnight. R recalls deferred matters.", "info", window="hall")
         elif key == "space":
-            self.home_view = "planning"
+            self.home_view, self.home_scroll = "hall", 0
         elif item and item["kind"] == "case" and (command.startswith("home:verdict:") or char in {"f", "a", "s"}):
             width, height = self._size("hall")
             if len(audience.content(b, item, width - 6)[1]) > height - 17:
@@ -5289,40 +5302,55 @@ class Game:
         self.on_key(event, home=False)
 
     def playtest_note(self) -> None:
-        import tkinter as tk
-        from tkinter import messagebox
+        """A note, written on the game's own grid, saved beside the campaign."""
+        self.note_typed = getattr(self, "note_typed", "")
+        window = self.app.window(
+            "note", "Playtest note", 72, 20,
+            on_key=self.on_note_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("note"))
+        self.repaint()
+        window.focus()
 
-        existing = getattr(self, "note_window", None)
-        if existing is not None and existing.winfo_exists():
-            existing.lift()
+    def save_note(self) -> None:
+        note = getattr(self, "note_typed", "").strip()
+        if not note:
             return
         context = {"seed": self.seed, "turn": self.world.date.absolute,
                    "window": self.active_window(), "hours": self.hours,
                    "orders": len(self.log)}
-        panel = self.note_window = tk.Toplevel(self.app.root())
-        panel.title(f"Playtest note · turn {context['turn']}")
-        tk.Label(panel, text="What confused you, broke, or felt good? Any format is fine.").pack(padx=12, pady=8)
-        entry = tk.Text(panel, width=70, height=12, wrap="word", undo=True)
-        entry.pack(padx=12, pady=8, fill="both", expand=True)
-        def record():
-            note = entry.get("1.0", "end").strip()
-            if not note:
-                return
-            try:
-                path = self.save_path.with_name("notes.jsonl")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                with path.open("a") as stream:
-                    stream.write(json.dumps({**context, "note": note}) + "\n")
-            except OSError as error:
-                messagebox.showerror("Could not save note", str(error), parent=panel)
-                return
-            panel.destroy()
-            self.session_notice = "Playtest note saved. Keep going whenever you like."
+        try:
+            path = self.save_path.with_name("notes.jsonl")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a") as stream:
+                stream.write(json.dumps({**context, "note": note}) + "\n")
+        except OSError as error:
+            self.session_notice = f"The note could not be saved: {error}."
             self.repaint()
-        tk.Button(panel, text="Save note and continue", command=record).pack(pady=8)
-        panel.bind("<Escape>", lambda _event: panel.destroy())
-        entry.focus_set()
-        panel.lift()
+            return
+        self.note_typed = ""
+        self.app.close("note")
+        self.session_notice = "Playtest note saved. Keep going whenever you like."
+        self.repaint()
+
+    def on_note_key(self, event) -> None:
+        command, key = getattr(event, "command", ""), event.keysym
+        control = bool(getattr(event, "state", 0) & 4)
+        typed = getattr(self, "note_typed", "")
+        if key == "Escape":
+            self.app.close("note")
+            return
+        if command == "save" or (control and key == "Return"):
+            self.save_note()
+            return
+        if key == "Return":
+            self.note_typed = typed + "\n"
+        elif key in ("BackSpace", "Delete"):
+            self.note_typed = typed[:-1]
+        elif event.char and event.char.isprintable():
+            self.note_typed = typed + event.char
+        else:
+            return
+        self.repaint()
 
     def quit(self) -> None:
         """The hall owns the session; every other window closes freely (D33)."""

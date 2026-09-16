@@ -164,7 +164,7 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
     if ledger:
         controls.append(affordable(
             Control("inspect_ledger", key_for("inspect_ledger")), hours))
-    note = ("Tab view   ↑↓ choose   Enter record   [ ] amount" if room
+    note = ("tab view   ↑↓ choose   Enter record   [ ] amount" if room
             else "↑↓ choose   Enter record   [ ] amount")
     return compose(
         "THE STOREHOUSE" if room else "THE STORES",
@@ -179,6 +179,13 @@ def stores(b: dict, selected: str = "", width: int = 76, height: int = 26,
 
 
 # --- the roll -----------------------------------------------------------------
+
+def _change(label: str, before: int, after: int, unit: str) -> str:
+    """One number when nothing moves, two only when something does."""
+    if before == after:
+        return f"{label} {after:,} {unit}"
+    return f"{label} {before:,} → {after:,} {unit}"
+
 
 def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
          scroll: int = 0, amount: int | None = None, priority: tuple = (),
@@ -212,18 +219,19 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
               if amount is not None else "QUEUE DRAFT · Enter gives; Esc cancels" if priority
               else "QUEUE IN FORCE · [ ] draft ration"), "flame"),
             (f"{group['name']}: gets {group['next_paid']:,} of {owed:,} qa", "clay"),
-            (f"arrears {group.get('arrears_qa', 0):,}→{group['next_arrears']:,} qa", "sand"),
-            (f"spent {before['spent']:,}→{draft['spent']:,} qa; "
-             f"left {before['remaining']:,}→{draft['remaining']:,} qa", "clay"),
-            ((f"{draft['remaining']:,} / {draft['need']:,} qa = "
-              f"{draft['coverage']} full-roll fortnights" if draft["need"]
-              else "coverage unknown: no ration demand recorded"), "dim"),
+            (_change("arrears", group.get("arrears_qa", 0), group["next_arrears"], "qa"), "sand"),
+            (_change("spent", before["spent"], draft["spent"], "qa") + "; "
+             + _change("left", before["remaining"], draft["remaining"], "qa"), "clay"),
+            ((f"the grain left feeds the whole roll for "
+              f"{draft['coverage']} fortnight{'s' if draft['coverage'] != 1 else ''}"
+              if draft["need"] else "no ration demand is recorded, so this cannot be judged"),
+             "dim"),
             ("Current grain only; excludes arrivals, spoilage and other uses.", "dim"),
         ]
         if group.get("next_labour") is not None:
             label = "field work" if group.get("at_fields") or group.get("function") == "field_labour" else "work"
-            detail.insert(3, (f"{label} {group['labour_now']:,}→{group['next_labour']:,} person-days "
-                              "(same people)", "sand"))
+            detail.insert(3, (_change(label, group["labour_now"], group["next_labour"],
+                                      "person-days"), "sand"))
     here = order.index(selected) if selected in order else -1
     controls = []
     if group is not None and amount is not None:
@@ -248,8 +256,9 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
         detail = [
             (f"PAYMENT DRAFT · {arrears:,} qa · Enter gives; Esc cancels", "flame"),
             ((group or {}).get("name", "choose a group"), "gold"),
-            (f"arrears {payment['owed']:,}→{payment['remaining_debt']:,} qa", "sand"),
-            (f"unreserved grain {payment['free']:,}→{payment['remaining_grain']:,} qa", "clay"),
+            (_change("arrears", payment["owed"], payment["remaining_debt"], "qa"), "sand"),
+            (_change("unreserved grain", payment["free"], payment["remaining_grain"], "qa"),
+             "clay"),
             (f"after next queue: {draft['remaining']:,} qa / {draft['need']:,} qa"
              + (f" = {draft['coverage']} fortnights" if draft['need'] else " · no ration demand"), "dim"),
             (payment["refusal"] or "Keeper pays now; standing ration stays unchanged.",
@@ -267,7 +276,7 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
             why="finish the ration draft" if amount is not None or priority else "no arrears"), hours))
     return compose(
         ("THE STOREHOUSE — LABOUR AND RATIONS" if room else "RATIONS — who eats first"),
-        ("group", "ration old→new", "unpaid qa", "work affected"),
+        ("group", "ration qa", "unpaid qa", "work affected"),
         (20, -19, -9, 12), rows, selected, detail, controls, hours,
         width, height, scroll, notice, empty="nobody is on the roll.",
         note=("Estimate · " + ("granary inspection" if "granary" in b.get("inspected", ())
@@ -316,9 +325,15 @@ def _year_band(surface, x: int, y: int, room: int, b: dict) -> None:
     bar = render.labour_bar(have, asks, data.get("labour_days_committed", 0))
     surface.text(x, y + 3, "THE HANDS", C["gold"], C["ink"])
     surface.text(x + 16, y + 3, bar, C["barley"], C["ink"])
-    said = (f"{have:,} person-days · asks {asks:,} · {idle:,} idle")
     column = x + 16 + len(bar) + 2
-    surface.text(column, y + 3, said[:max(0, room - 16 - len(bar) - 2)],
+    space = max(0, room - 16 - len(bar) - 2)
+    # The long form first; drop words, never the idle figure, when it will not fit.
+    for said in (f"{have:,} person-days · asks {asks:,} · {idle:,} idle",
+                 f"{have:,} days · asks {asks:,} · {idle:,} idle",
+                 f"{have:,} · asks {asks:,} · {idle:,} idle"):
+        if len(said) <= space:
+            break
+    surface.text(column, y + 3, said[:space],
                  C["clay"] if idle else C["flame"], C["ink"])
 
     # What is queued behind the season. An ask of nothing means one thing with
@@ -384,10 +399,10 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     detail += [(f"open ground takes "
                 f"{qa(data.get('seed_recommended', 0))}"[:pane], "dim"),
                ("THE RIVER", "gold"),
-               (f"gauge {data.get('gauge', 0)} · ordinary "
-                f"{project.GAUGE_ORDINARY} · the scribe's copy"[:pane], "sky"),
+               (f"the flood measured {data.get('gauge', 0)}, ordinary is "
+                f"{project.GAUGE_ORDINARY}"[:pane], "sky"),
                ("THE DUE", "gold")]
-    detail += paired(f"ordered {rate}/1000",
+    detail += paired(f"the due is {rate} qa in every 1,000",
                      f"took {qa(data.get('last_land_due', 0))} qa last year",
                      "gold")
     if estate is not None:
@@ -396,7 +411,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         detail += paired(f"at {_spoken(estate['place'])}",
                          f"{estate['hands']} hands", "dim")
         detail += paired(f"ground {qa(estate['extent'])}",
-                         f"returns {estate['capacity']:,}/1000", "sand")
+                         f"yields {estate['capacity']:,} a 1,000", "sand")
         detail += paired(f"sown {qa(estate['under_crop'])}",
                          f"open {qa(open_ground)}",
                          "verdigris" if estate["under_crop"] else "ash")
@@ -427,7 +442,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
     controls += [
         affordable(Control("inspect_ledger", key_for("inspect_ledger"), label="count the seed"),
                    hours),
-        Control("set_land_due", key_for("set_land_due"), label=f"land due {rate}/1000"),
+        Control("set_land_due", key_for("set_land_due"), label=f"land due {rate} in 1,000"),
     ]
     if chosen_group is not None:
         verb = "recall " if chosen_group.get("at_fields") else "send "
@@ -454,7 +469,7 @@ def land(b: dict, selected: str = "", width: int = 80, height: int = 28,
         (22, -6),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="this house holds no estates.",
-        note=f"Tab view   ↑↓ choose   {corvee_note}   [< >] due   [g] hands",
+        note=f"tab view   ↑↓ choose   {corvee_note}   [< >] due   [g] hands",
         views=STOREHOUSE_VIEWS if room else (), view="land",
         scene=draw, scene_rows=band)
 
@@ -507,7 +522,7 @@ def storehouse_account(b: dict, view: str, selected: str = "",
     return compose(
         f"THE STOREHOUSE — {view.upper()}", headers, widths, rows, selected,
         detail, controls, hours, width, height, scroll, notice,
-        note=("Tab view   ↑↓ choose"
+        note=("tab view   ↑↓ choose"
               + ("   [< >] draft" if view == "dues" else "")
               + ("   Enter give" if view == "dues" and selected in drafts
                  else "")),
@@ -674,7 +689,7 @@ def oaths(b: dict, selected: str = "", width: int = 78, height: int = 28,
         "THE OATHS", ("tablet", "standing", "before"), (26, -12, 20),
         rows, selected, detail, controls, hours, width, height, scroll,
         notice, empty="no oath tablet is held in this archive.",
-        note=("Tab / Shift-Tab view   ↑↓ choose" if views else
+        note=("tab / shift-tab view   ↑↓ choose" if views else
               "↑↓ choose   [ ] set an amount   [esc] close"),
         views=views, view=view)
 
@@ -727,7 +742,7 @@ def obligations(b: dict, selected: str = "", width: int = 78,
         "THE SHRINE — OBLIGATIONS", ("clause", "tablet", "standing"),
         (31, 22, 10), rows, selected, detail, [], hours, width, height,
         scroll, notice, empty="no obligation is written on an oath tablet.",
-        note="Tab / Shift-Tab view   ↑↓ choose",
+        note="tab / shift-tab view   ↑↓ choose",
         views=tuple((name, name.title()) for name in
                     ("rites", "offerings", "oaths", "obligations")),
         view="obligations")
@@ -759,8 +774,8 @@ def harvest_order(b: dict, group_id: str, to_fields: bool, hours: int,
                 surface.text(3, row, line, INDEX[tone], INDEX["ink"])
                 row += 1
     cost = registry.BY_ID["send_to_harvest"].cost
-    style.footer(surface, [style.FooterAction("Enter", f"give order · {cost} hour",
+    style.footer(surface, [style.FooterAction("enter", f"give order · {cost} hour",
                                              enabled=not p["refusal"] and hours >= cost),
-                           style.FooterAction("Esc", "cancel")],
+                           style.FooterAction("esc", "cancel")],
                  y=height - 2, x=2, width=width - 4)
     return surface.interactive()

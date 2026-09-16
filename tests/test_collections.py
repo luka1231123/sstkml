@@ -100,20 +100,6 @@ def _institutions(count: int) -> dict:
         for n in range(count)], "projects": [], "revenue": {}, "date": "first"}
 
 
-def test_the_docket_shows_a_scrolled_petition_and_says_where_it_is() -> None:
-    for count in SIZES:
-        belief = _petitions(count)
-        assert plain_text(palace.compose(belief, view="court", height=36))
-        if not count:
-            continue
-        text = plain_text(palace.compose(
-            belief, view="court", selected=f"p{count - 1}", height=36,
-            scroll=count))                       # past the end; must clamp back
-        assert f"kind{count - 1}" in text, count
-        if count > 12:
-            assert "OF" in text, "a partial list must say so"
-
-
 def test_search_results_beyond_the_ninth_can_be_reached() -> None:
     hits = _hits(100)
     text = plain_text(archive.compose({}, "q", hits, scroll=90))

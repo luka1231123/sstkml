@@ -29,7 +29,7 @@ def test_works_names_the_return_wager_and_whole_supply() -> None:
         belief, width=82, height=32, selected_plan="walls"))
 
     assert "FORTIFICATION" in text
-    assert "RETURN" in text and "WAGER" in text
+    assert "GIVES YOU" in text and "COSTS YOU" in text
     assert "2,000 copper, 20,000 grain" in text
     assert "36,000 copper" in text
     assert "PRECEDENT" not in text

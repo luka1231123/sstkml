@@ -5,14 +5,26 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
-## Court first, planning separately — playtest revision
+## Court first, then the Hall — playtest revision
 
 The primary screen is now Court. Each fortnight brings a single petition,
 messenger or urgent matter forward. Judgements and letter reading happen in
 place; reply drafting returns to Court when sealed. Deferring hides a matter
 for the current audience only; it returns next fortnight, with normal engine
-consequences. Planning holds proactive work and the explicit End fortnight
-control. Last report is a tab rather than an automatically opened window.
+consequences. Tab ends Court and opens the Hall, which is a dashboard of the
+year, stores, standing, rations and labour, waiting matters and motion, plus the
+doors. SPACE in the Hall ends the fortnight. Last report is reached with L.
+Help is drawn as a game screen with Manual and Ask halves, not a Tk notebook.
+The order review, the officeholder picker and the playtest note are grid
+windows too; no Tk widget is left in the game.
+
+The palace's judgement view is deleted. Claims are heard in Court and nowhere
+else, and the room is named the Palace. Default window sizes were measured
+against what each screen actually draws: the Palace shows five rows of people
+instead of one, the Shrine opens at the size it was drawn for, and two windows
+still fit side by side. Contracted notation is gone: the Shrine says what
+skipping a rite costs, the Land says a due in qa per thousand, and the Roll
+prints one number where it used to print an arrow between two equal ones.
 
 Removed the guided briefing module, unsolicited adviser lines, duplicate
 Audience/Advice tabs in the people workbench, and redundant report prose.

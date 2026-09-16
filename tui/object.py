@@ -81,5 +81,5 @@ def compose(item: dict, width: int = 58, height: int = 22,
     if provenance:
         surface.text(3, height - 4, provenance[:width - 6], C["sky"], C["ink"])
     style.footer(surface, (style.FooterAction("↑↓", "all facts"),
-                           style.FooterAction("Esc", "close")))
+                           style.FooterAction("esc", "close")))
     return surface.interactive()

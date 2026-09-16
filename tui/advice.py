@@ -91,7 +91,7 @@ def _unread(b: dict) -> Concern | None:
         "he keeps the tablets and knows what is on the pile",
         "no one keeps the tablet house; the scribe counted the pile himself")
     return Concern(
-        "unread", min(9, 4 + age), f"{len(unread)} unread tablets",
+        "unread", min(9, 4 + age), f"{len(unread)} unread tablet{'s' if len(unread) != 1 else ''}",
         f"The oldest, from {who}, {waited}.",
         "open the Inbox and read what has waited longest.", "stack",
         speaker=speaker, basis=basis)
@@ -161,7 +161,7 @@ def _petitions(b: dict) -> Concern | None:
     oldest = max(petitions, key=lambda item: item["waiting"])
     waiting = oldest["waiting"]
     return Concern(
-        "justice", min(9, 3 + waiting), f"{len(petitions)} judgements wait",
+        "justice", min(9, 3 + waiting), f"{len(petitions)} judgement{'s' if len(petitions) != 1 else ''} wait".replace("1 judgement wait", "1 judgement waits"),
         f"The oldest case has stood for {waiting} fortnights.",
         "hear the oldest claim, or give judgement on what is known.",
         "palace", speaker=SCRIBE,

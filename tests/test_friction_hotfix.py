@@ -26,7 +26,7 @@ def test_space_advances_only_from_the_hall() -> None:
     assert advanced == []
 
     game.on_key(Key(char=" ", keysym="space"))
-    assert advanced == [] and game.home_view == "planning"
+    assert advanced == [] and game.home_view == "hall"
     game.on_key(Key(keysym="Return"))
     assert advanced == ["advanced"]
 

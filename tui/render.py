@@ -85,7 +85,8 @@ def granary_line(b: dict) -> str:
     kept = fortnights_fed(b)
     if kept is None:
         return ""
-    said = "one fortnight" if kept == 1 else f"{kept} fortnights"
+    said = ("not one whole fortnight" if kept == 0 else
+            "one fortnight" if kept == 1 else f"{kept} fortnights")
     series = b.get("store_history", {}).get("grain", ())
     if len(series) < 2 or series[-1] == series[-2]:
         return f"{said} fed"

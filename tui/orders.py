@@ -276,7 +276,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
         rows, chosen.id if chosen else "", detail, controls, hours,
         width, height, scroll, notice,
         empty=_empty(view), views=VIEWS, view=view,
-        note="Tab / Shift-Tab view   ↑↓ choose   Enter open")
+        note="tab / shift-tab view   ↑↓ choose   Enter open")
 
 
 def _empty(view: str) -> str:

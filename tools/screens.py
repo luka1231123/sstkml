@@ -54,8 +54,11 @@ def _ledger(key: str) -> dict:
 SCREENS = {
     "court": ("THE COURT", lambda b: audience.compose(
         b, *desktop.default_size("hall"), hours=b.get("attention", 0))),
-    "hall": ("PLANNING", lambda b: audience.compose(
-        b, *desktop.default_size("hall"), view="planning", hours=b.get("attention", 0))),
+    "hall": ("THE HALL", lambda b: hall.compose(
+        b, *desktop.default_size("hall"), hours_left=b.get("attention", 0))),
+    "report": ("THE LAST REPORT", lambda b: audience.compose(
+        b, *desktop.default_size("hall"), view="report", hours=b.get("attention", 0),
+        report=("No fortnight has ended yet.",))),
     "stack": ("THE TABLET HOUSE", lambda b: inbox.compose(
         b, *desktop.default_size("stack"))),
     # The five workbenches, at the sizes `tui.desktop` opens them.
@@ -63,13 +66,9 @@ SCREENS = {
                lambda b: ledgers.stores(
                    b, room=True, **_ledger("stores"))),
     "roll": ("THE ROLL", lambda b: ledgers.roll(b, **_ledger("roll"))),
-    "muster": ("THE CORVÉE", lambda b: ledgers.muster(b, **_ledger("muster"))),
+    "muster": ("THE MUSTER", lambda b: ledgers.muster(b, **_ledger("muster"))),
     "oaths": ("THE OATHS", lambda b: ledgers.oaths(b, **_ledger("oaths"))),
     "land": ("THE LAND", lambda b: ledgers.land(b, **_ledger("land"))),
-    "palace": ("THE COURT", lambda b: palace.compose(
-        b, view="court", hours=8,
-        width=desktop.default_size("palace")[0],
-        height=desktop.default_size("palace")[1])),
     "house": ("THE PALACE — THE HOUSE", lambda b: palace.compose(
         b, view="house", hours=8,
         width=desktop.default_size("palace")[0],
@@ -78,22 +77,23 @@ SCREENS = {
         b, view="relations", hours=8,
         width=desktop.default_size("palace")[0],
         height=desktop.default_size("palace")[1])),
-    "help": ("FIELD MANUAL", lambda b: help_page.compose(52, 20)),
-    "alu": ("THE ALU", lambda b: alu.compose(b, None, 96, 36)),
-    "trade": ("TRADE", lambda b: trade.compose(b, 78, 28)),
-    "works": ("THE WORKS", lambda b: works.compose(b, "", 82, 32)),
-    "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, 104, 32)),
+    "help": ("FIELD MANUAL", lambda b: help_page.compose(*desktop.default_size("help"))),
+    "alu": ("THE ALU", lambda b: alu.compose(b, None, *desktop.default_size("alu"))),
+    "trade": ("TRADE", lambda b: trade.compose(b, *desktop.default_size("trade"))),
+    "works": ("THE WORKS", lambda b: works.compose(b, "", *desktop.default_size("works"))),
+    "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, *desktop.default_size("world"))),
     "counsel": ("COUNSEL", lambda b: counsel.compose(
         b, _talk(b), 6, "", False, *desktop.default_size("counsel"))),
     "altar": ("THE SHRINE", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
-        "harvest", ("oil", 20), 78, 32)),
+        "harvest", ("oil", 20), *desktop.default_size("altar"))),
     "archive": ("THE SCRIBES' ROOM — RECORDS", lambda b: archive.compose(
         b, "oath", b.get("archive_index", {}).get("hits", {}).get("oath", []),
         "", False, *desktop.default_size("stack"), embedded=True)),
     "orders": ("ORDERS", lambda b: orders.compose(
         b, _LOG, max((r["turn"] for r in _LOG), default=0),
-        hours=8, view="all", width=88, height=30)),
+        hours=8, view="all", width=desktop.default_size("orders")[0],
+        height=desktop.default_size("orders")[1])),
     "desk": ("THE SCRIBES' ROOM — WRITING TABLE", lambda b: _desk(b)),
 }
 

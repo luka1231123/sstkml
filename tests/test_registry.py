@@ -19,6 +19,7 @@ from tools import inventory
 REQUIRED_ATTENTION = {
     "end_fortnight": 0, "allocate": 0, "set_priority": 0,
     "read_letter": 2, "file_letter": 0, "delegate_letter": 1,
+    "pay_arrears": 1,
     "dictate_reply": 2, "dispatch_letter": 2,
     "inspect_ledger": 1, "send_gift": 1,
     "send_to_harvest": 1, "assign_troops": 1, "raise_corvee": 1,

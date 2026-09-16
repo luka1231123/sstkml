@@ -126,12 +126,12 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
                          C["flame"], C["ink"])
             surface.link(2, y, width - 4, 1, f"alu:open:{item['id']}")
     style.notice(surface, 3, height - 4, width - 6, notice)
-    nav = [style.FooterAction("Tab", "view")]
+    nav = [style.FooterAction("tab", "view")]
     if view in {"cohorts", "sites", "works"}:
         nav += [style.FooterAction("↑↓", "choose", command="alu:next"),
-                style.FooterAction("Enter", "open")]
+                style.FooterAction("enter", "open")]
     if view == "works":
-        nav.append(style.FooterAction("Enter", "manage works"))
+        nav.append(style.FooterAction("enter", "manage works"))
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     actions = []
     if view in {"overview", "cohorts"} and any(
@@ -141,7 +141,7 @@ def _plain(b: dict, view: str, width: int, height: int, notice: str,
                     style.FooterAction("z", "settle"),
                     style.FooterAction("d", "redirect"),
                     style.FooterAction("f", "refuse")]
-    actions.append(style.FooterAction("Esc", "close"))
+    actions.append(style.FooterAction("esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()
 
@@ -493,13 +493,13 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
              f"last took {revenue.get('last_harbour_due', 0)} "
              f"{revenue.get('harbour_good', 'oil')}.")[: width - 6],
             C["ash"], C["ink"])
-    actions = [style.FooterAction("Tab", "view")]
+    actions = [style.FooterAction("tab", "view")]
     if shown:
         actions += [style.FooterAction("↑↓", "choose", command="alu:next"),
-                    style.FooterAction("Enter", "inspect · 1h")]
+                    style.FooterAction("enter", "inspect · 1h")]
     actions += [style.FooterAction("n", "works"),
                 style.FooterAction("o", "orders"),
-                style.FooterAction("Esc", "close")]
+                style.FooterAction("esc", "close")]
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()
 
@@ -562,7 +562,7 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
         style.bar(surface, 2, height - 2, width - 4,
                   f" [r] set the men to it — about {want:,} days of corvée",
                   fg=C["clay"], bg=C["lapis"])
-    style.footer(surface, [style.FooterAction("P", "appoint / replace", command="appoint"),
-                          style.FooterAction("I", "inspect · 1 hour", command="inspect")],
+    style.footer(surface, [style.FooterAction("p", "appoint / replace", command="appoint"),
+                          style.FooterAction("i", "inspect · 1 hour", command="inspect")],
                  x=3, y=height - 4, width=width - 6)
     return surface.interactive()

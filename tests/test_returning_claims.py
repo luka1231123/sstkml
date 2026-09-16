@@ -35,9 +35,10 @@ def test_return_depends_on_the_award_and_can_be_refused(verdict, case_id, amount
     assert f'{award:,}' in case['claim_text']
     assert case['outcomes']['against']['amount'] == 0
     for width, height in ((92, 30), (68, 24)):
-        screen = palace.compose(b, view='audience', selected=case_id, hours=7,
-                                width=width, height=height)
-        controls = [hit for hit in screen.hits if hit.command.startswith('verdict:')]
+        screen = audience.compose(b, width, height, hours=7,
+                                  selected='case:' + case_id)
+        controls = [hit for hit in screen.hits
+                    if hit.command.startswith('home:verdict:')]
         assert len(controls) == 3 and all(hit.enabled for hit in controls)
     path = tmp_path / 'return.json'
     save(path, seed, 'seat', 4, log, world)

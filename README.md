@@ -35,10 +35,13 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 `run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
 Each fortnight opens in Court: one person or letter, with actions beside it.
-`F/A/S` reviews a judgement, `Enter` reads a letter, `B` replies, and `D` defers.
-`Tab` opens Planning for proactive letters, food, labour, institutions and defence.
-`Enter` in Planning ends the fortnight. `Ctrl-H` returns to Court. `?` opens
-free help with Ask and Controls tabs; `Ctrl-Shift-R` resets window sizes.
+`f/a/s` reviews a judgement, `enter` reads a letter, `b` replies, and `d` defers.
+`tab` leaves Court for the Hall: the dashboard of the year, stores, standing,
+rations and labour, waiting matters, and the doors to every working room.
+`space` in the Hall ends the fortnight and opens the next Court; `l` shows the
+last report. `Ctrl-H` returns here. `?` opens free help, which is one of the
+game's own screens with Manual and Ask halves; `Ctrl-Shift-R` resets window sizes.
+Claims are heard only in Court; the Palace holds people, offices and envoys.
 `F8` records a playtest note. Last report is available without opening another window.
 
 Version 29 saves still load. `--playtest` starts a separate autosave folder.

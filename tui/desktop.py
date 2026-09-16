@@ -81,19 +81,19 @@ WINDOWS: dict[str, WindowSpec] = {
         # block, and below that the calendar was dropped in silence -- the one
         # thing a room may never do with a fact it holds. Refusing to shrink is
         # the house rule for exactly this case.
-        _spec("hall", "Court", "anchor", (84, 28), (84, 28)),
-        _spec("stack", "The Scribes' Room", "workbench", (80, 27), (78, 26)),
+        _spec("hall", "Court and Hall", "anchor", (84, 28), (84, 28)),
+        _spec("stack", "The Scribes' Room", "workbench", (82, 28), (78, 26)),
         # Four full-size houses, their labels and their matching ledger rows
         # all fit at this floor. A shorter Alu used to cover those labels
         # with the Works band while still advertising the hidden number keys.
-        _spec("alu", "The Alu", "workbench", (74, 25), (70, 25)),
-        _spec("orders", "Orders", "workbench", (72, 24), (66, 22)),
+        _spec("alu", "The Alu", "workbench", (86, 32), (70, 25)),
+        _spec("orders", "Orders", "workbench", (84, 28), (66, 22)),
         # The World is intentionally exempt from the compact desktop pass.
         _spec("world", "The Known World", "workbench", (104, 32), (68, 22)),
-        _spec("trade", "Trade", "workbench", (72, 24), (66, 22)),
-        _spec("palace", "The Court", "workbench", (74, 25), (68, 24)),
-        _spec("works", "Works", "ledger", (66, 23), (62, 21)),
-        _spec("plague", "Sickness and Closures", "ledger", (62, 22), (58, 20)),
+        _spec("trade", "Trade", "workbench", (76, 26), (66, 22)),
+        _spec("palace", "The Palace", "workbench", (82, 30), (68, 24)),
+        _spec("works", "The Works", "ledger", (78, 30), (62, 21)),
+        _spec("plague", "Sickness and Closures", "ledger", (72, 26), (58, 20)),
         _spec("roll", "The Roll", "ledger", (84, 29), (82, 28)),
         # The Land carries the year band and the full estate dossier -- season,
         # hands, gauge, crop, due, ground. Eighty-two by twenty-eight is the
@@ -101,23 +101,23 @@ WINDOWS: dict[str, WindowSpec] = {
         # facts two to a row; it is wider than the old sixty-four and two rows
         # shorter, because the width is what the dossier was actually short of.
         _spec("land", "The Land", "ledger", (84, 29), (82, 28)),
-        _spec("muster", "The Muster", "ledger", (64, 22), (60, 20)),
-        _spec("oaths", "The Oaths", "ledger", (62, 22), (58, 20)),
+        _spec("muster", "The Muster", "ledger", (72, 26), (60, 20)),
+        _spec("oaths", "The Oaths", "ledger", (70, 26), (58, 20)),
         # The Storehouse hosts the Land page on its third tab, so it cannot be
         # smaller than the Land: the same dossier cut in half is still cut.
         _spec("stores", "The Storehouse", "workbench", (84, 29), (82, 28)),
         # The Shrine keeps enough vertical room for its medium altar vignette
         # above the fixed ritual controls, even at the minimum geometry.
-        _spec("altar", "The Shrine", "document", (54, 24), (52, 22)),
-        _spec("counsel", "Counsel", "document", (52, 18), (50, 17)),
-        _spec("fortnight", "The Fortnight", "document", (54, 18), (50, 17)),
-        _spec("help", "Help", "utility"),
+        _spec("altar", "The Shrine", "document", (74, 30), (52, 22)),
+        _spec("counsel", "Counsel", "document", (62, 24), (50, 17)),
+        _spec("fortnight", "The Fortnight", "document", (62, 24), (50, 17)),
+        _spec("help", "Help", "utility", (50, 22), (46, 17)),
         _spec("palette", "Command", "palette"),
         _spec("switcher", "Windows", "utility", (42, 17), (40, 15)),
-        _spec("institution:", "Institution", "document", (50, 19), (46, 18)),
+        _spec("institution:", "Institution", "document", (60, 24), (46, 18)),
         _spec("focus:", "Record", "document", (72, 30), (58, 22)),
-        _spec("letter:", "Tablet", "document", (50, 20), (46, 18)),
-        _spec("archive:", "Tablet", "document", (50, 20), (46, 18)),
+        _spec("letter:", "Tablet", "document", (62, 26), (46, 18)),
+        _spec("archive:", "Tablet", "document", (62, 26), (46, 18)),
     )
 }
 

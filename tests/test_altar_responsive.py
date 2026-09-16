@@ -65,7 +65,7 @@ def test_altar_controls_remain_legible_and_clickable_when_compact() -> None:
             "20 oil",
             "20 wine",
             "200 grain",
-            "[Enter] ask",
+            "[enter] ask",
         ):
             assert label in text, (size, label)
 

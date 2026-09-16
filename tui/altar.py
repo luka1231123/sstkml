@@ -116,9 +116,9 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
             surface.text(28, row, f"held {stores.get(good, 0):,}", C["clay"], C["ink"])
         surface.text(3, 12, "The chosen offering is consumed when a rite is performed.",
                      C["dim"], C["ink"])
-        style.footer(surface, (style.FooterAction("Tab", "view"),
-                               style.FooterAction("Enter", "return to rites"),
-                               style.FooterAction("Esc", "close")),
+        style.footer(surface, (style.FooterAction("tab", "view"),
+                               style.FooterAction("enter", "return to rites"),
+                               style.FooterAction("esc", "close")),
                      y=height - 2, x=2, width=width - 4)
         return surface.interactive()
 
@@ -129,17 +129,18 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
                    tuple((name, name.title()) for name in VIEWS), view)
     rites = b.get("rites", ())
     if rites:
-        for index, rite in enumerate(rites[:max(1, (foot - 5) // 2)]):
-            y = 3 + index * 2
-            needs = ", ".join(f"{qty} {good}" for good, qty in rite["requires"].items())
-            line = (f"{rite['id'].replace('_', ' ')} · fortnight "
-                    f"{rite['fortnight']} · {rite['hours']}h")
-            surface.text(3, y, line[:width - 6],
+        # Three rows a rite, and none of them may run into the altar: when it
+        # is asked, what it takes, and what skipping it costs.
+        room = max(20, width - 30)
+        for index, rite in enumerate(rites[:max(1, (foot - 5) // 3)]):
+            y = 3 + index * 3
+            needs = " + ".join(f"{qty} {good}" for good, qty in rite["requires"].items())
+            surface.text(3, y, (f"{rite['id'].replace('_', ' ')} · fortnight "
+                                f"{rite['fortnight']} · {rite['hours']}h")[:room],
                          C["sky"], C["ink"])
-            needs = needs.replace(", ", " + ")
-            consequence = (f"{needs} · skip L{rite['skip_legitimacy']:+} "
-                           f"U{rite['skip_unrest']:+}")
-            surface.text(5, y + 1, consequence[:width - 8],
+            surface.text(5, y + 1, needs[:room], C["dim"], C["ink"])
+            surface.text(5, y + 2, (f"skip it: standing {rite['skip_legitimacy']:+}"
+                                    f", unrest {rite['skip_unrest']:+}")[:room],
                          C["dim"], C["ink"])
     style.bar(surface, 2, foot, width - 4, " WHAT YOU WOULD KNOW",
               fg=C["bone"], bg=C["faint"])
@@ -191,8 +192,8 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
     actions = ([style.FooterAction("s", "suppress · 2h", command="do:suppress_omen"),
                 style.FooterAction("d", "defy", command="do:defy_omen")]
                if active else
-               [style.FooterAction("Enter", "ask · 2h + offering", command="altar:ask")])
-    actions += [style.FooterAction("Tab", "view"),
-                style.FooterAction("Esc", "close")]
+               [style.FooterAction("enter", "ask · 2h + offering", command="altar:ask")])
+    actions += [style.FooterAction("tab", "view"),
+                style.FooterAction("esc", "close")]
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive()

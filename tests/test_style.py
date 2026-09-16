@@ -93,7 +93,7 @@ def test_every_built_door_has_a_window_behind_it() -> None:
 
 def test_the_hall_says_which_keys_end_the_fortnight() -> None:
     text = plain_text(hall.compose(_belief(), 92, 30))
-    assert "[SPACE] end the fortnight" in text
+    assert "[space] end the fortnight" in text
 
 
 # --- the new windows ----------------------------------------------------------

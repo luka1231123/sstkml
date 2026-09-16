@@ -2,21 +2,30 @@
 
 Start a separate playtest: `./run.sh --playtest seat 8814402919`.
 
-Each fortnight begins in Court. People and messengers bring immediate matters.
-Read the two claims and compare payment options. F/A/S reviews a judgement;
-Confirm order commits it. Cancel or Escape leaves it unchanged.
+A fortnight has two halves.
 
-Enter opens a sealed letter at the displayed cost. Read it in Court; B opens
-the reply desk. After sealing your reply, you return to the audience.
-Left/right switches audiences; up/down scrolls long letters. D defers a matter
-until next fortnight without stopping its consequences; R recalls deferred matters.
+**Court** comes first, and nothing else is open. People and messengers bring
+immediate matters one at a time. Each claim shows both arguments, then what
+waiting costs, then the three payments. `f` rules for the petitioner, `a`
+against, `s` splits; every ruling is reviewed before it is given. `enter` opens
+a sealed letter at the displayed cost and `b` opens the reply desk. Left and
+right switch audiences, up and down scroll, `d` defers a matter to the next
+fortnight, and `r` recalls what you deferred.
 
-Tab opens Planning. This is where you initiate correspondence, allocate food,
-plan harvest labour, staff institutions and prepare defences. Open an institution
-to see its details and appoint a head. Inspecting a count remains a separate action.
-Enter in Planning ends the fortnight and returns to Court. Last report is a tab.
+**The Hall** opens with `tab`, and Court is finished for the fortnight. The
+Hall is a dashboard: the grain year across the top, then stores with their
+change, standing and temper, rations against work days, the matters before the
+king, what is still waiting, what is on the road, and the doors. Numbered
+matters open the room that answers them. Doors: `s` scribes, `y` alu, `x` trade,
+`t` storehouse, `m` muster, `j` palace, `v` shrine, `w` world.
 
-Ctrl-H returns to Court. Ctrl-Shift-R restores window sizes. ? opens free help
-with Ask and Controls tabs. F8 records multiline notes with seed, turn and screen.
+`space` in the Hall ends the fortnight; the next Court opens. `l` shows the
+last report and `esc` returns to the Hall. `ctrl-shift-r` restores window sizes.
+`?` opens free help, drawn like every other screen, with Manual and Ask halves.
+`F8` records a playtest note on the same grid.
 
-Current saves remain version 29. No balance or world rules changed in the Court redesign.
+Judgements are no longer heard in the Palace. The Palace holds people, offices,
+the house and foreign courts; Court hears the claims.
+
+Every control is printed the same way: `[esc]`, `[enter]`, `[tab]`, `[space]`
+and lower-case letters. Current saves remain version 29.

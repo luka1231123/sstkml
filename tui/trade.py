@@ -125,12 +125,12 @@ def compose(b: dict, width: int = 72, height: int = 24,
                 surface.link(2, y, width - 4, 1, f"tab:{jump}")
         y += 1
     style.notice(surface, 3, height - 4, width - 6, notice)
-    nav = [style.FooterAction("Tab", "view")]
+    nav = [style.FooterAction("tab", "view")]
     if view == "exchange":
-        nav.append(style.FooterAction("Esc", "close"))
+        nav.append(style.FooterAction("esc", "close"))
     if view in {"cargo", "movements", "routes"} and ids:
         nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
-                style.FooterAction("Enter", "open")]
+                style.FooterAction("enter", "open")]
     actions = []
     if view == "exchange":
         actions.append(style.FooterAction("g", "request grain abroad", command="tab:relief"))
@@ -149,10 +149,10 @@ def compose(b: dict, width: int = 72, height: int = 24,
     elif view == "dues":
         nav += [style.FooterAction("<", "due−"),
                 style.FooterAction(">", "due+"),
-                    *([style.FooterAction("Enter", "give due")]
+                    *([style.FooterAction("enter", "give due")]
                   if due_draft is not None else [])]
     style.footer(surface, nav, y=height - 3, x=2, width=width - 4)
     if view != "exchange":
-        actions.append(style.FooterAction("Esc", "close"))
+        actions.append(style.FooterAction("esc", "close"))
     style.footer(surface, actions, y=height - 2, x=2, width=width - 4)
     return surface.interactive(tuple(ids))

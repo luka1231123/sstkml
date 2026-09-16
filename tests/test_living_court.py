@@ -90,27 +90,6 @@ def _hit_count(screen, command: str) -> int:
     return sum(hit.command == command for hit in screen.hits)
 
 
-def test_decision_views_use_the_room_only_when_it_helps() -> None:
-    b = _belief()
-    audience = plain_text(palace.compose(
-        b, view="court", width=98, height=36))
-    household = plain_text(palace.compose(
-        b, view="house", width=98, height=36))
-    envoys = plain_text(palace.compose(
-        b, view="relations", width=98, height=36))
-    offices = plain_text(palace.compose(
-        b, view="house", choosing="post", person="sister",
-        width=98, height=36))
-
-    assert palace.scene_rows(36) == 11 < len(art.THRONE)
-    assert "AUDIENCE · 1 MATTER PRESENT" in audience
-    assert "HOUSEHOLD · 1 AT COURT · 1 AWAY" in household
-    assert "ENVOYS · 1 PRESENT · 1 COURT BY TABLET" in envoys
-    assert "A POST FOR THE KING'S SISTER" in offices
-    assert "reported output now" in offices
-    assert len({audience, household, envoys, offices}) == 4
-
-
 def test_only_people_at_court_get_a_body_on_the_floor() -> None:
     b = _belief()
     present = palace.compose(
@@ -174,39 +153,12 @@ def test_correspondence_does_not_conjure_a_distant_envoy() -> None:
     assert "no envoy is in the room." in empty_text
 
 
-def test_adviser_words_appear_only_when_supplied_through_belief() -> None:
-    b = _belief()
-    b["court_advisers"] = [
-        {"id": "steward", "name": "Ilimilku", "present": True},
-        {"id": "general", "name": "Shiptibaal", "present": False},
-    ]
-    without_voice = plain_text(palace.compose(
-        b, view="court", selected="boundary", width=98, height=36))
-    assert "1 ADVISER" in without_voice
-    assert "at the dais: Ilimilku" in without_voice
-    assert "They have not yet spoken." in without_voice
-
-    b["court_advice"] = {
-        "boundary": {
-            "subject": "boundary", "adviser_name": "Ilimilku",
-            "text": "Delay may look like favour.",
-            "basis": "petition and faction roll",
-        }
-    }
-    with_voice = plain_text(palace.compose(
-        b, view="court", selected="boundary", width=98, height=36))
-    assert "Ilimilku, at the dais:" in with_voice
-    assert "Delay may look like favour." in with_voice
-    assert "heard from: petition and" in with_voice
-    assert "faction roll" in with_voice
-
-
 def test_the_living_room_keeps_the_public_compose_shape_at_minimum_size() -> None:
     b = _belief()
     screen = palace.compose(
-        b, view="court", selected="boundary", scroll=0, hours=8,
+        b, view="people", selected="sister", scroll=0, hours=8,
         choosing="", person="", amount=0, good="copper", notice="",
         width=68, height=24)
     assert len(screen) == 24
     assert all(len(row) == 68 for row in screen)
-    assert "[f]" in plain_text(screen)
+    assert "[o]" in plain_text(screen)
