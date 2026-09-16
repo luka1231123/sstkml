@@ -49,7 +49,7 @@ BLOCK_LABELS = {
 }
 # Blocks the desk puts on a new tablet before the player touches it.
 OPENING_BLOCKS = ("address", "marker", "recognition", "matter", "terms", "seal")
-REQUIRED_BLOCKS = frozenset({"address", "marker", "matter", "terms", "seal"})
+REQUIRED_BLOCKS = frozenset({"address", "marker", "matter", "seal"})
 TERM_KINDS = (
     "gift", "request_good", "promise_good", "service",
     "marriage_proposal",

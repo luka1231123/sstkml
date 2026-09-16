@@ -34,18 +34,14 @@ The shared world contains 55 simulated Alu; authored court content currently mak
 
 `run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
 
-Hall prints current controls. `Tab` changes a room's view, arrows choose, `Enter` opens or confirms, `Space` toggles, and `Escape` cancels or closes. In Hall, `Space` ends the fortnight. `Ctrl-H` raises Hall, `Ctrl-G` opens the switcher, `Ctrl-Tab` cycles windows, `Ctrl-S` saves, `Ctrl-O` asks before reload, `:` opens Command, and `?` opens grounded Help.
+Each fortnight opens in Court: one person or letter, with actions beside it.
+`F/A/S` reviews a judgement, `Enter` reads a letter, `B` replies, and `D` defers.
+`Tab` opens Planning for proactive letters, food, labour, institutions and defence.
+`Enter` in Planning ends the fortnight. `Ctrl-H` returns to Court. `?` opens
+free help with Ask and Controls tabs; `Ctrl-Shift-R` resets window sizes.
+`F8` records a playtest note. Last report is available without opening another window.
 
-New games open Yabninu's briefing. Press `Enter` to follow the first matter;
-each destination explains its next control. `Ctrl-H` returns to the briefing,
-and `Tab` in Hall reveals the full palace. You may leave matters waiting.
-
-Abdi-Anu can return with a claim shaped by your earlier payment. The granary
-steward and master smith offer competing priorities, and the first year ends
-with a reckoning of rulings and remaining obligations. In the playtest build,
-F8 opens a multiline note pad; notes include the seed, turn and current screen.
-Saves use version 29; older campaigns remain on disk but cannot replay under
-the new court and opening-supply rules.
+Version 29 saves still load. `--playtest` starts a separate autosave folder.
 
 ## Required local language model
 

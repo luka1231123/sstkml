@@ -16,7 +16,8 @@ class Key:
 
 
 def test_space_advances_only_from_the_hall() -> None:
-    game = play_gui.Game.__new__(play_gui.Game)
+    from tests.test_ledgers import _game
+    game = _game(turns=1)
     advanced = []
     game.end_fortnight = lambda: advanced.append("advanced")
 
@@ -25,6 +26,8 @@ def test_space_advances_only_from_the_hall() -> None:
     assert advanced == []
 
     game.on_key(Key(char=" ", keysym="space"))
+    assert advanced == [] and game.home_view == "planning"
+    game.on_key(Key(keysym="Return"))
     assert advanced == ["advanced"]
 
 

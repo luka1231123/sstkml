@@ -254,8 +254,8 @@ def test_a_digit_chooses_a_view_and_the_views_keep_their_own_selection() -> None
     assert game.palace_state["view"] == "household"
     chosen = palace._people(game.belief)[1]["id"]
     game.palace_state["pick"]["household"] = chosen
-    game.on_palace_key(_Key("4"))
-    assert game.palace_state["view"] == "audience"
+    game.on_palace_key(_Key("2"))
+    assert game.palace_state["view"] == "offices"
     game.on_palace_key(_Key("3"))
     assert game.palace_pick("household") == chosen
 

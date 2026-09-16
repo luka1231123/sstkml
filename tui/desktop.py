@@ -81,7 +81,7 @@ WINDOWS: dict[str, WindowSpec] = {
         # block, and below that the calendar was dropped in silence -- the one
         # thing a room may never do with a fact it holds. Refusing to shrink is
         # the house rule for exactly this case.
-        _spec("hall", "The Hall", "anchor", (84, 28), (84, 28)),
+        _spec("hall", "Court", "anchor", (84, 28), (84, 28)),
         _spec("stack", "The Scribes' Room", "workbench", (80, 27), (78, 26)),
         # Four full-size houses, their labels and their matching ledger rows
         # all fit at this floor. A shorter Alu used to cover those labels

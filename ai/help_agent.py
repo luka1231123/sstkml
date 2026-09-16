@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import json
 import re
 import tomllib
 from collections import Counter
@@ -225,9 +226,13 @@ def current_choices(belief: dict) -> str:
         ("correspondents", [row["other"]
                             for row in belief.get("relations", [])]),
     ]
-    return "\n".join(
+    choices = "\n".join(
         f"{title}: {', '.join(values) if values else 'none'}"
         for title, values in sections)
+    records = {key: belief.get(key) for key in ('turn', 'stores', 'calendar', 'justice')}
+    records['rations'] = [{key: group.get(key) for key in ('name', 'size', 'entitlement', 'allocated', 'arrears_qa')}
+                          for group in belief.get('groups', ())]
+    return choices + '\nCURRENT PLAYER RECORDS:\n' + json.dumps(records, ensure_ascii=False)
 
 
 def build_prompt(question: str, said: list[tuple[str, str]],
@@ -248,8 +253,8 @@ def build_prompt(question: str, said: list[tuple[str, str]],
     })
     return [
         {"role": "system", "content":
-         "You are the game's Help agent. Answer how to operate the game, not "
-         "what strategic choice to make. Use only the retrieved command "
+         "You are the game's Help agent. Explain controls, current player records "
+         "and available options; do not make or execute the player's decision. Use only the retrieved command "
          "passages and current choices below. Never invent a key, command, "
          "cost, rule, or identifier. Give exact syntax and one useful example "
          "when the question asks how to do something. If the passages do not "

@@ -30,10 +30,10 @@ verbs = []
 [[command]]
 id = "hall"
 category = "interface"
-title = "Hall and navigation"
+title = "Court and planning"
 syntax = "[s] Scribes [y] Alu [x] Trade [t] Storehouse [m] Muster [j] Court [v] Shrine [w] World [:] Command"
-answer = "The Hall is home. Its eight letter keys open the working rooms. Tab and Shift-Tab cycle room tabs, arrows select, Enter opens or confirms, Space toggles, and Escape cancels or closes. In Hall, Space ends the fortnight. Ctrl-H raises Hall, Ctrl-G opens the switcher, Ctrl-Tab cycles windows, Ctrl-Shift-T tiles, Ctrl-Shift-C cascades, Ctrl-Shift-R puts every window back to its default size and forgets the one you dragged, Ctrl-S saves, Ctrl-O reloads, Ctrl-+/Ctrl--/Ctrl-0 resize type, : opens Command, and ? opens Help. Printed controls can also be clicked."
-examples = ["Press j for the Court, then c for Counsel.", "Click a numbered concern to follow it."]
+answer = "Court opens each fortnight with people and letters needing attention. F/A/S reviews a judgement; Enter reads the selected letter, costing the displayed hours; B replies. D defers a matter, R recalls deferred matters, left/right changes audience, and up/down scrolls. Tab opens Planning; Enter there ends the fortnight. Ctrl-H returns to Court, Ctrl-G opens the switcher, Ctrl-Shift-R resets window sizes, Ctrl-S saves, Ctrl-O reloads, and ? opens free help. Planning contains the proactive working rooms."
+examples = ["Tab opens Planning; T opens food and labour.", "D defers the current audience."]
 keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit", "window", "windows", "size", "resize", "reset", "default", "tile", "cascade", "too", "big", "small"]
 keys = ["s", "y", "x", "t", "m", "j", "v", "w", "space", ":", "?", "q"]
 verbs = []
@@ -523,12 +523,12 @@ keys = []
 verbs = []
 
 [[command]]
-id = "hall_briefing"
+id = "court_audience"
 category = "interface"
 title = "Your first audience"
-syntax = "Hall → arrows choose → Enter opens"
-answer = "Yabninu's briefing shows known matters, their stakes, and where to act. Enter opens the selected record without spending time. On your first turn, inspect the grain with I in Storehouse, then use Ctrl-H to return. A named court dispute is an early opportunity to compare real choices. Read both accounts and the labeled costs, then preview a verdict; Enter confirms and Escape cancels. Tab in Hall switches to the full palace. Space in Hall ends the fortnight; you may leave matters waiting."
-examples = ["What do I do on my first turn?", "How do I return to the briefing?"]
+syntax = "Court → decide, reply or defer → Tab for Planning"
+answer = "The first audience is a shipwright with a disputed palace debt. Read both claims and compare the three payments. F/A/S opens a confirmation; Confirm order commits it, Cancel or Escape leaves it unchanged. D defers without resolving it. Tab opens Planning, where you can write letters, allocate rations or work on institutions. Enter in Planning ends the fortnight; the next Court audience opens automatically. Last report shows what happened."
+examples = ["What do I do on my first turn?", "How do I return to Court?"]
 keywords = ["beginner", "start", "first", "turn", "audience", "briefing", "tutorial", "play", "controls"]
 keys = ["Tab", "Return", "Up", "Down"]
 verbs = []

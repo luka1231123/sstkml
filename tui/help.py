@@ -119,7 +119,7 @@ def compose(width: int = 52, height: int = 20, query: str = "",
 
     style.footer(surface, (
         style.FooterAction("up", "topic"),
-        style.FooterAction("/", "search"),
+        style.FooterAction("Tab", "ask"),
         style.FooterAction("esc", "close"),
     ))
     surface.text(2, height - 2, "costs no hours"[: width - 4],

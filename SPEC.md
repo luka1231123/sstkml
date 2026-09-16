@@ -381,13 +381,15 @@ The Hall is an exception docket, not a second copy of every ledger. It answers:
 who or what has reached the king, what changed, and where the evidence is.
 Rooms show working state.
 
-New campaigns open the Hall's guided briefing. It introduces the ruler and
-units, keeps food coverage and the next season visible, and presents a small
-selection from the court's known matters. Advice names its speaker and basis;
-it states a tradeoff and opens the relevant record without giving an order.
-Tab switches between this briefing and the full palace view at no court-time
-cost. The preference is saved as UI state. Guidance is optional: no tutorial
-completion gates, invented crises, or rewards for clearing the docket.
+New campaigns and each fortnight open directly in Court. One petitioner,
+messenger or urgent matter is presented at a time, with its immediate actions.
+Judgements and reading happen there; replying opens the writing desk. Deferring
+does not resolve a matter or stop its engine consequences. Deferred matters
+return next fortnight and can be recalled during the current audience.
+Planning is a separate tab for proactive correspondence, allocations, staffing
+and long-term decisions. The last report is another tab, not an automatic
+window. Court contains no generic advice feed or duplicate resource dashboard.
+There are no tutorial gates, invented crises, or rewards for clearing the docket.
 
 ---
 

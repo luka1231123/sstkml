@@ -29,8 +29,7 @@ def follow_through(before: dict, after: dict, log=()) -> list[str]:
                        "The Court can still hear this claim.")
     if not out:
         return []
-    return ["People and orders carried into this fortnight:", *out,
-            "Payments above are receipts; the new roll also reflects other events."]
+    return ["Your orders and outstanding claims:", *out]
 
 
 def lines(before: dict, after: dict, log=()) -> list[str]:

@@ -267,7 +267,7 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
             why="finish the ration draft" if amount is not None or priority else "no arrears"), hours))
     return compose(
         ("THE STOREHOUSE — LABOUR AND RATIONS" if room else "RATIONS — who eats first"),
-        ("group", "gets qa old→new", "short qa", "at stake"),
+        ("group", "ration old→new", "unpaid qa", "work affected"),
         (20, -19, -9, 12), rows, selected, detail, controls, hours,
         width, height, scroll, notice, empty="nobody is on the roll.",
         note=("Estimate · " + ("granary inspection" if "granary" in b.get("inspected", ())

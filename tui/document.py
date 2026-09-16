@@ -57,7 +57,8 @@ def answer_lines(item: dict, width: int) -> list[tuple[str, str]]:
     decision = str((item.get("facts") or {}).get("decision", ""))
     word = ANSWER_WORDS.get(decision)
     if not word:
-        return [("the seal is unbroken; the answer is not yet known", "ash")]
+        return [("No formal decision recorded; read the letter below." if item.get("read") else
+                 "Seal unbroken — open the letter to read it.", "ash")]
     tone = {"accept": "barley", "refuse": "blood",
             "counter": "gold"}[decision]
     rows: list[tuple[str, str]] = [(word, tone)]

@@ -5,6 +5,35 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
+## Court first, planning separately — playtest revision
+
+The primary screen is now Court. Each fortnight brings a single petition,
+messenger or urgent matter forward. Judgements and letter reading happen in
+place; reply drafting returns to Court when sealed. Deferring hides a matter
+for the current audience only; it returns next fortnight, with normal engine
+consequences. Planning holds proactive work and the explicit End fortnight
+control. Last report is a tab rather than an automatically opened window.
+
+Removed the guided briefing module, unsolicited adviser lines, duplicate
+Audience/Advice tabs in the people workbench, and redundant report prose.
+Institution details are free to open; inspection is explicit. They have an
+appointment picker, existing officeholders appear alongside the household,
+and the overview leaves staffing and history details to the selected building.
+
+Order reviews use a modal Confirm/Cancel window, preventing an unrelated
+Escape from cancelling a lingering draft. Works and institution windows now
+recompose on resize. Open letters with no structured verdict are no longer
+called sealed. New outgoing letters omit reply acknowledgement and empty
+terms by default; the optional Terms section can be removed. Help has Ask and
+Controls tabs, reads player-visible records and costs no court hours.
+
+Validation: 107 targeted checks passed, authority/information/inventory gates
+passed, all screen renderers completed. A native Tk smoke run checked Court,
+modal cancellation and confirmation, next-fortnight return, appointment picker
+and Help tabs. Save version remains 29: this revision changes interaction and
+presentation, not simulation balance. The turn-82 passive-play finding remains
+an open gameplay problem; the new structure is not evidence that it is solved.
+
 ## Returning characters and playtest — 2026-09-15
 
 Rulings now retain the actual award, recipient and turn in authoritative state.

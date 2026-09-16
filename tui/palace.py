@@ -35,8 +35,7 @@ from tui.grid import INDEX, InteractiveScreen, Surface
 C = INDEX
 
 VIEWS = (("people", "PEOPLE"), ("offices", "OFFICES"),
-         ("household", "HOUSE"), ("audience", "AUDIENCE"),
-         ("advisers", "ADVICE"))
+         ("household", "HOUSE"))
 
 # Which context's orders each view offers, so a claim in the registry and a
 # control on this screen cannot drift apart.
@@ -393,8 +392,8 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     """Both arguments and all three prices, before any verdict is live."""
     width = max(12, width)
     lines: list[tuple[str, str]] = [
-        (f"{item['kind']} · waiting {item['waiting']} fn" +
-         (f" · +{item['waiting_unrest']}/fn after {item['grace']} fn"
+        (f"Waiting {item['waiting']} fortnights" +
+         (f" · unrest +{item['waiting_unrest']} per fortnight after {item['grace']}"
           if item.get('waiting_unrest') else ""), "bone"),
         (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
     ]
@@ -423,7 +422,6 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
                 f"unrest {unrest:+}")
         lines.extend((row, "clay" if outcome.get("affordable", True) else "blood")
                      for row in textwrap.wrap(text, width))
-    lines.append(("Lower unrest means a calmer city.", "dim"))
     return lines
 
 
@@ -550,6 +548,13 @@ def _house(b: dict) -> list[workbench.Row]:
              (", ".join(claims) or "—",
               "gold" if person.get("named_heir") else "dim")),
             mark="*" if person.get("named_heir") else ""))
+    known = {r.id for r in rows}
+    for inst in b.get("institutions", ()):
+        head = inst.get("head")
+        if head and head not in known:
+            rows.append(workbench.Row(head, ((_name(head, b), "bone"), ("not assessed", "dim"),
+                (inst["name"], "clay"), ("officeholder", "dim"))))
+            known.add(head)
     return rows
 
 
@@ -577,6 +582,7 @@ def _household(b: dict) -> list[workbench.Row]:
 def _adviser_rows(b: dict) -> list[workbench.Row]:
     advisers = {p["id"] for p in _people(b) if p.get("post")}
     advisers |= {str(p.get("id", "")) for p in _advisers(b)}
+    advisers |= {i["head"] for i in b.get("institutions", ()) if i.get("head")}
     return [row for row in _house(b) if row.id in advisers]
 
 
@@ -618,7 +624,11 @@ def _post_detail(b: dict, chosen: str,
 def _house_detail(b: dict, chosen: str) -> list[tuple[str, str]]:
     person = next((p for p in _people(b) if p["id"] == chosen), None)
     if person is None:
-        return [("No adult of the house is available.", "ash")]
+        office = next((i for i in b.get("institutions", ()) if i.get("head") == chosen), None)
+        if office:
+            return [(_name(chosen, b), "bone"), (office["name"], "clay"),
+                    ("Current officeholder. Open the institution to replace them.", "dim")]
+        return [("No person selected.", "ash")]
     post = person.get("post") or ""
     lines = [
         (person["name"], "bone"),

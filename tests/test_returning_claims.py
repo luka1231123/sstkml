@@ -9,7 +9,7 @@ from engine.reduce import apply
 from engine.tick import advance
 from load import load_campaign
 from session import save, replay
-from tui import briefing, palace, reckoning
+from tui import audience, palace, reckoning
 from tui.grid import plain_text
 
 
@@ -67,7 +67,7 @@ def test_waiting_has_a_grace_period_and_ruling_stops_its_cost():
     world = court_turn(world)
     assert world.court.unrest == initial + 2
     b = project(world)
-    assert 'adds 2 city unrest' in next(m for m in briefing.agenda(b) if m.id == 'justice').stake
+    assert b['justice']['petitions'][0]['waiting_unrest'] == 2
     world, _ = apply(world, A.RulePetition('debt_shipwright', 'for'))
     unrest = world.court.unrest
     world = court_turn(world)
@@ -85,5 +85,4 @@ def test_year_reckoning_uses_recorded_awards_and_keeps_unread_answers_sealed():
     assert '6,000 copper' in text and 'Abdi-Anu' in text
     assert 'returned debt claim' in text and 'seal unbroken' in text
     assert 'accepted' not in text
-    assert briefing.agenda(b)[0].id == 'year'
-    assert len(briefing.arguments(b, 'food')) == 2
+    assert any(i['kind'] == 'case' for i in audience.queue(b))

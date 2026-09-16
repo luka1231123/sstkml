@@ -404,15 +404,14 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         surface.text(3, table, "what stands", C["bone"], C["faint"])
         surface.text(22, table, "it does", C["bone"], C["faint"])
         surface.text(37, table, "report", C["bone"], C["faint"])
-        surface.text(53, table, "kept by", C["bone"], C["faint"])
+        surface.text(53, table, "office", C["bone"], C["faint"])
         if standing.partial:
             label = "↑↓ " + standing.label()
             surface.text(max(3, width - 3 - len(label)), table - 1, label,
                          C["ash"], C["ink"])
     else:
         style.bar(surface, 2, table, width - 4,
-                  "  what stands             it              he has been saying"
-                  "   now   kept by"
+                  "  building                function        condition /1000        office"
                   + (f"   {standing.label()}" if standing.partial else ""),
                   fg=C["bone"], bg=C["faint"])
 
@@ -441,10 +440,9 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
 
         series = history.get(inst["id"]) or inst.get("history") or [
             inst["condition"]]
-        staff = vacancy or inst.get("group_name") or "—"
+        staff = "vacant" if not inst.get("head") else "staffed"
         figure = str(inst["condition"])
         if compact:
-            surface.text(37, y, sparkline(series, 8), C["sand"], C["ink"])
             surface.text(50 - len(figure), y, figure,
                          C["bone"] if inst["inspected"] else C["dim"], C["ink"])
             surface.text(51, y, "!" if inst["inspected"] else " ",
@@ -452,7 +450,6 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
             surface.text(53, y, staff[:max(0, width - 56)],
                          C["blood"] if vacancy else C["dim"], C["ink"])
         else:
-            surface.text(45, y, sparkline(series, 12), C["sand"], C["ink"])
             surface.text(64 - len(figure), y, figure,
                          C["bone"] if inst["inspected"] else C["dim"], C["ink"])
             surface.text(65, y, "!" if inst["inspected"] else " ",
@@ -525,10 +522,10 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
 
     facts = [
         ("condition", f"{inst['condition']}"
-                      + ("" if inst["inspected"] else "  (he says)")),
-        ("whole, it could", f"{inst['capacity']}"),
-        ("as it stands", f"{inst['effective']}"),
-        ("kept by", inst["group_name"] or "nobody on the roll"),
+                      + ("" if inst["inspected"] else "  (reported)")),
+        ("full capacity", f"{inst['capacity']}"),
+        ("current output", f"{inst['effective']}"),
+        ("staff", inst["group_name"] or "no assigned workers"),
         ("in the charge of",
          _spoken(inst["head"]) if inst["head"] else "NOBODY — the post is open"),
         ("at", _spoken(inst["place"])),
@@ -546,7 +543,7 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
             surface.text(26, y, f"{qty} {good}", C["clay"], C["ink"])
             y += 1
     if history:
-        surface.text(4, height - 6, "what he has been saying",
+        surface.text(4, height - 6, "Reported output over time",
                      C["dim"], C["ink"])
         surface.text(4, height - 5, sparkline(history, width - 10),
                      C["sand"], C["ink"])
@@ -565,4 +562,7 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
         style.bar(surface, 2, height - 2, width - 4,
                   f" [r] set the men to it — about {want:,} days of corvée",
                   fg=C["clay"], bg=C["lapis"])
+    style.footer(surface, [style.FooterAction("P", "appoint / replace", command="appoint"),
+                          style.FooterAction("I", "inspect · 1 hour", command="inspect")],
+                 x=3, y=height - 4, width=width - 6)
     return surface.interactive()
