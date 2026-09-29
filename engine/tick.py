@@ -100,7 +100,9 @@ def _calendar(world: World) -> tuple[World, list]:
         kernel=dataclasses.replace(
             kernel, land_due_per_1000=world.court.land_due_rate,
             baseline=world.baseline, site_extent_bonus=site_bonus,
-            route_capacity_bonus=route_bonus))
+            route_capacity_bonus=route_bonus,
+            # Open the turn's ledger before any transfer is made.
+            book=kernel.book.at_phase(kernel.date.absolute, "calendar")))
     return world, [_turn_advanced(world)]
 
 
@@ -194,7 +196,7 @@ def _reports(world: World) -> tuple[World, list]:
 
 
 def _project(world: World) -> tuple[World, list]:
-    world = _record_stores(world)
+    world = _record_meters(_record_flows(_record_stores(world)))
     seat_id = f"settlement:{world.chosen_alu}"
     population = world.kernel.people(seat_id)
     return dataclasses.replace(
@@ -219,6 +221,54 @@ def _record_stores(world: World) -> World:
         history[good] = (series + (stores.get(good, 0),))[-_HISTORY:]
     return dataclasses.replace(
         world, court=dataclasses.replace(world.court, store_history=history))
+
+
+_FLOWS = 3                         # movements kept per good
+
+# Plain word for a transfer reason. Direction is the sign of the quantity.
+_CAUSE = {
+    "authored": "dues and gifts", "harvested": "harvest", "produced": "output",
+    "spoiled": "spoilage", "consumed": "spending", "expended": "spending",
+    "sown": "sowing", "lost": "losses", "levied": "dues", "gifted": "gifts",
+    "sold": "trade", "paid": "trade", "delivered": "trade", "loaded": "trade",
+    "unloaded": "trade", "carried": "trade",
+}
+
+
+def _cause(t) -> str:
+    if t.good == "grain" and t.reason == "consumed" and t.phase == "consumption":
+        return "rations"
+    if t.good == "grain" and t.reason == "expended" and t.authority:
+        return "harvest"           # seed and the villages' share come off the crop
+    return _CAUSE.get(t.reason, t.reason)
+
+
+def _record_flows(world: World) -> World:
+    """This turn's transfers into and out of the seat's stores, by good and cause."""
+    holder, stores = world.kernel.seat_goods.holder, seat.held(world)
+    net: dict[tuple[str, str], int] = {}
+    for t in world.kernel.book.transfers:
+        gain, loss = t.to_holder == holder, t.from_holder == holder
+        if gain != loss and t.good in stores:
+            key = (t.good, _cause(t))
+            net[key] = net.get(key, 0) + (t.quantity if gain else -t.quantity)
+    flows: dict[str, list] = {}
+    for (good, cause), quantity in sorted(net.items()):
+        if quantity:
+            flows.setdefault(good, []).append((cause, quantity))
+    top = {good: tuple(sorted(found, key=lambda f: (-abs(f[1]), f[0]))[:_FLOWS])
+           for good, found in flows.items()}
+    return dataclasses.replace(
+        world, court=dataclasses.replace(world.court, flows=top))
+
+
+def _record_meters(world: World) -> World:
+    court = world.court
+    history = {name: (court.meter_history.get(name, ())
+                      + (getattr(court, name),))[-_HISTORY:]
+               for name in ("legitimacy", "unrest")}
+    return dataclasses.replace(
+        world, court=dataclasses.replace(court, meter_history=history))
 
 
 def _turn_advanced(world: World):

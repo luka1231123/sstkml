@@ -345,6 +345,13 @@ class Court:
     # 24 fortnights of stock readings per good, for the STORES sparkline (9.4).
     store_history: Mapping[GoodId, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
+    # The largest movements of each store in the fortnight just ended, as
+    # (cause, signed quantity), summed off the Book's transfers at the tick's close.
+    flows: Mapping[GoodId, tuple[tuple[str, int], ...]] = dataclasses.field(
+        default_factory=dict)
+    # 24 fortnights of unrest and legitimacy, for their trend.
+    meter_history: Mapping[str, tuple[int, ...]] = dataclasses.field(
+        default_factory=dict)
     # --- M9: the house and the cult ---
     house: Mapping[str, HouseMember] = dataclasses.field(default_factory=dict)
     ruler: str = ""                      # person id of whoever is on the seat
