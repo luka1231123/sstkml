@@ -1496,6 +1496,12 @@ def project(world) -> dict:
         "store_history": {
             good: list(series)
             for good, series in sorted(c.store_history.items())},
+        "flows": {
+            good: [{"cause": cause, "qty": qty} for cause, qty in found]
+            for good, found in sorted(c.flows.items())},
+        "meter_history": {
+            name: list(series)
+            for name, series in sorted(c.meter_history.items())},
         "gift_goods": [
             {"id": good, "available": stores.get(good, 0)}
             for good in sorted(world.gift_values)
