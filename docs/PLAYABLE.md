@@ -9,7 +9,7 @@
 
 The owner reports that the game remains unclear, hides actions and fails in
 ordinary use. Earlier implementation and smoke-check results do not establish
-playability. Follow the replacement [execution plan](AI_NEXT_PLAN.md): reproduce
+playability. Follow the replacement [execution plan](PLAN.md): reproduce
 failures, repair dependable and discoverable workflows, verify consequences,
 then measure balance. The review reproduced letter-parser quantity/intent gaps
 and identified an unadvertised end-turn input; native interaction verification
@@ -32,7 +32,7 @@ screen and wrap long text. Help describes the new controls.
 The earlier dated sections below are historical measurements and proposals.
 In particular, the guided Hall is retired and the returning shipwright is already
 implemented. Neither should be rebuilt from those paragraphs. The current work
-queue is [AI_NEXT_PLAN.md](AI_NEXT_PLAN.md). Human comprehension, long-run policy
+queue is [PLAN.md](PLAN.md). Human comprehension, long-run policy
 divergence and campaign balance remain open. Troop harvest duty currently adds
 no kernel farm labour; use the working Land/Rations allocation path.
 
@@ -131,7 +131,7 @@ Validation: 120 distinct targeted checks passed (119 in the broader run, then
 15 focused checks including one new continuity check). Authority and information
 audits are clean, all standard screens render, and the startup check finds Tk,
 the display and the supported model ready. A human beginner playtest remains.
-See [the comparison and remaining work](GAMEPLAY_NEXT.md) for the next milestone:
+See [the comparison and remaining work](PLAN.md) for the next milestone:
 a returning character whose situation materially depends on an earlier ruling.
 
 ## First-year slice — 2026-09-13

@@ -130,7 +130,7 @@ appointment picker, Help and the end of a fortnight.
 
 ## Still open
 
-See [the AI-led next plan](AI_NEXT_PLAN.md) for the current assessment,
+See [the AI-led next plan](PLAN.md) for the current assessment,
 priorities and acceptance criteria.
 The subsequent [decision-review build and playtest route](PLAYTEST_DECISIONS.md)
 addresses the screen gaps below; this list records the original pass's handoff.

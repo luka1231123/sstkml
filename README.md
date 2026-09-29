@@ -5,6 +5,8 @@ Information-constrained rulership sim. Fragile Late Bronze Age world.
 People, households, institutions, goods, labour, obligations, journeys, disease, and foreign courts are simulated deterministically. The player holds the Seat through fallible people and delayed, interested information. No omniscient strategy layer.
 
 [`SPEC.md`](SPEC.md) is the sole product authority. [`docs/PLAYABLE.md`](docs/PLAYABLE.md) records what the game measures today and what is left before it plays.
+[`docs/PLAN.md`](docs/PLAN.md) is the current execution plan: tell the engine
+to the player in words, through a facts layer and the local model.
 [`docs/FIRST_YEAR.md`](docs/FIRST_YEAR.md) walks through rations, grain relief,
 harvest decisions and the aftermath report.
 
@@ -64,7 +66,6 @@ Model supply language, not simulation truth. It may correct player's one- or two
 ## Verify
 
 ```sh
-./run.sh --test
 .venv/bin/python tools/first_year.py
 .venv/bin/python tools/inventory.py
 .venv/bin/python tools/corpus_lint.py
@@ -100,7 +101,6 @@ ai/              required grounded court-language layer
 tui/             character-cell screens and Tk/terminal backends
 content/         scenarios, people, goods, formulae, and correspondence
 tools/           audit, benchmark, balance, inspection, screens, and probes
-tests/           deterministic engine, controller, UI, and AI contracts
 docs/            PLAYABLE.md: measured state and the work left
 SPEC.md          sole current product specification
 ```

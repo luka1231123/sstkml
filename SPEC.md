@@ -143,7 +143,8 @@ regenerated.
 
 The supported lightweight local model is required in normal windowed play. It
 voices people, corrects player-written matter, interprets tablets, parses
-orders, and summarizes permitted records.
+orders, summarizes permitted records, and narrates the fortnight from the facts
+layer (`belief/facts.py`).
 
 It may not:
 
@@ -352,11 +353,12 @@ Supporting object windows use a small shared family:
 Opening a door raises its existing room. Rooms remember useful geometry,
 selection, drafts, and filters. Window management never costs court time.
 
-### 3.4 Text is scarce and specific
+### 3.4 Words first
 
-Screen text states a fact, a quantity, a date, or a consequence. No flavour
-paragraph where a number belongs, no restating what the layout already shows.
-Prose belongs in tablets, where a person wrote it and a scribe read it out.
+Every screen opens with plain sentences: what is wrong, why, and what the king
+can do. A number appears only where the player acts on it or compares it, in
+human units (fortnights, men, days), rounded. Exact ledgers stay one key away.
+No sentence states the obvious. See `docs/PLAN.md`.
 
 ---
 
