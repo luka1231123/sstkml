@@ -285,13 +285,14 @@ def compose(b: dict, width: int = 100, height: int = 32,
         outbound = filter_name == "outbox"
         actor = (selected_item.get("recipient") if outbound
                  else selected_item.get("sender"))
-        who = render.actor_name(actor or "unknown hand", b.get("house"))
-        heading = ("TO " if outbound else "FROM ") + who.upper()
+        head = render.who_rows(actor or "unknown hand", right_width, b.get("house"),
+                               "To " if outbound else "From ")
         surface.put(right - 2, 4, "▶" if not rack_focused else "·",
                     C["flame"] if not rack_focused else C["ash"], C["ink"])
-        surface.text(right, 4, _trunc(heading, right_width),
-                     C["bone"], C["ink"])
-        surface.text(right, 5, _trunc(_subject(selected_item), right_width),
+        for n, row in enumerate(head):
+            surface.text(right, 4 + n, row, C["bone"], C["ink"])
+        top = 4 + len(head)
+        surface.text(right, top, _trunc(_subject(selected_item), right_width),
                      C["sand"], C["ink"])
 
         if outbound:
@@ -320,24 +321,25 @@ def compose(b: dict, width: int = 100, height: int = 32,
                 second_meta += (
                     f"  ·  answered, turn "
                     f"{selected_item['answered_turn']}")
-        surface.text(right, 6, _trunc(meta, right_width),
+        surface.text(right, top + 1, _trunc(meta, right_width),
                      C["sky"], C["ink"])
-        surface.text(right, 7, _trunc(second_meta, right_width),
+        surface.text(right, top + 2, _trunc(second_meta, right_width),
                      C["dim"], C["ink"])
-        style.rule(surface, right, 8, right_width)
+        style.rule(surface, right, top + 3, right_width)
+        y0 = max(10, top + 4)
 
         available = b["attention"] if hours_left is None else hours_left
         if not outbound and not selected_item.get("read"):
             seal_width = min(right_width, 44)
-            surface.box(right, 10, seal_width, 7, style="single",
+            surface.box(right, y0, seal_width, 7, style="single",
                         fg=C["sand"], title="UNBROKEN SEAL")
-            surface.text(right + 3, 12, "◆ THE TABLET IS UNREAD",
+            surface.text(right + 3, y0 + 2, "◆ THE TABLET IS UNREAD",
                          C["flame"], C["ink"])
-            surface.text(right + 3, 14,
+            surface.text(right + 3, y0 + 4,
                          f"[enter] read · 2 hours · {available} remain",
                          C["clay"], C["ink"])
             if available < 2:
-                surface.text(right + 3, 15, "Not enough court time remains.",
+                surface.text(right + 3, y0 + 5, "Not enough court time remains.",
                              C["ash"], C["ink"])
         else:
             # Three kinds of tablet, three glances. An answer is read for its
@@ -361,8 +363,8 @@ def compose(b: dict, width: int = 100, height: int = 32,
                     ("• " + line, "gold")
                     for line in _fact_lines(
                         selected_item, right_width - 2)[:3]]
-            surface.text(right, 10, heading, C["bone"], C["ink"])
-            fact_y = 11
+            surface.text(right, y0, heading, C["bone"], C["ink"])
+            fact_y = y0 + 1
             for line, tone in glance:
                 # The reading of the clay yields room before a term does: a
                 # counter the king cannot read in full he cannot answer.

@@ -29,26 +29,30 @@ def current(b, deferred=(), selected=""):
     return next((i for i in items if i["id"] == selected), next(iter(items), None))
 
 
+def _who(b, actor, width):
+    return [(row, "sand") for row in render.who_rows(actor, width, b.get("house"))]
+
+
 def content(b, item, width):
     if item["kind"] == "case":
         case = item["case"]
         rows = palace._evidence_lines(b, case, width)
         end = next(i for i, (text, _) in enumerate(rows) if text.startswith("STAKES"))
-        return render.actor_name(case["petitioner"], b.get("house")), rows[:end]
+        return case["kind"].capitalize(), rows[:end]
     if item["kind"] == "letter":
         letter = item["letter"]
-        who = render.actor_name(letter["sender"], b.get("house"))
+        who = _who(b, letter["sender"], width)
         if not letter.get("read"):
-            return f"A messenger from {who}", [("A sealed letter awaits you.", "clay")]
+            return "A sealed letter", who
         rows = [(line, "clay") for paragraph in letter.get("body", "").splitlines()
                 for line in (textwrap.wrap(paragraph, width) or [""])]
         rows = [(line, 'sand') for line in textwrap.wrap(render.reply_effect(letter), width)] + [('', 'clay')] + rows
-        return f"Letter from {who}", rows or [("The letter has been opened. No text is recorded.", "clay")]
+        return "Letter", who + [("", "clay")] + rows
     if item["kind"] == "band":
         band = item["band"]
         return "People at the gate", palace._court_detail(b, band["id"], width)
     concern = item["concern"]
-    return concern.speaker, [(concern.title, "gold")] + [
+    return concern.title, _who(b, concern.speaker, width) + [
         (line, "clay") for line in textwrap.wrap(concern.reason, width)]
 
 

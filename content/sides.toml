@@ -1,0 +1,25 @@
+# The interests that pull at the court of Ugarit. A person's side is set in personas.toml.
+
+[palace]
+name = "Palace"
+wants = "Full stores, taxes paid, and order in the city."
+
+[temple]
+name = "Temple"
+wants = "The rites kept, the temple lands worked, and the temple's share paid."
+
+[merchants]
+name = "Merchants"
+wants = "Open sea, low tolls, debts paid, and contracts kept."
+
+[army]
+name = "Army"
+wants = "Rations, bronze for arms, and no summons to far wars."
+
+[commoners]
+name = "Commoners"
+wants = "Bread on the ration roll, fair rulings, and few labour days."
+
+[foreign]
+name = "Foreign courts"
+wants = "Grain, troops, gifts and news from Ugarit, and respect for their rank."

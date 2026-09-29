@@ -730,8 +730,6 @@ def _justice(world) -> dict:
             "counterclaim": dict(petition.counterclaim),
             "claim_text": petition.claim_text,
             "counter_text": petition.counter_text,
-            "petitioner_stake": petition.petitioner_stake,
-            "against_stake": petition.against_stake,
             "outcomes": outcomes,
             "source": "court docket", "as_of_turn": world.date.absolute,
             "certainty": "counted",
