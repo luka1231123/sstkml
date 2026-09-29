@@ -258,8 +258,6 @@ class Petition:
     award_max: int = 0
     deduct_award: bool = False
     waiting_unrest: int = 0
-    petitioner_stake: str = ""
-    against_stake: str = ""
     grace: int = 2
 
 

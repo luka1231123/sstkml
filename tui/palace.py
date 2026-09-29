@@ -393,26 +393,12 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     width = max(12, width)
     # The case first, then the pressure it is under: a man reads what is being
     # claimed before he reads what waiting costs him.
-    lines: list[tuple[str, str]] = [
-        (f"{_name(item['petitioner'], b)} asks you to pay:", "barley"),
-    ]
-    if item.get("petitioner_stake"):
-        lines.extend((row, "sand") for row in textwrap.wrap(item["petitioner_stake"], width))
-    lines.extend(
-        (line, "clay")
-        for line in textwrap.wrap(
-            item["claim_text"] or "—", width,
-            break_long_words=False, break_on_hyphens=False)
-    )
-    lines.append((f"{_name(item['against'], b)} disputes this:", "wine"))
-    if item.get("against_stake"):
-        lines.extend((row, "sand") for row in textwrap.wrap(item["against_stake"], width))
-    lines.extend(
-        (line, "clay")
-        for line in textwrap.wrap(
-            item["counter_text"] or "—", width,
-            break_long_words=False, break_on_hyphens=False)
-    )
+    lines: list[tuple[str, str]] = []
+    for actor, said, tone in ((item["petitioner"], item["claim_text"], "barley"),
+                              (item["against"], item["counter_text"], "wine")):
+        lines.extend((row, tone) for row in render.who_rows(actor, width, b.get("house")))
+        lines.extend((row, "clay") for row in textwrap.wrap(
+            said or "—", width, break_long_words=False, break_on_hyphens=False))
     waited = item["waiting"]
     lines.append((f"Waiting {waited} fortnight{'s' if waited != 1 else ''}" +
                   (f" · unrest +{item['waiting_unrest']} a fortnight"

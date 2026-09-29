@@ -150,16 +150,20 @@ def tablet(item: dict, body: str | None = None, house: dict | None = None,
     subject = (answer_subject(item) if is_answer(item)
                else render.letter_summary(item["topic"]))
     surface.text(3, 2, _trunc(subject, width - 6), C["dim"], C["ink"])
+    head = render.who_rows(item["sender"], width - 6, house)
+    for n, row in enumerate(head):
+        surface.text(3, 3 + n, row, C["sand"], C["ink"])
+    top = 3 + len(head)
     stamp = f"reached your hand, turn {item['received_turn']}"
-    surface.text(3, 3, stamp, C["ash"], C["ink"])
-    surface.text(3, 4, "─" * (width - 6), C["faint"], C["ink"])
+    surface.text(3, top, stamp, C["ash"], C["ink"])
+    surface.text(3, top + 1, "─" * (width - 6), C["faint"], C["ink"])
 
     if body is None:
         body = render.letter_body(item["sender"], item["topic"], item["facts"])
     # Authored templates wrap at their own margin; a blank line is a real
     # paragraph break and a single newline is not, so the second is unwrapped
     # before rewrapping to this window's width.
-    y = 6
+    y = top + 3
     # An answer is not read for its figures but for its decision, so its rows
     # are measured before a word of clay is drawn and the courtesies give way to
     # them. The terms are the matter; the wording around them is not.

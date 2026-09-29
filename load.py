@@ -772,8 +772,6 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
             good=case["good"], unit=case["unit"],
             claim_text=case["claim_text"].strip(),
             counter_text=case["counter_text"].strip(),
-            petitioner_stake=case.get("petitioner_stake", ""),
-            against_stake=case.get("against_stake", ""),
             unrest_for=int(case["unrest_for"]),
             unrest_against=int(case["unrest_against"]),
             unrest_split=int(case["unrest_split"]),

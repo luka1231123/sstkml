@@ -6,8 +6,10 @@ tablets do it. No colour dependency; glyphs and words carry the meaning.
 """
 from __future__ import annotations
 
+import textwrap
 import tomllib
 from pathlib import Path
+from belief import people
 from engine.actors import slug
 
 _CONTENT = Path(__file__).parent.parent / "content"
@@ -27,6 +29,14 @@ def actor_name(actor: str, house: dict | None = None) -> str:
             if person["id"] == actor:
                 return person["name"]
     return actor
+
+
+def who_rows(actor: str, width: int, house: dict | None = None, lead: str = "") -> list[str]:
+    """The speaker as one wrapped line: name, role, side, what he wants.
+
+    Someone the content does not tag (a child born in play) gets the plain name."""
+    line = people.line(actor) if people.tag(actor)["role"] else actor_name(actor, house)
+    return textwrap.wrap(lead + line, max(12, width), break_long_words=False, break_on_hyphens=False)
 
 
 def letter_summary(topic: str) -> str:
