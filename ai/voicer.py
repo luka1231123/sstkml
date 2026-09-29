@@ -41,7 +41,7 @@ CAP_PER_TURN = 8
 
 def persona(actor: str) -> dict:
     card = dict(_PERSONAS["default"])
-    card.update(_PERSONAS.get(actor, {}))
+    card.update(_PERSONAS.get(slug(actor), {}))
     return card
 
 

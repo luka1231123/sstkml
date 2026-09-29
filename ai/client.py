@@ -168,7 +168,8 @@ class OllamaClient:
         self._lock = threading.Lock()
 
     def call(self, role: str, messages: list[dict], schema: dict | None,
-             seed: int, max_tokens: int, timeout_s: float, turn: int = 0) -> str:
+             seed: int, max_tokens: int, timeout_s: float, turn: int = 0,
+             repeat: float = 1.05) -> str:
         model = self.model
         prompt = json.dumps(messages, sort_keys=True, separators=(",", ":"))
         key = hashlib.sha256(f"{role}|{model}|{prompt}|{seed}".encode()).hexdigest()
@@ -185,7 +186,7 @@ class OllamaClient:
                 "keep_alive": "30m",
                 "options": {
                     "temperature": 0, "top_k": 1, "top_p": 1,
-                    "repeat_penalty": 1.05, "seed": seed,
+                    "repeat_penalty": repeat, "seed": seed,
                     "num_ctx": 8192, "num_predict": max_tokens,
                 },
             }

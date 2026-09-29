@@ -84,7 +84,7 @@ def _voice(kind: str, draft: str, limit: int, tokens: int, client, seed: int, tu
     ]
     try:
         for _ in range(2):
-            text = client.call(role, messages, None, seed, tokens, 30, turn).strip()
+            text = client.call(role, messages, None, seed, tokens, 30, turn, repeat=1.0).strip()
             if _ok(text, draft, limit, task["also"]):
                 return text
             client.flag_last(role, guard_fail=True)
