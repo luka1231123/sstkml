@@ -448,10 +448,8 @@ inspect and balance.
 
 ### 5.5 Verification
 
-Release checks stay small: authority, inventory, conservation, compilation,
-one save/load smoke, representative headless runs, and the pinned benchmark.
-They verify the seams most likely to corrupt a campaign without turning the
-test suite into a second implementation.
+No automated test suite. Verification is play: `./run.sh --check`,
+`./run.sh --screens`, and the owner's playtest notes (F8).
 
 ---
 

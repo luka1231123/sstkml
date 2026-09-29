@@ -41,15 +41,8 @@ FONT_STACK = (
 _ROOT = None
 
 
-def headless() -> bool:
-    """Whether pytest has forbidden access to the desktop window server."""
-    return os.environ.get("STK_HEADLESS") == "1"
-
-
 def _root():
     global _ROOT
-    if headless():
-        raise RuntimeError("Tk is disabled during automated tests")
     if _ROOT is None:
         import tkinter as tk
         _ROOT = tk.Tk()
@@ -629,9 +622,6 @@ def diagnose() -> dict:
         return report
     report["tkinter"] = "present"
     report["tk_version"] = str(tkinter.TkVersion)
-    if headless():
-        report["display"] = "disabled (automated tests)"
-        return report
     try:
         _root()                      # made once, kept; never made twice
         report["display"] = "yes"
@@ -646,8 +636,6 @@ def available() -> bool:
     Called before choosing a backend so the game falls back to the terminal on
     a headless box rather than dying with a traceback about a display name.
     """
-    if headless():
-        return False
     try:
         import tkinter                                  # noqa: F401
         _root()

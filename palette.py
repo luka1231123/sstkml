@@ -222,9 +222,7 @@ def parse(line: str, belief: dict) -> Parse:
 
 # Some grammar lines say a value in a literal word rather than a slot: `file`
 # and `restore` are one action with opposite flags, as are `quarantine` and
-# `lift quarantine`. The keys are the registry's own grammar strings, and
-# `tests/test_palette.py` asserts every one of them still exists -- so a
-# reworded grammar line fails the suite rather than quietly ceasing to parse.
+# `lift quarantine`. The keys are the registry's own grammar strings.
 LITERAL_VALUES: dict[str, dict] = {
     "finance <amount>": {"good": "copper"},
     "inspect granary": {"ledger": "granary"},

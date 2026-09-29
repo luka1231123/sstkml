@@ -10,7 +10,6 @@
 #   ./run.sh              the windowed game
 #   ./run.sh --check      say which interpreter and whether Tk is there
 #   ./run.sh --cli        the terminal game
-#   ./run.sh --test       the suite
 #   ./run.sh --probe      find which Tk step kills the process
 #   ./run.sh --screens    print what the screens say, as text, no display
 set -euo pipefail
@@ -29,6 +28,5 @@ case "${1:-}" in
     --probe) exec "$PY" tools/tkprobe.py ;;
     --screens) shift; exec "$PY" tools/screens.py "$@" ;;
     --cli)   shift; exec "$PY" play_cli.py "${@:-seat}" ;;
-    --test)  shift; exec "$PY" tools/run_tests.py "$@" ;;
     *)       exec "$PY" play_gui.py "$@" ;;
 esac

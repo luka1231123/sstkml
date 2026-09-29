@@ -3,7 +3,3 @@ name = "sttkml"
 version = "0.5.2"
 description = "SAY TO THE KING, MY LORD — a deterministic Late Bronze Age archive game"
 requires-python = ">=3.12"
-
-[tool.pytest.ini_options]
-pythonpath = ["."]
-addopts = "-n auto --dist load"
