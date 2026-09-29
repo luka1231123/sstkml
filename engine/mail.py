@@ -205,8 +205,7 @@ def step_letters(world: World) -> tuple[World, list]:
     from engine import relations
     recorded_protocol = {record.letter_id for record in world.protocol_log}
     for letter in delivered:
-        # Structured DispatchLetter carries its profile but no legacy numeric
-        # grade. Only the older path with a ProtocolRecord applies that score.
+        # Old saved dispatches without a recorded assessment stay ungraded.
         if letter.outgoing and letter.id in recorded_protocol:
             world, applied = relations.deliver_protocol(world, letter)
             events += applied
@@ -397,16 +396,21 @@ def inject_incoming(world: World, sender: str, origin: str, topic: str,
 
 
 # --- dispatch (D1): the player's reply leaves the seat -----------------------
+def _courier_place(world: World, place: str) -> str:
+    record = world.places.get(place)
+    return record.alu if record and record.kind == 'palace_centre' else place
+
+
 def _recipient_place(world: World, recipient: str) -> str:
     relation = world.relations.get(recipient)
     if relation is not None:
-        return relation.place
+        return _courier_place(world, relation.place)
     correspondent = next(
         (item for item in world.correspondents if item.actor == recipient),
         None)
     if correspondent is None:
         raise ValueError(f"unknown correspondent: {recipient}")
-    return correspondent.place
+    return _courier_place(world, correspondent.place)
 
 
 def _validate_dispatch(world: World, action: A.DispatchLetter) -> Letter | None:
@@ -486,6 +490,8 @@ def apply_dispatch(world: World,
         seal=action.seal,
         courier_id=action.courier_id,
         protocol_profile=action.profile,
+        protocol_total=max(0, action.protocol_total),
+        protocol_violations=action.protocol_violations,
     )
 
     # Terms cross the same atomic seal boundary as the exact prose. Gifts are
@@ -504,6 +510,10 @@ def apply_dispatch(world: World,
         )
     world = dataclasses.replace(
         world, inbox=inbox, letter_seq=seq)
+    if action.protocol_total >= 0:
+        world = dataclasses.replace(world, protocol_log=world.protocol_log + (
+            ProtocolRecord(letter.id, action.recipient, action.profile,
+                           action.protocol_total, action.protocol_violations),))
 
     # The court's sealed copy persists even if the courier is intercepted.
     from engine import archive

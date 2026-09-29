@@ -12,6 +12,8 @@ def courts(b: dict) -> list[dict]:
         if not place or not actor or place == b.get("seat"):
             continue
         path = worldmap.route_path(b, b.get("seat", ""), place)
+        if len(path) == 1:
+            continue
         travel = sum(min(max(1, int(r.get("legs", 1))) for r in routes
                          if {r.get("a"), r.get("b")} == {a, z})
                      for a, z in zip(path, path[1:])) if path else None
@@ -31,17 +33,19 @@ def horizon(b: dict) -> int:
 
 
 def compose(b: dict, width: int, height: int, selected: str, quantity: int,
-            scroll: int, notice, hours: int, views):
+            scroll: int, notice, hours: int, views, labels=None):
     known = courts(b)
     chosen = next((c for c in known if c["id"] == selected), next(iter(known), None))
     surface = Surface(width, height)
     style.panel(surface, 0, 0, width, height, title="TRADE — GRAIN RELIEF", drop=False)
-    workbench.tabs(surface, 2, 2, width, tuple((v, "Trips" if v == "movements" else v.title())
+    workbench.tabs(surface, 2, 2, width, tuple((v, (labels or {}).get(v, v.title()))
                                               for v in views), "relief")
     def line(y, text, tone="clay"):
         surface.text(3, y, text[:max(1, width - 6)], C[tone], C["ink"])
-    line(4, f"Request {quantity:,} qa · [ ] changes by {ration(b):,} qa", "gold")
-    line(5, "Choose a court · reply estimate in fortnights", "dim")
+    meals = quantity / max(1, ration(b))
+    duration = f"{meals:g} fortnight" + ('' if meals == 1 else 's')
+    line(4, f"Ask: {duration} of palace rations · {quantity:,} qa grain", "gold")
+    line(5, "[ ] adds/removes one fortnight · choose a court below", "dim")
     room = max(1, height - 20)
     pick = known.index(chosen) if chosen else -1
     page = collection.page(len(known), room, scroll, pick)
@@ -60,9 +64,9 @@ def compose(b: dict, width: int, height: int, selected: str, quantity: int,
         line(y + 2, "Route: " + " > ".join(chosen["path"]), "dim")
     else:
         line(y + 1, "No known courier route. Consult the World route tablet.", "sky")
-    line(y + 3, "A request guarantees no grain; no payment is attached.", "flame")
-    line(y + 4, "The court may send less, refuse, delay, or stay silent.")
-    line(y + 5, "Sea closures and losses can delay reply and cargo.", "dim")
+    line(y + 3, "Asking lowers their esteem. Grain sent is a loan:", "flame")
+    line(y + 4, "repay in 12 fortnights by gift, or they send raiders.")
+    line(y + 5, "Want to pay? Market buys local grain with copper.", "dim")
     line(y + 6, "Enter prepares a letter. Edit and seal it in Scribes.", "sand")
     import registry
     cost = registry.BY_ID["dispatch_letter"].cost

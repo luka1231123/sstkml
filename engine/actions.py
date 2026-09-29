@@ -144,6 +144,8 @@ class DispatchLetter:
     orders: tuple[str, ...] = ()
     tone: str = "plain"
     unparsed: tuple[str, ...] = ()
+    protocol_total: int = -1
+    protocol_violations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         required = {
@@ -584,6 +586,14 @@ class CohortReceived:
     cohort: str
     decision: str
     destination: str
+
+
+@dataclasses.dataclass(frozen=True)
+class AidDefaulted:
+    creditor: str
+    good: str
+    owed: int
+    raid_from: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1040,7 +1050,7 @@ _TYPES = {
         AssignTroops, TroopsAssigned, SummonsReceived,
         Sown, Harvested, Threshed, SentToHarvest, CorveeRaised,
         CohortDisplaced, CohortReceived,
-        RaidLaunched, RaidDefeated, RaidSucceeded, AluOccupied,
+        AidDefaulted, RaidLaunched, RaidDefeated, RaidSucceeded, AluOccupied,
         TradeFinanced, TradeRequisitioned,
         SeatDefended, SeatTaken, SeatFell, AluFell,
         BronzeSmelted, BronzeWorn, FormationCapabilityChanged,

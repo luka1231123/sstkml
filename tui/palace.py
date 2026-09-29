@@ -394,15 +394,19 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
     # The case first, then the pressure it is under: a man reads what is being
     # claimed before he reads what waiting costs him.
     lines: list[tuple[str, str]] = [
-        (f"CLAIM · {_name(item['petitioner'], b)}", "barley"),
+        (f"{_name(item['petitioner'], b)} asks you to pay:", "barley"),
     ]
+    if item.get("petitioner_stake"):
+        lines.extend((row, "sand") for row in textwrap.wrap(item["petitioner_stake"], width))
     lines.extend(
         (line, "clay")
         for line in textwrap.wrap(
             item["claim_text"] or "—", width,
             break_long_words=False, break_on_hyphens=False)
     )
-    lines.append((f"ANSWER · {_name(item['against'], b)}", "wine"))
+    lines.append((f"{_name(item['against'], b)} disputes this:", "wine"))
+    if item.get("against_stake"):
+        lines.extend((row, "sand") for row in textwrap.wrap(item["against_stake"], width))
     lines.extend(
         (line, "clay")
         for line in textwrap.wrap(
@@ -416,6 +420,7 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
                   "bone"))
     outcomes = _outcomes(item)
     good = str(next(iter(outcomes.values()))["good"])
+    lines.append((f"Palace holds {int(b.get('stores', {}).get(good, 0)):,} {good}", "bone"))
     lines.append(("STAKES · payments and city unrest", "gold"))
     keys = {verdict: key.upper() for key, verdict, _label in VERDICTS}
     labels = {"for": "Pay the claim", "against": "Pay the counterclaim", "split": "Split the claim"}

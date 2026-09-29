@@ -22,7 +22,7 @@ from ai.numeric_guard import normalise
 # ("send me") is tested before a gift ("send").
 _GIVING = r"(?:i\s+send|i\s+give|i\s+have\s+sent|there\s+go(?:es)?)"
 _PROMISING = r"(?:i\s+shall\s+send|i\s+will\s+send|i\s+promise|i\s+shall\s+give)"
-_ASKING = r"(?:send\s+me|let\s+.{0,20}?\s*send\s+me|i\s+ask\s+(?:for|of)|grant\s+me)"
+_ASKING = r"(?:send\s+me|please\s+send|could\s+you\s+send|let\s+.{0,20}?\s*send\s+me|i\s+ask\s+(?:for|of)|grant\s+me)"
 
 from ai.numeric_guard import _NUMBER_WORDS  # noqa: E402  (shared word list)
 
@@ -56,6 +56,31 @@ class Commitment:
             "request_good": f"you ask for {subject}",
             "service": f"you pledge {subject}",
         }.get(self.kind, f"{self.kind}: {subject}")
+
+
+@dataclasses.dataclass(frozen=True)
+class ParseIssue:
+    """A material phrase that must be resolved before the clay can be sealed."""
+    kind: str
+    sentence: str
+    good: str = ""
+    quantity: int = 0
+    written_unit: str = ""
+    expected_unit: str = ""
+
+    def describe(self) -> str:
+        if self.kind == "unsupported_unit":
+            return (
+                f"{self.quantity:,} {self.written_unit} of "
+                f"{self.good.replace('_', ' ')} cannot be recorded: this "
+                f"good is counted in {self.expected_unit}. No conversion is "
+                "defined, so it will not be sent.")
+        if self.kind == "missing_promise_date":
+            return (
+                f"Your promise of {self.quantity:,} "
+                f"{self.good.replace('_', ' ')} needs a future due turn. "
+                "Open TERMS, choose PROMISE GOOD, set due, then impress it.")
+        return "This material wording needs a clearer attached term."
 
 
 def _sentences(matter: str) -> list[str]:
@@ -127,8 +152,39 @@ def _people_index(belief: dict) -> dict[str, tuple[str, str]]:
     return people
 
 
+def _written_unit(phrase: str, good: str) -> str:
+    """Return a stated measurement word, never guessing a conversion.
+
+    A phrase such as ``qa of grain`` has an accounting unit; a bare ``grain``
+    does not.  Adjectives are not treated as units.  The short historical-unit
+    list exists solely to reject a word the player actually wrote, not to add
+    a second display system to the game.
+    """
+    unit_words = {
+        "qa", "shekel", "shekels", "log", "logs", "mina", "minas",
+        "cubit", "cubits", "beam", "beams", "piece", "pieces",
+        "talent", "talents", "jar", "jars", "parisu", "parisus",
+    }
+    words = re.findall(r"[a-z]+", phrase.casefold())
+    for word in words:
+        if word in unit_words:
+            return word
+    return ""
+
+
+def _canonical_unit(good: str) -> str:
+    # Keep authored terms in one unit system.  Import lazily because this
+    # deterministic parser otherwise has no UI dependency during startup.
+    from tui import render
+    return render.unit_for(good)
+
+
+def _unit_matches(written: str, expected: str) -> bool:
+    return written.rstrip("s") == expected.rstrip("s")
+
+
 def _quantity_terms(sentence: str, opener: str, kind: str,
-                    goods: dict[str, str]) -> tuple[Commitment, ...]:
+                    goods: dict[str, str]) -> tuple[tuple[Commitment, str], ...]:
     """Every counted good named after this opener. One clause, one commitment.
 
     "forty jars of oil and two talents of copper" is two commitments, because
@@ -138,22 +194,30 @@ def _quantity_terms(sentence: str, opener: str, kind: str,
     if start is None:
         return ()
     rest = sentence[start.end():]
-    found: list[Commitment] = []
+    found: list[tuple[Commitment, str]] = []
     for match in re.finditer(rf"\b{_QUANTITY}\s+{_GOOD}{_STOP}", rest, re.I):
         quantity = _number(match[1])
         good = _match_good(match[2], goods)
         if quantity and good:
-            found.append(Commitment(kind=kind, good=good, quantity=quantity,
-                                    sentence=sentence.strip()))
+            found.append((
+                Commitment(kind=kind, good=good, quantity=quantity,
+                           sentence=sentence.strip()),
+                _written_unit(match[2], good)))
     return tuple(found)
 
 
-def read(matter: str, belief: dict) -> tuple[Commitment, ...]:
-    """Every commitment the finished matter makes, in the order it makes them."""
+def analyse(matter: str, belief: dict) -> tuple[tuple[Commitment, ...], tuple[ParseIssue, ...]]:
+    """Read executable terms and explicit problems from the king's matter.
+
+    Unsupported measurement words are not turned into a plausible-looking
+    term.  The Desk can therefore keep the exact editable wording while saying
+    why it cannot send it.
+    """
     goods = _goods_index(belief)
     people = _people_index(belief)
     actors = {str(row.get("other")) for row in belief.get("relations", [])}
     found: list[Commitment] = []
+    issues: list[ParseIssue] = []
 
     for sentence in _sentences(matter):
         marriage = re.search(
@@ -175,10 +239,32 @@ def read(matter: str, belief: dict) -> tuple[Commitment, ...]:
                              (_GIVING, "gift")):
             terms = _quantity_terms(sentence, opener, kind, goods)
             if terms:
-                found.extend(terms)
+                for term, written_unit in terms:
+                    expected_unit = _canonical_unit(term.good)
+                    if written_unit and not _unit_matches(
+                            written_unit, expected_unit):
+                        issues.append(ParseIssue(
+                            "unsupported_unit", sentence.strip(), term.good,
+                            term.quantity, written_unit, expected_unit))
+                        continue
+                    found.append(term)
+                    if term.kind == "promise_good":
+                        issues.append(ParseIssue(
+                            "missing_promise_date", sentence.strip(),
+                            term.good, term.quantity))
                 break
 
-    return tuple(found)
+    return tuple(found), tuple(issues)
+
+
+def read(matter: str, belief: dict) -> tuple[Commitment, ...]:
+    """Every executable commitment the finished matter makes."""
+    return analyse(matter, belief)[0]
+
+
+def issues(matter: str, belief: dict) -> tuple[ParseIssue, ...]:
+    """Explicit material problems which must be resolved before dispatch."""
+    return analyse(matter, belief)[1]
 
 
 def as_terms(commitments: tuple[Commitment, ...]):

@@ -502,12 +502,12 @@ def storehouse_account(b: dict, view: str, selected: str = "",
         land_rate = drafts.get("land", land_data.get("land_due_rate", 0))
         harbour_rate = drafts.get(
             "harbour", revenue.get("harbour_rate", 0))
-        rows = [Row("land", (("land due", "clay"),
-                              (f"{land_rate}/1000", "flame" if "land" in drafts else "gold"),
-                              (f"last {land_data.get('last_land_due', 0):,} grain", "dim")),
+        rows = [Row("land", (("harvest tax", "clay"),
+                              (f"{land_rate / 10:g}%", "flame" if "land" in drafts else "gold"),
+                              (f"last {land_data.get('last_land_due', 0):,} qa grain", "dim")),
                          mark="*" if "land" in drafts else ""),
-                Row("harbour", (("harbour due", "clay"),
-                                 (f"{harbour_rate}/1000", "flame" if "harbour" in drafts else "gold"),
+                Row("harbour", (("harbour toll", "clay"),
+                                 (f"{harbour_rate / 10:g}%", "flame" if "harbour" in drafts else "gold"),
                                  (f"last {revenue.get('last_harbour_due', 0):,} {revenue.get('harbour_good', 'oil')}", "dim")),
                     mark="*" if "harbour" in drafts else "")]
         headers, widths = ("account", "rate", "last taken"), (18, 14, 28)

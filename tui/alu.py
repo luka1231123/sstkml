@@ -63,20 +63,20 @@ def _overview(b: dict, room: int = 999) -> list[tuple[str, str]]:
     calendar = b.get("calendar") or {}
     hands = sum(c.get("labour", 0) for c in cohorts)
     return [
-        ("people", f"{heads:,} heads"
+        ("population", f"{heads:,} people"
                    + (f", {hungry:,} going hungry" if hungry else ", none hungry")),
-        ("hands", f"{hands:,} a fortnight · the fields ask "
-                  f"{land.get('labour_days_needed', 0):,}"),
+        ("labour / 2 weeks", f"{hands:,} person-days available"),
+        ("fields need", f"{land.get('labour_days_needed', 0):,} person-days"),
         ("the year", render.year_says(calendar, room) if calendar else "unknown"),
-        ("temper", f"{render.temper(b.get('alu_unrest', 0))}"
-                   f" · unrest {b.get('alu_unrest', 0)} of 1000, from unpaid rations"),
+        ("public unrest", f"{render.temper(b.get('alu_unrest', 0))}"
+                   f" · {b.get('alu_unrest', 0)} / 1000"),
         ("rations", f"{len(behind)} of {len(groups)} unpaid, worst {worst} fortnights"
                     if behind else f"all {len(groups)} paid"),
         ("at the gate", f"{waiting} cohorts wait to be received"
                         if waiting else "nobody waits"),
         ("institutions", f"{len(institutions)} standing"
                          + (f", {len(headless)} with no head" if headless else "")),
-        ("works", f"{len(projects)} running, {days:,} days left"
+        ("works", f"{len(projects)} queued/active; {days:,} labour-days left"
                   if projects else "nothing being built"),
     ]
 
@@ -304,13 +304,10 @@ def skyline(surface: Surface, x: int, ground: int, institutions: list[dict],
         # marked here as well as in the list, because the skyline is where the
         # eye goes first and a building nobody minds should say so.
         label = _short(inst, kinds)
-        pad = left + (SLOT - len(label) - 4) // 2
-        surface.text(pad, ground + 1, "[", C["dim"], C["ink"])
-        surface.text(pad + 1, ground + 1, str(index + 1), C["flame"], C["ink"])
-        surface.text(pad + 2, ground + 1, "]", C["dim"], C["ink"])
-        surface.text(pad + 4, ground + 1, label,
+        pad = left + (SLOT - len(label)) // 2
+        surface.text(pad, ground + 1, label,
                      C["bone"] if inst["inspected"] else C["clay"], C["ink"])
-        surface.link(pad, ground + 1, 4 + len(label), 1, str(index + 1))
+        surface.link(pad, ground + 1, len(label), 1, f"alu:open:{inst['id']}")
         if not inst["head"]:
             surface.text(pad + 4 + len(label) + 1, ground + 1, "×",
                          C["blood"], C["ink"])
@@ -426,14 +423,13 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
         # slices of `standing`, so the key can never name different houses.
         surface.text(1, y, ">" if inst["id"] == selected else " ",
                      C["flame"], C["ink"])
-        surface.text(3, y, str(number), C["flame"], C["ink"])
         if compact:
-            surface.link(1, y, width - 2, 1, str(number))
+            surface.link(1, y, width - 2, 1, f"alu:open:{inst['id']}")
             surface.text(5, y, inst["name"][:16], C["clay"], C["ink"])
             surface.text(22, y, DOES.get(inst["kind"], inst["kind"])[:13],
                          C["dim"], C["ink"])
         else:
-            surface.link(1, y, width - 2, 1, str(number))
+            surface.link(1, y, width - 2, 1, f"alu:open:{inst['id']}")
             surface.text(5, y, inst["name"][:20], C["clay"], C["ink"])
             surface.text(27, y, DOES.get(inst["kind"], inst["kind"])[:16],
                          C["dim"], C["ink"])
@@ -496,7 +492,7 @@ def compose(b: dict, history: dict[str, list[int]] | None = None,
     actions = [style.FooterAction("tab", "view")]
     if shown:
         actions += [style.FooterAction("↑↓", "choose", command="alu:next"),
-                    style.FooterAction("enter", "inspect · 1h")]
+                    style.FooterAction("enter", "open building")]
     actions += [style.FooterAction("n", "works"),
                 style.FooterAction("o", "orders"),
                 style.FooterAction("esc", "close")]
@@ -515,10 +511,9 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
     rows = art.weather(
         art.BUILDINGS.get(inst["kind"], art.HOVEL), inst["condition"])
     lit, mid, dark, edge = HUES.get(inst["kind"], DEFAULT_HUE)
-    left = width - SLOT - 5
-    art.draw(surface, left, 5, rows, lit=lit, mid=mid, dark=dark, edge=edge)
-    surface.text(left, 5 + len(rows), art.GROUND.get(inst["kind"], "▒") * SLOT,
-                 C["sky"] if inst["kind"] in art.GROUND else C["ash"], C["ink"])
+    left = width - SLOT - 5 if width >= 84 else width - 3
+    if width >= 84:
+        art.draw(surface, left, 5, rows, lit=lit, mid=mid, dark=dark, edge=edge)
 
     facts = [
         ("condition", f"{inst['condition']}"
@@ -526,7 +521,7 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
         ("full capacity", f"{inst['capacity']}"),
         ("current output", f"{inst['effective']}"),
         ("staff", inst["group_name"] or "no assigned workers"),
-        ("in the charge of",
+        ("overseer",
          _spoken(inst["head"]) if inst["head"] else "NOBODY — the post is open"),
         ("at", _spoken(inst["place"])),
     ]
@@ -542,11 +537,6 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
         for good, qty in sorted(inst["upkeep"].items()):
             surface.text(26, y, f"{qty} {good}", C["clay"], C["ink"])
             y += 1
-    if history:
-        surface.text(4, height - 6, "Reported output over time",
-                     C["dim"], C["ink"])
-        surface.text(4, height - 5, sparkline(history, width - 10),
-                     C["sand"], C["ink"])
 
     # The one verb on this screen. What it costs is stated in days, because
     # days are what it costs -- the grain is a consequence and the player can
@@ -554,15 +544,20 @@ def detail(b: dict, inst: dict, history: list[int] | None = None,
     project = next((p for p in (b.get("projects") or [])
                     if p["institution"] == inst["id"]), None)
     if project is not None:
-        surface.text(4, height - 3,
-                     f"the men are out on it: {project['days_done']:,} of "
-                     f"{project['days_needed']:,} days", C["barley"], C["ink"])
+        surface.text(4, height - 8,
+                     f"Repair: {project['days_done']:,}/{project['days_needed']:,} labour-days",
+                     C["barley"], C["ink"])
+        surface.text(4, height - 7, project.get('status', 'queued')[:width - 8], C['sand'], C['ink'])
     elif inst["condition"] < 1000:
         want = (1000 - inst["condition"]) * b.get("repair_days_per_point", 3)
         style.bar(surface, 2, height - 2, width - 4,
-                  f" [r] set the men to it — about {want:,} days of corvée",
+                  f" [r] queue repair · ~{want:,} labour-days",
                   fg=C["clay"], bg=C["lapis"])
-    style.footer(surface, [style.FooterAction("p", "appoint / replace", command="appoint"),
-                          style.FooterAction("i", "inspect · 1 hour", command="inspect")],
+    surface.text(4, height - 6, "Overseer ≠ crew. Corvée supplies labour."[:width - 8], C['dim'], C['ink'])
+    style.footer(surface, [style.FooterAction("p", "appoint overseer", command="appoint")],
+                 x=3, y=height - 5, width=width - 6)
+    style.footer(surface, [style.FooterAction("i", "inspect · 1 hour", command="inspect")],
                  x=3, y=height - 4, width=width - 6)
+    style.footer(surface, [style.FooterAction('n', 'Works: call up labour')],
+                 x=3, y=height - 3, width=width - 6)
     return surface.interactive()

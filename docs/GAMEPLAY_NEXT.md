@@ -1,5 +1,10 @@
 # From working court to compelling reign
 
+Current assessment, 2026-09-21: the owner does not find the game understandable
+or dependable. Follow the replacement [execution plan](AI_NEXT_PLAN.md).
+This file is historical design discussion, not an implementation queue or
+evidence that the existing interface is playable.
+
 Current handoff, 2026-09-16: [playtest the decision-review build](PLAYTEST_DECISIONS.md).
 The sections below retain the earlier assessment. The guided Hall has since been
 retired; the returning debt/household-grain claim and competing advice already

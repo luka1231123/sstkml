@@ -168,13 +168,14 @@ def _health(world: World) -> tuple[World, list]:
 
 def _politics(world: World) -> tuple[World, list]:
     from engine import correspondence_policy, defence, displacement, fall, justice
-    from engine import relations, revenue
+    from engine import aid, relations, revenue
 
     events: list = []
     world, produced = systems.recompute_unrest(world); events += produced
     world, produced = revenue.pressure(world); events += produced
     world, produced = justice.step(world); events += produced
     world, produced = relations.audit_oaths(world); events += produced
+    world, produced = aid.step(world); events += produced
     world, produced = correspondence_policy.step(world); events += produced
     if not world.baseline:
         world, produced = defence.launch(world); events += produced

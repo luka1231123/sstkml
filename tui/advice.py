@@ -188,6 +188,18 @@ def _arrears(b: dict) -> Concern | None:
 
 
 def _grain(b: dict) -> Concern | None:
+    fed = render.fortnights_fed(b)
+    wheel = b.get('calendar', {}).get('wheel', ())
+    now = max(0, b.get('fortnight', 1) - 1)
+    harvest = next((offset for offset in range(len(wheel))
+                    if wheel[(now + offset) % len(wheel)] == 'harvest'), None)
+    if fed is not None and harvest is not None and fed < harvest:
+        speaker, basis = _from(b, 'granary', 'ration roll and harvest calendar',
+                              'the scribe compared the ration roll with the calendar')
+        return Concern('grain', 9, 'Rations may run out before harvest',
+                       f'Reported grain covers {fed} fortnights; harvest starts in {harvest}.',
+                       'open Trade to buy local grain or request aid; Roll changes rations.',
+                       'trade', speaker=speaker, basis=basis)
     history = b.get("store_history", {}).get("grain", [])
     if len(history) < 4 or history[-1] >= history[-4]:
         return None
@@ -232,7 +244,7 @@ def _institutions(b: dict) -> Concern | None:
         "you walked down and saw it yourself" if worst.get("inspected")
         else f"this is what {speaker} reports, and nobody has been to look")
     return Concern(
-        "institutions", 5, f"{worst['name'].capitalize()} is failing",
+        "institutions", 5, f"Repair needed: {worst['name']}",
         f"Its condition is {worst['condition']}{qualifier}.",
         "inspect it in the Alu, then decide whether to repair it.", "alu",
         speaker=speaker, basis=basis)

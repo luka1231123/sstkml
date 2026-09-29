@@ -305,7 +305,8 @@ def term_summary(term: object) -> str:
     if person:
         parts.append(person.replace("_", " "))
     if type(quantity) is int and quantity:
-        parts.append(f"{quantity:,}")
+        unit = render.unit_for(good) if good else 'person-days' if kind == 'service' else ''
+        parts.append(f"{quantity:,} {unit}".rstrip())
     if destination:
         parts.append("at " + destination.replace("_", " "))
     if type(due) is int and due:
@@ -369,13 +370,13 @@ def scribe_expects(draft: Draft, intent: str = "reply") -> tuple[str, ...]:
     lines = ["The recipient will receive these words as your answer."]
     score = draft.score
     if not score.address_ok:
-        lines.append("The chosen address may be rejected.")
+        lines.append("This address does not fit their rank, too low or too high; esteem falls on arrival.")
     elif draft.profile == "hatti.servant_to_lord":
         lines.append("The address keeps the Sun above Ugarit.")
     elif draft.profile == "peer.equal_to_equal":
         lines.append("The address claims equal kingship.")
     else:
-        lines.append("The address names your kingship without submission.")
+        lines.append("This address names you as king, without submission.")
     if not score.prostration_ok:
         lines.append("No bow reaches the feet of the Sun.")
     if not score.self_designation_ok:
@@ -733,6 +734,10 @@ def _draw_footer(surface: Surface, recipient: str,
         return
 
     compact = width < 90
+    route_known = bool(seal_data.get("route"))
+    dispatch_label = (
+        "no route to send" if not route_known else
+        "review · 2h" if compact else "review & seal · 2h")
     if block_focus == "terms":
         style.footer(surface, [
             style.FooterAction("↑", "block", command="desk:block:previous"),
@@ -755,11 +760,11 @@ def _draw_footer(surface: Surface, recipient: str,
         ], y=height - 3, x=2, width=width - 4)
         style.footer(surface, [
             style.FooterAction(
-                "Enter", "review · 2h" if compact else "review & seal · 2h",
+                "Enter", dispatch_label,
                 enabled=(
                     bool(matter.strip()) and not composing
                     and bool(seal_id(recipient, blocks))
-                    and bool(seal_data.get("route"))),
+                    and route_known),
                 command="desk:dispatch"),
             style.FooterAction("esc", "keep"),
             style.FooterAction("x", "discard", command="desk:discard"),
@@ -808,11 +813,11 @@ def _draw_footer(surface: Surface, recipient: str,
                  x=2, width=width - 4)
     style.footer(surface, [
         style.FooterAction(
-            "Enter", "review · 2h" if compact else "review & seal · 2h",
+            "Enter", dispatch_label,
             enabled=(
                 bool(matter.strip()) and not composing
                 and bool(seal_id(recipient, blocks))
-                and bool(seal_data.get("route"))),
+                and route_known),
             command="desk:dispatch"),
         style.FooterAction("esc", "keep"),
         style.FooterAction("x", "discard", command="desk:discard"),
@@ -907,6 +912,8 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             y += 1
     y += 1
     source_body = str(item.get("body") or "")
+    if not new_letter and item.get('topic') == 'exemption':
+        source_body = render.reply_effect(item) + '\n\n' + source_body
     empty_source = (
         "No incoming tablet is pinned. This begins a new exchange."
         if new_letter else "No voiced copy is ready.")

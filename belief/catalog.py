@@ -36,7 +36,7 @@ KINDS = {
                "interests", "named_heir", "source", "as_of_turn", "certainty"),
     "petition": ("id", "petitioner", "against", "kind", "waiting", "good",
                  "unit", "claim", "counterclaim", "claim_text",
-                 "counter_text", "outcomes", "source",
+                 "counter_text", "petitioner_stake", "against_stake", "outcomes", "source",
                  "as_of_turn", "certainty"),
     "obligation": ("id", "kind", "party", "beneficiary", "authority", "good",
                    "quantity", "person_id", "destination", "created_turn",

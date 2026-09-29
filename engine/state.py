@@ -258,6 +258,8 @@ class Petition:
     award_max: int = 0
     deduct_award: bool = False
     waiting_unrest: int = 0
+    petitioner_stake: str = ""
+    against_stake: str = ""
     grace: int = 2
 
 
@@ -625,6 +627,15 @@ class Relation:
 
 
 @dataclasses.dataclass(frozen=True)
+class AidDebt:
+    creditor: ActorId
+    good: str
+    owed: int
+    due_turn: int
+    status: str = "open"
+
+
+@dataclasses.dataclass(frozen=True)
 class Clause:
     kind: str
     args: tuple[tuple[str, object], ...]
@@ -740,6 +751,7 @@ class World:
     letter_reservations: tuple["GoodsReservation", ...] = ()
     letter_obligations: tuple["LetterObligation", ...] = ()
     letter_claims: tuple["RequestClaim", ...] = ()
+    aid_debts: tuple[AidDebt, ...] = ()
     marriage_proposals: tuple["MarriageProposal", ...] = ()
     correspondence: tuple[CorrespondenceCase, ...] = ()
     case_seq: int = 0

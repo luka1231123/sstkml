@@ -45,7 +45,7 @@ EVENT_SUFFIXES = (
 # Named rather than matched: `SentToHarvest` is the event and `SendToHarvest`
 # is the order, and a suffix rule wide enough to catch the first would hide the
 # second from the orphan check entirely.
-EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched",
+EVENT_NAMES = frozenset({"SentToHarvest", "ArchiveSearched", "AidDefaulted",
                          # Not intent: it records that an accepted reading of a
                          # foreign court's answer was kept, so replay reads text
                          # instead of asking a model again (spec 2.6). It has no

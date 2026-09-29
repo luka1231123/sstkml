@@ -1,213 +1,424 @@
-# After the interface pass: an AI-led execution plan
+# Make the game understandable and dependable before expanding it
 
-Assessment: 2026-09-16. Subordinate to `../SPEC.md`.
-This is a plan, not a record of implemented changes.
+Assessment: 2026-09-21, revision `6df0d04`, clean working tree before this review.
+This replaces the previous execution plan. `SPEC.md` remains the product authority.
+This document proposes work; it does not record that work as delivered.
 
-Implementation update, 2026-09-16: the controls, decision previews, paged reviews,
-assignment/purchase receipts and improved note capture are implemented. See
-[the playtest handoff](PLAYTEST_DECISIONS.md) for delivered scope and the known
-troop-harvest limitation. Human playtesting and balance measurement remain open;
-the numbered sections below retain their acceptance criteria.
+## 1. Starting judgment
 
-## Judgment
+The owner reports that nothing feels intuitive or clear, features are hidden,
+and supposedly working actions do not actually work. Treat that as a failed
+playability gate, not as a request for a better manual. Do not answer it with
+passing test counts or a list of implemented systems.
 
-The interface pass was worthwhile: one home for judgements, consistent room
-names, clearer quantities, shared window sizes and native grid dialogs remove
-real friction. Keep those decisions. The next milestone should be **a player
-can understand a costly choice and recognize its consequence later**.
+There is substantial machinery to reuse: Court, ledgers, correspondence,
+reviews, receipts, return claims, reports, saves and a deterministic simulation.
+Its presence does not establish that a player can use it. The next milestone is:
 
-Another broad cosmetic pass will not establish that. Finish the controls and
-decision previews, observe a beginner, then measure whether different choices
-create different recoverable situations. Expand content only after that loop
-works. The existing returning shipwright and foreign grain request are enough
-to exercise it; neither needs replacing with a new subsystem.
+> Without coaching or memorized shortcuts, I can find a useful action, understand
+> its immediate cost, do what I intended, tell whether it happened, and later
+> recognize its result.
 
-## Evidence and gaps
+Hidden foreign information is intentional. Hidden controls, unexplained units,
+unclear focus, ambiguous order status and silently ineffective intentions are
+not the information constraint that makes this game interesting.
 
-Reviewed `INTERFACE_PASS.md`, `PLAYABLE.md`, `FIRST_YEAR.md`, `GAMEPLAY_NEXT.md`,
-the specification, relevant renderers/controller code and policy tools.
-Fresh text renders used seed 8814402919, turn 6, at the real default sizes.
-No native-window playtest, balance campaign or test suite was run for this review.
-The interface pass's 632 passing tests are historical evidence, not a new result.
+Work in this order: **trustworthy actions → discoverable workflows → recognizable
+consequences → worthwhile choices → wider alpha scope.** Repair each workflow
+through all three of the first steps before moving to the next room.
 
-| Finding | Why it matters | Priority |
+## 2. What this review actually established
+
+Reviewed the specification, current and historical plans, saved playtest notes,
+first-year output, controller, rendering, note capture, parser, letter terms,
+save system and policy tools. Fresh headless renders examined turn-1 Court,
+Hall, Storehouse and Muster. Small direct probes exercised letter parsing and
+term validation. No native-window interaction, new balance campaign, full test
+suite or human acceptance session was performed. No game code was changed.
+
+| Evidence | Finding | What it means for work |
 | --- | --- | --- |
-| Muster's default render shows the formation artwork but omits `SEND THEM`, task, destination and `[t]`/`[l]` instructions present in its detail data. | The advertised assignment requires controls the player cannot see. Larger defaults did not finish the layout work. | P0 |
-| Muster exposes the one-hour assignment cost, but no material or labour comparison in the room. | The player cannot weigh military duty against other uses of those people. Verify the actual engine coupling before promising a harvest penalty. | P1 |
-| Storehouse shows “recent” counts and a grain delta without an explicit interval in this render. Trade mixes per-thousand prices with a one-talent purchase. | Arithmetic can be correct while its meaning and purchase scope remain unclear. | P1 |
-| Counsel still reserves a fixed portrait column and keeps only the conversation tail. | Long answers and pending orders need usable space and a way to recover earlier context. | P1 |
-| Storehouse and Muster still print bare `Enter` in shared instructions. Counsel contains `F1`/`F2` suggestions. | The claim that every control is standardized is broader than the current implementation. Function-key gameplay suggestions also conflict with SPEC §4. | P1 |
-| Planning documents describe the removed guided Hall and already-delivered return claims as future work. | An AI following them can rebuild retired features or duplicate work. | P0 |
-| Policy divergence and beginner comprehension remain unproven by this review. | Screen renders and deterministic checks cannot establish that decisions matter to a player. | P1 |
+| Owner's current report; earlier local notes | Replies and counsel have failed; navigation and wording remain confusing; the owner does not trust the interface. | Reproduce the actual interaction before choosing a fix. Earlier repair claims do not close these reports. |
+| `ai/commitments.py`, fresh probe | `Send me 1000 qa of grain.` produces a request; `Please send 1000 qa of grain.` and `I need 1000 qa of grain.` produce no terms. | Ordinary intentions can become prose without the intended action. The current review labels unmatched text `unparsed`; that is not sufficient explanation or recovery. Do not claim all paraphrases should automatically have identical intent. Ask the player to resolve ambiguity. |
+| Same parser and engine term validation, fresh probe | `I send two talents of copper.` produces a gift quantity of 2, which validation accepts. Copper is counted in shekels. | An unsupported unit is being discarded instead of converted or rejected. Fix before treating free-text orders as reliable. Do not invent a conversion without an approved unit rule. |
+| Same probe | `I will send 1000 qa of grain.` creates a promise with due turn 0; validation refuses it because a future date is required. | The plain-language path does not collect information its engine requires. An explicit attached term may supply the date; that does not make the text-only workflow discoverable. |
+| `play_gui.py:on_audience_key` | In Hall, Enter and Space both advance the turn; only Space is advertised for that action. | A familiar open/confirm key has a consequential, unadvertised meaning. Verify actual focus behavior and remove the accidental-turn path. |
+| Fresh turn-1 render | Hall cuts a matter off as `The walls of ugarit is fa…`; Court prices a claim without showing the available copper alongside it. | Critical meaning and affordability still require inference or navigation. Presence of a quantity is not a complete decision. |
+| Current docs and `belief/muster.py` | Assigning a troop formation to harvest supplies no additional kernel farm labour. | A selectable duty implies an effect it does not produce. A disclaimer is not the final repair. Provide the working labour path clearly; implement any coupling only as a separate conservation change. |
+| Fresh screen-tool invocation | Rendering the desk at turn 1 raises `IndexError` because no incoming tablet exists. | This is a developer-tool failure, not proof that the native desk crashes. Repair empty-state coverage so review tools do not only inspect convenient states. |
+| Local human note at turn 82 | After the opening food problem and first harvest, advancing time felt sufficient and nothing else mattered. | Investigate the post-harvest decision drought after basic interactions work. Survival at 3.4 years is not itself wrong under the 15–30-year collapse target. |
+| Existing first-year comparison, historical | Passive play on the three recorded seeds ended with 3,366,397 qa and zero arrears; generous recovery spent more and cleared court claims. | Some outcomes differ, but this does not demonstrate engaging choices or a reason to keep playing. These figures were not rerun for this review. |
 
-Survival at turn 82 is not by itself a balance defect: that is about 3.4 years,
-whereas SPEC §6.4 targets unaided failure across seeds at 15–30 years. Investigate
-whether waiting avoids meaningful tradeoffs or makes intervention irrelevant.
-Do not turn this finding into a requirement to kill the player earlier.
+September 16 note files explicitly describe native smoke checks. They are not
+new human approval. Earlier human notes exist and must not be replaced by the
+incorrect blanket statement that no human feedback has been recorded.
 
-## Execution order
+## 3. Milestone A — capture failures and make one dependable route
 
-### 1. Establish one current backlog and repair Muster's layout
+### A1. Establish one small failure register
 
-Read `SPEC.md` first. Reconcile current-status sections of `PLAYABLE.md` and
-`GAMEPLAY_NEXT.md`; label earlier measurements and retired designs as history.
-Link this plan from the interface pass. Do not silently rewrite product rules.
-Record specification conflicts separately: for example, F8 playtest notes versus
-the blanket function-key prohibition, and old exception-docket wording versus
-the newer Hall dashboard contract.
+Import the existing human notes first. Keep original wording and references to
+the local note file/line. Separate automated smoke notes from human feedback.
+For each issue record:
 
-Fix Muster at default and minimum sizes. Preserve selection, task, destination,
-action, refusal and cost before allocating space to art. Make overflow reachable;
-do not solve this only by enlarging the window again. Check summons and threat
-selections as well as ordinary formations.
+- the player's goal, expected result, actual result, and impact;
+- build, save version, seed, turn, originating screen and reproduction route;
+- observed evidence, suspected cause, and what remains unknown;
+- one next task, acceptance conditions and status.
 
-Likely files: `tui/ledgers.py`, `tui/workbench.py`, `tui/desktop.py`,
-`play_gui.py`, the planning documents.
+Use statuses `reported`, `reproduced`, `implemented`, `interaction verified`,
+`player accepted`. An agent may advance the middle statuses with evidence. Only
+actual human feedback may establish player acceptance. Old reports can be
+marked `not reproduced on this build`, never silently called fixed.
 
-Done when a player can choose a formation, task and destination, inspect the
-order, cancel it, and give it using visible keyboard instructions at both sizes.
-Cancellation must not spend time or mutate the world. Retain the existing
-desktop tiling contract.
+Start with failed letter replies, counsel failures, hidden actions, accidental
+turn advancement, wrong letter quantities and unsupported troop harvest duty.
+Repair campaign corruption or accidental spending first, blocked core actions
+second, discoverability third, repetition and balance after that. Do not let a
+large backlog obscure the one next delivery.
 
-### 2. Finish the price of an order
+### A2. Strengthen the existing playtest capture, narrowly
 
-Start with Muster, then Storehouse/Trade, then Counsel. Use one presentation
-pattern, without building a new generic framework first:
+Current F8 capture already saves the originating screen as text, seed, turn,
+hours, action count and three recent confirmed orders. Ctrl-Enter writes
+`notes.jsonl` beside the separate campaign autosave. Reuse it.
 
-- who receives or performs the order, how much, and when;
-- immediate goods and attention costs;
-- current commitment and proposed commitment;
-- known competing demand and the resulting shortfall, where supported;
-- the record's date, estimate assumptions and any unknowns;
-- confirmation or a specific refusal, followed by a dated receipt.
+Add a small run manifest: revision/dirty indicator, save version, campaign,
+seed, start time, configured model, and display/font settings. Add note IDs and
+timestamps. Capture the active tab, selected object, pending review, last
+refusal/error and operation status where available. Keep a bounded diagnostic
+trail of attempts and results: failed clicks, refusals and model errors are not
+represented by three successful orders.
 
-For Muster, trace `AssignTroops` through the engine and Belief before writing
-preview arithmetic. Distinguish reassigning an existing formation from calling
-up new people. Show displaced work, food or equipment only where the simulation
-actually accounts for it. Missing coupling is a separately scoped engine gap,
-not permission to invent an impressive-looking number.
+At note time, preserve a diagnostic copy of the action-log save and relevant UI
+state, with a reference from the note. The autosave will otherwise advance past
+the failure. This is not a new snapshot save format. Do not call the model or
+advance the simulation to capture a note. Preserve unsent drafts and pending
+review context separately where needed to reproduce UI bugs. Keep developer
+truth out of the player's display.
 
-For Storehouse, explain counted, reserved and available goods, and label the
-interval behind a change. For Trade, make local purchase, requisition and foreign
-request distinct. A preview should identify the payment good/unit, obtainable
-quantity and known limits. Foreign acceptance and arrival remain uncertain.
-Inspect all Trade tabs, not only its opening Exchange view.
+Provide one small local note-summary/export command, not an analytics dashboard.
+It should group related reports, retain raw references, identify unknown build
+information in older notes, and produce one proposed next task. Notes remain
+local; no automatic external upload.
 
-For Counsel, reduce art at small sizes, make useful conversation recoverable,
-and keep the complete pending order available before confirmation. Preserve the
-existing distinction between free Help and paid counsel. Normalize shared key
-instructions and replace gameplay function-key suggestions with controls that
-fit the specification.
+Keep this to small deliveries. Build identification and reproducible note context
+come first; export convenience must not hold up a critical gameplay repair.
+Do not turn playtest support into a telemetry project.
 
-Likely files: `tui/ledgers.py`, `tui/trade.py`, `tui/relief.py`,
-`tui/counsel.py`, `tui/workbench.py`, relevant `belief/` projections,
-`registry.py`, and the existing confirmation path in `play_gui.py`.
+**Gate:** a note about a failed action contains enough evidence to investigate
+without asking the owner to reconstruct the whole session. Note capture itself
+does not spend attention, submit an order or alter campaign state.
 
-Done when the player can explain what is spent, who bears the cost, and what is
-uncertain before committing. Unknown information must stay unknown. Exercise
-insufficient goods, missing destination, stale records and long text, not just
-the happy path. Add targeted checks only for meaningful behavior or boundaries.
+### A3. Repair the first trustworthy workflow: read and reply
 
-### 3. Close one decision-to-consequence loop
+Correspondence is central to the game and has both human failure reports and
+freshly reproduced semantic defects. Own the whole route:
 
-Use the existing shipwright ruling and grain-relief correspondence as the two
-examples. Trace review → confirmed action → receipt → next report → later
-claim or delivery. Show the earlier decision where it helps interpret the new
-situation, with its actual recipient, amount and date.
+`arrival → read → reply → edit → review → confirm → sent receipt → later status`
 
-Keep “ordered,” “accepted,” “dispatched” and “received” separate. A paid claimant
-does not imply a repaired ship. An accepted request does not imply stored grain.
-Explain observed differences without attributing every change to the last order.
-Check deferral, refusal, partial payment and unanswered correspondence as well
-as payment and delivery. Preserve continuity across save/load.
+1. Reproduce the reported reply/seal-state problem from available saves. Track
+   letter IDs across resorting and reading. Do not diagnose it from prose alone.
+2. Make the current letter, read state, recipient and Reply action visible.
+3. Keep free writing, but show exactly which action the engine understood. If
+   a sentence asks for an unsupported or ambiguous action, explain that it will
+   not request or transfer anything and offer a concrete correction route.
+4. Validate quantities and units. Accept canonical units; reject unsupported
+   ones explicitly until a conversion is defined. Never ignore a unit word.
+5. If a promise lacks a due date, collect one visibly before confirmation.
+6. Keep the correspondence blocks required by SPEC, with sensible existing
+   defaults and recoverable detail. Do not make finding the Terms block a secret
+   prerequisite for an otherwise ordinary request.
+7. Show hours, immediate transfers, deferred commitments and uncertainty
+   separately. “Request grain” must not look like “receive grain.”
+8. Cancellation preserves the draft and costs nothing. Confirmation occurs once;
+   repeat input must not double-send. A refusal leaves an editable draft and a
+   specific reason. Model failure must leave a visible recovery path.
+9. After sending, show the recipient, recorded request, cost and status beside
+   a way to revisit that letter. Later, distinguish accepted, loaded, travelling
+   and received only where the player's records establish them.
 
-Likely files: `tui/audience.py`, `tui/aftermath.py`, `tui/orders.py`,
-`tui/reckoning.py`, relevant Belief records and `engine/justice.py` only where
-an authoritative record is demonstrably missing.
+Likely seams: `ai/commitments.py`, `tui/composer.py`, desk/inbox handlers in
+`play_gui.py`, `engine/letter_terms.py`, existing correspondence checks. Split
+parser safety, missing-date recovery, reply state and visual workflow into
+separate deliveries. Do not rewrite the entire controller.
 
-Done when a player can find an earlier choice, identify its recorded result,
-and understand why a returning matter still needs a decision. Do not expand
-the justice system or implement a workshop commission to satisfy this slice.
+**Gate:** native interaction can complete, cancel, reopen, fail and retry this
+route; committed terms match the visible review; save/reload preserves them.
+Then the owner can reply in their own words without a supplied magic sentence.
+Successful scripted dispatch alone does not pass.
 
-### 4. Observe a beginner before tuning difficulty
+**Current delivery status — 2026-09-21.** **Implemented:** polite canonical
+grain requests, unsupported-unit refusal, missing-promise-date recovery,
+pre-send terms/cost/uncertainty review, cancelled-draft retention, and opening
+the recorded sent copy after confirmation. **Interaction verified:** a separate
+native playtest read a tablet, wrote and cancelled/reopened a request, sent it
+once, and retained its outbox record across save/reload; unsupported units,
+missing promise dates, and insufficient attention were shown as refusals.
+**Human acceptance pending:** the owner has not yet played this repair.
 
-Prepare a separate playtest campaign and a short observation sheet. Ask a
-person unfamiliar with the interface to make a first ruling, find its receipt,
-give one allocation order, request grain, and reach the next report. Then have
-them play a year. Record hesitation, mistaken expectations, hidden controls and
-whether they recognize a later consequence. Avoid coaching during the task.
+**2026-09-22, from the 2026-09-21 playtest notes:** Hall Enter no longer ends
+the fortnight (only Space); Court shows who each party speaks for and the
+palace's holding of the claimed good; Hall matter titles wrap instead of
+truncating; the desk says a wrong address may be too low or too high. Aid
+is now a loan (`engine/aid.py`): each request delivered costs 40 esteem; grain
+received opens a debt due in 12 fortnights, repaid by gift of the same good;
+default costs 250 esteem and sends raiders from the creditor or a neighbour.
 
-Ask what they expect before confirmation and what they think happened afterward.
-Ask what they want to do next at year end. F8 notes can capture seed, turn and
-screen; a transcript of successful keypresses is not evidence of comprehension.
+## 4. Milestone B — make the rest of the basic loop discoverable
 
-The AI can prepare and summarize this session. A human must supply the actual
-experience. If nobody is available, record this gate as pending and continue
-with measurements; do not claim that an AI playthrough proves fun or clarity.
+### B1. Establish a screen contract through one real screen
 
-### 5. Measure choices, then tune only demonstrated causes
+Before coding a broad redesign, show one realistic Court/decision mockup or
+running revision. It should answer, in a compact layout:
 
-Rerun first-year comparisons on seeds 8814402919, 42 and 1, using separate output
-directories. Compare waiting, the existing generous recovery policy, and a
-clearly described selective policy. Log actual actions and refusals, not just
-policy names. Check attention budgets and that choices read only player Belief.
+1. Where am I, and what or whom have I selected?
+2. What is the current issue, and what information is known or dated?
+3. What can I do here, in plain verbs?
+4. What will this cost now, and what commitment or uncertainty remains?
+5. Did the last action happen, fail, or remain a draft?
 
-`tools/first_year.py` already provides a Belief-based starting point.
-`tools/gameplay_probe.py` currently reads authoritative stores/groups in `_act`;
-its policies are useful engine probes but are not automatically evidence of
-what a player could know or legally do within a fortnight. Separate diagnostic
-policies from player-feasible policies before interpreting their performance.
+For the shipwright, show the amount claimed, counterclaim, available copper,
+three actual payment options and the cost of waiting together. Do not fabricate
+ship repairs or future rewards. Put names and evidence in optional detail when
+they do not help the immediate choice. Explain a unit next to its use or in an
+accessible detail, not with repeated paragraphs on every screen.
 
-Compare peak arrears, shortage duration, goods spent, remaining stores, labour
-conflicts, unresolved claims, court unrest, actual cargo received and recovery
-time. For long runs, also compare population, whole-Alu unrest, foreign survival,
-fall dates and causes. Court unrest and whole-Alu collapse are different measures.
+The design must work through visible controls with mouse or keyboard. Printed
+shortcut letters supplement labelled actions. Show which control has focus;
+show unavailable actions with a specific reason. Essential actions and costs
+stay visible at minimum supported size; detail may page with a visible page
+indicator. Artwork gets the remaining space.
 
-Use 24 turns to diagnose the opening, an intermediate run to inspect recovery,
-then up to 720 turns for the long-campaign target. Keep calm-world and campaign
-runs separate. Publish revision, seeds, policy rules and measurements.
+Keep Court-first and the existing room architecture for the initial repair.
+If the prototype shows that those rules obstruct use, propose a precise SPEC
+change before implementing a larger structural change. Do not preserve a bad
+layout merely because an earlier plan described it as complete.
 
-Tune one causal bottleneck at a time only after identifying it: timing of relief,
-allocation competition, shock severity or recovery capacity. Preserve calm-world
-stability. Do not require active play to dominate every metric; protecting one
-group may reasonably cost another. The gate is a visible, explainable tradeoff
-with a playable recovery path, not an arbitrary score difference.
+### B2. Repair journeys, not all screens at once
 
-## Later work, after this milestone
+| Order | Player goal | Required result |
+| --- | --- | --- |
+| 1 | Hear a claim and make or defer a ruling | Comparable costs beside the choice; receipt names who was paid; deferral is clearly unresolved. |
+| 2 | Work out whether food will last and change its allocation | Food estimate, counted/reserved/available distinction, recipients and working labour controls are reachable without guessing room names. |
+| 3 | Buy grain or request help abroad | The two actions expose their different payment, timing and uncertainty; actual purchase receipt is accessible immediately. |
+| 4 | Move troops or contribute labour | Named source and destination, current/proposed duty, known defence change; no effective-looking harvest command without real labour effects. |
+| 5 | Appoint an official or inspect a building | Selected office, existing holder, candidate and cost are visible; opening an object is distinct from spending an inspection hour. |
+| 6 | End a fortnight and understand the report | Only the advertised end-turn input advances time; changed results and unresolved orders lead back to their evidence. |
+| 7 | Ask for help or advice | Free controls/help and paid counsel are distinguishable; pending generation, failure, retained history and reviewed orders remain usable. |
 
-Continue the correspondence release boundary in SPEC §6.2 before expanding
-justice or sensory polish. Inventory implemented letter kinds and obligation
-lifecycles against the specification; choose the next complete end-to-end case
-instead of adding several inert choices to a menu.
+Bring a concern directly to the relevant object/control, not merely to the
+room's default tab. Keep a consistent way back. Do not duplicate the full
+allocation system on the Hall or restore the retired flood of adviser prose.
+Audit every visible control in each repaired route against its handler, including
+empty data, low hours, unaffordable orders, long text and model failures.
 
-Standing orders and commissioned reports need a concrete repetition or
-information problem demonstrated in play. Profile save/load on current code
-before prioritizing persistence work. `session.py` still replays action logs;
-the older proposal to replace this with snapshots conflicts with SPEC §5.3.
-Any checkpoint design needs an explicit specification decision and replay
-equivalence, compatibility and corruption handling.
+**Gate per journey:** the owner finds it, can explain the immediate effect,
+performs it, and recognizes the receipt without coaching. A user stumbling on
+the same step reopens that issue even if all automated checks pass.
 
-`play_gui.py` is now 5,411 lines. Extract room handlers incrementally when working
-on those rooms, preserving controller behavior; avoid a whole-controller rewrite
-alongside gameplay changes. Aggregate noisy reports for readers while retaining
-the authoritative events needed to reconstruct outcomes.
+## 5. Milestone C — make consequences worth following
 
-## Instructions for the implementing AI
+Use the existing shipwright and relief request first. Do not add characters to
+conceal a weak connection between an order and its outcome.
 
-Work through the numbered slices in order. Deliver small reviewable changes;
-do not treat this plan as authorization to invent new mechanics or override
-`SPEC.md`. Before each slice, inspect the current tree and verify that the gap
-still exists. Keep simulation authority in the engine, player information in
-Belief, and model output limited to grounded language.
+For each, follow `decision → receipt → subsequent record → changed situation`.
+A returning claim should identify the earlier payment and why this claim still
+exists. A grain answer must be distinguished from a delivery. Reports should
+separate what was ordered, what was observed to happen and what is still unknown.
+Use actual records; do not explain every grain change as the effect of the last
+order. Reduce report noise while preserving causal events for the developer.
 
-For each delivery, report the user-visible change, touched files, evidence,
-remaining uncertainty and next gate. Update current status without presenting
-planned work as completed. For layout changes, render representative states at
-default and minimum sizes and inspect them in native Tk before claiming visual
-completion. For semantic changes, run the relevant focused checks and authority,
-information and conservation gates; exercise save/replay when state changes.
-Follow SPEC §5.5 for release verification. Do not rerun broad tests for prose edits.
+Then inspect the post-harvest period highlighted in the turn-82 feedback:
 
-**First assignment:** reconcile the backlog and make Muster's complete assignment
-flow visible at default and minimum sizes. Show the before/after evidence, then
-proceed to its grounded cost preview. This is the smallest useful next delivery.
+- Which decisions become available, and does the player notice them?
+- Does waiting avoid a real cost, or does it quietly harm something unreported?
+- Are offices, trade, defences, obligations and relationships connected enough
+  to make maintenance or preparation worth doing?
+- If food is safe, what existing problem can the player reasonably choose next?
+- Is there a recovery path after a bad choice, visible early enough to use?
+
+Separate three diagnoses: the consequence exists but is hidden; the action has
+no useful material coupling; the world currently offers no meaningful choice.
+They require different changes. Repeating urgency text fixes none of them.
+Add the smallest missing coupling or in-scope situation only after identifying
+which case applies. No artificial emergency each turn, reward for clearing every
+claim, automatic hostile court, or mandatory punishment for waiting.
+
+**Gate:** the player can describe a consequence of an earlier choice and names
+something they want to pursue next. A safe year is allowed; a year where nothing
+seems worth doing is a failed engagement check.
+
+## 6. Milestone D — measure choices, then tune balance
+
+Existing first-year policies read Belief and account for action hours, but they
+are headless scripts and bypass interface discovery. They do not prove UI
+usability. `tools/gameplay_probe.py:_act` reads authoritative state and does not
+enforce the player's attention budget. Keep those runs labelled engine
+Diagnostics until player-feasible policies are supplied.
+
+1. Add a selective policy alongside waiting and generous recovery. Document
+   actual triggers, actions, information and tradeoffs. Check Court phase rules
+   and information costs as well as action hours. Log skipped actions, refusals
+   and purchases/deliveries, not only ending totals.
+2. Compare seeds 8814402919, 42 and 1 for 24 turns, with separate output paths.
+   Then run to 96 turns to cover the reported post-harvest boredom, followed by
+   broader seeds and up to 720 turns when intermediate behavior warrants it.
+3. Measure shortage duration, peak arrears, goods spent, actual cargo received,
+   labour conflicts, unresolved claims, recovery time, and occasions when the
+   policies faced a visible consequential choice. For long runs, include world
+   population, whole-Alu unrest, foreign survival, player fall and cause.
+4. Keep calm-world runs separate from shocked campaigns. Change one demonstrated
+   cause at a time, rerun the same comparison and record revision and parameters.
+5. Return the changed scenario to human play. Different numbers are not enough
+   if the tradeoff still cannot be perceived or influenced.
+
+Active policy need not win every metric. Feeding more people may cost reserves.
+Do not tune to force an earlier death: SPEC targets unaided collapse across
+seeds around years 15–30, with unshocked stability and survivable individual
+shocks. Human readability and material policy comparison are separate gates.
+
+## 7. Milestone E — finish alpha scope and release reliability
+
+Only after the basic routes are accepted:
+
+- Inventory every correspondence kind required by SPEC §6.2 against composing,
+  deterministic meaning, review, dispatch, travel, response, consequences,
+  player visibility and replay. The five current term kinds are not proof that
+  every required interaction exists. Implement one complete case at a time.
+- Trace the four required obligation families—goods, labour/troops, tribute,
+  oaths—through due date, debtor, creditor, remedy and actual fulfillment/default.
+  A stored record or a menu choice alone does not complete a lifecycle.
+- Repair missing room interactions that matter to these cases. Keep justice
+  and religion small; do not expand to more playable courts or a workshop saga
+  before the one playable seat is dependable.
+- Profile actual startup, model response, turn resolution and save/reload at
+  representative campaign lengths. Show progress and recoverable errors where
+  waits occur. Preserve the specified action-log replay; snapshots require a
+  separate product decision, not a stealth performance fix.
+- Run the small SPEC §5.5 release gates: authority, inventory, conservation,
+  compilation, save/load smoke, representative runs and pinned benchmark.
+  Also perform native interaction on the supported display sizes and runtime
+  model failure/retry. Restore and continue a playtest campaign.
+
+Standing orders, extra advisers, sound, decorative art and broad controller
+refactoring wait for a demonstrated problem they solve. Extract a room handler
+only when necessary for a bounded repair, without mixing that refactor with
+unrelated mechanics or balance changes.
+
+## 8. How the owner uses playtests to steer the work
+
+Start with the existing separate campaign mode:
+
+```sh
+./run.sh --playtest seat 8814402919
+```
+
+Use F8 at the first confusion or unexpected result. A short note is enough:
+
+> Trying to: reply asking for grain.
+> Expected: a request for 1000 qa.
+> Happened: I cannot tell whether I sent anything.
+
+Ctrl-Enter saves. Escape closes while keeping the note draft in the session.
+Current files are `saves/seat/playtest-<timestamp>/notes.jsonl`, beside autosave.
+Current note context is useful but does not yet include the proposed manifest,
+error trail or per-note save copy. Do not assume those additions already exist.
+
+Use three kinds of session:
+
+| Session | What the player receives | What it decides |
+| --- | --- | --- |
+| Short discovery, about 10–15 minutes | A goal, such as “reply to this letter asking for food”; no shortcut recipe. | Can the player discover and understand the route? Stop at a blocking failure. |
+| Focused regression, about 5–10 minutes | The specific old failure and the repaired build. | Did the fix actually solve the problem, including cancel/retry/reload? |
+| Free play, about 30–45 minutes initially | Freedom to choose what matters; no requirement to clear the docket or play optimally. | Are choices interesting, consequences recognizable, and another session appealing? |
+
+These are suggested session sizes, not time-to-completion promises. Do not ask
+for a full year while the first action remains broken. Later compare the same
+seed with a different ruling or policy, then a different seed for robustness.
+The existing key-by-key `PLAYTEST_DECISIONS.md` route is useful regression
+coverage, not evidence of unaided discovery.
+
+Before a commitment, ask what the player expects to spend and happen. Afterward,
+ask what they think happened and where they would find the result. If a tester
+needs a hint, record the intervention instead of erasing the difficulty by
+coaching. Help may be used, but needing Help for every basic action is a design
+failure. The LLM help tab must not become a replacement for a usable interface.
+
+After a session the AI should return:
+
+1. The three highest-impact failures, grounded in exact notes.
+2. Which are reproduced, which are hypotheses and which need evidence.
+3. One small proposed change and the observation that would show it worked.
+4. The resulting task packet and, after implementation, the exact retest route.
+
+No wall of speculative features. If an action is confusing, fix that action
+before adding a tutorial for it. If it is understood but boring, inspect its
+consequences. If it produces the wrong result, stop polishing and fix correctness.
+If evidence contradicts a design assumption, update the plan and SPEC decision
+where appropriate instead of defending the earlier implementation.
+
+Proposed milestone acceptance: all core journeys above can be completed without
+developer coaching; no known wrong-quantity, accidental-order, blocked-reply or
+lost-save defect remains; the owner can identify an earlier consequence and a
+reason to keep playing. An unfamiliar second player is useful confirmation when
+available. AI playthroughs cannot award human acceptance.
+
+## 9. Execution discipline for less capable development agents
+
+Give one agent one bounded failure at a time. This plan is not a single prompt
+to “finish the game.” Avoid concurrent controller, parser and balance edits.
+The owner chooses what feels wrong and accepts the result; the AI investigates,
+implements the narrow repair, supplies evidence and proposes the next task.
+
+Each assignment needs:
+
+```text
+Task ID and one player-visible outcome:
+Current revision / relevant note ID:
+Reproduction: seed, save, turn, screen, inputs, expected vs actual.
+Evidence already established; uncertainty still open:
+Read first: named SPEC contract and relevant functions.
+Allowed edit scope / likely files:
+Required behavior, including cancel/refusal/empty-state cases:
+Non-goals:
+Verification: smallest useful checks plus the native interaction route.
+Done when: observable conditions, with human acceptance left pending.
+Stop/split if: new mechanic, spec conflict, save semantic change, or unrelated
+controller rewrite is needed. Report the decision needed; do not improvise it.
+Deliver: changed behavior, evidence, limitations and one next retest.
+```
+
+Aim for one behavior and a few files. File count is a signal to split work, not
+a rule that justifies a bad patch. Start by reproducing; do not “fix” an issue
+whose current behavior has not been checked. Preserve engine authority, Belief
+boundaries, deterministic terms and replay. Runtime model language must never
+supply authoritative quantities or decide whether an order succeeded.
+
+Use existing focused checks for semantic defects and critical cancellation,
+conservation, information and replay boundaries. Do not build a second test
+implementation or run a huge suite after a wording change. A UI delivery needs
+native interaction evidence; screenshots or synthetic event handlers alone are
+insufficient. If native verification was not performed, state that plainly and
+leave the status pending. Do not quote historical pass counts as fresh evidence.
+
+Three ready-to-issue first packets:
+
+- **A-01: Honest quantity parsing.** Reproduce the copper-unit example. Reject
+  unsupported units with a recoverable explanation, or normalize only explicitly
+  supported units. Keep canonical shekel/qa requests working. No broad NLP rewrite,
+  model substitution, balance changes or new letter kinds. Evidence: parsed terms,
+  visible review, actual dispatched quantity and cancel/refusal behavior.
+- **A-02: No unadvertised end turn.** Trace Hall focus and Enter routing. Make
+  only the advertised end-turn action advance the fortnight; preserve Enter's
+  documented behavior in reviews and selected records. Evidence: native key route,
+  unchanged turn for unrelated Enter, one advance for explicit end turn.
+- **A-03: Reproduce the failed reply.** Read relevant local notes/save, identify
+  the letter, read it, draft a response, cancel/reopen, confirm and inspect outbox.
+  Capture refusal/model/focus state. Repair only the demonstrated cause. If it
+  cannot be reproduced, deliver that result and improved diagnostics, not an
+  invented fix or a claim of completion.
+
+Between packets, retest the same player goal before expanding scope. The next
+assignment is determined by what still blocks play, not by which subsystem is
+most attractive for an agent to build.

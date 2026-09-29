@@ -730,6 +730,8 @@ def _justice(world) -> dict:
             "counterclaim": dict(petition.counterclaim),
             "claim_text": petition.claim_text,
             "counter_text": petition.counter_text,
+            "petitioner_stake": petition.petitioner_stake,
+            "against_stake": petition.against_stake,
             "outcomes": outcomes,
             "source": "court docket", "as_of_turn": world.date.absolute,
             "certainty": "counted",
@@ -1098,7 +1100,7 @@ def _trade(world, perr: int) -> dict:
                     if cohort else org.name if org else fallback),
                 "location": lot.location.split(":", 1)[-1],
                 "quality": lot.quality, "provenance": list(lot.provenance),
-                "source": "harbour cargo roll",
+                "source": "local private stock roll",
                 "as_of_turn": world.date.absolute, "certainty": "counted",
             })
     routes = []
@@ -1441,6 +1443,9 @@ def project(world) -> dict:
         "relations": relations,
         "oaths": oaths,
         "obligations": obligations,
+        "aid_debts": [{"creditor": debt.creditor, "good": debt.good,
+                       "owed": debt.owed, "due_turn": debt.due_turn}
+                      for debt in world.aid_debts if debt.status == "open"],
         "rites": [{"id": rite.id, "fortnight": rite.fortnight,
                    "hours": rite.hours, "requires": dict(rite.requires),
                    "skip_legitimacy": rite.skip_legitimacy,

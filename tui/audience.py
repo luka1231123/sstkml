@@ -42,6 +42,7 @@ def content(b, item, width):
             return f"A messenger from {who}", [("A sealed letter awaits you.", "clay")]
         rows = [(line, "clay") for paragraph in letter.get("body", "").splitlines()
                 for line in (textwrap.wrap(paragraph, width) or [""])]
+        rows = [(line, 'sand') for line in textwrap.wrap(render.reply_effect(letter), width)] + [('', 'clay')] + rows
         return f"Letter from {who}", rows or [("The letter has been opened. No text is recorded.", "clay")]
     if item["kind"] == "band":
         band = item["band"]
@@ -85,13 +86,12 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
                 line(height - 6, "↑↓ scroll to read more", "dim")
             actions = []
             if item["kind"] == "case":
-                visible = len(rows) <= room
                 for key, verdict, _ in palace.VERDICTS:
                     outcome = item["case"]["outcomes"][verdict]
                     label = {"for": "pay claim", "against": "pay counterclaim", "split": "split"}[verdict]
                     label += f" · {outcome['amount']:,} {outcome['good']} · unrest {outcome['unrest']:+} · 1 hour"
                     style.footer(surface, [style.FooterAction(key, label, command="home:verdict:" + verdict,
-                        enabled=visible and hours >= 1 and outcome["affordable"])],
+                        enabled=hours >= 1 and outcome["affordable"])],
                         x=3, y=height - 7 + len(actions), width=width - 6)
                     actions.append(verdict)
                 actions = []

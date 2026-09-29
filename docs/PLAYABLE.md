@@ -5,7 +5,22 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
-## Current handoff — 2026-09-16
+## Current assessment — 2026-09-21
+
+The owner reports that the game remains unclear, hides actions and fails in
+ordinary use. Earlier implementation and smoke-check results do not establish
+playability. Follow the replacement [execution plan](AI_NEXT_PLAN.md): reproduce
+failures, repair dependable and discoverable workflows, verify consequences,
+then measure balance. The review reproduced letter-parser quantity/intent gaps
+and identified an unadvertised end-turn input; native interaction verification
+and human acceptance remain pending. Historical human feedback exists in local
+playtest notes; automated smoke notes must not be counted as player acceptance.
+
+Everything below is historical status or measurement, not the current task
+queue. Do not implement older proposals without checking the current plan and
+`SPEC.md`, particularly the retired guided Hall and snapshot-save proposal.
+
+## Previous handoff — 2026-09-16
 
 The decision-review implementation is ready for a human playtest. See
 [the route and note instructions](PLAYTEST_DECISIONS.md). Muster's controls,

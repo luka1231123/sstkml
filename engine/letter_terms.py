@@ -286,6 +286,8 @@ def apply_delivered_terms(
     claims: list[O.RequestClaim] = []
     proposals: list[O.MarriageProposal] = []
     gift_updates: dict[str, GiftRecord] = {}
+    aid_moves: list = []
+    aid_asks: list = []
     existing_reservations = {
         record.id: record for record in world.letter_reservations}
     existing_obligations = {
@@ -318,6 +320,7 @@ def apply_delivered_terms(
             if record.arrive_turn is None:
                 gift_updates[record_id] = dataclasses.replace(
                     record, arrive_turn=turn)
+                aid_moves.append((sender, recipient, term.good, term.quantity))
         elif term.kind in {"promise_good", "service"}:
             existing = existing_obligations.get(record_id)
             obligations.append(
@@ -328,6 +331,8 @@ def apply_delivered_terms(
                     source, index, sender, recipient, sent_turn, term, turn))
         elif term.kind == "request_good":
             existing = existing_claims.get(record_id)
+            if existing is None and sender == world.court.actor:
+                aid_asks.append(recipient)
             claims.append(existing or O.RequestClaim(
                 id=record_id, source_letter=source, term_index=index,
                 party=recipient, beneficiary=sender, authority=sender,
@@ -374,6 +379,14 @@ def apply_delivered_terms(
         marriage_proposals=_merge_records(
             world.marriage_proposals, proposals),
     )
+    from engine import aid
+    for court in aid_asks:
+        world = aid.asked(world, court)
+    for giver, taker, good, quantity in aid_moves:
+        world = (aid.repaid(world, taker, good, quantity)
+                 if giver == world.court.actor
+                 else aid.received(world, giver, good, quantity)
+                 if taker == world.court.actor else world)
     return world, DeliveredTerms(
         tuple(delivered_gifts),
         tuple(obligations),
@@ -530,6 +543,9 @@ def apply_incoming_terms(world: World, letter) -> tuple[World, list]:
         A.CargoLanded(cargo.id, cargo.party, cargo.good, cargo.quantity)
         for cargo in landed
     ]
+    from engine import aid
+    for cargo in landed:
+        world = aid.received(world, sender, cargo.good, cargo.quantity)
     return dataclasses.replace(
         world,
         letter_obligations=_merge_records(world.letter_obligations, recorded),

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from belief import dues as due_math
+from tui.render import unit_for
 
 
 def _change(value: int | None, unit: str = "") -> str:
@@ -23,14 +24,15 @@ def facts(b: dict, target: str, rate: int,
     revenue = b.get("revenue", {})
     status = "DRAFT" if draft else "IN FORCE"
     live = quote["live_rate"]
-    shown_rate = (f"{live} → {rate} / 1,000" if draft
-                  else f"{rate} / 1,000")
+    shown_rate = (f"{live / 10:g}% → {rate / 10:g}%" if draft
+                  else f"{rate / 10:g}%")
 
     if target == "land":
         customary = revenue.get(
             "land_base", b.get("land", {}).get("land_due_base", 0))
-        rows = [(f"land due · {status}", shown_rate),
-                ("customary", f"{customary} / 1,000")]
+        rows = [(f"harvest tax · {status}", shown_rate),
+                ("paid by", "farmers, from the assessed crop"),
+                ("customary", f"{customary / 10:g}%")]
         if quote["take"] is None:
             rows += [
                 ("at harvest", _change(
@@ -39,9 +41,9 @@ def facts(b: dict, target: str, rate: int,
             ]
         else:
             rows += [
-                ("this harvest", f"~{quote['harvest_total']:,} grain  "
+                ("tax at harvest", f"~{quote['harvest_total']:,} qa grain  "
                                   f"({_change(quote['delta'])})"),
-                ("granary after", f"~{quote['grain_after']:,} / roof "
+                ("granary after", f"~{quote['grain_after']:,} qa / roof "
                                   f"{quote['roof_capacity']:,}"),
                 ("storage risk", (f"~{quote['unroofed']:,} unroofed"
                                   if quote["unroofed"] else "fits under roof")),
@@ -56,12 +58,13 @@ def facts(b: dict, target: str, rate: int,
     low, high = quote["delay_min"], quote["delay_max"]
     mark = "~" if quote["approximate"] else ""
     rows = [
-        (f"harbour due · {status}", shown_rate),
-        ("customary", f"{customary} / 1,000"),
-        ("next clearance", f"{mark}{quote['take']:,} {good}  "
+        (f"harbour toll · {status}", shown_rate),
+        ("paid by", "merchants, from cleared cargo"),
+        ("customary", f"{customary / 10:g}%"),
+        ("next clearance", f"{mark}{quote['take']:,} {unit_for(good)} {good}  "
                            f"({_change(quote['delta'])})"),
         ("cargo", f"{mark}{quote['clearable']:,} of "
-                  f"{quote['waiting']:,} clears"),
+                  f"{quote['waiting']:,} {unit_for(good)} clears"),
     ]
     if quote["esteem_loss_each"]:
         rows += [

@@ -637,10 +637,22 @@ class Game:
                             or f"new:{desk.get('recipient', '')}")
             self.__dict__.setdefault("desk_drafts", {}).pop(draft_key, None)
             self.desk = None
+            # `do` first opened the review, so this is the one place a
+            # confirmed dispatch can reliably leave the wet tablet.  Put the
+            # recorded copy under the player's eyes rather than leaving the
+            # old incoming letter selected behind the modal.
+            self.inbox_filter = "outbox"
+            sent = [
+                item for item in self.belief.get("outbox", [])
+                if item.get("recipient") == action.recipient
+                and item.get("reply_to") == action.reply_to
+            ]
+            self.inbox_pick = next((item['id'] for item in sent
+                                    if item['id'] == f'L{self.world.letter_seq}'), '')
+            self.inbox_body_scroll = 0
+            self.inbox_pane = "rack"
             if getattr(self, "audience_reply", "") and action.reply_to == self.audience_reply:
                 self.audience_reply = ""
-                self.app.close("stack")
-                self.hall_window.focus()
             self.repaint()
         return True
 
@@ -897,7 +909,7 @@ class Game:
                                       selected=getattr(self, "trade_pick", ""),
                                       scroll=getattr(self, "trade_scroll", 0),
                                       relief_quantity=getattr(self, "relief_quantity", None),
-                                      hours=self.hours,
+                                      hours=self.hours, purse=self._trade_purse(),
                                       due_draft=self.ledger_state["dues"]
                                       .setdefault("rates", {}).get("harbour"))
         if key == "alu":
@@ -1369,7 +1381,7 @@ class Game:
     # --- the desk ------------------------------------------------------------
 
     def _desk_correspondence(self) -> list[dict]:
-        b = self.belief
+        b = self._language_belief(self.belief)
         return list(b["stack"]) + list(b.get("correspondence_archive", []))
 
     def _desk_item(self, desk: dict | None = None) -> dict:
@@ -1696,6 +1708,29 @@ class Game:
                 explicit.append(parsed)
         return tuple(explicit)
 
+    def _desk_parse_issues(self) -> tuple:
+        """Problems in written material terms, after attached Terms can fix it."""
+        if self.desk is None:
+            return ()
+        try:
+            effective = self._desk_effective_terms()
+        except ValueError:
+            return ()
+        unresolved = []
+        for issue in commitments.issues(self.desk.get("matter", ""), self.belief):
+            if issue.kind != "missing_promise_date":
+                unresolved.append(issue)
+                continue
+            dated = any(
+                term.kind == "promise_good"
+                and term.good == issue.good
+                and term.quantity == issue.quantity
+                and term.due_turn > self.world.date.absolute
+                for term in effective)
+            if not dated:
+                unresolved.append(issue)
+        return tuple(unresolved)
+
     def _desk_bound(self) -> tuple[str, ...]:
         orders = self._desk_commitments()
         matter = self.desk.get("matter", "") if self.desk else ""
@@ -1711,9 +1746,15 @@ class Game:
                           for term in self._desk_effective_terms())
         except ValueError as error:
             terms = ("Cannot seal · " + str(error),)
-        return (terms
+        issues = tuple("fix before sending · " + issue.describe()
+                       for issue in self._desk_parse_issues())
+        prose_reading = tuple(
+            "prose only · " + line + " — it sends no goods or order."
+            for line in prose)
+        return (issues
+                + terms
                 + ("tone · " + tone,)
-                + tuple("unparsed · " + line for line in prose))
+                + prose_reading)
 
     def _desk_blocks(self) -> tuple[str, ...]:
         """The pieces on the wet tablet, in the order they lie on it."""
@@ -1877,7 +1918,13 @@ class Game:
                 return
             current = str(builder.get(field, ""))
             index = options.index(current) if current in options else 0
+            previous = current
             builder[field] = options[(index + by) % len(options)]
+            # A promise has no safe default date. Choosing it clears the due
+            # field, so the player must supply a future turn before sealing.
+            if (field == "kind" and builder[field] == "promise_good"
+                    and previous != "promise_good"):
+                builder["due_turn"] = 0
             if field == "kind":
                 valid = composer.term_fields(builder)
                 if desk.get("term_focus") not in valid:
@@ -2228,11 +2275,19 @@ class Game:
                 self.notify(str(error), registry.REFUSAL, window="stack")
                 self.repaint()
                 return
+            issues = self._desk_parse_issues()
+            if issues:
+                self.notify(issues[0].describe(), registry.REFUSAL,
+                            window="stack")
+                self.repaint()
+                return
             action = A.DispatchLetter(
                 recipient=recipient,
                 reply_to=str(desk.get("reply_to") or ""),
                 text=draft.text,
                 profile=draft.profile,
+                protocol_total=draft.score.total,
+                protocol_violations=draft.score.violations,
                 terms=terms,
                 scribe_id=str(desk.get("scribe_id") or "yabninu"),
                 seal=seal,
@@ -2241,8 +2296,10 @@ class Game:
                 orders=tuple(composer.term_summary(term) for term in terms),
                 tone=next((line.split(" · ", 1)[1] for line in self._desk_bound()
                            if line.startswith("tone · ")), "plain"),
-                unparsed=tuple(line.split(" · ", 1)[1] for line in self._desk_bound()
-                               if line.startswith("unparsed · ")),
+                unparsed=tuple(
+                    line.split(" · ", 1)[1].split(" — ", 1)[0]
+                    for line in self._desk_bound()
+                    if line.startswith("prose only · ")),
             )
             sealed = self.do(action, window="stack")
             if sealed:
@@ -3341,6 +3398,43 @@ class Game:
                 "members", []) if p["id"] == action.person_id),
                 action.person_id)
             return f"tablet {action.letter_id} has been entrusted to {person}"
+        if isinstance(action, A.DispatchLetter):
+            recipient = render.actor_name(action.recipient, b.get("house"))
+            requests = [term for term in action.terms
+                        if term.kind == "request_good"]
+            gifts = [term for term in action.terms if term.kind == "gift"]
+            promises = [term for term in action.terms
+                        if term.kind == "promise_good"]
+            lines = [f"Send sealed tablet to {recipient}."]
+            if action.terms:
+                lines.append("Recorded terms: " + "; ".join(
+                    composer.term_summary(term) for term in action.terms) + ".")
+            else:
+                lines.append("Recorded terms: none; this is correspondence only.")
+            if gifts:
+                lines.append("Immediate material: " + "; ".join(
+                    f"reserve {render.fmt_good(term.good, term.quantity)}"
+                    for term in gifts) + "; it has not arrived there yet.")
+            else:
+                lines.append("Immediate material: none.")
+            if promises:
+                lines.append("Future commitment: " + "; ".join(
+                    f"{render.fmt_good(term.good, term.quantity)} due turn {term.due_turn}"
+                    for term in promises) + ".")
+            if requests:
+                lines.append(
+                    "Uncertain: this asks for goods; it does not deliver any "
+                    "to Ugarit. The other court may refuse, delay, or stay silent.")
+            lines.append("Courier route: " + " > ".join(
+                place.replace("_", " ") for place in action.path) + ".")
+            if len(action.path) == 1:
+                lines.append("Local courier; delivered when the fortnight advances.")
+            if action.protocol_total >= 0:
+                lines.append("Address and form: " + (
+                    "protocol faults will lower esteem on arrival."
+                    if action.protocol_violations else
+                    "follows this recipient's rank; assessed on arrival."))
+            return "\n".join(lines)
         if isinstance(action, A.InspectLedger):
             return f"the {action.ledger.replace('_', ' ')} has been inspected"
         if isinstance(action, A.SendGift):
@@ -3377,7 +3471,7 @@ class Game:
         if isinstance(action, A.BeginBuild):
             return f"a {action.kind.replace('_', ' ')} has been put in hand"
         if isinstance(action, A.BeginRepair):
-            return f"repairs to {action.institution.replace('_', ' ')} have begun"
+            return "Repair queued. Open Works to call up corvée labour; this order assigns no workers."
         if isinstance(action, A.AbandonWork):
             return f"work on {action.project.replace('_', ' ')} has been called off"
         if isinstance(action, A.Quarantine):
@@ -3949,6 +4043,8 @@ class Game:
             return
         if (event.char or "").lower() == "r":
             self.order(A.BeginRepair(institution), window=key)
+        elif (event.char or "").lower() == "n":
+            self.open_works()
         elif (event.char or "").lower() == "i" or getattr(event, "command", "") == "inspect":
             self.do(A.InspectLedger(f"institution:{institution}"), window=key)
         elif (event.char or "").lower() == "p" or getattr(event, "command", "") == "appoint":
@@ -4035,8 +4131,7 @@ class Game:
             self.alu_scroll = 0
             self.repaint()
             return
-        if (view != "institutions" and char.isdigit()
-                and 1 <= int(char) <= len(views)):
+        if char.isdigit() and 1 <= int(char) <= len(views):
             self.alu_view = views[int(char) - 1]
             self.alu_pick = ""
             self.alu_scroll = 0
@@ -4149,15 +4244,6 @@ class Game:
                          if item["id"] == getattr(self, "alu_pick", "")), institutions[0])
             open_institution(inst)
             return
-        if char.isdigit() and char != "0":
-            # The digit means the nth row *shown*, which after a scroll is not
-            # the nth institution. The screen's own page resolves it.
-            page = alu.institution_page(
-                institutions, width, height, self.alu_scroll, self.alu_pick)
-            index = page.absolute(int(char))
-            if index < 0:
-                return
-            open_institution(institutions[index])
 
     def on_archive_key(self, event, embedded: bool = False) -> None:
         if embedded and self.archive_open_ref:
@@ -4722,8 +4808,13 @@ class Game:
             here = ids.index(picked) if picked in ids else 0
             self.open_focus(view.rstrip("s"), source[here])
             return
+        if view == "exchange" and (char in {"[", "]", "-", "+", "="} or command in {"trade:less", "trade:more"}):
+            up = char in {"]", "+", "="} or command == "trade:more"
+            self.trade_steps = max(1, getattr(self, "trade_steps", 1) + (1 if up else -1))
+            self.repaint()
+            return
         if view == "exchange" and (
-                char == "f" or command == "trade:finance"):
+                char in {"f", "b"} or event.keysym == "Return" or command == "trade:finance"):
             grain = sum(
                 max(0, int(item.get("available", 0)))
                 for item in self.belief.get("trade", {}).get("cargo", ())
@@ -4734,13 +4825,14 @@ class Game:
                             registry.REFUSAL, window="trade")
                 self.repaint()
                 return
-            if copper < 3000:
+            purse = self._trade_purse()
+            if copper < purse:
                 self.notify(
-                    f"one talent is 3,000 copper; only {copper:,} is free.",
+                    f"this order costs {purse:,} copper; only {copper:,} is free. Press [ to buy less.",
                     registry.REFUSAL, window="trade")
                 self.repaint()
                 return
-            self.do(A.FinanceTrade("copper", 3000), window="trade")
+            self.do(A.FinanceTrade("copper", purse), window="trade")
         elif view == "cargo" and char == "r":
             picked = getattr(self, "trade_pick", "")
             item = next((item for item, ref in zip(source, ids)
@@ -4758,6 +4850,14 @@ class Game:
             self._draft_due("harbour", -25 if char == "<" else 25)
         elif view == "dues" and event.keysym == "Return":
             self._commit_due("harbour", "trade")
+
+    def _trade_purse(self) -> int:
+        """Copper for one step of the Market order: a fortnight of rations a step."""
+        from belief.trade import purchase
+        b = self.belief
+        price = max(1, purchase(b)["price"])
+        step = -(-relief.ration(b) * price // 1000)
+        return max(1, getattr(self, "trade_steps", 1)) * step
 
     def on_relief_key(self, event) -> None:
         b = self.belief
@@ -5193,7 +5293,7 @@ class Game:
         elif view == "hall":
             # The hall is the planning half of the fortnight: doors, the last
             # report, and the one control that ends the turn.
-            if command == "space" or key in {"space", "Return"}:
+            if command == "space" or key == "space":
                 self.end_fortnight()
                 return True
             if char == "l":
@@ -5240,12 +5340,8 @@ class Game:
         elif key == "space":
             self.home_view, self.home_scroll = "hall", 0
         elif item and item["kind"] == "case" and (command.startswith("home:verdict:") or char in {"f", "a", "s"}):
-            width, height = self._size("hall")
-            if len(audience.content(b, item, width - 6)[1]) > height - 17:
-                self.notify("Enlarge Court to see both claims and all payments.", "info", window="hall")
-            else:
-                verdict = command.split(":")[-1] if command else {"f": "for", "a": "against", "s": "split"}[char]
-                self.do(A.RulePetition(item["case"]["id"], verdict), window="hall")
+            verdict = command.split(":")[-1] if command else {"f": "for", "a": "against", "s": "split"}[char]
+            self.do(A.RulePetition(item["case"]["id"], verdict), window="hall")
         elif item and item["kind"] == "letter" and (command in {"home:read", "home:reply"} or key == "Return" or char == "b"):
             letter = item["letter"]
             self.audience_pick = item["id"]

@@ -20,13 +20,10 @@ def purchase(b: dict, purse: int = 3000) -> dict:
 
 def lines(b: dict, purse: int = 3000) -> list[str]:
     p = purchase(b, purse)
-    out = [f"Local purchase · quay count, turn {b.get('turn', '?')}.",
-           f"Purse limit: {purse:,} copper shekels.",
-           f"Counted price: {p['price']:,} copper shekels per 1,000 qa.",
-           f"Estimated receipt: {p['grain']:,} qa from {p['available']:,} qa available.",
-           f"Estimated payment: {p['paid']:,} copper shekels (rounded up).",
-           f"Copper counted after payment: {p['remaining']:,} shekels.",
-           "Buys cargo already here; unused copper stays in your stores."]
+    out = [f"Buy grain from local merchants, counted turn {b.get('turn', '?')}.",
+           f"Estimated receipt: {p['grain']:,} qa, into the granary now.",
+           f"Payment: {p['paid']:,} copper at {p['price']:,} per 1,000 qa.",
+           f"Copper after: {p['remaining']:,} shekels."]
     if p["refusal"]:
         out.append(p["refusal"])
     return out

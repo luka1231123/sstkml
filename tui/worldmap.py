@@ -255,6 +255,11 @@ def court_at(b: dict, place: str) -> str:
 
 def route_path(b: dict, origin: str, destination: str) -> tuple[str, ...]:
     """The shortest known courier path, weighted by projected route legs."""
+    places = {p['id']: p for p in b.get('world_graph', {}).get('places', ())}
+    def settlement(place):
+        record = places.get(place, {})
+        return record.get('alu') or place if record.get('kind') == 'palace_centre' else place
+    origin, destination = settlement(origin), settlement(destination)
     if not origin or not destination:
         return ()
     if origin == destination:

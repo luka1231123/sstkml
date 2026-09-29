@@ -125,6 +125,13 @@ def _subject(item: dict) -> str:
     its subject is the decision it carries, and that is only known once the
     tablet has been read (`tui/document.py`).
     """
+    if item.get("outgoing") or (
+            item.get("recipient") and item.get("sent_turn") is not None):
+        from tui.composer import terms_summary
+
+        terms = item.get("terms") or ()
+        return ("recorded: " + terms_summary(terms)
+                if terms else "recorded: correspondence only")
     if document.is_answer(item):
         return document.answer_subject(item)
     return render.letter_summary(str(item.get("topic", "message")))
@@ -306,6 +313,9 @@ def compose(b: dict, width: int = 100, height: int = 32,
             second_meta = (
                 f"{standing.replace('_', ' ')}"
                 f"  ·  {len(peers)} in this exchange")
+            second_meta += (
+                "  ·  read" if selected_item.get("read")
+                else "  ·  unread / sealed")
             if selected_item.get("answered_turn") is not None:
                 second_meta += (
                     f"  ·  answered, turn "
@@ -379,6 +389,8 @@ def compose(b: dict, width: int = 100, height: int = 32,
                     selected_item.get("topic", ""),
                     selected_item.get("facts") or {})
             lines = _sections(body, max(12, right_width - 12))
+            if not outbound:
+                lines = _sections(render.reply_effect(selected_item), max(12, right_width - 12)) + [('', '')] + lines
             reading_room = max(1, height - words_y - 5)
             body_scroll = max(
                 0, min(body_scroll, max(0, len(lines) - reading_room)))
@@ -439,7 +451,7 @@ def compose(b: dict, width: int = 100, height: int = 32,
     ], y=height - 3, x=2, width=width - 4)
     style.footer(surface, [
         style.FooterAction(
-            "r", "answer here", enabled=can_answer,
+            "r", "reply", enabled=can_answer,
             command=f"reply:{selected_item['id']}" if selected_item else ""),
         style.FooterAction(
             "p", "pin beside", enabled=can_work,

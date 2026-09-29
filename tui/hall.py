@@ -1,5 +1,6 @@
 """The Hall: the dashboard the ruler plans from, between audiences."""
 from __future__ import annotations
+import textwrap
 
 from tui import advice, render, style
 from tui.grid import INDEX, InteractiveScreen, Surface, sparkline
@@ -68,6 +69,11 @@ def waiting(b: dict) -> list[dict]:
                                 f"{render.actor_name(item.get('sender', ''), b.get('house'))}"
                                 + (f" · {age}f old" if age else " · new"),
                          "weight": age + 2})
+    for debt in b.get("aid_debts", ()):
+        left = debt["due_turn"] - b.get("turn", 0)
+        rows.append({"say": f"owe {render.actor_name(debt['creditor'], b.get('house'))} "
+                            f"{render.fmt_good(debt['good'], debt['owed'])} · due in {left}f",
+                     "weight": 10 if left < 4 else 5})
     for bad in b.get("calamities", ()):
         rows.append({"say": f"{bad['say']} since fortnight {bad['began']}", "weight": 9})
     plague = b.get("plague", {})
@@ -179,10 +185,17 @@ def _matters(surface: Surface, b: dict, x: int, width: int, height: int) -> None
     # One row a matter, speaker first: the advice still comes out of a mouth,
     # and the rows it saves go to what is actually still waiting.
     for index, concern in enumerate(advice.concerns(b, 3), 1):
-        surface.text(x, y, _fit(f"[{index}] {concern.speaker}: {concern.title}", width),
-                     C["sky"], C["ink"])
-        surface.link(x, y, width, 1, f"concern:{index - 1}")
-        y += 1
+        title = f'{concern.speaker}: {concern.title}'
+        for line in textwrap.wrap(f"[{index}] {title}", width, subsequent_indent="    ")[:2]:
+            surface.text(x, y, line, C["sky"], C["ink"])
+            surface.link(x, y, width, 1, f"concern:{index - 1}")
+            y += 1
+        if concern.id == 'grain':
+            for line in (textwrap.wrap(concern.reason, width)[:2]
+                         + textwrap.wrap('Trade: buy grain or request aid.', width)):
+                surface.text(x, y, line, C['sand'], C['ink'])
+                surface.link(x, y, width, 1, f'concern:{index - 1}')
+                y += 1
     floor = height - 8
     waiting_rows, motion_rows = waiting(b), _motion(b)
     spare = max(0, floor - y - 4)

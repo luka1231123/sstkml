@@ -50,6 +50,15 @@ _GOODS = tomllib.loads((_CONTENT / "goods.toml").read_text())
 _UNIT = {good: spec["unit"] for good, spec in _GOODS.items()}
 
 
+def unit_for(good: str) -> str:
+    """The one authored accounting unit for a good, if it has one.
+
+    This is deliberately a display rule as well as a parser rule: correspondence
+    must not promise a quantity in a unit the ledgers cannot later record.
+    """
+    return _UNIT.get(good, "")
+
+
 def fmt_good(good: str, amount: int) -> str:
     """One quantity, one unit.
 
@@ -60,7 +69,7 @@ def fmt_good(good: str, amount: int) -> str:
     before it can be set beside a rate, because every rate in the game is in
     the base unit already. The base unit is now the only unit.
     """
-    unit = _UNIT.get(good)
+    unit = unit_for(good)
     return f"{amount:,} {unit}" if unit else f"{amount:,}"
 
 
@@ -73,6 +82,12 @@ def fortnights_fed(b: dict) -> int | None:
     if owed <= 0:
         return None
     return b.get("stores", {}).get("grain", 0) // owed
+
+
+def reply_effect(letter: dict) -> str:
+    if letter.get('topic') == 'exemption':
+        return 'Reply ends his unanswered wait, but cannot grant a toll exemption: that policy is not implemented.'
+    return 'Reply ends the unanswered wait. Only reviewed terms move goods or create commitments.'
 
 
 def granary_line(b: dict) -> str:
@@ -750,6 +765,12 @@ def events_lines(events, court) -> list[str]:
         elif isinstance(e, A.AluFell):
             out.append(f"  {e.alu} has fallen through {e.cause}. "
                        f"{len(e.elites)} of its ruling house are dead.")
+        elif isinstance(e, A.AidDefaulted):
+            out.append(
+                f"  The grain loan from {actor_name(e.creditor)} is unpaid: "
+                f"{fmt_good(e.good, e.owed)}. Their esteem falls"
+                + (f"; raiders set out from {e.raid_from.split(':')[-1]}."
+                   if e.raid_from else "."))
         elif isinstance(e, A.RaidLaunched) and e.target.endswith(
                 ":" + court.seat):
             due = ("next fortnight" if e.travel == 1 else
