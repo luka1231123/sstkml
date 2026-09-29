@@ -43,12 +43,18 @@ def _net(b: dict, good: str) -> int:
     return sum(flow["qty"] for flow in b["flows"].get(good, ()))
 
 
-def _moved(b: dict, good: str) -> list[str]:
-    """The two largest movements of a store, as plain causes."""
-    return [(f"rations for {_s(len(b['groups']), 'group')} ate" if f["cause"] == "rations"
-             else f"{f['cause']} {'added' if f['qty'] > 0 else 'took'}")
-            + f" about {render.fmt_good(good, _about(f['qty']))}"
-            for f in b["flows"].get(good, ())[:2]]
+def _moved(b: dict, good: str, rate: int = 0) -> list[str]:
+    """The two largest movements of a store, as plain causes; grain in fortnights."""
+    out = []
+    for f in b["flows"].get(good, ())[:2]:
+        qty = abs(f["qty"])
+        if f["cause"] == "rations":
+            out.append(f"{_s(len(b['groups']), 'group')} eat from the stores")
+            continue
+        size = (("a little" if qty < rate else f"about {_s(qty // rate, 'fortnight')} of grain")
+                if rate else f"about {render.fmt_good(good, _about(qty))}")
+        out.append(f"{f['cause']} {'added' if f['qty'] > 0 else 'took'} {size}")
+    return out
 
 
 def _fact(name, say, trend, why, urgency, source, sure, act, exact) -> dict:
@@ -79,9 +85,8 @@ def _grain(b: dict) -> dict:
         later += f"; grain falls {_s(gap, 'fortnight')} short"
     if k and river in _DRY:
         later += f"; {river}, so the harvest may be thin"
-    why = _moved(b, "grain") or [
-        f"rations for {_s(len(b['groups']), 'group')} need about "
-        f"{render.fmt_good('grain', _about(rate))} a fortnight"]
+    why = [later] + (_moved(b, "grain", rate)
+                     or [f"{_s(len(b['groups']), 'group')} eat from the stores"])
     act = []
     if gap and rate:
         trade = b["trade"]
@@ -89,13 +94,13 @@ def _grain(b: dict) -> dict:
         buy = (min(quay, stores.get("copper", 0) * 1000 // trade["grain_price"])
                if trade["grain_price"] else 0)
         if buy:
-            act.append(f"buy grain in Trade [x]; copper buys {_lasts(buy // rate)} of it")
+            act.append(f"buy {_lasts(buy // rate)} of grain in Trade [x]")
         act.append("cut rations in Storehouse [t]")
         if b["relations"]:
             act.append("ask a court for aid in Scribes [s]")
     return _fact("grain", f"grain lasts {_lasts(lasts)}",
                  _trend([stores["grain"] - _net(b, "grain"), stores["grain"]]),
-                 why[:2] + [later], urgency, _keeper(b, "granary"), "counted",
+                 why, urgency, _keeper(b, "granary"), "counted",
                  act, render.fmt_good("grain", stores["grain"]))
 
 
@@ -121,7 +126,7 @@ def _labour(b: dict) -> dict:
             act.append("send hands to the fields in Storehouse [t]")
         exact = f"{h['before'] * ticks:,} of {h['need']:,} days"
     elif lost > 0:
-        say = f"hunger costs the palace roll about {_about(lost):,} men's work"
+        say = f"hunger keeps about {_about(lost):,} men from work"
         short = sum(g["next_status"] != "full" for g in groups)
         why = [f"rations fall short for {_s(short, 'group')}"]
         urgency = 2 if nxt < now else 1
@@ -130,7 +135,7 @@ def _labour(b: dict) -> dict:
                ["buy grain in Trade [x]", "change who eats first in Storehouse [t]"])
         exact = f"{now:,} days"
     else:
-        say = f"the palace roll has about {_about(now // lph):,} men at work"
+        say = f"about {_about(now // lph):,} men work for the palace"
         why, urgency, exact = [], 0, f"{now:,} days"
     trend = "falling" if nxt < now else "rising" if nxt > now else "steady"
     return _fact("labour", say, trend, why, urgency, "the palace labour roll",
