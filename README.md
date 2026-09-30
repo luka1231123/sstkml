@@ -41,12 +41,13 @@ Each fortnight opens in Court: one person or letter, with actions beside it.
 `tab` leaves Court for the Hall: the dashboard of the year, stores, standing,
 rations and labour, waiting matters, and the doors to every working room.
 `space` in the Hall ends the fortnight and opens the next Court; `l` shows the
-last report. `Ctrl-H` returns here. `?` opens free help, which is one of the
-game's own screens with Manual and Ask halves; `Ctrl-Shift-R` resets window sizes.
+last report. `Ctrl-H` returns here. `?` opens Ask: ask what to do, how to do it or
+who someone is. Asking costs no hours, and a typed order is confirmed before it is
+given. `tab` in Ask opens the Manual; `Ctrl-Shift-R` resets window sizes.
 Claims are heard only in Court; the Palace holds people, offices and envoys.
 `F8` records a playtest note. Last report is available without opening another window.
 Hall `o` opens Orders and receipts. Long Stores/Muster/Orders details and order
-reviews use left/right; Counsel uses Page Up/Page Down. Notes now attach the
+reviews use left/right; Ask uses Page Up/Page Down. Notes now attach the
 originating screen automatically. See [the playtest route](docs/PLAYTEST_DECISIONS.md).
 
 Version 29 saves still load. `--playtest` starts a separate autosave folder.

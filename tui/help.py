@@ -1,9 +1,8 @@
-"""The Field Manual: deterministic, compact, free Help (UI/UX spec 11).
+"""The Field Manual: deterministic, compact, free (UI/UX spec 11).
 
-This used to be the Palace Tutor -- a 100 x 38 window with a portrait, a
-conversation, and a model behind it. It is now a 52 x 20 reference book:
-a search line, a list of topics, the selected topic beside it, and nothing
-that can be slow, absent, or wrong.
+A 52 x 20 reference book: a search line, a list of topics, the selected topic
+beside it, and nothing that can be slow, absent, or wrong. Questions go to Ask
+(`tui/counsel.py`), one Tab away.
 
 The list is the only thing that scrolls, the detail always shows the exact
 control, command, and cost, and none of it costs an hour. `manual.py` builds
@@ -54,44 +53,10 @@ def _detail_lines(topic, room: int) -> list[tuple[str, int]]:
     return rows
 
 
-def _ask(surface: Surface, width: int, height: int, said, typed: str,
-         thinking: bool) -> Screen:
-    """The same panel, holding a conversation instead of a page."""
-    room = width - 6
-    rows: list[tuple[str, int]] = []
-    for who, text in said:
-        colour = C["sky"] if who == "player" else C["clay"]
-        rows.extend((line, colour) for line in _wrap(("You: " if who == "player" else "") + text, room))
-        rows.append(("", C["ink"]))
-    if not rows:
-        rows = [(line, C["ash"]) for line in _wrap(
-            "Ask how a control works or what a record means. This costs no hours"
-            " and gives no orders.", room)]
-    if thinking:
-        rows.append(("the scribe is thinking...", C["flame"]))
-    top, foot = 2, height - 4
-    for offset, (line, colour) in enumerate(rows[-(foot - top):]):
-        surface.text(3, top + offset, line[:room], colour, C["ink"])
-    style.bar(surface, 2, height - 3, width - 4, f" Ask: {typed}",
-              fg=C["bone"], bg=C["faint"])
-    surface.put(min(width - 3, 8 + len(typed)), height - 3, "\u2588", C["flame"], C["faint"])
-    style.footer(surface, (
-        style.FooterAction("enter", "ask", enabled=not thinking),
-        style.FooterAction("tab", "manual"),
-        style.FooterAction("esc", "close"),
-    ))
-    return surface.interactive()
-
-
 def compose(width: int = 52, height: int = 20, query: str = "",
-            pick: str = "", screen: str = "", scroll: int = 0, *,
-            view: str = "manual", said=(), typed: str = "",
-            thinking: bool = False) -> Screen:
+            pick: str = "", screen: str = "", scroll: int = 0) -> Screen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     label = f"FIELD MANUAL · {screen.upper()}" if screen else "FIELD MANUAL"
-    if view == "ask":
-        style.panel(surface, 0, 0, width, height, title="HELP · ASK", drop=False)
-        return _ask(surface, width, height, said, typed, thinking)
     style.panel(surface, 0, 0, width, height, title=label, drop=False)
 
     # Search line. Deterministic and incremental: every keystroke re-scans the
