@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
+from ai import counsel as ai_counsel               # noqa: E402
 from belief.project import project              # noqa: E402
 from engine import actions as A                 # noqa: E402
 from engine.core import in_range                # noqa: E402
@@ -83,8 +84,8 @@ SCREENS = {
                                                hours=b.get("attention", 0))),
     "works": ("THE WORKS", lambda b: works.compose(b, "", *desktop.default_size("works"))),
     "world": ("THE KNOWN WORLD", lambda b: worldmap.compose(b, *desktop.default_size("world"))),
-    "counsel": ("COUNSEL", lambda b: counsel.compose(
-        b, _talk(b), 6, "", False, *desktop.default_size("counsel"))),
+    "counsel": ("ASK", lambda b: counsel.compose(
+        _talk(b), 6, "", *desktop.default_size("counsel"))),
     "altar": ("THE SHRINE", lambda b: altar.compose(
         b, ["He reads the liver and says: the year will be a poor one."],
         "harvest", ("oil", 20), *desktop.default_size("altar"))),
@@ -101,9 +102,8 @@ SCREENS = {
 
 def _talk(b: dict) -> list[tuple[str, str]]:
     """A sample exchange, so the room can be read with words in it."""
-    key, question, topic = counsel.QUESTIONS[1]
-    return [("king", question),
-            ("scribe", counsel.answer(b, topic, SEED, 8))]
+    question = "what should I do about grain?"
+    return [("king", question), ("scribe", ai_counsel.speak(question, [], b, SEED, 6)[0])]
 
 
 def _desk(b: dict):

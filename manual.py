@@ -3,7 +3,7 @@
 UI/UX specification section 11. Help is software documentation, not a
 conversation: correct, fast, compact, free, and never a model call. It answers
 "how do I assign troops?" and deliberately does not answer "should I?", which
-belongs to a named adviser who is allowed to be wrong.
+belongs to Ask (`ai/counsel.py`, which retrieves from the same records).
 
 Topics come from two places and are joined here. The live action registry knows
 the exact cost, the command grammar, the mnemonic, and which screens offer an
@@ -22,7 +22,7 @@ import dataclasses
 import re
 
 import registry
-from ai import help_agent
+from ai import counsel
 
 _WORD = re.compile(r"[a-z0-9]+")
 
@@ -76,7 +76,7 @@ def _titlecase(text: str) -> str:
 
 def _from_descriptor(descriptor) -> Topic:
     """A topic generated from an action, so it cannot drift from the game."""
-    doc = help_agent.BY_ID.get(descriptor.help_topic)
+    doc = counsel.BY_ID.get(descriptor.help_topic)
     body = doc.answer if doc is not None else ""
     where = ", ".join(_titlecase(context) for context in descriptor.contexts)
     lead = f"{descriptor.label} is offered in {where}."
@@ -124,7 +124,7 @@ def _build() -> tuple[Topic, ...]:
     live = registry.player_descriptors()
     topics = [_from_descriptor(d) for d in live]
     spoken_for = {d.help_topic for d in live}
-    topics += [_from_doc(doc) for doc in help_agent.DOCS
+    topics += [_from_doc(doc) for doc in counsel.DOCS
                if doc.id not in spoken_for]
     topics.sort(key=lambda topic: topic.title)
     return tuple(topics)

@@ -43,8 +43,7 @@ from engine.tick import advance
 from load import load_campaign
 from session import load_session, new_seed, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
-                help_agent, librarian, parser as ai_parser,
-                voicer as ai_voicer)
+                librarian, parser as ai_parser, voicer as ai_voicer)
 from tui import advice, collection, palace, aftermath, relief, reckoning, audience, dialog
 from tui import object as object_page
 from tui import ledgers as ledger_page
@@ -246,15 +245,13 @@ class Game:
         self.world_layer = worldmap.LAYERS[0]
         self.counsel_said: list[tuple[str, str]] = []
         self.counsel_typed = ""
-        self.counsel_typing = False
+        self.counsel_thinking = False
         self.counsel_pending: dict | None = None
         # Help is a book, not a conversation: a search line, a chosen topic,
-        # and the screen it was opened from (UI/UX spec 11).
+        # and the screen it was opened from (UI/UX spec 11). Ask is the chat.
         self.help_query = ""
         self.help_pick = ""
         self.help_screen = "hall"
-        self.help_view, self.help_typed, self.help_said = "manual", "", []
-        self.help_thinking = False
         self.altar_readings: list[str] = []
         self.altar_question = "harvest"
         self.altar_offering: tuple[str, int] | None = None
@@ -994,19 +991,11 @@ class Game:
             return object_page.compose(
                 item, width, height, kind, self.focus_scroll.get(key, 0)) if item else None
         if key == "counsel":
-            suggestions = [
-                concern.order_prompt or concern.suggestion
-                for concern in advice.concerns(b, 3)
-                if concern.destination == "counsel"
-            ]
-            return counsel.compose(b, self.counsel_said, self.hours,
-                                   self.counsel_typed, self.counsel_typing,
-                                   width, height, suggestions,
-                                   (self.counsel_pending["descriptions"]
-                                    if self.counsel_pending else None),
-                                   page=getattr(self, "counsel_page", 0),
-                                   pending_cost=(self.counsel_pending.get("cost", 0)
-                                                 if self.counsel_pending else 0))
+            pending = self.counsel_pending
+            return counsel.compose(self.counsel_said, self.hours, self.counsel_typed,
+                                   width, height, pending and pending["descriptions"],
+                                   getattr(self, "counsel_page", 0), pending and pending["cost"] or 0,
+                                   self.counsel_thinking)
         if key == "palette":
             return command_page.compose(
                 self.command_line,
@@ -1044,10 +1033,7 @@ class Game:
                         style.FooterAction("esc", "close")))
         if key == "help":
             return help_page.compose(
-                width, height, self.help_query, self.help_pick,
-                self.help_screen, view=getattr(self, "help_view", "manual"),
-                said=getattr(self, "help_said", ()), typed=getattr(self, "help_typed", ""),
-                thinking=getattr(self, "help_thinking", False))
+                width, height, self.help_query, self.help_pick, self.help_screen)
         if key == "altar":
             shrine_view = getattr(self, "shrine_view", "rites")
             if shrine_view == "oaths":
@@ -1123,9 +1109,8 @@ class Game:
                 live = self.app.live()
                 active = live[0] if live else "hall"
                 typing = ((active == "stack" and self.desk and self.desk.get("dictating"))
-                          or (active == "counsel" and self.counsel_typing)
                           or (active in {"stack", "archive"} and self.archive_typing)
-                          or active in {"palette", "note", "help"})
+                          or active in {"palette", "note", "help", "counsel"})
                 if typing:
                     return None
                 handler()
@@ -1136,7 +1121,7 @@ class Game:
             "<F8>": bind(self.playtest_note),
             "<colon>": guarded(self.open_palette),
             "<grave>": guarded(self.open_palette),
-            "<question>": guarded(self.open_help),
+            "<question>": guarded(self.open_counsel),
             "<Control-Tab>": bind(self.cycle_windows),
             "<Control-Shift-Tab>": bind(lambda: self.cycle_windows(True)),
         }
@@ -1257,7 +1242,7 @@ class Game:
         if key == "alu":
             return "the seat"
         if key == "counsel":
-            return "order pending" if self.counsel_pending else "advice"
+            return "order pending" if self.counsel_pending else ""
         return ""
 
     def open_switcher(self) -> None:
@@ -2641,10 +2626,10 @@ class Game:
         window.focus()
 
     def open_counsel(self) -> None:
-        """The Court's station for a word with the scribe."""
+        """Ask: the one chat with Yabninu. Free to ask; a typed order is confirmed first."""
         width, height = desktop.default_size("counsel")
         window = self.app.window(
-            "counsel", "Counsel", width, height,
+            "counsel", "Ask", width, height,
             on_key=self.on_counsel_key, on_resize=self.on_resize,
             on_close=lambda: self.app.close("counsel"))
         self.repaint()
@@ -3258,31 +3243,10 @@ class Game:
         self.repaint()
         window.focus()
 
-    def open_play_help(self) -> None:
-        self.help_view = "ask"
-        self.open_help()
-
-    def ask_help(self) -> None:
-        """Put the typed question to the scribe. Free, and it gives no orders."""
-        text = self.help_typed.strip()
-        if not text or getattr(self, "help_thinking", False):
-            return
-        self.help_typed = ""
-        self.help_said = list(getattr(self, "help_said", ())) + [("player", text)]
-        self.help_thinking = True
-        said, b, turn = list(self.help_said[:-1]), self.belief, self.world.date.absolute
-        def done(result, error):
-            self.help_thinking = False
-            self.help_said.append(("tutor", result[0] if result else
-                "The scribe could not answer. The manual is on the other tab."))
-            self.repaint()
-        self._run_model(lambda: help_agent.speak(text, said, b, self.seed, turn, self.client), done)
-        self.repaint()
-
     def _focused_screen(self) -> str:
         """Whichever window the player was last in, for Help's context."""
         for key in self.app.live():
-            if key not in ("help", "switcher"):
+            if key not in ("help", "switcher", "counsel"):
                 return key
         return "hall"
 
@@ -3302,19 +3266,7 @@ class Game:
             self.app.close("help")
             return
         if keysym == "Tab":
-            self.help_view = "manual" if getattr(self, "help_view", "manual") == "ask" else "ask"
-            self.repaint()
-            return
-        if getattr(self, "help_view", "manual") == "ask":
-            if keysym == "Return":
-                self.ask_help()
-            elif keysym in ("BackSpace", "Delete"):
-                self.help_typed = getattr(self, "help_typed", "")[:-1]
-            elif char.isprintable() and char:
-                self.help_typed = getattr(self, "help_typed", "") + char
-            else:
-                return
-            self.repaint()
+            self.open_counsel()
             return
         command = getattr(event, "command", "")
         if command.startswith("topic:"):
@@ -3344,80 +3296,25 @@ class Game:
             self.help_pick = topics[0].id
         self.repaint()
 
-    def ask_counsel(self, question: str, topic: str = "") -> None:
-        """An hour for an answer. He talks; the model does the talking (D38).
-
-        No engine action: a conversation changes nothing in the world, and the
-        hours are session state (attention is derived — see `hall.compose`). So
-        nothing goes in the log and a replay is unaffected.
-        """
-        self.counsel_page = 0
-        question = question.strip()
-        if not question:
-            self.counsel_said.append((
-                "scribe", "Ask me a question, my lord."))
-            self.repaint()
-            return
-        if self.hours < counsel.ASK_COST:
-            self.counsel_said.append((
-                "scribe",
-                f"That question takes {counsel.ASK_COST} hour; "
-                f"{self.hours} remain."))
-            self.repaint()
-            return
-        self.hours -= counsel.ASK_COST
-        b = self.belief
-        turn = self.world.date.absolute
-        # What he is wrong about is settled here, before any prompt exists.
-        remembered = counsel.recall(b, topic, self.seed, turn) if topic else {}
-        asks_advice = any(phrase in question.casefold() for phrase in (
-            "should", "what do you", "would you", "recommend", "advise"))
-        authored = (
-            counsel.recommend(b, topic) if asks_advice else
-            counsel.answer(b, topic, self.seed, turn) if topic else
-            counsel.recommend(b, ""))
-        said = list(self.counsel_said)
-        self.counsel_said.append(("king", question))
-        self.repaint()          # his question lands before the answer does
-        knowledge = ai_counsel.digest(b, remembered)
-
-        def work():
-            return ai_counsel.speak(
-                question, said, knowledge, authored,
-                self.seed, turn, self.client)
+    def ask_counsel(self, question: str) -> None:
+        """Free: Yabninu answers from the facts and the help records. The king's words are already on the page."""
+        said, b, turn = self.counsel_said[:-1], self.belief, self.world.date.absolute
+        self.counsel_thinking = True
 
         def done(result, error) -> None:
-            text = authored if error is not None or result is None else result[0]
-            self.counsel_said.append(("scribe", text))
+            self.counsel_thinking = False
+            self.counsel_said.append(("scribe", result[0] if result else "I cannot answer now. Press [tab] for the manual."))
             self.counsel_page = 0
             self.repaint()
 
-        if self.client is None:
-            done(work(), None)
-        else:
-            self._run_model(work, done)
-
-    @staticmethod
-    def _question_topic(question: str) -> str:
-        lowered = question.casefold()
-        for topic, words in {
-            "grain": ("grain", "granary", "food", "ration"),
-            "arrears": ("owed", "unpaid", "arrears", "allocation"),
-            "unanswered": ("unanswered", "written", "reply", "letter"),
-            "oaths": ("oath", "bound", "sworn"),
-            "troops": ("troop", "men", "army", "muster"),
-            "unrest": ("town", "unrest", "people", "mood"),
-        }.items():
-            if any(word in lowered for word in words):
-                return topic
-        return ""
+        self._run_model(lambda: ai_counsel.speak(question, said, b, self.seed, turn, self.client), done)
+        self.repaint()
 
     @staticmethod
     def _looks_like_question(text: str) -> bool:
-        lowered = text.casefold().strip()
-        starts = ("who ", "what ", "where ", "when ", "why ", "how ",
-                  "which ", "tell me ", "do we ", "are we ", "is there ")
-        return text.rstrip().endswith("?") or lowered.startswith(starts)
+        starts = ("who ", "what ", "where ", "when ", "why ", "how ", "which ", "is ", "are ", "do ", "does ",
+                  "can ", "should ", "would ", "will ", "tell me ", "explain ", "help ")
+        return text.rstrip().endswith("?") or text.casefold().lstrip().startswith(starts)
 
     def _describe_order(self, action) -> str:
         b = self.belief
@@ -3711,71 +3608,37 @@ class Game:
         self.repaint()
 
     def submit_counsel(self, text: str) -> None:
+        """A question is answered free. Other words are read as an order first; if they are none, they are answered."""
         self.counsel_page = 0
         text = text.strip()
-        if not text:
-            self.counsel_said.append((
-                "scribe", "Say what is to be done, my lord."))
-            self.repaint()
+        if not text or self.counsel_thinking:
             return
         self.counsel_said.append(("king", text))
         if self._looks_like_question(text):
-            # `ask_counsel` appends the king's words itself.
-            self.counsel_said.pop()
-            self.ask_counsel(text, self._question_topic(text))
+            self.ask_counsel(text)
             return
-        belief = self.belief
-        turn = self.world.date.absolute
-        # A clientless controller exists only in headless tests and recovery.
-        # Normal free-form court language goes to the required local model
-        # first; exact direct controls use their own structured paths.
-        if self.client is None:
-            immediate = ai_parser.preparse(text, belief)
-            if immediate is not None:
-                self._accept_counsel_result(immediate)
-                return
-
-        def work():
-            return ai_parser.parse(
-                text, belief, self.hours, self.seed, turn, self.client)
+        belief, turn = self.belief, self.world.date.absolute
+        if (exact := ai_parser.preparse(text, belief)) is not None:
+            self._accept_counsel_result(exact)
+            return
+        self.counsel_thinking = True
 
         def done(result, error) -> None:
-            if error is not None:
-                self.counsel_said.append((
-                    "scribe", f"I could not read that order: {error}."))
-                self.repaint()
-                return
-            self._accept_counsel_result(result)
+            if result is not None and (result.actions or result.question):
+                self.counsel_thinking = False
+                self._accept_counsel_result(result)
+            else:
+                self.ask_counsel(text)
 
-        if self.client is not None:
-            self._run_model(work, done)
-            return
-        done(work(), None)
+        self._run_model(lambda: ai_parser.parse(text, belief, self.hours, self.seed, turn, self.client), done)
+        self.repaint()
 
     def _accept_counsel_result(self, result) -> None:
         """Surface one parsed result; parsing itself never mutates the world."""
-        if result is None:
-            self.counsel_said.append((
-                "scribe", "I found neither a question nor an order in those "
-                "words, my lord."))
-            self.repaint()
-            return
         if result.actions:
             self.preview_counsel_actions(result.actions)
-        elif result.question:
-            self.counsel_said.append(("scribe", result.question))
-            self.repaint()
-        elif result.unavailable:
-            self.counsel_said.append((
-                "scribe",
-                "I could not make a precise order of that. Name the men, "
-                "place, and quantity another way, my lord."))
-            self.repaint()
         else:
-            self.counsel_said.append((
-                "scribe",
-                "I found neither a question nor an order in those words, "
-                "my lord."))
+            self.counsel_said.append(("scribe", result.question))
             self.repaint()
 
     def on_counsel_key(self, event) -> None:
@@ -3800,40 +3663,30 @@ class Game:
                 return
             self.app.close("counsel")
             return
+        if event.keysym == "Tab":
+            self.open_help()
+            return
         if getattr(event, "state", 0) & 4 and event.keysym.lower() == "u":
             self.counsel_typed = ""
             if self.counsel_pending is not None:
                 self.cancel_counsel_order()
                 return
-            self.counsel_typing = True
             self.repaint()
             return
         if self.counsel_pending is not None:
             if event.keysym == "Return":
                 self.confirm_counsel_order()
             return
-        if command.startswith("suggest:") or (
-                getattr(event, "state", 0) & 4 and event.keysym in {"1", "2"}):
-            index = int(command.split(":")[1]) if command else int(event.keysym) - 1
-            suggestions = [c.order_prompt or c.suggestion for c in advice.concerns(self.belief, 3)
-                           if c.destination == "counsel"]
-            if 0 <= index < len(suggestions):
-                self.counsel_typed = suggestions[index]
-            self.repaint()
-            return
         if event.keysym in ("BackSpace", "Delete"):
             self.counsel_typed = self.counsel_typed[:-1]
-        elif event.keysym == "Return":
+        elif event.keysym == "Return" and not self.counsel_thinking:
             words, self.counsel_typed = self.counsel_typed, ""
             self.submit_counsel(words)
             return
-        elif (event.char or "") == "/" and not self.counsel_typed:
-            pass
         elif (event.char or "").isprintable():
             self.counsel_typed += event.char
         else:
             return
-        self.counsel_typing = True
         self.repaint()
 
     def on_altar_key(self, event) -> None:
@@ -5434,7 +5287,7 @@ class Game:
         elif char.isdigit() and char != "0":
             self.activate_concern(int(char) - 1)
         elif char == "?":
-            self.open_play_help()
+            self.open_counsel()
         elif char in TABLETS or char in LEDGERS or char in ROOMS:
             self.open_door(char)
         elif char in {"r", "l"}:

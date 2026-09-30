@@ -109,7 +109,7 @@ WINDOWS: dict[str, WindowSpec] = {
         # The Shrine keeps enough vertical room for its medium altar vignette
         # above the fixed ritual controls, even at the minimum geometry.
         _spec("altar", "The Shrine", "document", (74, 30), (52, 22)),
-        _spec("counsel", "Counsel", "document", (62, 24), (50, 17)),
+        _spec("counsel", "Ask", "document", (62, 24), (50, 17)),
         _spec("fortnight", "The Fortnight", "document", (62, 24), (50, 17)),
         _spec("help", "Help", "utility", (50, 22), (46, 17)),
         _spec("palette", "Command", "palette"),
