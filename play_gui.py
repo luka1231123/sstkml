@@ -35,6 +35,8 @@ import registry
 from belief.project import project
 from belief import harvest
 from belief.rations import repayment
+from belief.facts import facts as court_facts
+from ai import narrator
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
@@ -177,6 +179,7 @@ class Game:
         self.audience_pick = ""
         self.audience_deferred = set()
         self.home_scroll = 0
+        self.receipts, self.told, self.hall_pick, self.why_open = (), {}, "", False
         # Presentation is remembered between runs; the world is not. A broken
         # settings file yields defaults rather than refusing to start.
         self.settings_path = Path(__file__).parent / "saves" / "settings.json"
@@ -298,6 +301,7 @@ class Game:
         # A Tk program launched from a terminal opens *behind* the terminal on
         # macOS, which is indistinguishable from nothing having happened.
         self.hall_window.present()
+        self._brief()
         if playtest:
             self.save_current(automatic=True)
             self.session_notice = "Playtest: F8 records a note. Your campaign has its own autosave."
@@ -332,6 +336,43 @@ class Game:
             done(result, error)
         if self._model_jobs:
             self.app.root().after(20, self._poll_model_results)
+
+    def _voice(self, key: str, draft: str, work) -> None:
+        """Ask the model for these words. The draft shows until they come."""
+        def done(result, error) -> None:
+            if result:
+                self.told[key] = (draft, result[0])
+                self.repaint()
+        self._run_model(work, done)
+
+    def _voiced(self, key: str, draft: str) -> str:
+        """The model's words while the facts still match them; else the draft."""
+        told, text = self.told.get(key, ("", ""))
+        return text if told == draft else draft
+
+    def _brief(self) -> None:
+        fs, receipts, turn = court_facts(self.belief), self.receipts, self.world.date.absolute
+        self._voice("brief", narrator.template(fs, receipts),
+                    lambda: narrator.briefing(fs, receipts, self.client, seed=self.seed, turn=turn))
+
+    def _words(self, b: dict) -> dict:
+        """What the Hall says: the briefing, the fact under the cursor, its why."""
+        fs = court_facts(b)
+        fact = hall.picked(fs, self.hall_pick)
+        why = self._voiced("why", narrator.why(fact, None, seed=self.seed, turn=self.world.date.absolute)[0])
+        return {"briefing": self._voiced("brief", narrator.template(fs, self.receipts)),
+                "pick": fact["id"], "why": why if self.why_open else ""}
+
+    def ask_why(self, pick: str = "") -> None:
+        """Open Yabninu's why for a fact of the Hall. Asking again closes it."""
+        fact = hall.picked(court_facts(self.belief), pick or self.hall_pick)
+        if self.why_open and self.hall_pick == fact["id"]:
+            self.why_open = False
+            return
+        self.hall_pick, self.why_open = fact["id"], True
+        turn = self.world.date.absolute
+        self._voice("why", narrator.why(fact, None, seed=self.seed, turn=turn)[0],
+                    lambda: narrator.why(fact, self.client, seed=self.seed, turn=turn))
 
     @property
     def belief(self) -> dict:
@@ -702,6 +743,7 @@ class Game:
         self.chosen_alu = str(data["chosen_alu"])
         self.log = list(data["log"])
         self.home_view, self.audience_pick, self.home_scroll = "court", "", 0
+        self.receipts, self.hall_pick, self.why_open = (), "", False
         self.audience_deferred = set()
         saved_hours = data.get("hours_left")
         attention = self.belief["attention"]
@@ -759,6 +801,7 @@ class Game:
             self.app.close(key)
         self.session_notice = (
             f"Loaded turn {self.world.date.absolute} from the verified autosave.")
+        self._brief()
         self.repaint()
         return True
 
@@ -775,6 +818,9 @@ class Game:
         before = self.belief
         self.world, events = advance(self.world)
         self.hours = self.belief["attention"]
+        self.receipts = aftermath.receipts(before, self.belief, self.log)
+        self.hall_pick, self.why_open = "", False
+        self._brief()
         self.works_corvee_draft = 0
         land_state = self.__dict__.get("_ledger_state", {}).get("land")
         if land_state is not None:
@@ -831,7 +877,8 @@ class Game:
         notice = self.notice_for(key)
         if key == "hall":
             if b.get("ended") or getattr(self, "home_view", "court") == "hall":
-                return hall.compose(b, width, height, hours_left=self.hours, notice=notice)
+                return hall.compose(b, width, height, hours_left=self.hours, notice=notice,
+                                    **self._words(b))
             return audience.compose(b, width, height, hours=self.hours,
                 view=getattr(self, "home_view", "court"), selected=getattr(self, "audience_pick", ""),
                 deferred=getattr(self, "audience_deferred", ()), scroll=getattr(self, "home_scroll", 0),
@@ -5300,6 +5347,15 @@ class Game:
                 self.home_view, self.home_scroll = "report", 0
             elif command.startswith("concern:") or (char.isdigit() and char != "0"):
                 self.activate_concern(int(command.split(":")[1]) if command else int(char) - 1)
+            elif char == "e" or command.startswith("why:"):
+                self.ask_why(command[4:])
+            elif key in {"Up", "Down"}:
+                fs = court_facts(b)
+                here = fs.index(hall.picked(fs, self.hall_pick))
+                self.hall_pick = fs[(here + (1 if key == "Down" else -1)) % len(fs)]["id"]
+                self.why_open = False
+            elif key == "Escape" and self.why_open:
+                self.why_open = False
             elif (command or char) in {k for k, _, _ in hall.DOORS}:
                 door = command or char
                 if door == "j":

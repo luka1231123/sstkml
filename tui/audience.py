@@ -2,7 +2,8 @@
 import textwrap
 import registry
 
-from tui import advice, palace, render, style
+from belief.facts import facts
+from tui import advice, hall, palace, render, style
 from tui.grid import Surface, INDEX as C
 
 
@@ -76,6 +77,9 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
             line(7, "No fortnight report yet.")
         style.footer(surface, [style.FooterAction("↑↓", "scroll"), style.FooterAction("esc", "back to the hall", command="home:hall")], y=height - 2)
     else:
+        worst = facts(b)[0]
+        if worst["urgency"]:
+            line(1, hall.fact_line(worst).strip(), "blood" if worst["urgency"] > 1 else "bone")
         item = current(b, deferred, selected)
         items = [i for i in queue(b, selected) if i["id"] not in deferred]
         if item:

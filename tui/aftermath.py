@@ -4,6 +4,33 @@ from belief.harvest import plan as harvest_plan
 from belief.rations import plan as ration_plan
 from tui.render import actor_name
 
+_SAID = {
+    "Allocate": "you set the rations of {group}",
+    "PayArrears": "you paid the arrears of {group}",
+    "SendToHarvest": "you gave field orders to {group}",
+    "RulePetition": "you gave judgement in a claim",
+    "FinanceTrade": "you bought grain at the quay",
+    "DispatchLetter": "you sent a tablet to {who}",
+    "SendGift": "you sent a gift to {who}",
+    "ReceiveCohort": "you answered the people at the gate",
+    "RaiseCorvee": "you called up corvée labour",
+    "SetLandDue": "you changed the land due",
+    "AssignTroops": "you gave the troops new orders",
+}
+
+
+def receipts(before: dict, after: dict, log=()) -> list[str]:
+    """What the king ordered last fortnight, in plain words, for the briefing."""
+    groups = {g["id"]: g["name"] for g in after.get("groups", ())}
+    out = []
+    for record in log:
+        act = record.get("action", {})
+        if record.get("turn") == before.get("turn") and act.get("_t") in _SAID:
+            out.append(_SAID[act["_t"]].format(
+                group=groups.get(act.get("group_id"), act.get("group_id")),
+                who=actor_name(act.get("recipient", ""), after.get("house"))))
+    return out
+
 
 def follow_through(before: dict, after: dict, log=()) -> list[str]:
     out = []

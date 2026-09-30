@@ -2,8 +2,10 @@
 from __future__ import annotations
 import textwrap
 
+from ai import narrator
+from belief.facts import facts
 from tui import advice, render, style
-from tui.grid import INDEX, InteractiveScreen, Surface, sparkline
+from tui.grid import INDEX, InteractiveScreen, Surface
 
 C = INDEX
 DOORS = (
@@ -19,10 +21,22 @@ DOORS = (
 BUILT = frozenset(target for _key, _label, target in DOORS)
 MARKS = {"stack": "▤", "alu": "▩", "trade": "◇", "stores": "▥",
          "muster": "⚑", "palace": "♚", "altar": "△", "world": "◉"}
+TREND = {"rising": "▲", "falling": "▼"}
+URGENT = {3: "!!", 2: "!"}
 
 
 def _fit(text: str, width: int) -> str:
     return text if len(text) <= width else text[:max(0, width - 1)] + "…"
+
+
+def fact_line(f: dict) -> str:
+    """One fact: an urgency mark, what is so, and which way it moves."""
+    return f"{URGENT.get(f['urgency'], ''):<3}{f['say']} {TREND.get(f['trend'], '')}".rstrip()
+
+
+def picked(fs: list[dict], pick: str) -> dict:
+    """The fact under the cursor: the one named, else the worst."""
+    return next((f for f in fs if f["id"] == pick), fs[0])
 
 
 def _counts(b: dict) -> dict[str, int]:
@@ -109,111 +123,81 @@ def _header(surface: Surface, b: dict, hours: int) -> None:
     style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
     when = f"{b['date']} · fortnight {b.get('fortnight', 0)} of 24"
     surface.text(max(3, width - 2 - len(when)), 0, when, C["sky"], C["lapis"])
-    surface.text(3, 2, f"{hours} of {b['attention_base']} hours remain", C["clay"], C["ink"])
+    surface.text(3, 1, f"{hours} of {b['attention_base']} hours remain", C["clay"], C["ink"])
     sea = "the sea is open" if b.get("sea_open") else "the sea is shut"
-    surface.text(width - 3 - len(sea), 2, sea, C["sky"], C["ink"])
-    said = render.granary_line(b)
-    if said:
-        surface.text(3, 3, f"granary · {said}", C["barley"], C["ink"])
+    surface.text(width - 3 - len(sea), 1, sea, C["sky"], C["ink"])
 
 
-def _year(surface: Surface, b: dict, width: int) -> None:
-    """The year gets the full width: it is the fact every plan is made against."""
-    calendar = b.get("calendar") or {}
-    surface.text(3, 5, "THE YEAR", C["gold"], C["ink"])
-    for index, (glyph, colour, now) in enumerate(render.year_wheel(calendar)):
-        surface.put(13 + index, 5, glyph, C["flame"] if now else C[colour], C["ink"])
-    surface.text(3, 6, _fit(render.year_says(calendar, width - 6), width - 6),
-                 C["clay"], C["ink"])
+def _brief(surface: Surface, y: int, head: str, text: str) -> int:
+    """The scribe's words as a paragraph. Returns the first free row."""
+    surface.text(3, y, head, C["gold"], C["ink"])
+    rows = textwrap.wrap(text, surface.width - 6, max_lines=6, placeholder=" …")
+    for row, line in enumerate(rows, y + 1):
+        surface.text(3, row, line, C["bone"], C["ink"])
+    return y + 1 + len(rows)
 
 
-def _standing(surface: Surface, b: dict, x: int, width: int, height: int) -> int:
-    surface.text(x, 8, "STORES", C["gold"], C["ink"])
-    for y, good in enumerate(("grain", "copper", "tin"), 9):
-        values = b.get("store_history", {}).get(good, ())
-        value = b.get("stores", {}).get(good, 0)
-        delta = value - (values[-2] if len(values) > 1 else value)
-        line = f"{good:<7}{render.fmt_good(good, value)}"
-        surface.text(x, y, _fit(line, width), C["bone"], C["ink"])
-        mark = f"Δ{'+' if delta >= 0 else '−'}{render.fmt_good(good, abs(delta))}"
-        if width - len(mark) > len(line) + 1:
-            surface.text(x + width - len(mark), y, mark,
-                         C["dim"] if not delta else C["barley"] if delta > 0 else C["blood"],
-                         C["ink"])
-        series = b.get("store_history", {}).get(good, ())
-        if len(series) > 2 and width > 44:
-            surface.text(x + width - len(mark) - 9, y, sparkline(series, 8), C["faint"], C["ink"])
-    surface.text(x, 13, "STANDING", C["gold"], C["ink"])
-    surface.text(x, 14, _fit(f"king {render.standing(b.get('legitimacy', 0))}"
-                             f" · {b.get('legitimacy', 0)} of 1000", width), C["bone"], C["ink"])
-    surface.text(x, 15, _fit(f"city {render.temper(b.get('unrest', 0))}"
-                             f" · {b.get('unrest', 0)} of 1000", width), C["bone"], C["ink"])
-    groups = b.get("groups", ())
-    if not groups or height < 28:
-        return 18
-    # What the next fortnight already owes, and what underfeeding costs in work.
-    promised = sum(g.get("allocated", 0) for g in groups)
-    need = sum(g.get("size", 0) * g.get("entitlement", 0) for g in groups)
-    now = sum(g.get("labour_now", 0) for g in groups)
-    fed = sum(g.get("labour_if_fed", 0) for g in groups)
-    arrears = sum(g.get("arrears_qa", 0) for g in groups)
-    surface.text(x, 17, "RATIONS AND LABOUR", C["gold"], C["ink"])
-    # A number against an identical number tells the king nothing. Say the
-    # shortfall when there is one, and say it is met when there is not.
-    said = [(f"rations {need - promised:,} qa short of {need:,}" if promised < need
-             else f"rations paid in full · {need:,} qa",
-             "blood" if promised < need else "bone"),
-            (f"{fed - now:,} work days lost to hunger" if fed > now
-             else f"work in full · {fed:,} days", "blood" if fed > now else "bone")]
-    reserved, free = b.get("ration_reserved", 0), b.get("ration_grain_left", 0)
-    if reserved or free:
-        said.append((f"reserved {reserved:,} qa · unspent {free:,} qa", "clay"))
-    if arrears:
-        said.append((f"arrears {arrears:,} qa", "blood"))
-    season = b.get("works_season_name")
-    if season:
-        said.append((f"works: {season} · {b.get('works_rate', 0)} men-days a point", "dim"))
-    for offset, (line, tone) in enumerate(said[:max(0, height - 26)], 18):
-        surface.text(x, offset, _fit(line, width), C[tone], C["ink"])
-    return 25
-
-
-def _matters(surface: Surface, b: dict, x: int, width: int, height: int) -> None:
-    """Three matters, then what is unresolved, then what is on the road."""
-    surface.text(x, 8, "MATTERS BEFORE THE KING", C["gold"], C["ink"])
-    y = 9
-    # One row a matter, speaker first: the advice still comes out of a mouth,
-    # and the rows it saves go to what is actually still waiting.
-    for index, concern in enumerate(advice.concerns(b, 3), 1):
-        title = f'{concern.speaker}: {concern.title}'
-        for line in textwrap.wrap(f"[{index}] {title}", width, subsequent_indent="    ")[:2]:
-            surface.text(x, y, line, C["sky"], C["ink"])
-            surface.link(x, y, width, 1, f"concern:{index - 1}")
-            y += 1
-        if concern.id == 'grain':
-            for line in (textwrap.wrap(concern.reason, width)[:2]
-                         + textwrap.wrap('Trade: buy grain or request aid.', width)):
-                surface.text(x, y, line, C['sand'], C['ink'])
-                surface.link(x, y, width, 1, f'concern:{index - 1}')
-                y += 1
-    floor = height - 8
-    waiting_rows, motion_rows = waiting(b), _motion(b)
-    spare = max(0, floor - y - 4)
-    for_waiting = min(len(waiting_rows) or 1, max(1, spare - min(len(motion_rows) or 1, 3)))
+def _facts(surface: Surface, fs: list[dict], y: int, width: int, chosen: str) -> int:
+    """One line for each fact; a click or [e] asks why. Returns the first free row."""
+    surface.text(3, y, "WHERE THINGS STAND", C["gold"], C["ink"])
+    surface.text(3 + width - 9, y, "[↑↓] pick", C["dim"], C["ink"])
     y += 1
-    surface.text(x, y, "STILL WAITING", C["gold"], C["ink"])
-    if not waiting_rows:
-        surface.text(x, y + 1, "nothing is left hanging", C["ash"], C["ink"])
-    for offset, row in enumerate(waiting_rows[:for_waiting], 1):
-        surface.text(x, y + offset, _fit(row["say"], width), C["blood"], C["ink"])
-    y += 1 + max(1, min(for_waiting, len(waiting_rows))) + 1
+    for f in fs:
+        rows = textwrap.wrap(fact_line(f), width, subsequent_indent="   ")
+        tone = "blood" if f["urgency"] > 1 else "bone" if f["id"] == chosen else "clay"
+        for row, line in enumerate(rows, y):
+            surface.text(3, row, line, C[tone], C["ink"])
+        if f["id"] == chosen:
+            surface.text(1, y, ">", C["flame"], C["ink"])
+        surface.link(3, y, width, len(rows), "why:" + f["id"])
+        y += len(rows)
+    return y
+
+
+def _matters(surface: Surface, b: dict, y: int, width: int, floor: int) -> None:
+    """The matters the officers raise; a digit or a click opens each."""
     if y >= floor:
         return
-    surface.text(x, y, "IN MOTION", C["gold"], C["ink"])
-    if not motion_rows:
-        surface.text(x, y + 1, "nothing is on the road", C["ash"], C["ink"])
-    for offset, line in enumerate(motion_rows[:max(0, floor - y - 1)], 1):
-        surface.text(x, y + offset, _fit(line, width), C["sky"], C["ink"])
+    surface.text(3, y, "MATTERS BEFORE THE KING", C["gold"], C["ink"])
+    y += 1
+    for index, concern in enumerate(advice.concerns(b, 3), 1):
+        title = f"[{index}] {concern.speaker}: {concern.title}"
+        for line in textwrap.wrap(title, width, subsequent_indent="    ")[:2]:
+            if y >= floor:
+                return
+            surface.text(3, y, line, C["sky"], C["ink"])
+            surface.link(3, y, width, 1, f"concern:{index - 1}")
+            y += 1
+
+
+def _year(surface: Surface, b: dict, x: int, y: int, width: int) -> int:
+    """The year as one glyph a fortnight, and where it stands. Returns the first free row."""
+    calendar = b.get("calendar") or {}
+    surface.text(x, y, "THE YEAR", C["gold"], C["ink"])
+    for index, (glyph, colour, now) in enumerate(render.year_wheel(calendar)):
+        surface.put(x + index, y + 1, glyph, C["flame"] if now else C[colour], C["ink"])
+    says = textwrap.wrap(render.year_says(calendar, 2 * width - 5), width)
+    for row, line in enumerate(says, y + 2):
+        surface.text(x, row, line, C["clay"], C["ink"])
+    return y + 2 + len(says)
+
+
+def _pending(surface: Surface, b: dict, x: int, y: int, width: int, floor: int) -> None:
+    """What is unresolved, then what is on the road, whole rows as far as the room goes."""
+    blocks = (("STILL WAITING", [row["say"] for row in waiting(b)], "nothing is left hanging", "blood"),
+              ("IN MOTION", _motion(b), "nothing is on the road", "sky"))
+    for n, (head, rows, none, tone) in enumerate(blocks):
+        if y >= floor - 1:
+            return
+        surface.text(x, y, head, C["gold"], C["ink"])
+        room, lines = max(1, (floor - y - 1) // (2 - n)), []
+        for row in rows:
+            said = textwrap.wrap(row, width, max_lines=2, placeholder="…")
+            if len(lines) + len(said) <= room:
+                lines += said
+        for row, line in enumerate(lines or [_fit(rows[0], width) if rows else none], y + 1):
+            surface.text(x, row, line, C[tone] if rows else C["ash"], C["ink"])
+        y += 2 + max(1, len(lines))
 
 
 def _doors(surface: Surface, b: dict, height: int) -> None:
@@ -228,28 +212,35 @@ def _doors(surface: Surface, b: dict, height: int) -> None:
         surface.link(x, y, len(text), 1, key)
 
 
-def compose(b: dict, width: int = 84, height: int = 28,
-            hours_left: int | None = None, notice: str = "") -> InteractiveScreen:
+def compose(b: dict, width: int = 84, height: int = 28, hours_left: int | None = None,
+            notice: str = "", briefing: str | None = None, pick: str = "",
+            why: str = "") -> InteractiveScreen:
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     hours = b["attention"] if hours_left is None else max(0, hours_left)
     _header(surface, b, hours)
-    style.notice(surface, 3, 4, width - 6, notice)
+    style.notice(surface, 3, height - 2, width - 6, notice)
     if b.get("ended"):
         surface.text(3, 7, "THE ALU HAS FALLEN", C["blood"], C["ink"])
         surface.text(3, 9, _fit(b.get("end_reason", "the reign is ended"), width - 6),
                      C["bone"], C["ink"])
         style.footer(surface, (style.FooterAction("esc", "close"),))
         return surface.interactive()
-    _year(surface, b, width)
-    split = max(30, (width - 9) // 2)
-    for y in range(8, height - 7):
-        surface.put(split + 3, y, "│", C["faint"], C["ink"])
-    _standing(surface, b, 3, split - 1, height)
-    _matters(surface, b, split + 5, width - split - 8, height)
+    fs = facts(b)
+    text = why or (narrator.template(fs, []) if briefing is None else briefing)
+    top = _brief(surface, 2, "YABNINU SAYS WHY" if why else "YABNINU SAYS", text) + 1
+    if why:
+        style.keycap(surface, width - 14, 2, "esc", "close")
+    cols = max(50, (width - 9) // 2)
+    side, room, floor = cols + 6, max(20, width - cols - 9), height - 7
+    for y in range(top, floor):
+        surface.put(side - 2, y, "│", C["faint"], C["ink"])
+    _matters(surface, b, _facts(surface, fs, top, cols, picked(fs, pick)["id"]) + 1, cols, floor)
+    _pending(surface, b, side, _year(surface, b, side, top, room) + 1, room, floor)
     _doors(surface, b, height)
     style.footer(surface, (
         style.FooterAction("space", "end the fortnight", command="space"),
+        style.FooterAction("e", "why"),
         style.FooterAction("l", "report", command="home:report"),
         style.FooterAction("o", "orders", command="home:orders"),
-        style.FooterAction(":", "command"), style.FooterAction("?", "help")))
+        style.FooterAction("?", "help"), style.FooterAction(":", "command")))
     return surface.interactive()
