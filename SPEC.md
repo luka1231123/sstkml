@@ -324,16 +324,14 @@ not raw dictionaries or aliases for another view:
 #### 3.3.1 The Hall
 
 The Hall is the room the player lands in and the room they end the fortnight
-from. Three columns:
+from. Top to bottom:
 
-- **left** — the believed standing of what matters: grain, copper, tin, each
-  with its change since the last fortnight, each dated to the record it came
-  from;
-- **centre** — the doors, listed vertically, each with its access letter, its
-  mark (a plain placeholder is sufficient), and the count of matters flagged
-  in that room;
-- **right** — what is in motion: envoys and where they are believed to be, and
-  orders dispatched but not yet resolved.
+- **Yabninu says** — the briefing: last fortnight's result, the worst facts
+  with their causes, and what the king can do (`ai/narrator.py`);
+- **where things stand** — one line per fact that needs the king, marked `!!`
+  or `!`, then one calm line; `e` asks why;
+- **matters**, **the year**, **still waiting** and **in motion**;
+- **the doors**, each with its access letter and the count of matters behind it.
 
 Counts are the only alert. A door with nothing behind it shows nothing.
 

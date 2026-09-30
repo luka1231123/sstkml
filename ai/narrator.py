@@ -38,7 +38,7 @@ def _can(acts: list[str]) -> str:
 
 
 def template(facts: list[dict], receipts: list[str]) -> str:
-    top = facts[:3]
+    top = [f for f in facts[:3] if f["urgency"]] or facts[:3]
     out = [_cap("Last fortnight: " + receipts[0])] if receipts else []
     if top and not top[0]["urgency"]:
         out.append("Nothing is urgent.")

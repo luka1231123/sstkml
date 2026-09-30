@@ -21,7 +21,6 @@ DOORS = (
 BUILT = frozenset(target for _key, _label, target in DOORS)
 MARKS = {"stack": "▤", "alu": "▩", "trade": "◇", "stores": "▥",
          "muster": "⚑", "palace": "♚", "altar": "△", "world": "◉"}
-TREND = {"rising": "▲", "falling": "▼"}
 URGENT = {3: "!!", 2: "!"}
 
 
@@ -30,8 +29,12 @@ def _fit(text: str, width: int) -> str:
 
 
 def fact_line(f: dict) -> str:
-    """One fact: an urgency mark, what is so, and which way it moves."""
-    return f"{URGENT.get(f['urgency'], ''):<3}{f['say']} {TREND.get(f['trend'], '')}".rstrip()
+    return f"{URGENT.get(f['urgency'], ''):<3}{f['say']}".rstrip()
+
+
+def urgent(fs: list[dict]) -> list[dict]:
+    """The facts that get a line and a pick of their own; calm ones share one line."""
+    return [f for f in fs if f["urgency"]] or fs[:1]
 
 
 def picked(fs: list[dict], pick: str) -> dict:
@@ -142,7 +145,8 @@ def _facts(surface: Surface, fs: list[dict], y: int, width: int, chosen: str) ->
     surface.text(3, y, "WHERE THINGS STAND", C["gold"], C["ink"])
     surface.text(3 + width - 9, y, "[↑↓] pick", C["dim"], C["ink"])
     y += 1
-    for f in fs:
+    own = urgent(fs)
+    for f in own:
         rows = textwrap.wrap(fact_line(f), width, subsequent_indent="   ")
         tone = "blood" if f["urgency"] > 1 else "bone" if f["id"] == chosen else "clay"
         for row, line in enumerate(rows, y):
@@ -151,6 +155,10 @@ def _facts(surface: Surface, fs: list[dict], y: int, width: int, chosen: str) ->
             surface.text(1, y, ">", C["flame"], C["ink"])
         surface.link(3, y, width, len(rows), "why:" + f["id"])
         y += len(rows)
+    calm = "; ".join(f["say"] for f in fs if f not in own)
+    for line in textwrap.wrap("Calm: " + calm, width, max_lines=2, placeholder=" …") if calm else ():
+        surface.text(3, y, line, C["ash"], C["ink"])
+        y += 1
     return y
 
 

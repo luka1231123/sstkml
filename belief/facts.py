@@ -166,7 +166,8 @@ def _unrest(b: dict) -> dict:
     trend = _trend(b["meter_history"].get("unrest", []), 10)
     urgency = min(3, sum(level >= floor for floor in (150, 350, 600))
                   + (trend == "rising"))
-    return _fact("unrest", f"the city is {render.temper(level)}", trend, why,
+    rising = ", but unrest is rising" if trend == "rising" else ""
+    return _fact("unrest", f"the city is {render.temper(level)}{rising}", trend, why,
                  urgency, "the scribe", "reported", act, f"{level} of 1000")
 
 

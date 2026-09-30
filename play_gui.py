@@ -5351,8 +5351,9 @@ class Game:
                 self.ask_why(command[4:])
             elif key in {"Up", "Down"}:
                 fs = court_facts(b)
-                here = fs.index(hall.picked(fs, self.hall_pick))
-                self.hall_pick = fs[(here + (1 if key == "Down" else -1)) % len(fs)]["id"]
+                own = hall.urgent(fs)
+                here = own.index(hall.picked(own, self.hall_pick))
+                self.hall_pick = own[(here + (1 if key == "Down" else -1)) % len(own)]["id"]
                 self.why_open = False
             elif key == "Escape" and self.why_open:
                 self.why_open = False

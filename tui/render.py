@@ -100,24 +100,6 @@ def reply_effect(letter: dict) -> str:
     return 'Reply ends the unanswered wait. Only reviewed terms move goods or create commitments.'
 
 
-def granary_line(b: dict) -> str:
-    """How long the grain lasts, and whether that number is getting better.
-
-    A level tells the king where he stands; the direction tells him whether he
-    must act this fortnight or may spend it on something else. Both, or the
-    room has told him nothing he can use.
-    """
-    kept = fortnights_fed(b)
-    if kept is None:
-        return ""
-    said = ("not one whole fortnight" if kept == 0 else
-            "one fortnight" if kept == 1 else f"{kept} fortnights")
-    series = b.get("store_history", {}).get("grain", ())
-    if len(series) < 2 or series[-1] == series[-2]:
-        return f"{said} fed"
-    return f"{said} fed, {'rising' if series[-1] > series[-2] else 'falling'}"
-
-
 def temper(unrest: int) -> str:
     """Unrest as the court would say it. 0..1000 is not a sentence."""
     return ("quiet" if unrest < 150 else "grumbling" if unrest < 350
