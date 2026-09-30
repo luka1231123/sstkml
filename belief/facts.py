@@ -25,6 +25,11 @@ def _about(n: int) -> int:
     return round(n, 2 - len(str(n))) if n > 99 else n
 
 
+def _amt(good: str, n: int) -> str:
+    text = render.fmt_good(good, n)
+    return text if n == 1 or text.endswith("qa") or text[-1].isdigit() else text + "s"
+
+
 def _s(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
@@ -77,7 +82,7 @@ def _moved(b: dict, good: str, rate: int = 0) -> list[str]:
             out.append(f"{_s(len(b['groups']), 'group')} eat from the stores")
             continue
         size = (("a little" if qty < rate else f"about {_s(qty // rate, 'fortnight')} of grain")
-                if rate else f"about {render.fmt_good(good, _about(qty))}")
+                if rate else f"about {_amt(good, _about(qty))}")
         out.append(f"{f['cause']} {'added' if f['qty'] > 0 else 'took'} {size}")
     return out
 
@@ -219,7 +224,7 @@ def _metal(b: dict, good: str) -> dict:
     urgency = (0 if lasts is None else 3 if lasts <= 2 else 2 if lasts <= 6
                else 1 if lasts <= 12 else 0)
     say = (f"no {good} is left" if not stock else
-           f"{good} stands at about {render.fmt_good(good, _about(stock))}"
+           f"{good} stands at about {_amt(good, _about(stock))}"
            if lasts is None else f"{good} lasts {_lasts(lasts)} at this pace")
     return _fact(good, say, _trend([stock - net, stock]), _moved(b, good), urgency,
                  "the scribe", "counted",
@@ -248,7 +253,7 @@ def _debt(b: dict) -> list:
     if not d:
         return []
     who, left = _name(d["creditor"]), d["due_turn"] - b["turn"]
-    return [_fact("debt", f"about {render.fmt_good(d['good'], _about(d['owed']))} is owed to {who}, due {_in(left)}",
+    return [_fact("debt", f"about {_amt(d['good'], _about(d['owed']))} is owed to {who}, due {_in(left)}",
                   why=[f"if it is unpaid, {who} sends raiders and thinks far less of the king"],
                   urgency=3 if left <= 2 else 1, act=[f"pay {who} in Scribes [s]"],
                   exact=render.fmt_good(d["good"], d["owed"]))]
@@ -273,7 +278,7 @@ def _plague(b: dict) -> list:
         return []
     dead, shut = p["burials_at_seat"], ", ".join(_place(b, x) for x in p["quarantined"])
     return [_fact("plague", "sickness is in the city" + (f", and about {_about(dead):,} are buried" if dead else ""),
-                  why=[f"the roads to {shut} are closed" if shut else "no road or harbour is closed"], urgency=2,
+                  why=[f"the roads to {shut} are closed" if shut else "roads and harbours are still open"], urgency=2,
                   source="the physician", sure="reported",
                   act=[] if shut else ["close a road or harbour in World [w]"], exact=f"{dead:,} buried")]
 

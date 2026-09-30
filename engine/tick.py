@@ -228,7 +228,7 @@ _FLOWS = 3                         # movements kept per good
 # Plain word for a transfer reason. Direction is the sign of the quantity.
 _CAUSE = {
     "authored": "dues and gifts", "harvested": "harvest", "produced": "output",
-    "spoiled": "spoilage", "consumed": "spending", "expended": "spending",
+    "spoiled": "spoilage", "consumed": "daily use", "expended": "daily use",
     "sown": "sowing", "lost": "losses", "levied": "dues", "gifted": "gifts",
     "sold": "trade", "paid": "trade", "delivered": "trade", "loaded": "trade",
     "unloaded": "trade", "carried": "trade",
