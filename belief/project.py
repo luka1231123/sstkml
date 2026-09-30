@@ -1218,6 +1218,14 @@ def _forecast_basis(world, land: dict, institutions: list[dict],
     }
 
 
+def _sea_turns(world) -> int:
+    """Fortnights until the sailing season next turns; 0 if it never does."""
+    fn = world.date.fortnight
+    now = sea_open(world.season, fn)
+    return next((n for n in range(1, 25)
+                 if sea_open(world.season, (fn - 1 + n) % 24 + 1) != now), 0)
+
+
 def project(world) -> dict:
     from engine import fall
     c = world.court
@@ -1421,6 +1429,7 @@ def project(world) -> dict:
         "attention": attention_available(c, d.fortnight),
         "attention_base": c.attention_base,
         "sea_open": sea_open(world.season, d.fortnight),
+        "sea_turns": _sea_turns(world),
         "stack": stack,
         "correspondence_archive": correspondence_archive,
         "outbox": outbox,
