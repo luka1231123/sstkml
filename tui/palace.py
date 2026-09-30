@@ -825,7 +825,7 @@ def compose(b: dict, view: str = "people", selected: str = "",
                      "advisers": "house", "offices": "post"}.get(listing, listing)
 
     title = "THE PALACE — RELATIONS" if view == "relations" else "THE PALACE"
-    note = "↑↓ choose   Enter open   Tab view   [c] counsel"
+    note = "↑↓ choose   Enter open   Tab view   [c] ask"
     if choosing == "post":
         named = next((p["name"] for p in _people(b) if p["id"] == person), "")
         title = f"THE PALACE — A POST FOR {named.upper()}"

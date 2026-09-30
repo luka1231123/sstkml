@@ -5132,7 +5132,6 @@ class Game:
         concern = matters[index]
         if concern.destination == "counsel":
             self.counsel_typed = concern.order_prompt
-            self.counsel_typing = bool(concern.order_prompt)
             self.open_counsel()
             return
         if concern.destination == "oaths":
@@ -5140,6 +5139,10 @@ class Game:
             return
         if concern.destination == "plague":
             self.open_plague()
+            return
+        if concern.destination == "court":
+            self.home_view, self.home_scroll = "court", 0
+            self.repaint()
             return
         if concern.destination == "orders":
             self.open_orders()
@@ -5186,7 +5189,7 @@ class Game:
             self.home_view = command.split(":")[1]
             self.home_scroll = 0
         elif command == "home:help" or char == "?":
-            self.open_help()
+            self.open_counsel()
         elif view == "hall" and (char == "o" or command == "home:orders"):
             self.open_orders()
             return True
@@ -5218,7 +5221,7 @@ class Game:
             else:
                 return False
         elif key in {"Tab", "ISO_Left_Tab"}:
-            self.home_view, self.home_scroll = "hall", 0
+            self.home_view, self.home_scroll = ("court" if view == "hall" else "hall"), 0
         elif view == "report" and key == "Escape":
             self.home_view, self.home_scroll = "hall", 0
         elif key in {"Up", "Down", "Prior", "Next", "Home", "End"}:

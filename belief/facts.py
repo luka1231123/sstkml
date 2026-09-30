@@ -188,7 +188,7 @@ def _unrest(b: dict) -> dict:
         act.append("pay the arrears in Storehouse [t]")
     if late:
         why.append(f"{_s(len(late), 'judgement')} left waiting too long")
-        act.append("hear the judgements in Palace [j]")
+        act.append("hear the judgements in Court [tab]")
     if b["revenue"]["land_rate"] > b["revenue"]["land_base"]:
         why.append("the land due is above custom")
         act.append("lower the land due in Storehouse [t]")

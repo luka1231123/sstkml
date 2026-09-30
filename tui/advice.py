@@ -164,7 +164,7 @@ def _petitions(b: dict) -> Concern | None:
         "justice", min(9, 3 + waiting), f"{len(petitions)} judgement{'s' if len(petitions) != 1 else ''} wait".replace("1 judgement wait", "1 judgement waits"),
         f"The oldest case has stood for {waiting} fortnights.",
         "hear the oldest claim, or give judgement on what is known.",
-        "palace", speaker=SCRIBE,
+        "court", speaker=SCRIBE,
         basis="he keeps the docket and reads the waiting off it")
 
 

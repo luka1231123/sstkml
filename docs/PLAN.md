@@ -1,6 +1,6 @@
 # Plan: tell the engine in words
 
-- Status: current execution plan. Approved 2026-09-29.
+- Status: Do now 1–5 and Do later 1–2 built 2026-09-29 on branch `words-first`. Owner playtest pending.
 - Written: 2026-09-29
 
 ## Problem
@@ -70,7 +70,7 @@ A failed guard gives the template lines. If the prose is weak, try `STTKML_MODEL
 4. **Why** key on any meter or matter. It speaks the fact's `why` list.
 5. **Ask** window: one chat for "how do I" and "what should I do". It merges `ai/counsel.py` and `ai/help_agent.py` over the same Facts.
 
-## Do now
+## Do now (built; playtest pending)
 
 1. **Decide.** Done 2026-09-29: plan approved, pending work committed, SPEC 3.4
    rewritten, old plan docs deleted.
@@ -90,8 +90,8 @@ A failed guard gives the template lines. If the prose is weak, try `STTKML_MODEL
 
 ## Do later
 
-1. Facts for trade, letters and foreign courts, with `sure` spoken ("the merchant claims").
-2. Facts for plague, troops and works.
+1. Done: facts for trade, letters and foreign courts, with `sure` spoken.
+2. Done: facts for plague, troops and works.
 3. A narrated World map: one line for each place the court knows about.
 4. Delete every number panel that words have replaced. Do not keep both.
 5. Balance only after the owner can read the game.
