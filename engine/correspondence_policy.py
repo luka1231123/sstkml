@@ -153,7 +153,7 @@ def _reckon(belief: Belief, home: str, good: str, wanted: int, due: int,
         counted=True, basis=tuple(sorted(claim.id for claim in read)))
 
 
-def _times_asked(belief: Belief, good: str) -> tuple[int, tuple[str, ...]]:
+def _times_asked(belief: Belief, good: str, turn: int) -> tuple[int, tuple[str, ...]]:
     """On how many separate days this court has been asked for this good.
 
     A delivered request leaves claims dated to the day the sender sealed the
@@ -163,12 +163,13 @@ def _times_asked(belief: Belief, good: str) -> tuple[int, tuple[str, ...]]:
     asking, which is what they were.
     """
     held = tuple(claim for claim in belief.claims
-                 if claim.attribute == f"request_good:{good}")
+                 if claim.attribute == f"request_good:{good}"
+                 and claim.age(turn) < 24)
     days = {claim.observed_turn for claim in held}
     return len(days), tuple(sorted(claim.id for claim in held))
 
 
-def _shortage(belief: Belief) -> tuple[int, str, tuple[str, ...]]:
+def _shortage(belief: Belief, turn: int) -> tuple[int, str, tuple[str, ...]]:
     """What this court believes the sender is short of, and from which claim.
 
     Only a tablet can teach a court that somebody far off is short of grain, and
@@ -177,7 +178,8 @@ def _shortage(belief: Belief) -> tuple[int, str, tuple[str, ...]]:
     marked as interested: it is the sender's own account of his want.
     """
     claimed = tuple(claim for claim in belief.claims
-                    if claim.attribute.startswith("short:"))
+                    if claim.attribute.startswith("short:")
+                    and claim.age(turn) < 24)
     if not claimed:
         return 0, "", ()
     worst = max(claimed, key=lambda claim: (claim.value, claim.id))
@@ -234,7 +236,7 @@ def _answer_goods(belief: Belief, home: str, case: CorrespondenceCase,
     if not offers:
         asked, asked_ids = 0, ()
         for one in reckoned:
-            times, ids = _times_asked(belief, one.good)
+            times, ids = _times_asked(belief, one.good, turn)
             asked = max(asked, times)
             asked_ids += ids
         if asked >= SILENCE_AFTER:
@@ -299,7 +301,7 @@ def _answer_proposal(belief: Belief, case: CorrespondenceCase, turn: int,
             "delay", delay_until=case.received_turn + PROPOSAL_DELAY,
             basis=basis,
             reason="the household has not finished talking about the match")
-    want, good, cited = _shortage(belief)
+    want, good, cited = _shortage(belief, turn)
     if want > 0:
         return Decision(
             "refuse", basis=basis + cited,
@@ -405,7 +407,7 @@ def step(world: World) -> tuple[World, list]:
     from engine import foreign_belief, letter_terms, mail
 
     now = world.date.absolute
-    events: list = []
+    world, events = letter_terms.step_promises(world)
     cases = list(world.correspondence)
     for index, case in enumerate(cases):
         if not case.open() or case.delay_until > now:

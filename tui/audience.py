@@ -37,9 +37,39 @@ def _who(b, actor, width):
 def content(b, item, width):
     if item["kind"] == "case":
         case = item["case"]
-        rows = palace._evidence_lines(b, case, width)
-        end = next(i for i, (text, _) in enumerate(rows) if text.startswith("STAKES"))
-        return case["kind"].capitalize(), rows[:end]
+        rows = []
+        claim_text, counter_text = case["claim_text"], case["counter_text"]
+        if case["id"].startswith("court:payroll:"):
+            amount = int(case.get("claim", {}).get("amount", 0))
+            claim_text = (f"The filed claim asks for {amount:,} qa of unpaid rations. "
+                          "An award clears debt; surplus grain stays with the households.")
+            counter_text = ("Refuse, or pay half. A judgement leaves the standing "
+                            "ration allowance unchanged.")
+        for actor, said, tone, label in (
+                (case["petitioner"], claim_text, "barley", "CLAIM"),
+                (case["against"], counter_text, "wine", "RESPONSE")):
+            name = render.actor_name(actor, b.get("house"))
+            rows.append((f"{label} · {name}", tone))
+            if said.startswith(name + " says "):
+                said = said[len(name) + 6:]
+                said = said[:1].upper() + said[1:]
+            rows.extend((row, "clay") for row in textwrap.wrap(
+                said or "No testimony recorded.", width, max_lines=3, placeholder=" …"))
+        if case.get("beneficiary", case["petitioner"]) != case["petitioner"]:
+            rows.append((f"Grain joins {case['beneficiary_name']} reserves.", "sand"))
+        waited, grace = case["waiting"], case["grace"]
+        delay = (f"Delay adds {case['waiting_unrest']} anger each fortnight"
+                 if waited >= grace else f"{max(0, grace - waited)} fortnights before delay adds anger")
+        cap = case.get("waiting_penalty_cap")
+        if cap is not None and waited >= grace + cap:
+            delay = "Waiting penalty has reached its cap; the claim remains open."
+        elif cap is not None:
+            delay += f" · capped after {cap} charges"
+        if not case.get("waiting_unrest"):
+            delay = "This claim has no delay penalty."
+        rows.append((delay, "sand"))
+        rows.append((f"Available: {b.get('stores', {}).get(case['good'], 0):,} {case['good']} · [enter/v] testimony", "dim"))
+        return case["kind"].replace("_", " ").capitalize(), rows
     if item["kind"] == "letter":
         letter = item["letter"]
         who = _who(b, letter["sender"], width)
@@ -67,6 +97,8 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
     surface.text(width - 10, 2, "? Help", C["sky"], C["ink"])
     surface.link(width - 10, 2, 7, 1, "home:help")
     line(2, f"{b.get('date', '')} · {hours} hours", "dim")
+    surface.text(width - 23, 2, "F2 Reign", C["sky"], C["ink"])
+    surface.link(width - 23, 2, 8, 1, "home:reign")
     if view == "report":
         rows = [r for p in report for r in (textwrap.wrap(p, width - 6) or [""])]
         room = height - 12
@@ -94,10 +126,11 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
                 line(height - 6, "↑↓ scroll to read more", "dim")
             actions = []
             if item["kind"] == "case":
+                line(height - 8, "Each award spends stores and changes city anger.", "dim")
                 for key, verdict, _ in palace.VERDICTS:
                     outcome = item["case"]["outcomes"][verdict]
-                    label = {"for": "pay claim", "against": "pay counterclaim", "split": "split"}[verdict]
-                    label += f" · {outcome['amount']:,} {outcome['good']} · unrest {outcome['unrest']:+} · 1 hour"
+                    label = {"for": "Grant", "against": "Refuse" if not outcome["amount"] else "Counter-offer", "split": "Compromise"}[verdict]
+                    label += f" · {outcome['amount']:,} {outcome['good']} · anger {outcome['unrest']:+} · 1h"
                     style.footer(surface, [style.FooterAction(key, label, command="home:verdict:" + verdict,
                         enabled=hours >= 1 and outcome["affordable"])],
                         x=3, y=height - 7 + len(actions), width=width - 6)
@@ -121,8 +154,26 @@ def compose(b, width=84, height=28, *, hours=0, view="court", selected="",
             if deferred:
                 line(12, f"[R] Recall {len(deferred)} deferred matters", "sky")
                 surface.link(3, 12, width - 6, 1, "home:recall")
-        style.footer(surface, [style.FooterAction("←→", "audience"),
+        style.footer(surface, [style.FooterAction("tab", "Hall", command="home:hall"),
+            style.FooterAction("←→", "next"),
             style.FooterAction("d", "defer", command="home:defer", enabled=bool(item)),
-            style.FooterAction("tab", "leave court", command="home:hall")], x=3, y=height - 2, width=width - 6)
+            style.FooterAction("v", "details", command="home:evidence", enabled=bool(item)),
+            style.FooterAction("F3", "aims", command="home:charter")], x=3, y=height - 2, width=width - 6)
     style.notice(surface, 3, height - 3, width - 6, notice)
     return surface.interactive()
+
+
+def evidence(b, item, width=76, height=30, scroll=0):
+    s = Surface(width, height)
+    style.panel(s, 0, 0, width, height, title='THE FULL TESTIMONY', drop=False)
+    if item['kind'] == 'case':
+        rows = palace._evidence_lines(b, item['case'], width - 6)
+    else:
+        _, rows = content(b, item, width - 6)
+    room = height - 7
+    start = max(0, min(scroll, max(0, len(rows) - room)))
+    for y, (row, tone) in enumerate(rows[start:start + room], 3):
+        s.text(3, y, row[:width - 6], C[tone], C['ink'])
+    s.text(3, height - 4, f'Testimony {start + 1}–{min(len(rows), start + room)} of {len(rows)} · reading is free', C['dim'], C['ink'])
+    style.footer(s, [style.FooterAction('↑↓', 'scroll'), style.FooterAction('esc', 'return to court')])
+    return s.interactive()

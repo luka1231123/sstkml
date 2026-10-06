@@ -124,17 +124,18 @@ def _header(surface: Surface, b: dict, hours: int) -> None:
     width = surface.width
     title = f" {render.actor_name(b['actor'], b.get('house')).upper()} OF {b['scenario'].upper()}"
     style.bar(surface, 0, 0, width, title, fg=C["bone"], bg=C["lapis"])
-    when = f"{b['date']} · fortnight {b.get('fortnight', 0)} of 24"
+    when = (f"{b['date']} of 24" if "fortnight" in b["date"]
+            else f"{b['date']} · fortnight {b.get('fortnight', 0)} of 24")
     surface.text(max(3, width - 2 - len(when)), 0, when, C["sky"], C["lapis"])
     surface.text(3, 1, f"{hours} of {b['attention_base']} hours remain", C["clay"], C["ink"])
     sea = "the sea is open" if b.get("sea_open") else "the sea is shut"
     surface.text(width - 3 - len(sea), 1, sea, C["sky"], C["ink"])
 
 
-def _brief(surface: Surface, y: int, head: str, text: str) -> int:
+def _brief(surface: Surface, y: int, head: str, text: str, *, limit=3) -> int:
     """The scribe's words as a paragraph. Returns the first free row."""
     surface.text(3, y, head, C["gold"], C["ink"])
-    rows = textwrap.wrap(text, surface.width - 6, max_lines=6, placeholder=" …")
+    rows = textwrap.wrap(text, surface.width - 6, max_lines=limit, placeholder=" …")
     for row, line in enumerate(rows, y + 1):
         surface.text(3, row, line, C["bone"], C["ink"])
     return y + 1 + len(rows)
@@ -145,7 +146,7 @@ def _facts(surface: Surface, fs: list[dict], y: int, width: int, chosen: str) ->
     surface.text(3, y, "WHERE THINGS STAND", C["gold"], C["ink"])
     surface.text(3 + width - 9, y, "[↑↓] pick", C["dim"], C["ink"])
     y += 1
-    own = urgent(fs)
+    own = urgent(fs)[:3]
     for f in own:
         rows = textwrap.wrap(fact_line(f), width, subsequent_indent="   ")
         tone = "blood" if f["urgency"] > 1 else "bone" if f["id"] == chosen else "clay"
@@ -155,7 +156,7 @@ def _facts(surface: Surface, fs: list[dict], y: int, width: int, chosen: str) ->
             surface.text(1, y, ">", C["flame"], C["ink"])
         surface.link(3, y, width, len(rows), "why:" + f["id"])
         y += len(rows)
-    calm = "; ".join(f["say"] for f in fs if f not in own)
+    calm = "; ".join(f["say"] for f in fs if not f["urgency"])
     for line in textwrap.wrap("Calm: " + calm, width, max_lines=2, placeholder=" …") if calm else ():
         surface.text(3, y, line, C["ash"], C["ink"])
         y += 1
@@ -192,7 +193,7 @@ def _year(surface: Surface, b: dict, x: int, y: int, width: int) -> int:
 
 def _pending(surface: Surface, b: dict, x: int, y: int, width: int, floor: int) -> None:
     """What is unresolved, then what is on the road, whole rows as far as the room goes."""
-    blocks = (("STILL WAITING", [row["say"] for row in waiting(b)], "nothing is left hanging", "blood"),
+    blocks = (("STILL WAITING", [row["say"] for row in waiting(b)], "no matter waits", "blood"),
               ("IN MOTION", _motion(b), "nothing is on the road", "sky"))
     for n, (head, rows, none, tone) in enumerate(blocks):
         if y >= floor - 1:
@@ -227,6 +228,8 @@ def compose(b: dict, width: int = 84, height: int = 28, hours_left: int | None =
     hours = b["attention"] if hours_left is None else max(0, hours_left)
     _header(surface, b, hours)
     style.notice(surface, 3, height - 2, width - 6, notice)
+    surface.text(width // 2 - 5, 1, "[F2] Reign", C["sky"], C["ink"])
+    surface.link(width // 2 - 5, 1, 10, 1, "home:reign")
     if b.get("ended"):
         surface.text(3, 7, "THE ALU HAS FALLEN", C["blood"], C["ink"])
         surface.text(3, 9, _fit(b.get("end_reason", "the reign is ended"), width - 6),
@@ -235,7 +238,7 @@ def compose(b: dict, width: int = 84, height: int = 28, hours_left: int | None =
         return surface.interactive()
     fs = facts(b)
     text = why or (narrator.template(fs, []) if briefing is None else briefing)
-    top = _brief(surface, 2, "YABNINU SAYS WHY" if why else "YABNINU SAYS", text) + 1
+    top = _brief(surface, 2, "THE SCRIBE EXPLAINS" if why else "THE PALACE SCRIBE", text, limit=6 if why else 3) + 1
     if why:
         style.keycap(surface, width - 14, 2, "esc", "close")
     cols = max(50, (width - 9) // 2)
@@ -246,10 +249,10 @@ def compose(b: dict, width: int = 84, height: int = 28, hours_left: int | None =
     _pending(surface, b, side, _year(surface, b, side, top, room) + 1, room, floor)
     _doors(surface, b, height)
     style.footer(surface, (
-        style.FooterAction("space", "end the fortnight", command="space"),
+        style.FooterAction("space", "end", command="space"),
         style.FooterAction("tab", "court", command="home:court"),
-        style.FooterAction("e", "why"),
+        style.FooterAction("F3", "aims", command="home:charter"),
         style.FooterAction("l", "report", command="home:report"),
-        style.FooterAction("o", "orders", command="home:orders"),
-        style.FooterAction("?", "ask"), style.FooterAction(":", "command")))
+        style.FooterAction("enter", "act", command="home:act"),
+        style.FooterAction("?", "help")))
     return surface.interactive()

@@ -13,9 +13,9 @@ module, and every prompt field passes `ai.client.safe_fields` on the way in.
 
 On scheduling (8.7): thirty letters generated synchronously would cost minutes
 of a turn nobody asked to spend. Instead a background worker fills bodies in
-Stack order, top item first, capped per turn. The lightweight local model is
-the normal voice; the authored template is runtime recovery while a voice is
-not ready or a guarded request fails. None of this can affect replay: text
+Stack order, top item first, capped per turn. Ordinary reports use short authored text so every reported quantity remains
+visible. Decision replies can use the local voice, with authored recovery
+while it is not ready or a guarded request fails. None of this can affect replay: text
 never enters World.
 """
 from __future__ import annotations
@@ -66,12 +66,12 @@ def _tone_pressure(item: dict) -> str:
             "close to saying so.")
     esteem = item.get("sender_esteem", "formal")
     lines.append({
-        "honoured": "You are warm, and you expect warmth returned.",
-        "warm": "You are on good terms and the letter should feel it.",
-        "formal": "Relations are correct and no more than correct.",
-        "displeased": "You are displeased, and it shows through the courtesies.",
-        "hostile": "Relations are bad. The forms are kept and nothing else is.",
-    }.get(esteem, "Relations are correct and no more than correct."))
+        "honoured": "Relations are close. Use the customary greeting.",
+        "warm": "Relations are friendly. Keep the request direct.",
+        "formal": "Relations are formal. State the matter.",
+        "displeased": "You are displeased. State the unmet request.",
+        "hostile": "Relations are hostile. Keep the address and state the demand.",
+    }.get(esteem, "Relations are formal. State the matter."))
     return "\n".join(lines)
 
 
@@ -104,6 +104,18 @@ def _fact_lines(item: dict) -> str:
                      for key, value in sorted(facts.items()))
 
 
+def court_address(item: dict, text: str) -> str:
+    title = item.get("recipient_title", "")
+    if title:
+        # Address only: a later reference to another court keeps its meaning.
+        first, separator, rest = text.partition("\n")
+        first = first.replace("king of Ugarit", str(title))
+        if item.get("recipient_name"):
+            first = first.replace("To Ammurapi", "To " + str(item["recipient_name"]))
+        return first + separator + rest
+    return text
+
+
 def build_prompt(item: dict) -> list[dict]:
     """Assemble the Voicer prompt from a Belief stack item. Every field is run
     through `safe_fields`, so this raises rather than leaks."""
@@ -127,7 +139,7 @@ def build_prompt(item: dict) -> list[dict]:
         f"TEMPER: {fields['temper']}\n"
         f"TONE: {fields['tone']}\n"
         f"{fields['pressure']}\n"
-        f"YOU ADDRESS HIM AS: {fields['address']}\n"
+        f"YOU ADDRESS HIM AS: {court_address(item, fields['address'])}\n"
         f"WHAT YOU WANT: {fields['wants']}\n"
         f"WRITE: {fields['min_lines']} to {fields['max_lines']} lines. "
         "Output the letter only.\n"
@@ -137,21 +149,28 @@ def build_prompt(item: dict) -> list[dict]:
     return [
         {"role": "system", "content":
          "You are writing a Late Bronze Age diplomatic letter on clay. Write "
-         "the letter only -- no title, no commentary, no signature block. Use "
-         "no number that was not given to you. /no_think"},
+         "the letter only -- no title, no commentary, no signature block. "
+         "Keep it brief. State the report or demand once. Omit filler about fairness, "
+         "shared knowledge, or having goods for sale when the offer already says so. Use "
+         "no number that was not given to you. Use short direct sentences. "
+         "Keep conventional addresses, but add no metaphor, scenic detail, "
+         "moral lesson, or repeated plea. State the matter and the request. /no_think"},
         {"role": "user", "content": prompt},
     ]
 
 
 def fallback_body(item: dict) -> str:
-    """The authored emergency reading when the required local voice fails."""
+    """The short authored report, or a decision-grounded reply recovery."""
     from ai import replier
     if replier.is_reply(item):
         # A foreign court's answer has no authored template and must not get
         # one: its words are built from the decision the engine wrote.
         return replier.recovery_text(item)
     from tui import render
-    return render.letter_body(item["sender"], item["topic"], item.get("facts", {}))
+    facts = dict(item.get("facts", {}))
+    if item.get("sender_name"):
+        facts["sender"] = item["sender_name"]
+    return court_address(item, render.letter_body(item["sender"], item["topic"], facts))
 
 
 def voice(item: dict, seed: int, turn: int, client=None) -> tuple[str, str]:
@@ -227,7 +246,8 @@ class Voicer:
         # projects them as `body`, and asking a model again would be the one
         # thing spec 2.6 forbids.
         pending = [it for it in items
-                   if it["id"] not in self._bodies
+                   if it.get("read") and it.get("topic") not in _LETTERS
+                   and it["id"] not in self._bodies
                    and not str(it.get("body") or "").strip()]
         self.skipped = max(0, len(pending) - self.cap)
         batch = pending[:self.cap]
@@ -265,6 +285,8 @@ class Voicer:
         stored = str(item.get("body") or "").strip()
         if stored:
             return stored, "stored"
+        if item.get("read") and item.get("topic") in _LETTERS:
+            return fallback_body(item), "authored"
         with self._lock:
             ready = self._bodies.get(item["id"])
         if ready is not None:

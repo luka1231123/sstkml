@@ -165,6 +165,7 @@ class LetterObligation:
     due_turn: int
     status: str = "promised"
     history: tuple[str, ...] = ()
+    rendered: int = 0         # goods that reached the beneficiary, not dispatched
 
 
 @dataclasses.dataclass(frozen=True)

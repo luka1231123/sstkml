@@ -121,7 +121,7 @@ def _grain(b: dict) -> dict:
     act = []
     if gap and rate:
         trade = b["trade"]
-        quay = sum(c["available"] for c in trade["cargo"] if c["good"] == "grain")
+        quay = sum(c["available"] for c in trade["cargo"] if c["good"] == "grain" and c.get("for_sale", False))
         buy = (min(quay, stores.get("copper", 0) * 1000 // trade["grain_price"])
                if trade["grain_price"] else 0)
         if buy:
@@ -339,13 +339,13 @@ def _quay(b: dict) -> list:
     tr, (rate, _, _, gap) = b["trade"], _cover(b)
     if not (rate and tr["grain_price"]):
         return []
-    stock = sum(c["available"] for c in tr["cargo"] if c["good"] == "grain")
+    stock = sum(c["available"] for c in tr["cargo"] if c["good"] == "grain" and c.get("for_sale", False))
     buy = min(stock, b["stores"].get("copper", 0) * 1000 // tr["grain_price"]) // rate
     ships = [m["remaining"] for m in tr["movements"] if m["cargo"] and m["destination"] == b["seat"]]
     return [_fact("quay", f"your copper buys {_lasts(buy)} of grain from local merchants" if stock
-                  else "the quay has no grain for sale",
-                  why=[f"a ship with cargo arrives {_in(min(ships, default=0))}"] * bool(ships),
-                  urgency=2 if gap and buy < gap else 0, source="the harbour master's roll",
+                  else "local merchants have no grain for sale",
+                  why=[f"cargo arrives {_in(min(ships, default=0))}"] * bool(ships),
+                  urgency=2 if gap and buy < gap else 0, source="the trade roll",
                   act=["buy grain in Trade [x]"] * bool(stock), exact=render.fmt_good("grain", stock))]
 
 

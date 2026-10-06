@@ -28,4 +28,6 @@ Judgements are no longer heard in the Palace. The Palace holds people, offices,
 the house and foreign courts; Court hears the claims.
 
 Every control is printed the same way: `[esc]`, `[enter]`, `[tab]`, `[space]`
-and lower-case letters. Current saves remain version 29.
+and lower-case letters. Current saves use version 30.
+
+The Reign window (F2) chooses Ugarit, Byblos, Tyre, Carchemish or Alashiya. In Trade, K appoints a standing grain purchase mandate with a reserve target and spending cap. Purchases need a granary keeper, copper and merchant grain actually offered at your seat. Watch the fortnight report for his receipt. Shrine obligations list promises, their remaining quantities, and aid loans; gifts of the owed good repay those loans, including defaults. Local recurring claims follow the actual state of household reserves and unpaid rations, and withdraw when that cause resolves.

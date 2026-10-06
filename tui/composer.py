@@ -15,7 +15,7 @@ import re
 import textwrap
 
 from ai.composer import Draft, fallback_text, raw_draft
-from ai.grader import formula, grade_for, load_formulae, profile_for
+from ai.grader import court_context, formula, grade_for, load_formulae, profile_for
 from tui import render, style
 from tui.grid import INDEX, Screen, Surface
 
@@ -70,9 +70,9 @@ class BlockChoice:
     text: str
 
 
-def formulary(recipient: str, intent: str, seed: int, turn: int) -> Draft:
+def formulary(recipient: str, intent: str, seed: int, turn: int, context: dict | None = None) -> Draft:
     """Compact deterministic recovery for non-desk callers."""
-    profile_id = profile_for(recipient)
+    profile_id = profile_for(recipient, context=context)
     text = fallback_text(recipient, intent, profile_id, seed, turn)
     return Draft(
         text=text, profile=profile_id,
@@ -80,12 +80,12 @@ def formulary(recipient: str, intent: str, seed: int, turn: int) -> Draft:
         source="formulary")
 
 
-def dictated(text: str, recipient: str) -> Draft:
+def dictated(text: str, recipient: str, context: dict | None = None) -> Draft:
     """The king's exact words, read against the recipient's known forms."""
-    return raw_draft(text, recipient)
+    return raw_draft(text, recipient, context)
 
 
-def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
+def block_choices(recipient: str, context: dict | None = None) -> dict[str, tuple[BlockChoice, ...]]:
     """Return the pieces available at the desk for this recipient.
 
     The court form is the protocol-safe default.  The other forms are real
@@ -93,7 +93,7 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
     omission, and an unsealed ending can all change how a tablet is received.
     """
     data = load_formulae()
-    profile_id = profile_for(recipient, data)
+    profile_id = profile_for(recipient, data, context)
     rule = formula(data, profile_id)
     name = render.actor_name(recipient)
     proper = rule["opening"].format(recipient=name)
@@ -104,7 +104,7 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
         f"By {' and '.join(gods)}, what I have written I shall perform."
         if gods else "By the gods, what I have written I shall perform.")
     return {
-        "marker": (BlockChoice("ROYAL WORD", "Message of Ammurapi, king of Ugarit."),),
+        "marker": (BlockChoice("ROYAL WORD", "Message of the king."),),
         "prostration": (
             BlockChoice("SEVEN AND SEVEN",
                         rule.get("prostration")
@@ -144,10 +144,10 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
             BlockChoice("COURT FORM", proper),
             BlockChoice(
                 "PLAIN NAME",
-                f"To {name}: thus says Ammurapi, king of Ugarit."),
+                f"To {name}: thus says the king."),
             BlockChoice(
                 "AS BROTHER",
-                f"To {name}, my brother: thus says Ammurapi, your brother."),
+                f"To {name}, my brother: thus says your brother."),
         ),
         "recognition": (
             BlockChoice("HEARD IN HALL", "Your words were heard in my hall."),
@@ -159,10 +159,10 @@ def block_choices(recipient: str) -> dict[str, tuple[BlockChoice, ...]]:
         "seal": (
             BlockChoice(
                 "PALACE SEAL",
-                "Yabninu wrote it; the palace courier bears the sealed tablet."),
+                "The palace scribe wrote it; the courier bears the sealed tablet."),
             BlockChoice(
                 "KING'S OWN",
-                "This is the word of Ammurapi beneath his seal."),
+                "This is the king’s word beneath his seal."),
             BlockChoice("LEAVE UNSEALED", ""),
         ),
     }
@@ -172,9 +172,9 @@ def default_blocks() -> dict[str, int]:
     return {"address": 0, "recognition": 0, "seal": 0}
 
 
-def permitted_blocks(recipient: str) -> tuple[str, ...]:
+def permitted_blocks(recipient: str, context: dict | None = None) -> tuple[str, ...]:
     """Which pieces this recipient's register allows, in tablet order."""
-    rule = formula(load_formulae(), profile_for(recipient))
+    rule = formula(load_formulae(), profile_for(recipient, context=context))
     allowed = set(rule.get("blocks", OPENING_BLOCKS))
     if "quotation" in allowed:
         allowed.add("precedent")
@@ -188,11 +188,11 @@ def permitted_blocks(recipient: str) -> tuple[str, ...]:
     return tuple(name for name in BLOCK_ORDER if name in allowed)
 
 
-def opening_order(recipient: str) -> tuple[str, ...]:
+def opening_order(recipient: str, context: dict | None = None) -> tuple[str, ...]:
     """The pieces a fresh tablet starts with for this recipient."""
-    allowed = permitted_blocks(recipient)
+    allowed = permitted_blocks(recipient, context)
     start = [name for name in OPENING_BLOCKS if name in allowed]
-    rule = formula(load_formulae(), profile_for(recipient))
+    rule = formula(load_formulae(), profile_for(recipient, context=context))
     # A register that requires a piece starts with it laid out, so that the
     # player removes it deliberately rather than forgetting it.
     if rule.get("prostration") and "prostration" in allowed:
@@ -202,9 +202,9 @@ def opening_order(recipient: str) -> tuple[str, ...]:
     return tuple(name for name in BLOCK_ORDER if name in start)
 
 
-def normalise_order(order, recipient: str) -> tuple[str, ...]:
+def normalise_order(order, recipient: str, context: dict | None = None) -> tuple[str, ...]:
     """Keep a saved block order legal: permitted pieces, tablet order, matter."""
-    allowed = permitted_blocks(recipient)
+    allowed = permitted_blocks(recipient, context)
     aliases = {"quotation": "precedent", "instruction": "warning"}
     kept = [aliases.get(name, name) for name in (order or ())]
     kept = [name for name in kept if name in allowed]
@@ -215,11 +215,11 @@ def normalise_order(order, recipient: str) -> tuple[str, ...]:
 
 
 def normalize_blocks(blocks: dict[str, int] | None,
-                     recipient: str) -> dict[str, int]:
-    choices = block_choices(recipient)
+                     recipient: str, context: dict | None = None) -> dict[str, int]:
+    choices = block_choices(recipient, context)
     # Every piece the register allows carries its first form until the player
     # picks another, so a block added to the tablet is never blank.
-    selected = {name: 0 for name in permitted_blocks(recipient)}
+    selected = {name: 0 for name in permitted_blocks(recipient, context)}
     selected.update(default_blocks())
     selected.update(blocks or {})
     for name in list(selected):
@@ -232,14 +232,14 @@ def normalize_blocks(blocks: dict[str, int] | None,
 
 def selected_blocks(recipient: str, blocks: dict[str, int] | None,
                     edits: dict[str, str] | None = None,
-                    ) -> dict[str, BlockChoice]:
+                    context: dict | None = None) -> dict[str, BlockChoice]:
     """The chosen line for each block, with the player's own words winning.
 
     An edited block keeps its label so the desk still says which piece it is,
     and shows what the king actually dictated rather than the canned form.
     """
-    choices = block_choices(recipient)
-    picked = normalize_blocks(blocks, recipient)
+    choices = block_choices(recipient, context)
+    picked = normalize_blocks(blocks, recipient, context)
     made = {name: choices[name][picked[name]] for name in picked}
     for name, text in (edits or {}).items():
         if name in choices and text.strip():
@@ -250,17 +250,17 @@ def selected_blocks(recipient: str, blocks: dict[str, int] | None,
 
 def assemble(recipient: str, blocks: dict[str, int] | None, matter: str,
              source: str = "player", order=None,
-             edits: dict[str, str] | None = None) -> Draft:
+             edits: dict[str, str] | None = None, context: dict | None = None) -> Draft:
     """Press the pieces on this tablet, in their order, around the matter."""
-    picked = selected_blocks(recipient, blocks, edits)
-    laid = normalise_order(order or OPENING_BLOCKS, recipient)
+    picked = selected_blocks(recipient, blocks, edits, context)
+    laid = normalise_order(order or (opening_order(recipient, context) if context else OPENING_BLOCKS), recipient, context)
     parts = [
         matter.strip() if name == "matter"
         else picked.get(name, BlockChoice("", "")).text.strip()
         for name in laid
     ]
     text = "\n".join(part for part in parts if part)
-    made = raw_draft(text, recipient)
+    made = raw_draft(text, recipient, context)
     return dataclasses.replace(made, source=source)
 
 
@@ -359,9 +359,9 @@ def selected_term_summary(terms: tuple[object, ...] | list[object],
     return f"{picked + 1}/{len(terms)}{joiner}{reading}"
 
 
-def seal_id(recipient: str, blocks: dict[str, int] | None) -> str:
+def seal_id(recipient: str, blocks: dict[str, int] | None, context: dict | None = None) -> str:
     """Material seal corresponding to the visible Seal block choice."""
-    selected = normalize_blocks(blocks, recipient)
+    selected = normalize_blocks(blocks, recipient, context)
     return SEAL_IDS[selected["seal"] % len(SEAL_IDS)]
 
 
@@ -372,20 +372,20 @@ def scribe_expects(draft: Draft, intent: str = "reply") -> tuple[str, ...]:
     if not score.address_ok:
         lines.append("This address does not fit their rank, too low or too high; esteem falls on arrival.")
     elif draft.profile == "hatti.servant_to_lord":
-        lines.append("The address keeps the Sun above Ugarit.")
+        lines.append("The address names the recipient as your lord.")
     elif draft.profile == "peer.equal_to_equal":
         lines.append("The address claims equal kingship.")
     else:
         lines.append("This address names you as king, without submission.")
     if not score.prostration_ok:
-        lines.append("No bow reaches the feet of the Sun.")
+        lines.append("The required prostration is missing.")
     if not score.self_designation_ok:
         lines.append("Your place beneath the recipient is left unstated.")
     if score.topic_count > 1:
         lines.append("More than one matter may be heard on this tablet.")
     readings = {
         "kinship_overreach": "\"Brother\" claims equal rank.",
-        "excuse_and_request": "An excuse and a request share the same clay.",
+        "excuse_and_request": "The tablet combines an excuse with a request.",
         "wrong_oath_gods": "The oath invokes gods this court may reject.",
     }
     lines.extend(
@@ -531,8 +531,8 @@ def _compact_reading(draft: Draft, intent: str, matter: str,
                      width: int) -> list[tuple[str, str]]:
     """The reading that must survive the Scribes' real 26-row floor."""
     title = (
-        "YABNINU'S READING · WORDS SMOOTHED"
-        if advisor_undo else "YABNINU'S READING · HE EXPECTS")
+        "SCRIBE'S READING · WORDS SMOOTHED"
+        if advisor_undo else "SCRIBE'S READING · EXPECTED REPLY")
     rows = [(title, "bone")]
     if matter.strip() and failed:
         short_failures = (
@@ -548,7 +548,7 @@ def _compact_reading(draft: Draft, intent: str, matter: str,
             + " · ".join(short_failures[name] for name in failed),
             "blood"))
     if composing:
-        rows.append(("He is tightening your words; meaning stays.", "clay"))
+        rows.append(("The scribe is copying your words.", "clay"))
         return rows
     if not matter.strip():
         rows.append(("Next · write your matter.", "clay"))
@@ -720,7 +720,7 @@ def _draw_footer(surface: Surface, recipient: str,
                  block_focus: str, laid: tuple[str, ...], seal_data: dict,
                  term_count: int,
                  width: int,
-                 height: int) -> None:
+                 height: int, context: dict | None = None) -> None:
     if dictating:
         style.footer(surface, [
             style.FooterAction("arrows", "move stylus", command="Right"),
@@ -778,7 +778,7 @@ def _draw_footer(surface: Surface, recipient: str,
             command="desk:undo-correction")
         if advisor_undo else
         style.FooterAction(
-            "y", "correct" if compact else "Yabninu correct",
+            "y", "correct" if compact else "scribe correct",
             enabled=bool(matter.strip()) and not composing,
             command="desk:correct"))
     movement = [
@@ -793,7 +793,7 @@ def _draw_footer(surface: Surface, recipient: str,
         style.FooterAction(
             "+", "add piece",
             enabled=any(name not in laid
-                        for name in permitted_blocks(recipient)),
+                        for name in permitted_blocks(recipient, context)),
             command="desk:block:add"),
         style.FooterAction("-", "take off",
                            enabled=block_focus not in REQUIRED_BLOCKS,
@@ -804,6 +804,7 @@ def _draw_footer(surface: Surface, recipient: str,
             "e", "write" if compact else "write this piece",
             command="desk:edit"),
         advisor_action,
+        style.FooterAction("b", "business", command="desk:presets"),
     ]
     # The desk always has this spare row. Use it: a visible control is faster
     # than a memorised one, even after the window grows.
@@ -840,11 +841,11 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             seal_data: dict | None = None,
             block_order=None,
             block_edits: dict[str, str] | None = None,
-            bound: tuple[str, ...] = ()) -> Screen:
+            bound: tuple[str, ...] = (), context: dict | None = None) -> Screen:
     """Lay source knowledge beside the wet outgoing tablet and its pieces."""
     recipient = str(item["sender"])
-    picked = selected_blocks(recipient, blocks, block_edits)
-    laid = normalise_order(block_order or OPENING_BLOCKS, recipient)
+    picked = selected_blocks(recipient, blocks, block_edits, context)
+    laid = normalise_order(block_order or (opening_order(recipient, context) if context else OPENING_BLOCKS), recipient, context)
     bound = tuple(bound)
     terms = tuple(terms)
     term_pick = (
@@ -913,10 +914,12 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
     y += 1
     source_body = str(item.get("body") or "")
     if not new_letter and item.get('topic') == 'exemption':
-        source_body = render.reply_effect(item) + '\n\n' + source_body
+        source_body = (render.reply_effect(item)
+                       + ' Storehouse > Dues holds the same harbour rate.'
+                       + '\n\n' + source_body)
     empty_source = (
         "No incoming tablet is pinned. This begins a new exchange."
-        if new_letter else "No voiced copy is ready.")
+        if new_letter else "The scribe’s copy is not ready.")
     source_lines = _wrapped(source_body or empty_source, source_room)
     room = max(1, source_bottom - y - 2)
     source_scroll = max(
@@ -953,7 +956,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
         _draw_footer(
             surface, recipient, blocks, matter, dictating, composing,
             advisor_undo, block_focus, laid, seal_data, len(terms), width,
-            height)
+            height, context)
         return surface.interactive()
 
     y = 4
@@ -1050,8 +1053,8 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
             max(0, height - advice_top - 5), " ", C["clay"], C["ink"])
         style.rule(surface, right, advice_top, right_width)
         reading_title = (
-            "YABNINU'S READING · WORDS SMOOTHED"
-            if advisor_undo else "YABNINU'S READING · HE EXPECTS")
+            "SCRIBE'S READING · WORDS SMOOTHED"
+            if advisor_undo else "SCRIBE'S READING · EXPECTED REPLY")
         surface.text(right, advice_top + 1, _short(reading_title, right_width),
                      C["bone"], C["ink"])
         reading_y = advice_top + 2
@@ -1082,7 +1085,7 @@ def compose(item: dict, draft: Draft, intent: str = "reply",
 
     _draw_footer(
         surface, recipient, blocks, matter, dictating, composing,
-        advisor_undo, block_focus, laid, seal_data, len(terms), width, height)
+        advisor_undo, block_focus, laid, seal_data, len(terms), width, height, context)
     return surface.interactive()
 
 

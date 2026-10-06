@@ -127,7 +127,8 @@ def step(world: World) -> tuple[World, list]:
         if heads >= cohort.people:
             continue
         parent, party = SP.split(
-            cohort, {"displaced": heads}, world.date.absolute)
+            cohort, {"displaced": heads}, world.date.absolute,
+            conserve_ration_accounts=world.opening_rules_version == 1)
         if parent.id != cohort.id:
             parent, party = party, parent
         parent = dataclasses.replace(parent, status="distressed")
@@ -138,6 +139,14 @@ def step(world: World) -> tuple[World, list]:
         party = dataclasses.replace(
             party, armed=hostile,
             status=party.status, origin=cohort.origin or cohort.settlement)
+        if world.opening_rules_version == 1 and party.roll_id:
+            # Leaving the palace's service ends permission to eat its stores.
+            # Their apportioned unpaid claim travels with them; it is not
+            # erased or copied back onto the remaining ration households.
+            party = dataclasses.replace(party, tenure="subsistence",
+                roll_id="", roll_place="", roll_function="",
+                institution="", allowance=-1, precedence=0,
+                corvee=0, reaping=False)
         cohorts[parent.id] = parent
         cohorts[party.id] = party
         events.append(A.CohortDisplaced(

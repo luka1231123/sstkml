@@ -32,7 +32,7 @@ id = "hall"
 category = "interface"
 title = "Court and hall"
 syntax = "[s] Scribes [y] Alu [x] Trade [t] Storehouse [m] Muster [j] Palace [v] Shrine [w] World [e] Why [:] Command"
-answer = "A fortnight has two halves. Court comes first: people, letters and urgent matters arrive one at a time. F/A/S reviews a judgement; Enter reads the selected letter at the displayed cost; B replies; D defers a matter and R recalls it; left/right changes audience and up/down scrolls. The top line of Court names the worst problem, if there is one. Tab switches between Court and the Hall. The Hall opens with Yabninu's briefing, then one line for each fact the court knows, worst first. ! marks a problem that needs you soon and !! one that needs you now. Calm facts share one line. Up and Down choose a line. E asks Yabninu why it is so; the answer replaces the briefing until you press E or Escape, or choose another line. The Hall also shows the year, the matters before the king, what is still waiting, what is in motion, and the doors to every working room. Exact figures stay in Storehouse [t]. SPACE in the Hall ends the fortnight and opens the next Court. L shows the last report; Ctrl-H returns here; ? opens Ask."
+answer = "Normal startup opens the Reign tablet. Choose Continue to load your saved history, or Begin to start another. F2 opens the Reign tablet from any window, with direct doors to food records, local grain purchases and foreign relief. Every accepted order autosaves. Kept letter drafts survive restarting. A fortnight has two halves. Court comes first: people, letters and urgent matters arrive one at a time. F/A/S reviews a judgement; Enter reads the selected letter at the displayed cost; B replies; D defers a matter and R recalls it; left/right changes audience and up/down scrolls. The top line of Court names the worst problem, if there is one. Tab switches between Court and the Hall. The Hall opens with Yabninu's briefing, then one line for each fact the court knows, worst first. ! marks a problem that needs you soon and !! one that needs you now. Calm facts share one line. Up and Down choose a line. E asks Yabninu why it is so; the answer replaces the briefing until you press E or Escape, or choose another line. The Hall also shows the year, the matters before the king, what is still waiting, what is in motion, and the doors to every working room. Exact figures stay in Storehouse [t]. SPACE in the Hall ends the fortnight and opens the next Court. L shows the last report; Ctrl-H returns here; ? opens Ask."
 examples = ["Tab leaves Court for the Hall; T opens food and labour.", "D defers the current audience.", "Press E in the Hall to ask why grain is short."]
 keywords = ["hall", "home", "dashboard", "go", "open", "place", "navigation", "concern", "mouse", "click", "leave", "quit", "window", "windows", "size", "resize", "reset", "default", "tile", "cascade", "too", "big", "small", "why", "briefing", "explain", "cause", "trend", "urgent", "fact"]
 keys = ["s", "y", "x", "t", "m", "j", "v", "w", "e", "up", "down", "esc", "space", ":", "?", "q"]
@@ -153,7 +153,7 @@ id = "reply"
 category = "orders"
 title = "Answer a tablet"
 syntax = "reply <tablet> <intent>"
-answer = "Outgoing words still belong at the Desk: read a tablet, choose Answer, choose an intent or dictate the exact text, and seal it. Ask will not put words in the king's mouth while the correspondence redesign is parked. A reply costs two hours."
+answer = "Read a tablet and choose Answer to open the writing desk in Scribes. B opens business presets: aid, copper gift, reassurance, refusal and warning. A preset prepares editable words and explicit goods terms; it sends nothing. Select Matter and E to write, or Terms to change the quantity. Enter reviews the exact tablet, terms and courier route; confirm to seal. Aid is a loan if accepted and can be delayed or refused. Sealing costs two hours. Escape keeps a draft, including across a restart; X discards it."
 examples = ["reply ii refuse the demand", "Open a read tablet and choose Answer."]
 keywords = ["reply", "answer", "dictate", "letter", "tablet", "desk", "seal", "write", "correspondence"]
 keys = []
@@ -527,8 +527,52 @@ id = "court_audience"
 category = "interface"
 title = "Your first audience"
 syntax = "Court → decide, reply or defer → Tab for the Hall"
-answer = "The first audience is a shipwright with a disputed palace debt. Read both claims and compare the three payments. F/A/S opens a confirmation; Confirm order commits it, Cancel or Escape leaves it unchanged. D defers without resolving it. Tab leaves Court for the Hall, where you read the kingdom's state and open the working rooms. SPACE in the Hall ends the fortnight and the next Court opens. L shows the last report."
+answer = "The first audience is a local worker with a disputed palace debt. Read both claims and compare the three payments. F/A/S opens a confirmation; Confirm order commits it, Cancel or Escape leaves it unchanged. D defers without resolving it. Tab leaves Court for the Hall, where you read the kingdom's state and open the working rooms. SPACE in the Hall ends the fortnight and the next Court opens. L shows the last report."
 examples = ["What do I do on my first turn?", "How do I return to Court?"]
 keywords = ["beginner", "start", "first", "turn", "audience", "briefing", "tutorial", "play", "controls"]
 keys = ["Tab", "Return", "Up", "Down"]
+verbs = []
+
+[[command]]
+id = "grain_mandate"
+category = "stores"
+title = "The keeper's standing mandate"
+syntax = "Trade Exchange [k]; choose a reserve and spending cap; confirm"
+answer = "The keeper buys local grain when the granary is below the ordered reserve. Set two, four, or eight fortnights and a maximum copper purse per fortnight. No copper, no local stock, or a vacant granary office stops the purchase. The mandate remains until cancelled; purchases appear in the fortnight report. Sealing or cancelling costs one court hour. Purchases can exhaust the copper stores."
+examples = ["keep 4 fortnights grain spending 3000 copper"]
+keywords = ["automatic", "delegate", "standing", "mandate", "grain", "keeper", "routine", "restock"]
+keys = ["k"]
+verbs = []
+
+[[command]]
+id = "city_charter"
+category = "interface"
+title = "What should I work toward?"
+syntax = "F3 → 1–3 open a room; 5 expands the charter"
+answer = "Your city charter gives three voluntary aims with current progress and direct room links. Covered means the current account meets that aim; conditions can change. The chapter follows seasons, succession and reported pressure. Read the fuller reasoning with 5. The aims carry no reward."
+examples = ["What are my goals?", "Where do I go next?"]
+keywords = ["charter", "aim", "objective", "goal", "next", "city", "chapter"]
+keys = ["F3"]
+verbs = []
+
+[[command]]
+id = "royal_pledge"
+category = "court"
+title = "The king's public word"
+syntax = "F3 → 4 → choose a pledge → review and confirm"
+answer = "An optional pledge costs one court hour. For six closing accounts, keep grain for two full payrolls, leave no ration arrears, or leave no claim beyond its grace. Every account must pass. A kept word improves court standing and lowers anger; a broken one does the opposite. It cannot be cancelled. Only one may run, with twelve fortnights between declarations. Progress and the public result appear in the charter and report."
+examples = ["pledge bread", "pledge wages", "pledge justice"]
+keywords = ["pledge", "promise", "challenge", "word", "standing", "reward"]
+keys = []
+verbs = []
+
+[[command]]
+id = "governance"
+category = "court"
+title = "Governing orders"
+syntax = "F3 → 6 → 1–3 choose an order → review and confirm"
+answer = "Pylos, Pi-Ramesses and Hattusa have a separate governing account every six fortnights. Open it from the charter. Each order shows its cost and effect. Workshop tools spend bronze; household provisions move royal grain to living households. Assessments change land dues and must bring in the required grain before the account closes. Military service commits troops who then leave home defence. Read the account for the current requirement, deadline and result. An order costs one court hour."
+examples = ["How do I supply the workshops?", "Where are the temple orders?", "How do I meet royal service?"]
+keywords = ["governance", "govern", "workshops", "temple", "assessment", "royal", "service", "culture"]
+keys = ["F3"]
 verbs = []

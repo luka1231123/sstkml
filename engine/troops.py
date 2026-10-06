@@ -125,6 +125,8 @@ def note_summons(world: World) -> tuple[World, list]:
 
 def assign(world: World, action) -> tuple[World, list]:
     """ASSIGN_TROOPS (spec 11). One line, one order, no negotiation."""
+    if action.task == "harvest" and world.opening_rules_version >= 1:
+        raise ValueError("Use Storehouse > Rations field orders to supply farm labour. Troop harvest assignments do not supply labour.")
     if action.task not in TASKS:
         raise ValueError(f"troops cannot be set to: {action.task}")
     place = action.place or world.court.seat

@@ -22,20 +22,35 @@ def actor_name(actor: str, house: dict | None = None) -> str:
     mid-run is only named in the house, so fall back to it rather than printing
     a person id at the player."""
     key = slug(actor)
-    if key in _ACTORS:
-        return _ACTORS[key]
     if house:
         for person in house.get("members", ()):
-            if person["id"] == actor:
+            if slug(person["id"]) == key:
                 return person["name"]
+        names = house.get("actor_names", {})
+        if actor in names or key in names:
+            return names.get(actor, names.get(key))
+    if key in _ACTORS:
+        return _ACTORS[key]
     return actor
+
+
+def place_name(place: str, b: dict) -> str:
+    return next((str(p["name"]) for p in b.get("world_graph", {}).get("places", ())
+                 if p["id"] == place), str(place).replace("_", " "))
 
 
 def who_rows(actor: str, width: int, house: dict | None = None, lead: str = "") -> list[str]:
     """The speaker as one wrapped line: name, role, side, what he wants.
 
     Someone the content does not tag (a child born in play) gets the plain name."""
-    line = people.line(actor) if people.tag(actor)["role"] else actor_name(actor, house)
+    name = actor_name(actor, house)
+    authored_here = bool(house) and (
+        actor in house.get("actor_names", {})
+        or slug(actor) in house.get("actor_names", {})
+        or any(slug(person["id"]) == slug(actor)
+               for person in house.get("members", ())))
+    line = (people.line(actor) if people.tag(actor)["role"] and not authored_here
+            else name)
     return textwrap.wrap(lead + line, max(12, width), break_long_words=False, break_on_hyphens=False)
 
 
@@ -96,7 +111,7 @@ def fortnights_fed(b: dict) -> int | None:
 
 def reply_effect(letter: dict) -> str:
     if letter.get('topic') == 'exemption':
-        return 'Reply ends his unanswered wait, but cannot grant a toll exemption: that policy is not implemented.'
+        return 'Reply ends his unanswered wait. Lower the harbour toll in Trade > Taxes. The rate applies to all merchants.'
     return 'Reply ends the unanswered wait. Only reviewed terms move goods or create commitments.'
 
 
@@ -270,9 +285,9 @@ def desk_screen(recipient: str, intent: str, draft) -> str:
         f"  score {score.total} / 1000",
     ]
     if score.violations:
-        lines.append("  Yabninu warns: " + ", ".join(score.violations))
+        lines.append("  The scribe warns: " + ", ".join(score.violations))
     else:
-        lines.append("  Yabninu: the forms are in order, my lord.")
+        lines.append("  The scribe: the forms are in order, my lord.")
     lines.append("\n  [send] [split] [dictate] [burn]")
     return "\n".join(lines)
 
@@ -669,12 +684,18 @@ def events_lines(events, court) -> list[str]:
     """Diegetic footer lines for what the turn's advance surfaced."""
     from engine import actions as A
     out = []
+    for event in events:
+        if isinstance(event, (A.GovernanceRecorded, A.GovernanceAccountClosed)):
+            out.append(event.detail)
     arrivals = [e for e in events if isinstance(e, A.LetterArrived)]
     if arrivals:
         senders = ", ".join(sorted({actor_name(e.sender) for e in arrivals}))
         out.append(f"  A courier has come. On the pile now: {senders}.")
     for e in events:
-        if isinstance(e, A.RiteSkipped):
+        if isinstance(e, A.RoyalPledgeResolved):
+            out.append(f"  The king's {e.kind} pledge was {'kept' if e.kept else 'broken'}. "
+                       + ("Standing improves; public anger falls." if e.kept else "Standing suffers; public anger rises."))
+        elif isinstance(e, A.RiteSkipped):
             out.append(f"  The temple records that the rite '{e.rite_id}' was not kept.")
         elif isinstance(e, A.GiftSent):
             out.append(
@@ -685,15 +706,14 @@ def events_lines(events, court) -> list[str]:
                 f"{actor_name(e.recipient)}.")
         elif isinstance(e, A.PatronSought):
             out.append(
-                f"  A merchant whispers: {actor_name(e.actor)} seeks another patron.")
+                f"  A merchant reports: {actor_name(e.actor)} seeks another patron.")
         elif isinstance(e, A.PlagueBegan) and e.place_id == court.seat:
             # Sickness at the seat is directly observable. A foreign authored
             # introduction is World truth and stays off this court report until
             # a traveller or correspondent actually brings word of it.
-            out.append("  There is sickness in the Alu. Men are lying in the "
-                       "streets by the customs house.")
+            out.append("  Sickness is reported in the lower town.")
         elif isinstance(e, A.PlagueDeaths) and e.place_id == court.seat:
-            out.append(f"  The gravediggers have taken {e.dead} more.")
+            out.append(f"  {e.dead} more people have died.")
         elif isinstance(e, A.OathExpiated):
             # Note what is NOT here: whether it worked. Nobody at court knows,
             # so nobody at court can say (spec 6.12).
@@ -748,12 +768,11 @@ def events_lines(events, court) -> list[str]:
                        "his reign, and the scribes begin the count again.")
             if e.contested:
                 out.append(f"  {e.rivals} other claim(s) were heard. "
-                           "Not everyone in the house is content.")
+                           "The succession is contested.")
             out.append("  Every oath sworn by the dead king has lapsed with "
                        "him. Nobody is bound. See the oath tablets.")
         elif isinstance(e, A.SuccessionFailed):
-            out.append("  There is no heir. The seat is empty and the "
-                       "household looks at the door.")
+            out.append("  There is no heir. The throne is vacant.")
         elif isinstance(e, A.AluFell):
             out.append(f"  {e.alu} has fallen through {e.cause}. "
                        f"{len(e.elites)} of its ruling house are dead.")
@@ -796,8 +815,7 @@ def events_lines(events, court) -> list[str]:
                 f"  The gate was taken. Raiders carried off "
                 f"{fmt_good('grain', e.grain)}.")
         elif isinstance(e, A.OmenLeaked):
-            out.append("  What the diviner said is being repeated in the "
-                       "lower town, and not as you told it.")
+            out.append("  The diviner’s words are being repeated differently in the lower town.")
     # Deliberately absent: anything at all about the melt ledger. Spec 6.5 --
     # "Nothing announces this. No warning, no alert, no colour change." The
     # number is on the STORES tab if the player looks, and that is the whole

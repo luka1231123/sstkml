@@ -1,5 +1,13 @@
 # Court cases are scarce, authored resource choices. Both arguments and every
 # consequence are shown before judgement; there is no hidden correct answer.
+# The engine also hears actual ration debts, household hunger, extraordinary
+# land dues, corvee bread and good-year reserves. Those cases use the current
+# city's living cohorts and receipts, and remain available in later years.
+# Further state-backed audiences hear sick households, soldiers' families,
+# households supplying active works, and workers whose ration was cut while
+# the king sent a foreign gift. Awards remain actual household grain; they
+# do not cure disease, recall troops, finish works or retract diplomatic gifts.
+# Those new audiences wait at most six unrest-charged fortnights after grace.
 
 [[cases]]
 id = "debt_shipwright"
@@ -98,3 +106,51 @@ unrest_for = -4
 unrest_against = 0
 unrest_split = -2
 unrest_arrival = 0
+
+[[cases]]
+id = "injury_quarry_balance"
+arrived_turn = 0
+after_case = "injury_quarry"
+delay = 6
+award_min = 0
+award_max = 59999
+deduct_award = true
+petitioner = "arwanu_stonemason"
+against = "biriyawaza_foreman"
+kind = "the injured household returns"
+good = "grain"
+unit = "qa of grain"
+claim = 60000
+counterclaim = 0
+claim_text = "The injury award was {paid:,} qa. Our household asks for the remaining {balance:,} qa."
+counter_text = "The foreman asks that the first award stand. Grain is needed for the ration roll."
+unrest_for = -9
+unrest_against = 8
+unrest_split = -2
+unrest_arrival = 0
+waiting_unrest = 1
+grace = 3
+
+[[cases]]
+id = "widows_ration_balance"
+arrived_turn = 0
+after_case = "widows_ration"
+delay = 12
+award_min = 0
+award_max = 179999
+deduct_award = true
+petitioner = "ship_porters_widows"
+against = "zakarbaal_collector"
+kind = "the widows bring the old receipt"
+good = "grain"
+unit = "qa of grain"
+claim = 180000
+counterclaim = 0
+claim_text = "Twelve fortnights after judgement, the widows bring its receipt: {paid:,} qa paid of their 180,000 claim. They ask {balance:,} more."
+counter_text = "The collector asks that the earlier award stand. Grain is needed for current rations."
+unrest_for = -12
+unrest_against = 12
+unrest_split = -2
+unrest_arrival = 0
+waiting_unrest = 1
+grace = 4

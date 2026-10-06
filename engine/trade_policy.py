@@ -37,6 +37,22 @@ def _available(book, seat: str, good: str, owner: str = "",
     )
 
 
+def cargo_for_sale(world, good: str):
+    """Merchant goods and visiting cargo, never local households' reserves.
+
+    Presence at a settlement does not constitute an offer to sell. The palace
+    can trade with merchant houses and goods carried in by foreign owners;
+    local farmers' food requires a lawful levy or an explicit requisition.
+    """
+    view = world.kernel.seat_goods
+    orgs = world.kernel.registry.orgs
+    return tuple(lot for lot in _available(
+        world.kernel.book, view.seat, good, exclude=view.owner)
+        if lot.owner in orgs and (
+            orgs[lot.owner].kind == "merchant"
+            or orgs[lot.owner].settlement != view.seat))
+
+
 def _finance(world, action: A.FinanceTrade):
     """Spend at most this much copper on reported grain cargo."""
     if action.good != carry.COPPER:
@@ -44,15 +60,15 @@ def _finance(world, action: A.FinanceTrade):
     if action.quantity <= 0:
         raise ValueError("a trade purse must be positive")
 
-    seat = f"settlement:{world.chosen_alu}"
-    crown = world.kernel.controller(seat)
+    seat = world.kernel.seat_goods.seat
+    crown = world.kernel.seat_goods.owner
     book = world.kernel.book
     purse = sum(lot.free for lot in _available(
         book, seat, carry.COPPER, crown))
     if purse < action.quantity:
         raise ValueError(f"only {purse} copper is available")
 
-    cargo = _available(book, seat, farm.GRAIN, exclude=crown)
+    cargo = cargo_for_sale(world, farm.GRAIN)
     available = sum(lot.free for lot in cargo)
     if available <= 0:
         raise ValueError("no grain cargo is available at the quay")

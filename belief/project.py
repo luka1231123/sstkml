@@ -24,6 +24,8 @@ _LEDGERS = {"granary": "grain", "seed": "seed_grain"}
 
 
 def date_label(chosen_alu: str, year: int, fortnight: int) -> str:
+    if chosen_alu not in {"seat", "ugarit"}:
+        return f"yr {year}, fortnight {fortnight}"
     culture = "ugarit"
     labels = _MONTHS[culture]
     if fortnight < 1:
@@ -31,6 +33,26 @@ def date_label(chosen_alu: str, year: int, fortnight: int) -> str:
     month = labels["months"][(fortnight - 1) // 2]
     half = labels["halves"][(fortnight - 1) % 2]
     return f"yr {year}, {month}, {half}"
+
+
+def _seat_name(world) -> str:
+    place = world.places.get(world.court.seat)
+    if place:
+        return place.name
+    settlement = world.kernel.registry.settlements.get(f"settlement:{world.court.seat}")
+    return settlement.name if settlement else world.court.seat.replace("_", " ").title()
+
+
+def _court_address(world, text: str) -> str:
+    """Display source-authored salutations for the selected court."""
+    place = world.places.get(world.court.seat)
+    if place and place.name != "Ugarit":
+        title = {"mycenaean": "wanax of Pylos", "egyptian": "Pharaoh",
+                 "hittite": "Great King of Hatti"}.get(str(world.governance_config.get("kind", "")), f"king of {place.name}")
+        text = text.replace("To my lord the king of Ugarit",
+                            f"To my lord the {title}")
+        text = text.replace("To the king of Ugarit", f"To the {title}")
+    return text
 
 
 def _freshness(age: int) -> str:
@@ -109,6 +131,12 @@ def _inbox_items(world, perr: int) -> list[dict]:
         )
         items.append({
             "id": L.id, "sender": L.sender, "topic": L.topic,
+            "recipient_name": world.court.house[world.court.ruler].name if world.court.ruler in world.court.house else world.court.actor,
+            "sender_name": (world.kernel.registry.persons[L.sender].name
+                            if L.sender in world.kernel.registry.persons else ""),
+            "recipient_title": {"mycenaean": "wanax of Pylos", "egyptian": "Pharaoh",
+                "hittite": "Great King of Hatti"}.get(str(world.governance_config.get("kind", "")),
+                f"king of {_seat_name(world)}"),
             "received_turn": arr, "age": age,
             "freshness": _freshness(age), "read": L.read, "facts": facts,
             "answered_turn": L.answered_turn,
@@ -120,7 +148,7 @@ def _inbox_items(world, perr: int) -> list[dict]:
             "sender_status": relation.status_claim if relation else "servant",
             "persona": persona,
             "unanswered": relation.unanswered_letters_from_them if relation else 0,
-            "body": (L.text or stored.get(L.id, "")) if L.read else "",
+            "body": _court_address(world, L.text or stored.get(L.id, "")) if L.read else "",
             "terms": (
                 [_term_dict(term) for term in L.terms]
                 if L.read else []),
@@ -705,11 +733,17 @@ def _justice(world) -> dict:
                               petition.id))
     for petition in ordered:
         outcomes = {}
+        beneficiary = justice.beneficiary(world, petition)
+        recipient = world.kernel.registry.cohorts.get(beneficiary)
+        beneficiary_name = ((recipient.name or
+                             f"local {recipient.kind.replace('_', ' ')} households")
+                            if recipient else beneficiary)
         for verdict in justice.VERDICTS:
             good, amount, unrest = justice.consequence(petition, verdict)
             next_unrest = max(0, min(1000, world.court.unrest + unrest))
             outcomes[verdict] = {
-                "beneficiary": petition.petitioner,
+                "beneficiary": beneficiary,
+                "beneficiary_name": beneficiary_name,
                 "good": good,
                 "amount": amount,
                 "unrest": next_unrest - world.court.unrest,
@@ -718,10 +752,14 @@ def _justice(world) -> dict:
         item = {
             "id": petition.id,
             "petitioner": petition.petitioner,
+            "beneficiary": beneficiary,
+            "beneficiary_name": beneficiary_name,
             "against": petition.against,
             "kind": petition.kind,
             "waiting": petition.waiting,
             "waiting_unrest": petition.waiting_unrest,
+            "waiting_penalty_cap": (6 if petition.id.startswith("court:")
+                and petition.id.split(":", 2)[1] in justice.NEW_SITUATIONS else None),
             "grace": petition.grace,
             "after_case": petition.after_case,
             "good": petition.good,
@@ -943,6 +981,24 @@ def _house(world) -> dict:
         "reigns": court.reigns,
         "named_heir": court.named_heir,
         "members": people,
+        "actor_names": {
+            **{ident: person.name for ident, person in world.kernel.registry.persons.items()
+               if ident in {str(c.actor) for c in world.correspondents}
+               or ident in world.relations},
+            **{ident.removeprefix("person:"): person.name
+               for ident, person in world.kernel.registry.persons.items()
+               if ident in {str(c.actor) for c in world.correspondents}
+               or ident in world.relations},
+            **{actor: world.kernel.registry.persons[f"person:{actor}"].name
+               for case in world.justice_cases
+               for actor in (case.petitioner, case.against)
+               if f"person:{actor}" in world.kernel.registry.persons},
+            **{cohort.id: (f"{cohort.representative}, speaking for {cohort.name}"
+                           if cohort.representative else cohort.name)
+               for cohort in world.kernel.registry.cohorts.values()
+               if cohort.settlement == world.kernel.seat_goods.seat
+               and (cohort.name or cohort.representative)},
+        },
         # Everything the diviner has said, and nothing about whether he was
         # right. There is no field here that could answer that (spec 6.11).
         "omens": [
@@ -1083,6 +1139,8 @@ def _trade(world, perr: int) -> dict:
     seat = f"settlement:{world.chosen_alu}"
     controller = world.kernel.controller(seat)
     market = carry.readings(world.kernel, seat)
+    from engine.trade_policy import cargo_for_sale
+    offered = {lot.id for good in ("grain", "tin", "copper") for lot in cargo_for_sale(world, good)}
     cargo = []
     for lot in world.kernel.book.at(seat):
         if lot.owner != controller and lot.quantity:
@@ -1092,7 +1150,7 @@ def _trade(world, perr: int) -> dict:
             cargo.append({
                 "id": lot.id, "good": lot.good, "quantity": lot.quantity,
                 "reserved": lot.reserved, "available": lot.free,
-                "owner": lot.owner, "holder": lot.holder,
+                "owner": lot.owner, "holder": lot.holder, "for_sale": lot.id in offered,
                 "owner_name": (
                     (cohort.name or cohort.kind.replace("_", " "))
                     if cohort else org.name if org else fallback),
@@ -1227,7 +1285,7 @@ def _sea_turns(world) -> int:
 
 
 def project(world) -> dict:
-    from engine import fall
+    from engine import fall, governance
     c = world.court
     d = world.date
     perr = p_error(c.scribe_competence, c.scribe_fatigue)
@@ -1389,6 +1447,7 @@ def project(world) -> dict:
         "source": "oath tablet", "as_of_turn": d.absolute,
         "certainty": "counted",
     } for oath in world.oaths]
+    outgoing_refs = {doc.ref for doc in world.documents if doc.kind == "letter_out"}
     obligations = []
     for kind, records in (
             ("reservation", world.letter_reservations),
@@ -1396,11 +1455,32 @@ def project(world) -> dict:
             ("request", world.letter_claims),
             ("marriage proposal", world.marriage_proposals)):
         for record in records:
+            if kind == "reservation":
+                outgoing = "L-" + record.source_letter in outgoing_refs
+                arrived = record.status == "delivered"
+                if not outgoing and not arrived:
+                    continue
             item = dataclasses.asdict(record)
+            is_outgoing = "L-" + record.source_letter in outgoing_refs
+            if is_outgoing and kind == "reservation":
+                item["status"] = "dispatched"
+                item["history"] = [f"Cargo sealed for {record.recipient}" ] if hasattr(record, "recipient") else ["Cargo sealed and dispatched"]
+            elif is_outgoing and item.get("status") == "sealed_undelivered":
+                item["status"] = "promised"
+                item["history"] = [f"turn {record.created_turn}: promise sealed and dispatched"]
             item["kind"] = item.get("kind") or kind
+            if kind == "promise":
+                item["remaining"] = max(0, record.quantity - record.rendered)
             item.update(source="correspondence record", as_of_turn=d.absolute,
                         certainty="counted")
             obligations.append(item)
+    for index, debt in enumerate(world.aid_debts):
+        if debt.status in {"open", "defaulted"}:
+            obligations.append({"id": f"aid-debt:{index}", "kind": "aid loan",
+                "creditor": debt.creditor, "good": debt.good, "remaining": debt.owed,
+                "due_turn": debt.due_turn, "status": debt.status,
+                "repayment": "Send the creditor a gift of the owed good from Scribes.",
+                "source": "aid tablet", "as_of_turn": d.absolute, "certainty": "counted"})
     stores = _stores(world, perr)
     priority = list(seat_door.order_of_payment(world))
     ration_reserved = (seat_door.held(world).get("grain", 0)
@@ -1423,7 +1503,7 @@ def project(world) -> dict:
         "scenario": world.kernel.registry.settlements[
             f"settlement:{world.chosen_alu}"].name,
         "actor": c.actor,
-        "date": date_label(world.chosen_alu, d.year, d.fortnight),
+        "date": date_label(str(world.governance_config.get("kind", _seat_name(world).lower())), d.year, d.fortnight),
         "year": d.year, "fortnight": d.fortnight,
         "turn": d.absolute,
         "attention": attention_available(c, d.fortnight),
@@ -1442,6 +1522,11 @@ def project(world) -> dict:
         "legitimacy": c.legitimacy,
         "stores": stores,
         "priority": priority,
+        "governance": governance.project(world),
+        "royal_pledge": dataclasses.asdict(c.royal_pledge) if c.royal_pledge else None,
+        "pledge_history": [dataclasses.asdict(pledge) for pledge in c.pledge_history],
+        "grain_mandate": list(c.grain_mandate),
+        "mandate_report": list(c.mandate_report),
         "ration_grain_left": grain_left,
         "ration_reserved": ration_reserved,
         "groups": groups,
@@ -1451,8 +1536,8 @@ def project(world) -> dict:
         "oaths": oaths,
         "obligations": obligations,
         "aid_debts": [{"creditor": debt.creditor, "good": debt.good,
-                       "owed": debt.owed, "due_turn": debt.due_turn}
-                      for debt in world.aid_debts if debt.status == "open"],
+                       "owed": debt.owed, "due_turn": debt.due_turn, "status": debt.status}
+                      for debt in world.aid_debts if debt.status in {"open", "defaulted"}],
         "rites": [{"id": rite.id, "fortnight": rite.fortnight,
                    "hours": rite.hours, "requires": dict(rite.requires),
                    "skip_legitimacy": rite.skip_legitimacy,

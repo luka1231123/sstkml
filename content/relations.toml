@@ -39,3 +39,5 @@ wrong_god_reply_delay = 2
 aid_request = -40
 aid_repay_turns = 12
 aid_default = -250
+aid_repaid = 50
+aid_default_repaid = 120

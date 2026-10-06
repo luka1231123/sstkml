@@ -27,7 +27,7 @@ from tui import render
 
 # The king's own scribe. He speaks for anything that has no other officer, and
 # he is a person with a name rather than the interface clearing its throat.
-SCRIBE = "Yabninu"
+SCRIBE = "The palace scribe"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -193,13 +193,13 @@ def _grain(b: dict) -> Concern | None:
     now = max(0, b.get('fortnight', 1) - 1)
     harvest = next((offset for offset in range(len(wheel))
                     if wheel[(now + offset) % len(wheel)] == 'harvest'), None)
-    if fed is not None and harvest is not None and fed < harvest:
+    if fed is not None and harvest is not None and fed < max(0, harvest - 1):
         speaker, basis = _from(b, 'granary', 'ration roll and harvest calendar',
                               'the scribe compared the ration roll with the calendar')
         return Concern('grain', 9, 'Rations may run out before harvest',
                        f'Reported grain covers {fed} fortnights; harvest starts in {harvest}.',
-                       'open Trade to buy local grain or request aid; Roll changes rations.',
-                       'trade', speaker=speaker, basis=basis)
+                       'Review the ration queue; Trade needs a seller, and foreign relief takes time.',
+                       'roll', speaker=speaker, basis=basis)
     history = b.get("store_history", {}).get("grain", [])
     if len(history) < 4 or history[-1] >= history[-4]:
         return None

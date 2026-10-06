@@ -184,8 +184,8 @@ def compose(b: dict, readings: list[str], chosen: str = "harvest",
     else:
         surface.text(
             3, foot + 7,
-            "a larger offering does not buy a truer answer. "
-            "it buys a readier one."[:width - 6],
+            "The offering can change the diviner’s answer. "
+            "It does not change the future."[:width - 6],
             C["ash"], C["ink"])
     active = next((o for o in reversed(b.get("house", {}).get("omens", ()))
                    if o.get("published") and not o.get("defied")), None)

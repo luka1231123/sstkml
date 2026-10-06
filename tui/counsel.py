@@ -14,7 +14,7 @@ C = INDEX
 def reading(said, width: int, height: int, pending=None):
     """(rows of conversation that fit, every wrapped line); a pending order lists its steps instead."""
     items = ([(f"{n}. {step}", "bone") for n, step in enumerate(pending, 1)] if pending else
-             [(f"{'you' if who == 'king' else 'Yabninu'}: {what}", "clay" if who == "king" else "bone") for who, what in said])
+             [(f"{'you' if who == 'king' else 'scribe'}: {what}", "clay" if who == "king" else "bone") for who, what in said])
     lines = []
     for text, tone in items:
         lines += [(line, tone) for line in textwrap.wrap(text, width - 6)] + [("", "clay")]
@@ -31,9 +31,9 @@ def compose(said, hours_left: int, typed: str = "", width: int = 62, height: int
     surface = Surface(width, height, fg=C["clay"], bg=C["ink"])
     style.panel(surface, 0, 0, width, height, title="ASK", drop=False)
     capacity, lines = reading(said, width, height, pending)
-    lines += [("Yabninu is thinking...", "flame")] * thinking
+    lines += [("The scribe is reading the accounts…", "flame")] * thinking
     title = (f"ORDER REVIEW · {pending_cost}h · {hours_left}h left" if pending else
-             f"Yabninu · {hours_left}h left · questions are free")
+             f"Scribe · {hours_left}h left · questions are free")
     surface.text(3, 2, title[:width - 6], C["sand"], C["ink"])
     pages = max(1, -(-len(lines) // capacity))
     current = max(0, min(page, pages - 1))

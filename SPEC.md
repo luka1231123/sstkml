@@ -380,6 +380,14 @@ words. Destructive or irreversible orders confirm explicitly.
 The Hall summarizes what changed, what needs attention and where the evidence
 is. Rooms retain the detailed working records and allocation controls.
 
+Normal startup first opens a Reign tablet in its own Palace Desktop window,
+with Continue and Begin choices. Beginning enters Court. F2 reopens that tablet:
+it reads only current Belief, exposes direct routes into existing rooms, and
+shows the final cause when the player's seat falls. New reigns preserve their
+predecessor's save. Scribes offers editable business presets for aid, gifts,
+reassurance, refusal and warnings; the usual terms and seal review still apply.
+Accepted orders autosave, and presentation-only letter drafts survive reload.
+
 New campaigns and each fortnight open directly in Court. One petitioner,
 messenger or urgent matter is presented at a time, with its immediate actions.
 Judgements and reading happen there; replying opens the writing desk. Deferring
@@ -564,3 +572,87 @@ never act as a predictive `collapsed` flag, scripted victim, or countdown.
 - no research tree, technology bar, or iron victory in 0.7;
 - no tactical battle layer;
 - no second full-screen dashboard replacing the rooms.
+
+
+## Expanded reigns
+
+The Palace Desktop remains the player interface. Authored playable courts may
+use distinct simulated cities, including their real geography, seasons, cohorts,
+local stocks and courier routes. Campaign selection must explain their different
+resources and pressures rather than offer cosmetic ruler names.
+
+Court life may recur throughout the reign. New claims must originate in current
+ration debt, food needs, land dues, institutional damage or unresolved awards;
+judgements move real owned goods and remain recorded. A previous payment may
+change who returns and what they request. No notification-clearing reward exists.
+
+A reviewed standing grain mandate delegates routine local purchases to the
+granary keeper. It specifies a reserve in fortnights and a copper ceiling per
+fortnight, uses only available goods, requires a keeper, and reports actual
+receipts or the reason it could not execute. It does not guarantee food or
+foreign aid. The player may revise or cancel it at the ordinary attention cost.
+Foreign promises must be fulfilled by real cargo when their due date comes;
+recovered foreign courts may resume answering after a period of silence.
+
+
+## Clearer court life and public undertakings
+
+Court's first view is a concise decision, with the cost and public anger change
+of grant, refusal and compromise. Free full testimony remains accessible in its
+own palace window. Fortnight reports lead with a causal summary; their complete
+records remain readable below. The voluntary city charter follows the actual
+season, known conditions and succession, and opens the rooms for its three aims.
+A covered aim is a current condition, never a permanent completion score.
+
+A reviewed public pledge costs one court hour and runs for six closing accounts.
+The king may promise two full payrolls of unreserved grain, zero local ration
+arrears, or no waiting claim beyond its grace. Every closing account must meet
+the promise. Kept words add ten standing and remove ten anger; broken words
+remove fifteen standing and add ten anger, clipped to ordinary court bounds.
+Only one pledge can run, and declarations are at least twelve fortnights apart.
+The court retains eight public outcomes; a pledge creates no goods and cannot
+be cancelled. These conditions use local counted stores, rolls and dockets.
+New audience triggers activate only after an existing save's recorded timeline,
+so additional content does not invalidate its previous orders.
+
+## Cultural campaigns (2026-10-06)
+
+The native campaign selector offers eight courts: Ugarit, Byblos, Tyre,
+Carchemish, Alashiya, Pylos, Pi-Ramesses and Hattusa. The last three have
+historically inspired, fictional royal households. Existing map settlements,
+fields and routes remain the physical world. A sovereign Pylos is not a vassal
+of Mycenae. No separate Nile inundation simulation is claimed.
+
+A governing account is exposed through public Belief and the charter's 6/G
+control. One order costs one court hour and requires review. Accounts close
+on six-fortnight intervals, a game abstraction rather than a historical
+calendar. Fulfilment adds six standing. A missed account subtracts twelve
+standing and adds eight anger, once at closure. The next account opens then.
+
+- Pylos may issue stored bronze as workshop tools, increasing equipment in
+  use and its capacity by the amount issued; or pay grain to living local
+  craft households. Neither choice clears previous ration arrears.
+- Pi-Ramesses may endow living temple households with royal grain, increase
+  the land assessment by 50/1000, or remit it by 50/1000. Assessment must bring
+  in the stated amount of actual harvest dues before closure. The rate stays
+  changed until reordered. Remission costs twelve standing immediately and
+  incurs no second standing or anger charge at closure.
+- Hattusa may commit its largest capable formation to service at Carchemish
+  for three closing musters, or issue grain to living local garrison
+  households. Troops on campaign do not defend the capital and stay assigned
+  until the player reassigns them. No new vassal command or combat engine is
+  implied by this account.
+
+All issues use available royal stores. Household grain retains its owner and
+feeds the actual receiving cohort. Governance stores no copied goods balance.
+Accounts, actions and receipts replay from the campaign log. Courts without
+such a configuration acquire no new governing-account behavior.
+
+New letter forms use the current ruler, court title and publicly recorded
+rank. Saved dynamic forms encode the identity needed to grade that draft
+without requiring the current ruler to remain alive. Historical corpus texts
+remain source examples. Legacy form identifiers remain readable.
+
+Player-facing prose names the actor, goods and action in short sentences.
+Preserve quantities, uncertainty, costs and consequences. Do not add metaphor,
+lectures, dramatic filler or invented historical scenes to interface prose.

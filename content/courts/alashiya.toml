@@ -1,0 +1,760 @@
+# Authored alternative reign: canonical seat IDs, distinct material constraints.
+chosen_alu = "alashiya"
+campaign_name = "Alashiya"
+campaign_tagline = "Copper-exporting island kingdom"
+campaign_description = "An island kingdom exporting copper and importing grain and tin. Your brother oversees mining and your queen seeks foreign ties. Sea closures interrupt supplies."
+actor = "alashiya_king"
+seat = "seat"
+attention_base = 10
+house_names_f = ["Nikkal", "Talaya", "Arsay", "Tanit", "Pidray", "Elat"]
+house_names_m = ["Kushmeshusha", "Eshuwara", "Itur", "Talaya", "Kushme", "Abdi"]
+names = ["Eshuwara", "Itur", "Talaya", "Kushme", "Abdi", "Resheph", "Arsay", "Nikkal"]
+priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
+oaths = []
+land_capacity_per_mille = 400
+
+[scribe]
+competence = 820
+fatigue = 500
+
+[stores]
+grain = 530000
+seed_grain = 0
+oil = 4000
+wine = 3000
+copper = 120000
+tin = 380
+bronze = 1100
+
+[[harbour_cargo]]
+id = "sinaranu_oil_1"
+owner = "sinaranu"
+place = "seat"
+good = "oil"
+quantity = 1200
+
+[[harbour_cargo]]
+id = "ura_oil_1"
+owner = "ura_merchant"
+place = "seat"
+good = "oil"
+quantity = 1200
+
+[[groups]]
+id = "household"
+name = "the king's household"
+size = 120
+entitlement = 16
+function = "household"
+place = "seat"
+
+[[groups]]
+id = "garrison_mahadu"
+name = "the harbour watch"
+size = 80
+entitlement = 14
+function = "garrison"
+place = "seat"
+
+[[groups]]
+id = "cult_baal"
+name = "the servants of the island shrines"
+size = 80
+entitlement = 13
+function = "cult"
+place = "seat"
+
+[[groups]]
+id = "smiths_palace"
+name = "smiths of the palace quarter"
+size = 140
+entitlement = 12
+function = "bronze_working"
+place = "seat"
+
+[[groups]]
+id = "weavers"
+name = "weavers of the queen's house"
+size = 210
+entitlement = 11
+function = "weaving"
+place = "seat"
+
+[[groups]]
+id = "field_hands"
+name = "field hands of the crown estates"
+size = 180
+entitlement = 10
+function = "field_labour"
+place = "seat"
+
+[[groups]]
+id = "palace_dependents"
+name = "dependents of the Alashiya palace"
+size = 8000
+entitlement = 10
+function = "populace"
+place = "seat"
+
+[metals]
+bronze_in_circulation = 26400
+melt_ledger = 0
+
+[[workshops]]
+id = "palace_forge"
+name = "the palace forge"
+group_id = "smiths_palace"
+bronze_demand = 600
+
+[[institutions]]
+id = "harbour_mahadu"
+name = "the harbour of Alashiya"
+kind = "harbour"
+place = "seat"
+group = "garrison_mahadu"
+head = "harbourmaster"
+condition = 720
+capacity = 1000
+
+[institutions.upkeep]
+oil = 6
+
+[[institutions]]
+id = "granary_seat"
+name = "the great granary"
+kind = "granary"
+place = "seat"
+group = "household"
+head = "steward_granary"
+condition = 760
+capacity = 1000
+
+[[institutions]]
+id = "forge_palace"
+name = "the palace forge"
+kind = "workshop"
+place = "seat"
+group = "smiths_palace"
+head = "master_smith"
+condition = 880
+capacity = 600
+
+[[institutions]]
+id = "temple_baal"
+name = "the copper-workers’ sanctuary"
+kind = "temple"
+place = "seat"
+group = "cult_baal"
+head = "high_priest"
+condition = 900
+capacity = 1000
+
+[institutions.upkeep]
+oil = 10
+
+[[institutions]]
+id = "walls_seat"
+name = "the walls of Alashiya"
+kind = "walls"
+place = "seat"
+head = ""
+condition = 590
+capacity = 1000
+
+[[institutions]]
+id = "tablet_house"
+name = "the tablet house"
+kind = "archive"
+place = "seat"
+head = ""
+condition = 700
+capacity = 1000
+
+[[formations]]
+id = "chariotry"
+name = "the maryannu chariotry"
+strength = 45
+equipment_floor = 9000
+task = "garrison"
+place = "seat"
+
+[[formations]]
+id = "household_troops"
+name = "the household troops"
+strength = 230
+equipment_floor = 7961
+task = "garrison"
+place = "seat"
+
+[[formations]]
+id = "coast_watch"
+name = "the island watch"
+strength = 80
+equipment_floor = 4000
+task = "watch"
+place = "seat"
+
+[[house]]
+id = "alashiya_king"
+name = "Kushmeshusha"
+sex = "m"
+age_years = 47
+health = 720
+spouse = "alashiya_ehli_nikkalu"
+own_agenda = "hold the house together"
+
+[[house]]
+id = "alashiya_ehli_nikkalu"
+name = "Nikkal, the queen"
+sex = "f"
+age_years = 38
+health = 760
+spouse = "alashiya_king"
+own_agenda = "see her own son on the seat"
+
+[[house]]
+id = "alashiya_sharelli"
+name = "Eshuwara, the queen mother"
+sex = "f"
+age_years = 68
+health = 640
+faction = "queen_mother"
+is_queen_mother = true
+own_agenda = "protect the estates and her favoured grandson"
+
+[[house]]
+id = "alashiya_talmi_teshub"
+name = "Itur, the king’s brother"
+sex = "m"
+age_years = 42
+health = 740
+faction = "harbour_house"
+competence = 810
+loyalty = 540
+own_agenda = "keep the mine crews working"
+
+[[house]]
+id = "alashiya_yarim_limu"
+name = "Talaya, the king’s cousin"
+sex = "m"
+age_years = 36
+health = 710
+faction = "palace_house"
+competence = 420
+loyalty = 880
+own_agenda = "seek a marriage alliance across the sea"
+
+[[house]]
+id = "alashiya_niqmaddu"
+name = "Abdi"
+sex = "m"
+age_years = 20
+health = 700
+mother = "alashiya_ehli_nikkalu"
+father = "alashiya_king"
+faction = "elder_prince"
+own_agenda = "be seen to be the elder"
+
+[[house]]
+id = "alashiya_ibiranu"
+name = "Resheph"
+sex = "m"
+age_years = 15
+health = 660
+mother = "alashiya_ehli_nikkalu"
+father = "alashiya_king"
+faction = "younger_prince"
+own_agenda = "be liked by his grandmother"
+
+[[house]]
+id = "alashiya_pidray"
+name = "Arsay"
+sex = "f"
+age_years = 19
+health = 780
+mother = "alashiya_ehli_nikkalu"
+father = "alashiya_king"
+own_agenda = "marry well and be remembered at home"
+
+[diviner]
+competence = 640
+loyalty = 700
+faction = "temple"
+
+[[correspondents]]
+actor = "hatti_king"
+place = "hattusa"
+cadence = 6
+offset = 2
+topic = "grain_owed"
+understate = ["ships_sailed"]
+
+[correspondents.facts]
+ships_promised = 4
+ships_sailed = 1
+
+[[correspondents]]
+actor = "carchemish_viceroy"
+place = "carchemish"
+cadence = 5
+offset = 1
+topic = "great_king_demand"
+exaggerate = ["troops"]
+understate = ["within"]
+
+[correspondents.facts]
+troops = 200
+within = 2
+
+[[correspondents]]
+actor = "ammurapi"
+place = "alashiya"
+cadence = 3
+offset = 0
+topic = "vassal_plea"
+exaggerate = ["ships"]
+understate = ["men"]
+
+[correspondents.facts]
+towns_taken = 1
+enemy = "ships on the coast"
+
+[[correspondents]]
+actor = "pharaoh"
+place = "egypt"
+cadence = 9
+offset = 4
+topic = "greeting"
+exaggerate = ["gold"]
+
+[correspondents.facts]
+gold = 5
+
+[[correspondents]]
+actor = "byblos_king"
+place = "byblos"
+cadence = 4
+offset = 1
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 3
+enemy = "the men of Amurru"
+
+[[correspondents]]
+actor = "amurru_king"
+place = "amurru"
+cadence = 7
+offset = 3
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 1
+enemy = "raiders from the sea"
+
+[[correspondents]]
+actor = "sidon_king"
+place = "sidon"
+cadence = 8
+offset = 5
+topic = "tribute_due"
+exaggerate = ["purple"]
+
+[correspondents.facts]
+purple = 40
+
+[[correspondents]]
+actor = "tyre_king"
+place = "tyre"
+cadence = 8
+offset = 2
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 2
+enemy = "the king of Sidon"
+
+[[correspondents]]
+actor = "assyria_king"
+place = "assur"
+cadence = 12
+offset = 6
+topic = "brother_greeting"
+exaggerate = ["number"]
+
+[correspondents.facts]
+gift = "fine horses"
+number = 6
+
+[[correspondents]]
+actor = "babylon_king"
+place = "babylon"
+cadence = 14
+offset = 8
+topic = "brother_greeting"
+exaggerate = ["number"]
+
+[correspondents.facts]
+gift = "lapis"
+number = 20
+
+[[correspondents]]
+actor = "ura_merchant"
+place = "ura"
+cadence = 6
+offset = 2
+topic = "grain_offer"
+exaggerate = ["price_copper"]
+understate = ["grain"]
+
+[correspondents.facts]
+grain = 8000
+price_copper = 400
+
+[[correspondents]]
+actor = "sinaranu"
+place = "seat"
+cadence = 4
+offset = 1
+topic = "exemption"
+
+[correspondents.facts]
+
+[[correspondents]]
+actor = "mira_king"
+place = "mira"
+cadence = 10
+offset = 3
+topic = "warning"
+exaggerate = ["ships"]
+
+[correspondents.facts]
+enemy = "the Lukka"
+ships = 30
+
+[[correspondents]]
+actor = "emar_overseer"
+place = "emar"
+cadence = 7
+offset = 4
+topic = "warning"
+
+[correspondents.facts]
+enemy = "no caravan from the east"
+ships = 0
+
+[[foreign_courts]]
+actor = "pharaoh"
+people = 40000
+
+[foreign_courts.stores]
+grain = 1400000
+
+[foreign_courts.need]
+grain = 60000
+
+[foreign_courts.floor]
+grain = 400000
+
+[[foreign_courts]]
+actor = "hatti_king"
+people = 30000
+
+[foreign_courts.stores]
+grain = 300000
+
+[foreign_courts.need]
+grain = 52000
+
+[foreign_courts.floor]
+grain = 150000
+
+[[foreign_courts]]
+actor = "carchemish_viceroy"
+people = 12000
+
+[foreign_courts.stores]
+grain = 190000
+
+[foreign_courts.need]
+grain = 20000
+
+[foreign_courts.floor]
+grain = 60000
+
+[[foreign_courts]]
+actor = "alashiya_gov"
+people = 9000
+
+[foreign_courts.stores]
+grain = 40000
+
+[foreign_courts.need]
+grain = 15000
+
+[foreign_courts.floor]
+grain = 20000
+
+[[foreign_courts]]
+actor = "ura_merchant"
+people = 300
+
+[foreign_courts.stores]
+grain = 8000
+
+[foreign_courts.need]
+grain = 500
+
+[foreign_courts.floor]
+grain = 0
+
+[[foreign_courts]]
+actor = "byblos_king"
+people = 7000
+
+[foreign_courts.stores]
+grain = 60000
+
+[foreign_courts.need]
+grain = 12000
+
+[foreign_courts.floor]
+grain = 24000
+
+[[relations]]
+other = "hatti_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 410
+obligation = 0
+last_gift_from_us = 0
+last_gift_from_them = 0
+best_known_rival_gift = 5000
+known_rival_gift_source = "pharaoh"
+report_bias = 500
+is_vassal = false
+
+[[relations]]
+other = "carchemish_viceroy"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 560
+obligation = 0
+report_bias = 300
+is_vassal = false
+
+[[relations]]
+other = "ammurapi"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 650
+obligation = 0
+report_bias = 2200
+is_vassal = false
+
+[[relations]]
+other = "pharaoh"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 720
+obligation = 0
+last_gift_from_them = 4500
+report_bias = 800
+is_vassal = false
+
+[[relations]]
+other = "byblos_king"
+status_claim = "brother"
+their_status_claim = "lord"
+esteem = 480
+obligation = 0
+is_vassal = false
+report_bias = 150
+
+[[relations]]
+other = "amurru_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 430
+obligation = 0
+report_bias = 900
+is_vassal = false
+
+[[relations]]
+other = "sidon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 600
+obligation = 0
+report_bias = 400
+is_vassal = false
+
+[[relations]]
+other = "tyre_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 590
+obligation = 0
+report_bias = 700
+is_vassal = false
+
+[[relations]]
+other = "assyria_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 540
+obligation = 0
+report_bias = 600
+is_vassal = false
+
+[[relations]]
+other = "babylon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 560
+obligation = 0
+report_bias = 600
+is_vassal = false
+
+[[relations]]
+other = "ura_merchant"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 620
+obligation = 0
+report_bias = 800
+is_vassal = false
+
+[[relations]]
+other = "sinaranu"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 680
+obligation = 0
+report_bias = 0
+is_vassal = false
+
+[[relations]]
+other = "mira_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 500
+obligation = 0
+report_bias = 1200
+is_vassal = false
+
+[[relations]]
+other = "emar_overseer"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 580
+obligation = 0
+report_bias = 0
+is_vassal = false
+
+[plague]
+beta = 520
+gamma = 180
+mortality = 90
+exposure = 45
+import_place = "seat"
+import_turn = 10
+import_cases = 8
+
+[[rites]]
+id = "new_year_island_shrines"
+fortnight = 1
+hours = 3
+skip_legitimacy = -180
+skip_unrest = 120
+
+[rites.requires]
+grain = 400
+wine = 60
+oil = 20
+
+[[rites]]
+id = "first_fruits"
+fortnight = 9
+hours = 2
+skip_legitimacy = -80
+skip_unrest = 40
+
+[rites.requires]
+grain = 300
+oil = 10
+
+[case_overrides]
+
+[case_overrides.debt_shipwright]
+claim_text = "Itur the smelter says the palace owes him 9,000 copper shekels."
+counter_text = "The palace factor says contaminated ore returned; he offers 3,000."
+petitioner = "alashiya_abdi_anu_shipwright"
+against = "alashiya_kuppiya_factor"
+
+[case_overrides.injury_quarry]
+claim_text = "Resheph the mine cutter's crushed hand leaves his household owed 60,000 qa."
+counter_text = "The foreman blames Resheph the mine cutter and offers 20,000 qa."
+petitioner = "alashiya_arwanu_stonemason"
+against = "alashiya_biriyawaza_foreman"
+
+[case_overrides.widows_ration]
+claim_text = "the drowned ore porters’ households ask the palace for 180,000 qa."
+counter_text = "the ration clerk says only this season is owed: 60,000 qa."
+petitioner = "alashiya_ship_porters_widows"
+against = "alashiya_zakarbaal_collector"
+
+[case_overrides.shipwright_balance]
+claim_text = "Paid {paid:,} on turn {turn}; Itur the smelter asks for {balance:,} more."
+counter_text = "the palace factor: keep the first settlement. Pay no more."
+petitioner = "alashiya_abdi_anu_shipwright"
+against = "alashiya_kuppiya_factor"
+
+[case_overrides.shipwright_bread]
+claim_text = "The {paid:,} copper settled it. Now Itur the smelter asks 18,000 qa for his household."
+counter_text = "the palace factor: he has his copper. Keep grain for the roll."
+petitioner = "alashiya_abdi_anu_shipwright"
+against = "alashiya_kuppiya_factor"
+
+[case_overrides.injury_quarry_balance]
+claim_text = "The injury judgement gave our household {paid:,} qa. We ask for the remaining {balance:,} of the original claim; the judgement is still on the tablet."
+counter_text = "The foreman asks the king to keep the first settlement. Reopening it spends grain already needed by the ration roll."
+petitioner = "alashiya_arwanu_stonemason"
+against = "alashiya_biriyawaza_foreman"
+
+[case_overrides.widows_ration_balance]
+claim_text = "Twelve fortnights after judgement, the widows bring its receipt: {paid:,} qa paid of their 180,000 claim. They ask {balance:,} more."
+counter_text = "The collector says the king settled that disputed claim already. Let the earlier award stand and keep the grain for living obligations."
+petitioner = "alashiya_ship_porters_widows"
+against = "alashiya_zakarbaal_collector"
+
+[revenue]
+
+[revenue.land]
+initial_rate = 150
+base_rate = 150
+
+[revenue.harbour]
+initial_rate = 100
+customary_rate = 100
+
+[cohort_voices]
+
+[cohort_voices."cohort:seat_field_labour"]
+name = "the farming households of Alashiya"
+representative = "Eshuwara"
+
+[cohort_voices."cohort:seat_craft"]
+name = "the craft households of Alashiya"
+representative = "Itur"
+
+[actor_names]
+alashiya_abdi_anu_shipwright = "Itur the smelter"
+alashiya_kuppiya_factor = "the palace factor"
+alashiya_arwanu_stonemason = "Resheph the mine cutter"
+alashiya_biriyawaza_foreman = "the works foreman"
+alashiya_ship_porters_widows = "the drowned ore porters’ households"
+alashiya_zakarbaal_collector = "the ration clerk"

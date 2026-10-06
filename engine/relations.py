@@ -96,6 +96,8 @@ def _receive_gift(world: World, gift_id: str) -> tuple[World, list]:
         None)
     if record is None:
         raise ValueError(f"scheduled unknown gift: {gift_id}")
+    if record.arrive_turn is not None:
+        return world, []
     relation = world.relations[record.recipient]
     relation, adequacy, delta = evaluate_gift(
         relation, record.value, world.reciprocity_table,
@@ -111,6 +113,12 @@ def _receive_gift(world: World, gift_id: str) -> tuple[World, list]:
     world = dataclasses.replace(
         world, relations=relations,
         court=dataclasses.replace(world.court, treasury_gifts_sent=gifts))
+
+    from engine import aid, letter_terms
+    world = aid.repaid(world, record.recipient, record.good, record.quantity)
+    world = letter_terms._render_promises(
+        world, record.sender, record.recipient, record.good,
+        record.quantity, gift_id)
 
     from engine import mail
     for observer, other in sorted(world.relations.items()):

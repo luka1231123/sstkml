@@ -10,3 +10,5 @@ saves/screens.txt
 .DS_Store
 output/
 tmp/
+
+saves/**/reign-*.json

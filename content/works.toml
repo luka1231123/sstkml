@@ -44,7 +44,7 @@ condition = 900
 capacity = 1000
 category = "PALACE & STOREROOM"
 effect = "adds roofed grain capacity and cuts overflow spoilage"
-tradeoff = "only pays while the palace has a surplus worth storing"
+tradeoff = "useful when grain exceeds current storage capacity"
 history = "Knossos, Mari, and Mycenae collected staples here and paid dependents back out."
 
 [build.granary.per_1000_days]
@@ -57,7 +57,7 @@ condition = 900
 capacity = 1000
 category = "FORTIFICATION"
 effect = "multiplies the strength of troops holding this place"
-tradeoff = "empty while troops reap or campaign; its copper cannot maintain bronze"
+tradeoff = "requires a garrison; construction spends copper needed for bronze"
 history = "Uruk, Zhengzhou, and Hattusa used walls for defence, gate control, and royal display."
 
 [build.walls.per_1000_days]
@@ -71,7 +71,7 @@ capacity = 400
 category = "PALACE & STOREROOM"
 effect = "adds bronze-making capacity for tools, weapons, and repairs"
 tradeoff = "still needs paid smiths and imported copper and tin"
-history = "Palace workshops turned distant metal into the fittings that kept the redistributive system running."
+history = "Palace workshops made tools, weapons and fittings from imported metal."
 
 [build.workshop.per_1000_days]
 copper = 440
@@ -83,8 +83,8 @@ condition = 900
 capacity = 1000
 category = "PALACE & STOREROOM"
 effect = "adds archive capacity, so searches return more records"
-tradeoff = "buys information, not food, and opens without a head"
-history = "Palace tablet houses made collection, storage, and redistribution legible."
+tradeoff = "requires an appointed keeper after construction"
+history = "Palace tablet houses recorded collections, stores and payments."
 
 [build.harbour]
 name = "a quay"
@@ -108,7 +108,7 @@ capacity = 1000
 upkeep = { oil = 10 }
 category = "MONUMENT"
 effect = "adds cult capacity and softens the cost of a missed rite"
-tradeoff = "burns oil and feeds no one directly"
+tradeoff = "requires oil for upkeep; adds no grain"
 history = "Pyramids, ziggurats, and Anyang tombs legitimated rule; Wadi al-Jarf records rationed Giza crews rotating as floods idled fields."
 
 [build.temple.per_1000_days]
@@ -144,7 +144,7 @@ condition = 900
 capacity = 600
 category = "FORTIFICATION"
 effect = "raises the effectiveness of troops holding this place"
-tradeoff = "without troops at the gate it returns nothing"
+tradeoff = "requires troops at the gate"
 history = "Fortified gates controlled goods and people as well as attackers."
 
 [build.garrison.per_1000_days]

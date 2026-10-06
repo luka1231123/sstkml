@@ -1,0 +1,771 @@
+# Authored alternative reign: canonical seat IDs, distinct material constraints.
+chosen_alu = "carchemish"
+campaign_name = "Carchemish"
+campaign_tagline = "River court serving Hatti"
+campaign_description = "A river court with a large ration roll and army. Hatti requires grain and troops. Your brother commands the border and your sons contest the succession."
+actor = "carchemish_viceroy"
+seat = "seat"
+attention_base = 12
+house_names_f = ["Puduhepa", "Kubaba", "Tuwatiya", "Tarriyelli", "Hepat", "Taduhepa"]
+house_names_m = ["Talmi-Teshub", "Talmi", "Kuzi", "Hesni", "Ini", "Tuwati"]
+names = ["Talmi", "Kuzi", "Hesni", "Ini", "Tuwati", "Arma", "Kumarbi", "Tarhunta"]
+priority = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
+land_capacity_per_mille = 1100
+
+[scribe]
+competence = 920
+fatigue = 500
+
+[stores]
+grain = 1650000
+seed_grain = 0
+oil = 4000
+wine = 3000
+copper = 48000
+tin = 2600
+bronze = 2600
+
+[[harbour_cargo]]
+id = "sinaranu_oil_1"
+owner = "sinaranu"
+place = "seat"
+good = "oil"
+quantity = 1200
+
+[[harbour_cargo]]
+id = "ura_oil_1"
+owner = "ura_merchant"
+place = "seat"
+good = "oil"
+quantity = 1200
+
+[[groups]]
+id = "household"
+name = "the king's household"
+size = 120
+entitlement = 16
+function = "household"
+place = "seat"
+
+[[groups]]
+id = "garrison_mahadu"
+name = "the river watch"
+size = 90
+entitlement = 14
+function = "garrison"
+place = "seat"
+
+[[groups]]
+id = "cult_baal"
+name = "the servants of Kubaba"
+size = 80
+entitlement = 13
+function = "cult"
+place = "seat"
+
+[[groups]]
+id = "smiths_palace"
+name = "smiths of the palace quarter"
+size = 140
+entitlement = 12
+function = "bronze_working"
+place = "seat"
+
+[[groups]]
+id = "weavers"
+name = "weavers of the queen's house"
+size = 210
+entitlement = 11
+function = "weaving"
+place = "seat"
+
+[[groups]]
+id = "field_hands"
+name = "field hands of the crown estates"
+size = 650
+entitlement = 10
+function = "field_labour"
+place = "seat"
+
+[[groups]]
+id = "palace_dependents"
+name = "dependents of the Carchemish palace"
+size = 24000
+entitlement = 10
+function = "populace"
+place = "seat"
+
+[metals]
+bronze_in_circulation = 62400
+melt_ledger = 0
+
+[[workshops]]
+id = "palace_forge"
+name = "the palace forge"
+group_id = "smiths_palace"
+bronze_demand = 600
+
+[[institutions]]
+id = "harbour_mahadu"
+name = "the river quay"
+kind = "harbour"
+place = "seat"
+group = "garrison_mahadu"
+head = "harbourmaster"
+condition = 650
+capacity = 1000
+
+[institutions.upkeep]
+oil = 6
+
+[[institutions]]
+id = "granary_seat"
+name = "the great granary"
+kind = "granary"
+place = "seat"
+group = "household"
+head = "steward_granary"
+condition = 760
+capacity = 1000
+
+[[institutions]]
+id = "forge_palace"
+name = "the palace forge"
+kind = "workshop"
+place = "seat"
+group = "smiths_palace"
+head = "master_smith"
+condition = 880
+capacity = 600
+
+[[institutions]]
+id = "temple_baal"
+name = "the temple of Kubaba"
+kind = "temple"
+place = "seat"
+group = "cult_baal"
+head = "high_priest"
+condition = 900
+capacity = 1000
+
+[institutions.upkeep]
+oil = 10
+
+[[institutions]]
+id = "walls_seat"
+name = "the walls of Carchemish"
+kind = "walls"
+place = "seat"
+head = ""
+condition = 760
+capacity = 1000
+
+[[institutions]]
+id = "tablet_house"
+name = "the tablet house"
+kind = "archive"
+place = "seat"
+head = ""
+condition = 700
+capacity = 1000
+
+[[formations]]
+id = "chariotry"
+name = "the maryannu chariotry"
+strength = 180
+equipment_floor = 36000
+task = "garrison"
+place = "seat"
+
+[[formations]]
+id = "household_troops"
+name = "the household troops"
+strength = 780
+equipment_floor = 27000
+task = "garrison"
+place = "seat"
+
+[[formations]]
+id = "coast_watch"
+name = "the river watch"
+strength = 90
+equipment_floor = 4500
+task = "watch"
+place = "seat"
+
+[[house]]
+id = "carchemish_viceroy"
+name = "Talmi-Teshub"
+sex = "m"
+age_years = 52
+health = 720
+spouse = "carchemish_ehli_nikkalu"
+own_agenda = "hold the house together"
+
+[[house]]
+id = "carchemish_ehli_nikkalu"
+name = "Puduhepa, the queen"
+sex = "f"
+age_years = 44
+health = 760
+spouse = "carchemish_viceroy"
+own_agenda = "see her own son on the seat"
+
+[[house]]
+id = "carchemish_sharelli"
+name = "Ini-Teshub, the queen mother"
+sex = "f"
+age_years = 73
+health = 640
+faction = "queen_mother"
+is_queen_mother = true
+own_agenda = "protect the estates and her favoured grandson"
+
+[[house]]
+id = "carchemish_talmi_teshub"
+name = "Kuzi-Teshub, the king’s brother"
+sex = "m"
+age_years = 45
+health = 740
+faction = "harbour_house"
+competence = 880
+loyalty = 470
+own_agenda = "command the river border"
+
+[[house]]
+id = "carchemish_yarim_limu"
+name = "Kubaba, the king’s cousin"
+sex = "m"
+age_years = 39
+health = 710
+faction = "palace_house"
+competence = 420
+loyalty = 880
+own_agenda = "keep the great court faithful to Hatti"
+
+[[house]]
+id = "carchemish_niqmaddu"
+name = "Hesni"
+sex = "m"
+age_years = 24
+health = 700
+mother = "carchemish_ehli_nikkalu"
+father = "carchemish_viceroy"
+faction = "elder_prince"
+own_agenda = "be seen to be the elder"
+
+[[house]]
+id = "carchemish_ibiranu"
+name = "Arnuwanda"
+sex = "m"
+age_years = 18
+health = 660
+mother = "carchemish_ehli_nikkalu"
+father = "carchemish_viceroy"
+faction = "younger_prince"
+own_agenda = "be liked by his grandmother"
+
+[[house]]
+id = "carchemish_pidray"
+name = "Tuwati"
+sex = "f"
+age_years = 21
+health = 780
+mother = "carchemish_ehli_nikkalu"
+father = "carchemish_viceroy"
+own_agenda = "marry well and be remembered at home"
+
+[diviner]
+competence = 640
+loyalty = 700
+faction = "temple"
+
+[[correspondents]]
+actor = "hatti_king"
+place = "hattusa"
+cadence = 6
+offset = 2
+topic = "great_king_demand"
+understate = ["within"]
+summons_oath = "oath_hatti_grain"
+exaggerate = ["troops"]
+
+[correspondents.facts]
+troops = 350
+within = 4
+
+[[correspondents]]
+actor = "ammurapi"
+place = "carchemish"
+cadence = 5
+offset = 1
+topic = "vassal_plea"
+summons_oath = ""
+exaggerate = ["troops"]
+understate = ["within"]
+
+[correspondents.facts]
+towns_taken = 1
+enemy = "ships on the coast"
+
+[[correspondents]]
+actor = "alashiya_gov"
+place = "alashiya"
+cadence = 3
+offset = 0
+topic = "ships_sighted"
+exaggerate = ["ships"]
+understate = ["men"]
+
+[correspondents.facts]
+ships = 12
+men = 30
+
+[[correspondents]]
+actor = "pharaoh"
+place = "egypt"
+cadence = 9
+offset = 4
+topic = "greeting"
+exaggerate = ["gold"]
+
+[correspondents.facts]
+gold = 5
+
+[[correspondents]]
+actor = "byblos_king"
+place = "byblos"
+cadence = 4
+offset = 1
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 3
+enemy = "the men of Amurru"
+
+[[correspondents]]
+actor = "amurru_king"
+place = "amurru"
+cadence = 7
+offset = 3
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 1
+enemy = "raiders from the sea"
+
+[[correspondents]]
+actor = "sidon_king"
+place = "sidon"
+cadence = 8
+offset = 5
+topic = "tribute_due"
+exaggerate = ["purple"]
+
+[correspondents.facts]
+purple = 40
+
+[[correspondents]]
+actor = "tyre_king"
+place = "tyre"
+cadence = 8
+offset = 2
+topic = "vassal_plea"
+exaggerate = ["towns_taken"]
+
+[correspondents.facts]
+towns_taken = 2
+enemy = "the king of Sidon"
+
+[[correspondents]]
+actor = "assyria_king"
+place = "assur"
+cadence = 12
+offset = 6
+topic = "brother_greeting"
+exaggerate = ["number"]
+
+[correspondents.facts]
+gift = "fine horses"
+number = 6
+
+[[correspondents]]
+actor = "babylon_king"
+place = "babylon"
+cadence = 14
+offset = 8
+topic = "brother_greeting"
+exaggerate = ["number"]
+
+[correspondents.facts]
+gift = "lapis"
+number = 20
+
+[[correspondents]]
+actor = "ura_merchant"
+place = "ura"
+cadence = 6
+offset = 2
+topic = "grain_offer"
+exaggerate = ["price_copper"]
+understate = ["grain"]
+
+[correspondents.facts]
+grain = 8000
+price_copper = 400
+
+[[correspondents]]
+actor = "sinaranu"
+place = "seat"
+cadence = 4
+offset = 1
+topic = "exemption"
+
+[correspondents.facts]
+
+[[correspondents]]
+actor = "mira_king"
+place = "mira"
+cadence = 10
+offset = 3
+topic = "warning"
+exaggerate = ["ships"]
+
+[correspondents.facts]
+enemy = "the Lukka"
+ships = 30
+
+[[correspondents]]
+actor = "emar_overseer"
+place = "emar"
+cadence = 7
+offset = 4
+topic = "warning"
+
+[correspondents.facts]
+enemy = "no caravan from the east"
+ships = 0
+
+[[foreign_courts]]
+actor = "pharaoh"
+people = 40000
+
+[foreign_courts.stores]
+grain = 1400000
+
+[foreign_courts.need]
+grain = 60000
+
+[foreign_courts.floor]
+grain = 400000
+
+[[foreign_courts]]
+actor = "hatti_king"
+people = 30000
+
+[foreign_courts.stores]
+grain = 300000
+
+[foreign_courts.need]
+grain = 52000
+
+[foreign_courts.floor]
+grain = 150000
+
+[[foreign_courts]]
+actor = "carchemish_viceroy"
+people = 12000
+
+[foreign_courts.stores]
+grain = 190000
+
+[foreign_courts.need]
+grain = 20000
+
+[foreign_courts.floor]
+grain = 60000
+
+[[foreign_courts]]
+actor = "alashiya_gov"
+people = 9000
+
+[foreign_courts.stores]
+grain = 40000
+
+[foreign_courts.need]
+grain = 15000
+
+[foreign_courts.floor]
+grain = 20000
+
+[[foreign_courts]]
+actor = "ura_merchant"
+people = 300
+
+[foreign_courts.stores]
+grain = 8000
+
+[foreign_courts.need]
+grain = 500
+
+[foreign_courts.floor]
+grain = 0
+
+[[foreign_courts]]
+actor = "byblos_king"
+people = 7000
+
+[foreign_courts.stores]
+grain = 60000
+
+[foreign_courts.need]
+grain = 12000
+
+[foreign_courts.floor]
+grain = 24000
+
+[[relations]]
+other = "hatti_king"
+status_claim = "servant"
+their_status_claim = "servant"
+esteem = 640
+obligation = -3000
+last_gift_from_us = 0
+last_gift_from_them = 0
+best_known_rival_gift = 5000
+known_rival_gift_source = "pharaoh"
+report_bias = 500
+is_vassal = false
+
+[[relations]]
+other = "ammurapi"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 560
+obligation = -1000
+report_bias = 300
+is_vassal = false
+
+[[relations]]
+other = "alashiya_gov"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 650
+obligation = 0
+report_bias = 2200
+
+[[relations]]
+other = "pharaoh"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 720
+obligation = 0
+last_gift_from_them = 4500
+report_bias = 800
+is_vassal = false
+
+[[relations]]
+other = "byblos_king"
+status_claim = "brother"
+their_status_claim = "lord"
+esteem = 480
+obligation = 0
+is_vassal = true
+report_bias = 150
+
+[[relations]]
+other = "amurru_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 430
+obligation = 0
+report_bias = 900
+
+[[relations]]
+other = "sidon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 600
+obligation = 0
+report_bias = 400
+
+[[relations]]
+other = "tyre_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 590
+obligation = 0
+report_bias = 700
+
+[[relations]]
+other = "assyria_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 540
+obligation = 0
+report_bias = 600
+
+[[relations]]
+other = "babylon_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 560
+obligation = 0
+report_bias = 600
+
+[[relations]]
+other = "ura_merchant"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 620
+obligation = 0
+report_bias = 800
+
+[[relations]]
+other = "sinaranu"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 680
+obligation = 0
+report_bias = 0
+
+[[relations]]
+other = "mira_king"
+status_claim = "brother"
+their_status_claim = "brother"
+esteem = 500
+obligation = 0
+report_bias = 1200
+
+[[relations]]
+other = "emar_overseer"
+status_claim = "lord"
+their_status_claim = "lord"
+esteem = 580
+obligation = 0
+report_bias = 0
+
+[[oaths]]
+id = "oath_hatti_grain"
+parties = ["carchemish_viceroy", "hatti_king"]
+superior = "hatti_king"
+gods = ["storm_god_of_hatti"]
+sworn_turn = -24
+sworn_by = "carchemish_viceroy"
+
+[[oaths.clauses]]
+kind = "provide_goods"
+good = "grain"
+qty = 180000
+per_year = true
+
+[[oaths.clauses]]
+kind = "provide_troops"
+n = 350
+within = 4
+
+[plague]
+beta = 520
+gamma = 180
+mortality = 90
+exposure = 45
+import_place = "seat"
+import_turn = 20
+import_cases = 8
+
+[[rites]]
+id = "new_year_kubaba"
+fortnight = 1
+hours = 3
+skip_legitimacy = -180
+skip_unrest = 120
+
+[rites.requires]
+grain = 400
+wine = 60
+oil = 20
+
+[[rites]]
+id = "first_fruits"
+fortnight = 9
+hours = 2
+skip_legitimacy = -80
+skip_unrest = 40
+
+[rites.requires]
+grain = 300
+oil = 10
+
+[case_overrides]
+
+[case_overrides.debt_shipwright]
+claim_text = "Hesni the chariot builder says the palace owes him 9,000 copper shekels."
+counter_text = "The palace factor says broken chariot fittings returned; he offers 3,000."
+petitioner = "carchemish_abdi_anu_shipwright"
+against = "carchemish_kuppiya_factor"
+
+[case_overrides.injury_quarry]
+claim_text = "Tuwati the bridge mason's crushed hand leaves his household owed 60,000 qa."
+counter_text = "The foreman blames Tuwati the bridge mason and offers 20,000 qa."
+petitioner = "carchemish_arwanu_stonemason"
+against = "carchemish_biriyawaza_foreman"
+
+[case_overrides.widows_ration]
+claim_text = "the missing river guards’ households ask the palace for 180,000 qa."
+counter_text = "the ration clerk says only this season is owed: 60,000 qa."
+petitioner = "carchemish_ship_porters_widows"
+against = "carchemish_zakarbaal_collector"
+
+[case_overrides.shipwright_balance]
+claim_text = "Paid {paid:,} on turn {turn}; Hesni the chariot builder asks for {balance:,} more."
+counter_text = "the palace factor: keep the first settlement. Pay no more."
+petitioner = "carchemish_abdi_anu_shipwright"
+against = "carchemish_kuppiya_factor"
+
+[case_overrides.shipwright_bread]
+claim_text = "The {paid:,} copper settled it. Now Hesni the chariot builder asks 18,000 qa for his household."
+counter_text = "the palace factor: he has his copper. Keep grain for the roll."
+petitioner = "carchemish_abdi_anu_shipwright"
+against = "carchemish_kuppiya_factor"
+
+[case_overrides.injury_quarry_balance]
+claim_text = "The injury judgement gave our household {paid:,} qa. We ask for the remaining {balance:,} of the original claim; the judgement is still on the tablet."
+counter_text = "The foreman asks the king to keep the first settlement. Reopening it spends grain already needed by the ration roll."
+petitioner = "carchemish_arwanu_stonemason"
+against = "carchemish_biriyawaza_foreman"
+
+[case_overrides.widows_ration_balance]
+claim_text = "Twelve fortnights after judgement, the widows bring its receipt: {paid:,} qa paid of their 180,000 claim. They ask {balance:,} more."
+counter_text = "The collector says the king settled that disputed claim already. Let the earlier award stand and keep the grain for living obligations."
+petitioner = "carchemish_ship_porters_widows"
+against = "carchemish_zakarbaal_collector"
+
+[revenue]
+
+[revenue.land]
+initial_rate = 150
+base_rate = 150
+
+[revenue.harbour]
+initial_rate = 100
+customary_rate = 100
+
+[cohort_voices]
+
+[cohort_voices."cohort:seat_field_labour"]
+name = "the farming households of Carchemish"
+representative = "Talmi"
+
+[cohort_voices."cohort:seat_craft"]
+name = "the craft households of Carchemish"
+representative = "Kuzi"
+
+[actor_names]
+carchemish_abdi_anu_shipwright = "Hesni the chariot builder"
+carchemish_kuppiya_factor = "the palace factor"
+carchemish_arwanu_stonemason = "Tuwati the bridge mason"
+carchemish_biriyawaza_foreman = "the works foreman"
+carchemish_ship_porters_widows = "the missing river guards’ households"
+carchemish_zakarbaal_collector = "the ration clerk"

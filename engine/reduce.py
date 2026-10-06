@@ -20,6 +20,18 @@ def apply(world: World, action) -> tuple[World, list]:
     if world.ended:
         raise ValueError(world.end_reason or "the game is over")
 
+    if isinstance(action, A.GovernanceOrder):
+        from engine import governance
+        return governance.order(world, action.kind)
+
+    if isinstance(action, A.MakeRoyalPledge):
+        from engine import pledges
+        return pledges.declare(world, action)
+
+    if isinstance(action, A.SetGrainMandate):
+        from engine import steward
+        return steward.set_mandate(world, action)
+
     if isinstance(action, A.Allocate):
         if action.group_id not in seat.groups(world):
             raise ValueError(f"unknown group: {action.group_id}")

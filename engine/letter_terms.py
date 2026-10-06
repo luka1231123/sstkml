@@ -326,7 +326,7 @@ def apply_delivered_terms(
             obligations.append(
                 existing
                 if existing is not None
-                and existing.status in {"delivered", "overdue"}
+                and existing.status not in {"promised", "sealed_undelivered"}
                 else _obligation(
                     source, index, sender, recipient, sent_turn, term, turn))
         elif term.kind == "request_good":
@@ -387,6 +387,7 @@ def apply_delivered_terms(
                  if giver == world.court.actor
                  else aid.received(world, giver, good, quantity)
                  if taker == world.court.actor else world)
+        world = _render_promises(world, giver, taker, good, quantity, source)
     return world, DeliveredTerms(
         tuple(delivered_gifts),
         tuple(obligations),
@@ -545,12 +546,125 @@ def apply_incoming_terms(world: World, letter) -> tuple[World, list]:
     ]
     from engine import aid
     for cargo in landed:
-        world = aid.received(world, sender, cargo.good, cargo.quantity)
-    return dataclasses.replace(
+        world = aid.received(world, sender, cargo.good, cargo.quantity,
+                             request_letter=letter.reply_to)
+    world = dataclasses.replace(
         world,
         letter_obligations=_merge_records(world.letter_obligations, recorded),
         letter_reservations=_merge_records(world.letter_reservations, landed),
-    ), events
+    )
+    for cargo in landed:
+        world = _render_promises(
+            world, sender, world.court.actor, cargo.good, cargo.quantity, source)
+    return world, events
+
+
+def _render_promises(world: World, giver: str, taker: str, good: str,
+                     quantity: int, source: str) -> World:
+    """Delivered goods discharge the oldest matching promises once.
+
+    A sealed promise moves nothing. A dispatched caravan discharges nothing.
+    Only the receiving boundary calls this, after establishing custody.
+    """
+    updates = {}
+    for record in sorted(world.letter_obligations,
+                         key=lambda item: (item.due_turn, item.created_turn, item.id)):
+        if (record.kind != "promise_good" or record.party != giver
+                or record.beneficiary != taker or record.good != good
+                or record.status not in {"delivered", "overdue", "part_fulfilled"}
+                or quantity <= 0):
+            continue
+        rendered = min(quantity, max(0, record.quantity - record.rendered))
+        if not rendered:
+            continue
+        quantity -= rendered
+        total = record.rendered + rendered
+        status = ("fulfilled" if total >= record.quantity else
+                  "overdue" if world.date.absolute > record.due_turn else
+                  "part_fulfilled")
+        updates[record.id] = dataclasses.replace(
+            record, rendered=total, status=status,
+            history=record.history + (
+                f"turn {world.date.absolute}: {rendered} {good} delivered "
+                f"with {source}; {total} of {record.quantity} fulfilled",))
+    return dataclasses.replace(
+        world, letter_obligations=tuple(
+            updates.get(record.id, record) for record in world.letter_obligations))
+
+
+def step_promises(world: World) -> tuple[World, list]:
+    """Foreign courts honour dated goods undertakings by physical courier.
+
+    The steward acts on his own dated count and keeps the same reserves as an
+    immediate aid decision. Arrival is aimed at the promised date using route
+    latency. Short shipments leave an outstanding balance; closed seas,
+    depleted granaries and interception can all make a promise late.
+    """
+    from engine import correspondence_policy as policy, foreign_belief, mail
+    from engine.state import CorrespondenceCase
+
+    now, events = world.date.absolute, []
+    obligations = tuple(
+        dataclasses.replace(record, status="overdue", history=record.history + (
+            f"turn {now}: the delivery date passed with "
+            f"{record.quantity - record.rendered} {record.good} outstanding",))
+        if (record.kind == "promise_good" and record.due_turn < now
+            and record.status in {"delivered", "part_fulfilled"})
+        else record for record in world.letter_obligations)
+    world = dataclasses.replace(world, letter_obligations=obligations)
+    for record in sorted(obligations, key=lambda item: (item.due_turn, item.id)):
+        if (record.kind != "promise_good" or record.party == world.court.actor
+                or record.beneficiary != world.court.actor
+                or record.status not in {"delivered", "overdue", "part_fulfilled"}):
+            continue
+        relation = world.relations.get(record.party)
+        if relation is None:
+            continue
+        path = mail.shortest_path(world.routes, relation.place, world.court.seat)
+        if not path:
+            continue
+        latency = mail.route_latency(world.routes, relation.place, world.court.seat,
+                                     world.season, world.date.fortnight)
+        if now + latency < record.due_turn:
+            continue
+        # A reservation remembers its undertaking even when its carrier was
+        # intercepted. Lost cargo does not spring back into a second caravan.
+        marker = f"undertaking {record.id}"
+        dispatched = sum(
+            cargo.quantity for cargo in world.letter_reservations
+            if marker in cargo.history)
+        remaining = record.quantity - max(record.rendered, dispatched)
+        if remaining <= 0:
+            continue
+        home = foreign_belief.settlement_of(world, record.party)
+        belief = foreign_belief.belief_of(world, record.party)
+        reckoning = policy._reckon(belief, home, record.good, remaining,
+                                   record.due_turn, now)
+        quantity = min(remaining, reckoning.spare,
+                       spare_in_court(world, record.party, record.good))
+        if quantity <= 0:
+            continue
+        request = next((case.letter_id for case in world.correspondence
+                        if case.reply_letter_id == record.source_letter),
+                       record.source_letter)
+        case = CorrespondenceCase(
+            id=f"fulfil:{record.id}", letter_id=request, actor=record.party,
+            place=relation.place, received_turn=now)
+        decision = policy.Decision(
+            "accept", terms=(A.LetterTerm(
+                kind="gift", good=record.good, quantity=quantity),),
+            basis=reckoning.basis,
+            reason=f"{quantity} {record.good} loaded against {record.source_letter}")
+        world, reply, sent = mail.foreign_reply(world, case, decision)
+        events += sent
+        stolen = any(isinstance(event, A.LetterIntercepted)
+                     and event.letter_id == reply.id for event in sent)
+        world = load_court_cargo(world, record.party, reply, intercepted=stolen)
+        world = dataclasses.replace(world, letter_reservations=tuple(
+            dataclasses.replace(cargo, history=cargo.history + (marker,))
+            if cargo.source_letter == reply.id else cargo
+            for cargo in world.letter_reservations))
+    return world, events
 
 
 def mark_intercepted_terms(world: World, letter) -> World:

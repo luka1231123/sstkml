@@ -1,107 +1,53 @@
 # SAY TO THE KING, MY LORD
 
-Information-constrained rulership sim. Fragile Late Bronze Age world.
+A Bronze Age court game about ruling through letters, accounts and people whose reports may be late or unreliable. You hear disputes, allocate grain, manage obligations and deal with neighbouring rulers through a desktop of movable text windows.
 
-People, households, institutions, goods, labour, obligations, journeys, disease, and foreign courts are simulated deterministically. The player holds the Seat through fallible people and delayed, interested information. No omniscient strategy layer.
+The idea is interesting, and there are moments when an earlier decision comes back as a different problem. The game is an early alpha, though. Long campaigns need balancing, some claims become repetitive, and the interface needs more work.
 
-[`SPEC.md`](SPEC.md) is the sole product authority. [`docs/PLAYABLE.md`](docs/PLAYABLE.md) records what the game measures today and what is left before it plays.
-[`docs/PLAN.md`](docs/PLAN.md) is the current execution plan: tell the engine
-to the player in words, through a facts layer and the local model.
-[`docs/FIRST_YEAR.md`](docs/FIRST_YEAR.md) walks through rations, grain relief,
-harvest decisions and the aftermath report.
+Much of this was vibe coded. It became a lesson in adding features faster than checking whether they made the game better. The simulation grew before the basic experience had enough play time.
 
-## What is here now
+## What you can play
 
-- deterministic, replayable court and world kernel;
-- explicit goods, labour, ownership, custody, movement, obligations, causal records;
-- actor-specific dated Belief projected through one player boundary;
-- agriculture, institutions, trade, cargo, news, disease, justice, household, ritual, military service, construction foundations;
-- required grounded local-model language for scribes, advisers, tablets;
-- multi-window character-cell Palace Desktop;
-- Hall, Scribes, Alu, Trade, Storehouse, Muster, Court, Shrine, and World;
-- corpus-derived writing blocks and a parsed order/tone review before sealing;
-- versioned atomic saves, replay checks, audits, balance tools, screen renders, causal developer inspector.
+Eight courts are available: Ugarit, Byblos, Tyre, Carchemish, Alashiya, Pylos, Pi-Ramesses and Hattusa. They have different reserves, routes, households and obligations. Pylos has workshop accounts, Egypt has temple and provincial accounts, and Hattusa has military service requirements. These are game scenarios; the cultural and agricultural differences are incomplete.
 
-The shared world contains 55 simulated Alu; authored court content currently makes only `seat` playable.
+The game tracks goods, labour, trade, journeys, disease, households and debts. Decisions spend actual stores, letters take time to arrive, and earlier judgements can affect later claims. Each court has its own autosave.
 
 ## Run
 
-```sh
-./run.sh                  # windowed game
-./run.sh --playtest       # fresh campaign with its own autosave; F8 records notes
-./run.sh --check          # interpreter, Tk, display, Ollama, and model
-./run.sh --screens         # render one screen as text
-./run.sh --probe          # live Tk probe
-```
-
-`run.sh` use project `.venv`, create when absent. Windowed backend need Python with Tk support.
-
-Each fortnight opens in Court: one person or letter, with actions beside it.
-`f/a/s` reviews a judgement, `enter` reads a letter, `b` replies, and `d` defers.
-`tab` leaves Court for the Hall: the dashboard of the year, stores, standing,
-rations and labour, waiting matters, and the doors to every working room.
-`space` in the Hall ends the fortnight and opens the next Court; `l` shows the
-last report. `Ctrl-H` returns here. `?` opens Ask: ask what to do, how to do it or
-who someone is. Asking costs no hours, and a typed order is confirmed before it is
-given. `tab` in Ask opens the Manual; `Ctrl-Shift-R` resets window sizes.
-Claims are heard only in Court; the Palace holds people, offices and envoys.
-`F8` records a playtest note. Last report is available without opening another window.
-Hall `o` opens Orders and receipts. Long Stores/Muster/Orders details and order
-reviews use left/right; Ask uses Page Up/Page Down. Notes now attach the
-originating screen automatically. See [the playtest route](docs/PLAYTEST_DECISIONS.md).
-
-Version 29 saves still load. `--playtest` starts a separate autosave folder.
-
-## Required local language model
-
-Supported baseline:
+The windowed game needs Python with Tk and a running Ollama server:
 
 ```sh
 ollama pull qwen3:4b-instruct
+./run.sh
 ```
 
-Ollama must run. If `ollama serve` report port `11434` already in use, server already listening — do not start second one.
-
-Model supply language, not simulation truth. It may correct player's one- or two-sentence letter matter, voice permitted beliefs, summarize selected records. It cannot see hidden World state, choose policy, invent authoritative quantities, calculate outcomes, or mutate game.
-
-## Verify
+The launcher creates a project virtual environment when needed.
 
 ```sh
-.venv/bin/python tools/first_year.py
-.venv/bin/python tools/inventory.py
-.venv/bin/python tools/corpus_lint.py
-.venv/bin/python tools/m13_benchmark.py
-.venv/bin/python tools/balance.py austerity 96
-.venv/bin/python tools/gameplay_probe.py 4 180
-.venv/bin/python tools/gameplay_probe.py 3 720 --baseline --policy passive
-.venv/bin/python tools/information_audit.py
-.venv/bin/python tools/kernel_inspect.py where grain
+./run.sh --check       # check local requirements
+./run.sh --playtest    # separate playtest save
 ```
 
-`tools/kernel_inspect.py` = omniscient developer inspector. Explain why lot exist, where quantity went, why actor decided, what evidence belief rest on, what obligation authorized, which request unsatisfied. Never player-facing.
+The local model helps with letters and advice. Ordinary reports use authored text; the engine calculates outcomes.
 
-`tools/look.py` = read a run without reading a screen.
+## Basic controls
+
+Each fortnight opens in Court. Tab takes you to the Hall; Space in the Hall ends the fortnight. Enter in the Hall opens the account behind the selected report. G opens cultural governing orders where available.
+
+F2 opens the reign screen, F3 shows current aims, and L in the Hall shows the last report. Ctrl-H returns to the Hall. Use ? for help and Tab within Ask for the manual.
+
+## Fast headless play
+
+After setup, you can run all eight courts without windows or Ollama:
 
 ```sh
-.venv/bin/python tools/look.py figures --turns 60 --every 4   # numbers, one row a turn
-.venv/bin/python tools/look.py events --turns 40              # events by domain, not 767 lines
-.venv/bin/python tools/look.py events --turns 40 --each --kind hungry
-.venv/bin/python tools/look.py belief justice.petitions       # what a screen could show
-.venv/bin/python tools/look.py belief stores --diff --turns 8 # what the last turn changed
+.venv/bin/python tools/quick_play.py --turns 72
 ```
 
-Runtime engine standard-library-only, integer-state, immutable, seeded, replayable. `belief/` = only World-to-player projection boundary.
+This uses a simple policy and writes results to `output/quick-play.json`. It helps find economic problems; it does not measure whether the game is fun.
 
-## Repository map
+## Notes
 
-```text
-engine/          authoritative simulation, actions, systems, and records
-engine/kernel/   world entities, allocation, farming, transport, and tick
-belief/          safe dated projections for actors and player UI
-ai/              required grounded court-language layer
-tui/             character-cell screens and Tk/terminal backends
-content/         scenarios, people, goods, formulae, and correspondence
-tools/           audit, benchmark, balance, inspection, screens, and probes
-docs/            PLAYABLE.md: measured state and the work left
-SPEC.md          sole current product specification
-```
+[Play report](docs/HUMAN_PLAY_REPORT.md) · [Player research](docs/MARKET_RESEARCH.md) · [Opening balance](docs/OPENING_BALANCE.md) · [Specification](SPEC.md)
+
+The code is split between `engine/` for the simulation, `belief/` for what the player can know, `tui/` for screens, `ai/` for language, and `content/` for scenarios. Inspection and balance tools live in `tools/`.

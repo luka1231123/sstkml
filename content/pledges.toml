@@ -1,0 +1,25 @@
+# Optional promises made publicly, never automatically imposed on a campaign.
+[rules]
+duration = 6
+cooldown = 12
+bread_payrolls = 2
+success_legitimacy = 10
+success_unrest = -10
+failure_legitimacy = -15
+failure_unrest = 10
+history_limit = 8
+
+[bread]
+name = "Bread in reserve"
+promise = "At each of the next six closing accounts, keep enough unreserved grain for two full dependent payrolls."
+stakes = "Reserve grain while paying for gifts, sales and court awards."
+
+[wages]
+name = "No unpaid worker"
+promise = "At each of the next six closing accounts, leave no ration arrears on the local payroll."
+stakes = "Pay current rations and old ration debts."
+
+[justice]
+name = "Claims heard on time"
+promise = "At each of the next six closing accounts, leave no waiting claim beyond its stated grace."
+stakes = "Hear claims before their stated grace expires."

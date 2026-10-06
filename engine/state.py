@@ -272,6 +272,17 @@ class Ruling:
 
 
 @dataclasses.dataclass(frozen=True)
+class RoyalPledge:
+    id: str
+    kind: str
+    start_turn: int
+    due_turn: int
+    checked: int = 0
+    kept: int = 0
+    status: str = "active"
+
+
+@dataclasses.dataclass(frozen=True)
 class Rite:
     id: str
     fortnight: int
@@ -342,6 +353,17 @@ class Court:
     harbour_traffic: int = 1000
     last_harbour_due: int = 0
     named_heir: str = ""
+    governance_due: int = 0
+    governance_status: str = "open"
+    governance_order: str = ""
+    governance_progress: int = 0
+    governance_land_seen: int = 0
+    governance_last: tuple[str, ...] = ()
+    governance_failures: int = 0
+    royal_pledge: RoyalPledge | None = None
+    pledge_history: tuple[RoyalPledge, ...] = ()
+    grain_mandate: tuple[int, ...] = ()
+    mandate_report: tuple[str, ...] = ()
     # 24 fortnights of stock readings per good, for the STORES sparkline (9.4).
     store_history: Mapping[GoodId, tuple[int, ...]] = dataclasses.field(
         default_factory=dict)
@@ -819,6 +841,10 @@ class World:
     documents: tuple[Document, ...] = ()
     # Debug-only breadcrumb of rng draws; excluded from the state hash.
     rng_ledger: tuple[str, ...] = ()
+    # Expanded audiences start after an existing save’s recorded history.
+    governance_config: Mapping[str, object] = dataclasses.field(default_factory=dict)
+    court_content_from: int = 0
+    opening_rules_version: int = 0
 
     # --- the map, read off the registry (Task 2 C5) -------------------------
     # `World.places` and `World.routes` were the second copy of the geography.

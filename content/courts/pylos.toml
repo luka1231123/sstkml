@@ -1,0 +1,486 @@
+# Fictional royal household; historically inspired Late Bronze Age setting.
+"chosen_alu" = "pylos"
+"campaign_name" = "Pylos"
+"campaign_tagline" = "Workshops and coastal watches"
+"campaign_description" = "A Mycenaean palace kingdom. Keep smiths and weaving households supplied, cover estate work and pay the coast watch. Neighbouring kings are peers, not an Aegean emperor. This household is fictional."
+"actor" = "pylos_eketos"
+"seat" = "seat"
+"attention_base" = 12
+"house_names_f" = ["Eritha", "Alke", "Doris", "Theodora", "Alexandra", "Philai"]
+"house_names_m" = ["Eketos", "Aktor", "Enkhelyawon", "Dorieus", "Alkman", "Mawon"]
+"names" = ["Eketos", "Aktor", "Enkhelyawon", "Dorieus", "Alkman", "Mawon", "Eritha", "Alke", "Doris", "Theodora", "Alexandra", "Philai"]
+"priority" = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
+"land_capacity_per_mille" = 950
+"foreign_courts" = []
+"oaths" = []
+"sovereign" = true
+
+["scribe"]
+"competence" = 900
+"fatigue" = 500
+
+["stores"]
+"grain" = 1400000
+"seed_grain" = 0
+"oil" = 5000
+"wine" = 4000
+"copper" = 72000
+"tin" = 1600
+"bronze" = 5000
+
+[["harbour_cargo"]]
+"id" = "pylos_cargo_oil"
+"owner" = "ura_merchant"
+"place" = "seat"
+"good" = "oil"
+"quantity" = 2400
+
+[["groups"]]
+"id" = "household"
+"name" = "the king’s household"
+"size" = 80
+"entitlement" = 16
+"function" = "household"
+"place" = "seat"
+
+[["groups"]]
+"id" = "garrison_mahadu"
+"name" = "the coast watch"
+"size" = 160
+"entitlement" = 14
+"function" = "garrison"
+"place" = "seat"
+
+[["groups"]]
+"id" = "cult_baal"
+"name" = "the servants of Poseidon"
+"size" = 100
+"entitlement" = 13
+"function" = "cult"
+"place" = "seat"
+
+[["groups"]]
+"id" = "smiths_palace"
+"name" = "the bronze allocation house"
+"size" = 420
+"entitlement" = 12
+"function" = "bronze_working"
+"place" = "seat"
+
+[["groups"]]
+"id" = "weavers"
+"name" = "the linen workers of the palace"
+"size" = 1600
+"entitlement" = 11
+"function" = "weaving"
+"place" = "seat"
+
+[["groups"]]
+"id" = "field_hands"
+"name" = "the workers of the royal estates"
+"size" = 1200
+"entitlement" = 10
+"function" = "field_labour"
+"place" = "seat"
+
+[["groups"]]
+"id" = "palace_dependents"
+"name" = "the ration households of Pylos"
+"size" = 13000
+"entitlement" = 10
+"function" = "populace"
+"place" = "seat"
+
+["metals"]
+"bronze_in_circulation" = 36000
+"melt_ledger" = 0
+
+[["workshops"]]
+"id" = "palace_forge"
+"name" = "the bronze allocation house"
+"group_id" = "smiths_palace"
+"bronze_demand" = 650
+
+[["institutions"]]
+"id" = "harbour_mahadu"
+"name" = "the palace landing place"
+"kind" = "harbour"
+"place" = "seat"
+"group" = "garrison_mahadu"
+"head" = "harbourmaster"
+"condition" = 760
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 6
+
+[["institutions"]]
+"id" = "granary_seat"
+"name" = "the royal granaries"
+"kind" = "granary"
+"place" = "seat"
+"group" = "household"
+"head" = "steward_granary"
+"condition" = 760
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "forge_palace"
+"name" = "the bronze allocation house"
+"kind" = "workshop"
+"place" = "seat"
+"group" = "smiths_palace"
+"head" = "master_smith"
+"condition" = 820
+"capacity" = 650
+
+[["institutions"]]
+"id" = "temple_baal"
+"name" = "the sanctuary of Poseidon"
+"kind" = "temple"
+"place" = "seat"
+"group" = "cult_baal"
+"head" = "high_priest"
+"condition" = 850
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 10
+
+[["institutions"]]
+"id" = "walls_seat"
+"name" = "the palace perimeter"
+"kind" = "walls"
+"place" = "seat"
+"head" = ""
+"condition" = 600
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "tablet_house"
+"name" = "the Linear B tablet rooms"
+"kind" = "archive"
+"place" = "seat"
+"head" = ""
+"condition" = 840
+"capacity" = 1000
+
+[["formations"]]
+"id" = "chariotry"
+"name" = "the royal chariot force"
+"strength" = 90
+"equipment_floor" = 16200
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "household_troops"
+"name" = "the royal infantry"
+"strength" = 400
+"equipment_floor" = 14000
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "coast_watch"
+"name" = "the coast watch"
+"strength" = 160
+"equipment_floor" = 5600
+"task" = "watch"
+"place" = "seat"
+
+[["house"]]
+"id" = "pylos_eketos"
+"name" = "Eketos"
+"sex" = "m"
+"age_years" = 42
+"health" = 720
+"spouse" = "pylos_queen"
+"own_agenda" = "keep the army and households supplied"
+
+[["house"]]
+"id" = "pylos_queen"
+"name" = "Eritha, the queen"
+"sex" = "f"
+"age_years" = 44
+"health" = 760
+"spouse" = "pylos_eketos"
+"own_agenda" = "secure her son’s succession"
+
+[["house"]]
+"id" = "pylos_queen_mother"
+"name" = "Alke, the queen mother"
+"sex" = "f"
+"age_years" = 73
+"health" = 640
+"faction" = "queen_mother"
+"is_queen_mother" = true
+"own_agenda" = "retain the temple estates"
+
+[["house"]]
+"id" = "pylos_commander"
+"name" = "Aktor, commander"
+"sex" = "m"
+"age_years" = 45
+"health" = 740
+"faction" = "harbour_house"
+"competence" = 880
+"loyalty" = 470
+"own_agenda" = "keep the army paid"
+
+[["house"]]
+"id" = "pylos_steward"
+"name" = "Enkhelyawon, estate overseer"
+"sex" = "m"
+"age_years" = 39
+"health" = 710
+"faction" = "palace_house"
+"competence" = 420
+"loyalty" = 880
+"own_agenda" = "keep the estate accounts in order"
+
+[["house"]]
+"id" = "pylos_elder"
+"name" = "Dorieus"
+"sex" = "m"
+"age_years" = 24
+"health" = 700
+"mother" = "pylos_queen"
+"father" = "pylos_eketos"
+"faction" = "elder_prince"
+"own_agenda" = "receive the royal seal"
+
+[["house"]]
+"id" = "pylos_younger"
+"name" = "Alkman"
+"sex" = "m"
+"age_years" = 18
+"health" = 660
+"mother" = "pylos_queen"
+"father" = "pylos_eketos"
+"faction" = "younger_prince"
+"own_agenda" = "receive command of the troops"
+
+[["house"]]
+"id" = "pylos_daughter"
+"name" = "Doris"
+"sex" = "f"
+"age_years" = 21
+"health" = 780
+"mother" = "pylos_queen"
+"father" = "pylos_eketos"
+"own_agenda" = "arrange a marriage with another court"
+
+["diviner"]
+"competence" = 640
+"loyalty" = 700
+"faction" = "temple"
+
+[["correspondents"]]
+"actor" = "alashiya_gov"
+"place" = "alashiya"
+"topic" = "ships_sighted"
+"cadence" = 4
+"offset" = 0
+
+["correspondents"."facts"]
+"ships" = 8
+"men" = 30
+
+[["correspondents"]]
+"actor" = "ura_merchant"
+"place" = "ura"
+"topic" = "grain_offer"
+"cadence" = 5
+"offset" = 2
+
+["correspondents"."facts"]
+"grain" = 12000
+"price_copper" = 600
+
+[["correspondents"]]
+"actor" = "mycenae_king"
+"place" = "mycenae"
+"topic" = "brother_greeting"
+"cadence" = 8
+"offset" = 1
+
+["correspondents"."facts"]
+"gift" = "bronze fittings"
+"number" = 8
+
+[["correspondents"]]
+"actor" = "knossos_king"
+"place" = "knossos"
+"topic" = "warning"
+"cadence" = 7
+"offset" = 3
+
+["correspondents"."facts"]
+"enemy" = "unidentified ships"
+"ships" = 12
+
+[["correspondents"]]
+"actor" = "pharaoh"
+"place" = "egypt"
+"topic" = "greeting"
+"cadence" = 12
+"offset" = 4
+
+["correspondents"."facts"]
+"gold" = 4
+
+[["relations"]]
+"other" = "alashiya_gov"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 650
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "ura_merchant"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 600
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "mycenae_king"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 570
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "knossos_king"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 580
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "pharaoh"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 500
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+["plague"]
+"beta" = 470
+"gamma" = 180
+"mortality" = 90
+"exposure" = 35
+"import_place" = "seat"
+"import_turn" = 20
+"import_cases" = 6
+
+[["rites"]]
+"id" = "poseidon_offering"
+"fortnight" = 1
+"hours" = 2
+"skip_legitimacy" = -100
+"skip_unrest" = 60
+
+["rites"."requires"]
+"grain" = 450
+"wine" = 40
+"oil" = 20
+
+[["rites"]]
+"id" = "first_fruits"
+"fortnight" = 9
+"hours" = 2
+"skip_legitimacy" = -70
+"skip_unrest" = 30
+
+["rites"."requires"]
+"grain" = 300
+"oil" = 15
+
+["case_overrides"]
+
+["case_overrides"."debt_shipwright"]
+"claim_text" = "Aktor the bronze worker asks for 9,000 copper shekels owed by the palace."
+"counter_text" = "The workshop overseer reports defective fittings and offers 3,000."
+"petitioner" = "pylos_craft_claimant"
+"against" = "pylos_workshop_overseer"
+
+["case_overrides"."injury_quarry"]
+"claim_text" = "Mawon the estate mason lost the use of one hand on royal work. His household asks for 60,000 qa."
+"counter_text" = "The works overseer disputes the claim and offers 20,000 qa."
+"petitioner" = "pylos_injured_builder"
+"against" = "pylos_works_overseer"
+
+["case_overrides"."widows_ration"]
+"claim_text" = "the coast-watch households ask for 180,000 qa in unpaid rations."
+"counter_text" = "The ration clerk records 60,000 qa owed for this season."
+"petitioner" = "pylos_soldier_households"
+"against" = "pylos_ration_clerk"
+
+["case_overrides"."shipwright_balance"]
+"claim_text" = "Aktor the bronze worker received {paid:,} copper on turn {turn}. He asks for the remaining {balance:,}."
+"counter_text" = "The workshop overseer asks that the first settlement stand."
+"petitioner" = "pylos_craft_claimant"
+"against" = "pylos_workshop_overseer"
+
+["case_overrides"."shipwright_bread"]
+"claim_text" = "Aktor the bronze worker received {paid:,} copper. His household now asks for 18,000 qa of grain."
+"counter_text" = "The workshop overseer says the debt was paid. The ration roll needs the grain."
+"petitioner" = "pylos_craft_claimant"
+"against" = "pylos_workshop_overseer"
+
+["case_overrides"."injury_quarry_balance"]
+"claim_text" = "Our household received {paid:,} qa for the injury. We ask for the remaining {balance:,}."
+"counter_text" = "The works overseer asks that the first settlement stand."
+"petitioner" = "pylos_injured_builder"
+"against" = "pylos_works_overseer"
+
+["case_overrides"."widows_ration_balance"]
+"claim_text" = "Our households received {paid:,} qa twelve fortnights ago. We ask for the remaining {balance:,}."
+"counter_text" = "The ration clerk asks that the first settlement stand."
+"petitioner" = "pylos_soldier_households"
+"against" = "pylos_ration_clerk"
+
+["revenue"]
+
+["revenue"."land"]
+"initial_rate" = 180
+"base_rate" = 180
+
+["revenue"."harbour"]
+"initial_rate" = 90
+"customary_rate" = 90
+
+["cohort_voices"]
+
+["cohort_voices"."cohort:seat_field_labour"]
+"name" = "the farming households of Pylos"
+"representative" = "Mawon"
+
+["cohort_voices"."cohort:seat_craft"]
+"name" = "the craft households of Pylos"
+"representative" = "Philai"
+
+["actor_names"]
+"pylos_craft_claimant" = "Aktor the bronze worker"
+"pylos_workshop_overseer" = "the workshop overseer"
+"pylos_injured_builder" = "Mawon the estate mason"
+"pylos_works_overseer" = "the works overseer"
+"pylos_soldier_households" = "the coast-watch households"
+"pylos_ration_clerk" = "the ration clerk"
+
+["governance"]
+cycle = 6
+bronze_quota = 600
+craft_group = "smiths_palace"
+"kind" = "mycenaean"

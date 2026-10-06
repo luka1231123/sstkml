@@ -401,20 +401,25 @@ def _evidence_lines(b: dict, item: dict, width: int) -> list[tuple[str, str]]:
             said or "—", width, break_long_words=False, break_on_hyphens=False))
     waited = item["waiting"]
     lines.append((f"Waiting {waited} fortnight{'s' if waited != 1 else ''}" +
-                  (f" · unrest +{item['waiting_unrest']} a fortnight"
+                  (f" · anger +{item['waiting_unrest']} a fortnight"
                    f" after {item['grace']}" if item.get("waiting_unrest") else ""),
                   "bone"))
+    if item.get("waiting_penalty_cap") is not None:
+        lines.append((f"Delay charges stop after {item['waiting_penalty_cap']} fortnights beyond grace.", "sand"))
+    if item.get("beneficiary", item["petitioner"]) != item["petitioner"]:
+        lines.extend((row, "sand") for row in textwrap.wrap(
+            f"Grain joins {item['beneficiary_name']} reserves on behalf of the claimant.", width))
     outcomes = _outcomes(item)
     good = str(next(iter(outcomes.values()))["good"])
     lines.append((f"Palace holds {int(b.get('stores', {}).get(good, 0)):,} {good}", "bone"))
-    lines.append(("STAKES · payments and city unrest", "gold"))
+    lines.append(("STAKES · payments and city anger", "gold"))
     keys = {verdict: key.upper() for key, verdict, _label in VERDICTS}
-    labels = {"for": "Pay the claim", "against": "Pay the counterclaim", "split": "Split the claim"}
+    labels = {"for": "Grant", "against": "Counter-offer" if outcomes["against"]["amount"] else "Refuse", "split": "Compromise"}
     for verdict in ("for", "against", "split"):
         outcome = outcomes[verdict]
         unrest = int(outcome["unrest"])
         text = (f"[{keys[verdict]}] {labels[verdict]}: {int(outcome['amount']):,} {good}; "
-                f"unrest {unrest:+}")
+                f"anger {unrest:+}")
         lines.extend((row, "clay" if outcome.get("affordable", True) else "blood")
                      for row in textwrap.wrap(text, width))
     return lines
@@ -432,9 +437,9 @@ def _court_detail(b: dict, chosen: str,
              f"grievance {band.get('grievance', 0)}", "clay"),
             (f"they would eat {eats:,} qa a fortnight", "clay"),
             ("", "clay"),
-            ("Take them in and they are yours to feed. Turn them away and "
-             "they go hungry to the next gate, or take what they need at "
-             "this one.", "ash"),
+            ("If admitted, they receive palace rations. If refused, "
+             "they may leave or raid "
+             "the city.", "ash"),
         ]
     item = next((p for p in b.get("justice", {}).get("petitions", [])
                  if p["id"] == chosen), None)

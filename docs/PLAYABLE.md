@@ -5,7 +5,30 @@
   verification and screen repairs after `d382965`
 - Every number below comes from a run in this repository, not from reading code
 
-## Current assessment — 2026-09-21
+## Cultural expansion — 2026-10-06
+
+Eight playable courts include Pylos, Pi-Ramesses and Hattusa. Their governing
+accounts issue actual workshop bronze, feed craft or temple households, change
+provincial assessments, or commit troops to service at Carchemish. The account
+window shows costs, deadlines and results. Letter forms use the current ruler
+and recorded rank. Screen text and authored letters were edited for direct
+language. Native order review and issue were inspected; saved account progression
+resumed correctly. Scope and limitations are in [CULTURES_PLAN.md](CULTURES_PLAN.md).
+
+## Native expansion — 2026-10-06
+
+Five playable courts retain the original Palace Desktop. The charter (F3) gives
+three city-specific, seasonal aims and direct room links. Court starts with a
+concise decision; Enter/V opens full testimony. Reports lead with changed stakes
+and actual causes, retaining full records below. Optional six-fortnight public
+pledges create explicit policy stakes. Recurring state-backed audiences include
+sickness, campaign families, construction levies and royal gifts during ration
+cuts. New injury and widow grain awards reach living local household reserves,
+with the recipient shown before judgement; old saved transfers replay intact.
+These are implemented features; sustained human enjoyment and balance
+remain an assessment for actual play, not established by automated progression.
+
+## Historical assessment — 2026-09-21
 
 The owner reports that the game remains unclear, hides actions and fails in
 ordinary use. Earlier implementation and smoke-check results do not establish

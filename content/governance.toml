@@ -1,0 +1,22 @@
+# Scenario rules, not a claim to reconstruct a complete ancient constitution.
+# Every issue comes from the existing grain or bronze account.
+[rules]
+cycle = 6
+grain_quota = 12000
+bronze_quota = 600
+muster_min = 100
+
+[mycenaean]
+title = "The workshop account"
+source = "Linear B palace records and the workshops of Mycenaean Greece"
+source_url = "https://www.metmuseum.org/essays/mycenaean-civilization"
+
+[egyptian]
+title = "Temple and province"
+source = "Egyptian estate accounts, grain assessments and temple supplies"
+source_url = "https://www.ucl.ac.uk/museums-static/digitalegypt/accountancy/assessment.html"
+
+[hittite]
+title = "The royal service"
+source = "Hittite diplomatic texts: military service and obligations"
+source_url = "https://www.bibliovault.org/BV.book.epl?ISBN=9781628374759"

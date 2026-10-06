@@ -43,15 +43,18 @@ def historical(direction: str = "") -> tuple[dict, ...]:
         if not direction or letter.get("direction") == direction)
 
 
-def scribe_messages(recipient: str, matter: str) -> list[dict]:
+def scribe_messages(recipient: str, matter: str, context: dict | None = None) -> list[dict]:
     """The scribe's prompt for one matter: standing rules, rank, examples.
 
     Assembled here rather than written inline so that the rules, the register
     and the worked pairs can each be read and tested on their own.
     """
-    rule = formula(load_formulae(), profile_for(recipient))
+    rule = formula(load_formulae(), profile_for(recipient, context=context))
     direction = rule.get("direction", "level")
     system = _SCRIBE["system"]["text"]
+    if context:
+        system = system.replace("Yabninu", "the palace scribe").replace("Ammurapi", context["ruler"]).replace("king of Ugarit", context["title"])
+        system += f"\nThe sender is {context['ruler']}, {context['title']}. Use that identity."
     rank = _SCRIBE.get("rank", {}).get(direction, {}).get("text", "")
     if rank:
         system = f"{system}\n\n{rank}"
@@ -128,7 +131,7 @@ def _body(intent: str) -> tuple[str, str]:
     forms = {
         "reassure": (
             "Your tablet was heard in my hall.",
-            "Let your heart be reassured: goodwill remains between our houses.",
+            "Goodwill remains between our houses.",
         ),
         "refuse": (
             "Your words were heard in my hall.",
@@ -141,8 +144,7 @@ def _body(intent: str) -> tuple[str, str]:
         ),
         "warn": (
             "Hear the word brought swiftly to my gate.",
-            "Danger gathers upon the road; set your watch before it "
-            "reaches your walls.",
+            "Danger is reported on the road. Set your watch.",
         ),
         "excuse": (
             "Your words were heard in my hall.",
@@ -159,7 +161,7 @@ def _body(intent: str) -> tuple[str, str]:
         (body for key, body in forms.items() if key == _intent_key(intent)),
         (
             "The words dictated in my hall are set before you.",
-            "Hear this matter as Ammurapi has spoken it beneath his seal.",
+            "Hear the matter spoken by the king beneath his seal.",
         ),
     )
 
@@ -200,12 +202,12 @@ def fallback_text(recipient: str, intent: str, profile_id: str,
     if rule.get("wellbeing_required") and rule.get("wellbeing"):
         lines.append(rule["wellbeing"])
     lines.extend(_body(intent))
-    lines.append("Yabninu wrote it; the palace courier bears the sealed tablet.")
+    lines.append("The palace scribe wrote it; the courier bears the sealed tablet.")
     return "\n".join(lines)
 
 
-def raw_draft(text: str, recipient: str) -> Draft:
-    profile_id = profile_for(recipient)
+def raw_draft(text: str, recipient: str, context: dict | None = None) -> Draft:
+    profile_id = profile_for(recipient, context=context)
     return Draft(
         text, profile_id, grade_for(text, profile_id, recipient=recipient), "player")
 
@@ -319,7 +321,7 @@ def _matter_ok(original: str, corrected: str) -> bool:
 
 
 def correct_matter(recipient: str, matter: str, seed: int, turn: int,
-                   client=None) -> MatterCorrection:
+                   client=None, context: dict | None = None) -> MatterCorrection:
     """Have Yabninu compact a matter without changing its material meaning.
 
     The result contains only the corrected matter, never an address or closing.
@@ -330,7 +332,7 @@ def correct_matter(recipient: str, matter: str, seed: int, turn: int,
     if client is None:
         return MatterCorrection(recovery, "fallback")
 
-    messages = scribe_messages(recipient, matter)
+    messages = scribe_messages(recipient, matter, context)
     limit = int(_SCRIBE["meta"].get("max_words", 140))
     try:
         for attempt in range(int(_SCRIBE["meta"].get("attempts", 2))):
@@ -354,9 +356,9 @@ def correct_matter(recipient: str, matter: str, seed: int, turn: int,
 
 
 def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
-            client=None) -> Draft:
+            client=None, context: dict | None = None) -> Draft:
     data = load_formulae()
-    profile_id = profile_for(recipient, data)
+    profile_id = profile_for(recipient, data, context)
     rule = formula(data, profile_id)
     allowed = set(data["meta"]["formulaic_numbers"])
     allowed.update(extract_numerals_and_number_words(
@@ -373,8 +375,9 @@ def compose(recipient: str, intent: str, facts: dict, seed: int, turn: int,
     )
     messages = [
         {"role": "system", "content":
-         "You are Yabninu, scribe of Ammurapi. Write only a compact Bronze Age "
-         "tablet of 25 to 90 words in 3 to 6 formulaic lines. Preserve the "
+         f"You are the palace scribe of {context['ruler'] if context else 'the king'}. Write only a compact Bronze Age "
+         "tablet of 25 to 90 words in 3 to 6 short lines. No metaphor, "
+         "moral lesson, praise, or invented atmosphere. Preserve the "
          "stated intent, recipient, and facts exactly; invent no terms. /no_think"},
         {"role": "user", "content": prompt},
     ]

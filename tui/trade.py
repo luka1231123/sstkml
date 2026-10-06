@@ -19,8 +19,8 @@ def _due(arrives: int | None, now: int) -> str:
 
 
 def _lots(count: int) -> str:
-    return "nothing at the quay" if not count else (
-        f"{count} lot{'s' if count != 1 else ''} at the quay")
+    return "nothing at the market" if not count else (
+        f"{count} lot{'s' if count != 1 else ''} at the market")
 
 
 def _cargo_name(cargo: dict) -> str:
@@ -62,6 +62,7 @@ def compose(b: dict, width: int = 72, height: int = 24,
             ("OTHER WAYS TO GET GRAIN", "gold"),
             ("[g] ask a foreign court: a loan, arrives in weeks", "clay"),
             ("[2] Stocks: seize merchants' grain, unpaid; unrest rises", "clay"),
+            ("[k] keeper's mandate: delegate routine grain purchases", "gold"),
         ]
         for line, tone in facts:
             surface.text(3, y, line[:width - 6], C[tone], C["ink"])
@@ -117,7 +118,8 @@ def compose(b: dict, width: int = 72, height: int = 24,
     style.notice(surface, 3, height - 4, width - 6, notice)
     nav = [style.FooterAction("tab", "view")]
     if view == "exchange":
-        nav.append(style.FooterAction("esc", "close"))
+        nav += [style.FooterAction("k", "keeper mandate", command="trade:mandate"),
+                style.FooterAction("esc", "close")]
     if view in {"cargo", "movements", "routes"} and ids:
         nav += [style.FooterAction("↑↓", "choose", command="trade:next"),
                 style.FooterAction("enter", "open")]

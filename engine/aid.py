@@ -1,5 +1,8 @@
-"""Asked-for aid is a loan: asking costs esteem, receiving opens a debt,
-and an unpaid debt brings raiders."""
+"""Asked-for aid is a loan: delivery opens a debt and repayment repairs trust.
+
+Default leaves an enforceable balance. A king who survives a creditor's raid
+can still repay what he owes and reopen the relationship.
+"""
 from __future__ import annotations
 
 import dataclasses
@@ -32,10 +35,12 @@ def asked(world, actor: str):
     return _esteem(world, court, _rule(world, "aid_request", -40)) if court else world
 
 
-def received(world, actor: str, good: str, quantity: int):
+def received(world, actor: str, good: str, quantity: int,
+             *, request_letter: str | None = None):
     court = _court(world, actor)
     if not court or not any(
             _court(world, claim.party) == court and claim.good == good
+            and (request_letter is None or claim.source_letter == request_letter)
             for claim in world.letter_claims):
         return world
     due = world.date.absolute + _rule(world, "aid_repay_turns", 12)
@@ -53,12 +58,18 @@ def received(world, actor: str, good: str, quantity: int):
 def repaid(world, actor: str, good: str, quantity: int):
     court, debts = _court(world, actor), []
     for debt in world.aid_debts:
-        if quantity and debt.creditor == court and debt.good == good and debt.status == "open":
+        if (quantity and debt.creditor == court and debt.good == good
+                and debt.status in {"open", "defaulted"}):
             pay = min(quantity, debt.owed)
             quantity -= pay
+            previous_status = debt.status
             debt = dataclasses.replace(
                 debt, owed=debt.owed - pay,
-                status="paid" if pay == debt.owed else "open")
+                status="paid" if pay == debt.owed else debt.status)
+            if debt.status == "paid" and court:
+                world = _esteem(world, court, _rule(
+                    world, "aid_default_repaid" if previous_status == "defaulted"
+                    else "aid_repaid", 120 if previous_status == "defaulted" else 50))
         debts.append(debt)
     return dataclasses.replace(world, aid_debts=tuple(debts))
 

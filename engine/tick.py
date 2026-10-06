@@ -132,7 +132,7 @@ def _arrivals(world: World) -> tuple[World, list]:
 
 
 def _production(world: World, kernel_events: list) -> tuple[World, list]:
-    from engine import institution, metal, revenue, works
+    from engine import institution, metal, revenue, works, steward
 
     events: list = []
     world, produced = seat.harvest(world, kernel_events); events += produced
@@ -142,6 +142,7 @@ def _production(world: World, kernel_events: list) -> tuple[World, list]:
     world, produced = revenue.land_cargo(world); events += produced
     world, produced = revenue.collect_harbour(world); events += produced
     world, produced = works.step(world); events += produced
+    world, produced = steward.step(world); events += produced
     return world, events
 
 
@@ -170,7 +171,7 @@ def _health(world: World) -> tuple[World, list]:
 
 def _politics(world: World) -> tuple[World, list]:
     from engine import correspondence_policy, defence, displacement, fall, justice
-    from engine import aid, relations, revenue
+    from engine import aid, relations, revenue, pledges, governance
 
     events: list = []
     world, produced = systems.recompute_unrest(world); events += produced
@@ -183,6 +184,8 @@ def _politics(world: World) -> tuple[World, list]:
         world, produced = defence.launch(world); events += produced
         world, produced = displacement.step(world); events += produced
         world, produced = defence.step(world); events += produced
+    world, produced = governance.step(world); events += produced
+    world, produced = pledges.step(world); events += produced
     world, produced = fall.step(world); events += produced
     return world, events
 

@@ -25,7 +25,7 @@ def new_seed() -> int:
     return secrets.randbits(48)
 
 
-SAVE_VERSION = 29
+SAVE_VERSION = 30
 
 
 def play(seed: int, chosen_alu: str, script: list[list]) -> tuple[object, list, list]:
@@ -48,7 +48,8 @@ def play(seed: int, chosen_alu: str, script: list[list]) -> tuple[object, list, 
 def save(path: str | Path, seed: int, chosen_alu: str, turns: int,
          log: list, world, ai_log: list | None = None,
          hours_left: int | None = None,
-         court_report: list[str] | None = None) -> None:
+         court_report: list[str] | None = None,
+         desk_drafts: dict | None = None, last_receipt: list[str] | None = None) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps({
@@ -56,12 +57,16 @@ def save(path: str | Path, seed: int, chosen_alu: str, turns: int,
         "seed": seed,
         "chosen_alu": chosen_alu,
         "turns": turns,
+        "court_content_from": world.court_content_from,
+        "opening_rules_version": world.opening_rules_version,
         "log": log,
         "ai_log": ai_log or [],
         # Questions and other information work can spend attention without
         # changing World, so a GUI save must carry the remainder explicitly.
         "hours_left": hours_left,
         "court_report": court_report or [],
+        "desk_drafts": desk_drafts or {},
+        "last_receipt": last_receipt or [],
     }, indent=2)
     # A campaign save should never be a half-written JSON file after an
     # interrupted process.  Replace a sibling temporary file atomically.
@@ -78,7 +83,9 @@ def load_session(path: str | Path):
             "This save predates the current shared-world format and cannot be loaded. "
             f"Start a new campaign (save {data.get('version')!r}, "
             f"current {SAVE_VERSION}).")
-    world = load_campaign(data["chosen_alu"], data["seed"])
+    world = load_campaign(data["chosen_alu"], data["seed"],
+        court_content_from=data.get("court_content_from", data["turns"] + 1),
+        opening_rules_version=data.get("opening_rules_version", 0))
     by_turn: dict[int, list] = {}
     for entry in data["log"]:
         action = from_dict(entry["action"])
@@ -97,3 +104,19 @@ def replay(path: str | Path):
     """Compatibility entry point returning only the rebuilt world."""
     world, _data = load_session(path)
     return world
+
+
+def compatible_save(path: str | Path) -> bool:
+    try:
+        return json.loads(Path(path).read_text()).get("version") == SAVE_VERSION
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def latest_campaign() -> str:
+    from load import playable_courts
+    root = Path(__file__).parent / "saves"
+    saves = [(root / city["id"] / "autosave.json", city["id"])
+             for city in playable_courts()]
+    saves = [(path, city) for path, city in saves if compatible_save(path)]
+    return max(saves, key=lambda item: item[0].stat().st_mtime)[1] if saves else "seat"

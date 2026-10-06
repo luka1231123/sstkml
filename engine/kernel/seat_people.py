@@ -204,7 +204,7 @@ def _apportion(total: int, weights: tuple[tuple[str, int], ...],
 
 
 def split(cohort: Cohort, shares: Mapping[str, int],
-          turn: int) -> tuple[Cohort, ...]:
+          turn: int, *, conserve_ration_accounts: bool = False) -> tuple[Cohort, ...]:
     """Send parts of a cohort somewhere, conserving people and households."""
     asked = {key: int(shares[key]) for key in sorted(shares)}
     if any(heads < 0 for heads in asked.values()):
@@ -246,6 +246,21 @@ def split(cohort: Cohort, shares: Mapping[str, int],
         cohort, people=cohort.people - taken, households=houses[cohort.id],
         infected=infected[cohort.id], recovered=recovered[cohort.id],
         dead=dead[cohort.id])
+    if conserve_ration_accounts:
+        # These are quantities owed or authorised, not per-person traits.
+        # Copying them would multiply both the debt and permission to eat.
+        shortfall = _apportion(cohort.shortfall, weights,
+                              {key: cohort.shortfall if heads else 0
+                               for key, heads in weights})
+        allowance = (_apportion(cohort.allowance, weights,
+                                {key: cohort.allowance if heads else 0
+                                 for key, heads in weights})
+                     if cohort.allowance >= 0 else None)
+        parts = [dataclasses.replace(part, shortfall=shortfall[part.id],
+                    allowance=allowance[part.id] if allowance is not None else -1)
+                 for part in parts]
+        parent = dataclasses.replace(parent, shortfall=shortfall[parent.id],
+                    allowance=allowance[parent.id] if allowance is not None else -1)
     return tuple(sorted([parent] + parts, key=lambda c: c.id))
 
 

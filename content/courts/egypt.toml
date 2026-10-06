@@ -1,0 +1,525 @@
+# Fictional royal household; historically inspired Late Bronze Age setting.
+"chosen_alu" = "egypt"
+"campaign_name" = "Pi-Ramesses"
+"campaign_tagline" = "Pharaoh’s granaries and officials"
+"campaign_description" = "An Egyptian royal court in the Delta. Grain deliveries support a large ration roll, temple staff and chariot forces. Keep officials paid and stores ready for the next harvest. This household is fictional."
+"actor" = "egypt_meriatum"
+"seat" = "seat"
+"attention_base" = 12
+"house_names_f" = ["Tia", "Henuttawy", "Iset", "Takhat", "Nefertari", "Merit"]
+"house_names_m" = ["Meriatum", "Hori", "Panehsy", "Pentaweret", "Nakht", "Meryre"]
+"names" = ["Meriatum", "Hori", "Panehsy", "Pentaweret", "Nakht", "Meryre", "Tia", "Henuttawy", "Iset", "Takhat", "Nefertari", "Merit"]
+"priority" = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
+"land_capacity_per_mille" = 1250
+"foreign_courts" = []
+"sovereign" = true
+
+["scribe"]
+"competence" = 920
+"fatigue" = 500
+
+["stores"]
+"grain" = 3600000
+"seed_grain" = 0
+"oil" = 12000
+"wine" = 7000
+"copper" = 110000
+"tin" = 8000
+"bronze" = 15000
+
+[["harbour_cargo"]]
+"id" = "egypt_cargo_oil"
+"owner" = "ura_merchant"
+"place" = "seat"
+"good" = "oil"
+"quantity" = 2400
+
+[["groups"]]
+"id" = "household"
+"name" = "the royal household"
+"size" = 220
+"entitlement" = 16
+"function" = "household"
+"place" = "seat"
+
+[["groups"]]
+"id" = "garrison_mahadu"
+"name" = "the royal guard"
+"size" = 300
+"entitlement" = 14
+"function" = "garrison"
+"place" = "seat"
+
+[["groups"]]
+"id" = "cult_baal"
+"name" = "the servants of Amun"
+"size" = 900
+"entitlement" = 13
+"function" = "cult"
+"place" = "seat"
+
+[["groups"]]
+"id" = "smiths_palace"
+"name" = "the royal chariot workshops"
+"size" = 350
+"entitlement" = 12
+"function" = "bronze_working"
+"place" = "seat"
+
+[["groups"]]
+"id" = "weavers"
+"name" = "the linen workers of the royal estate"
+"size" = 600
+"entitlement" = 11
+"function" = "weaving"
+"place" = "seat"
+
+[["groups"]]
+"id" = "field_hands"
+"name" = "the workers of the royal estates"
+"size" = 3200
+"entitlement" = 10
+"function" = "field_labour"
+"place" = "seat"
+
+[["groups"]]
+"id" = "palace_dependents"
+"name" = "the ration households of Pi-Ramesses"
+"size" = 40000
+"entitlement" = 10
+"function" = "populace"
+"place" = "seat"
+
+["metals"]
+"bronze_in_circulation" = 138000
+"melt_ledger" = 0
+
+[["workshops"]]
+"id" = "palace_forge"
+"name" = "the royal chariot workshops"
+"group_id" = "smiths_palace"
+"bronze_demand" = 900
+
+[["institutions"]]
+"id" = "harbour_mahadu"
+"name" = "the Nile quay"
+"kind" = "harbour"
+"place" = "seat"
+"group" = "garrison_mahadu"
+"head" = "harbourmaster"
+"condition" = 760
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 6
+
+[["institutions"]]
+"id" = "granary_seat"
+"name" = "the royal granaries"
+"kind" = "granary"
+"place" = "seat"
+"group" = "household"
+"head" = "steward_granary"
+"condition" = 760
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "forge_palace"
+"name" = "the royal chariot workshops"
+"kind" = "workshop"
+"place" = "seat"
+"group" = "smiths_palace"
+"head" = "master_smith"
+"condition" = 820
+"capacity" = 900
+
+[["institutions"]]
+"id" = "temple_baal"
+"name" = "the temple of Amun"
+"kind" = "temple"
+"place" = "seat"
+"group" = "cult_baal"
+"head" = "high_priest"
+"condition" = 850
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 10
+
+[["institutions"]]
+"id" = "walls_seat"
+"name" = "the walls of Pi-Ramesses"
+"kind" = "walls"
+"place" = "seat"
+"head" = ""
+"condition" = 820
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "tablet_house"
+"name" = "the royal record office"
+"kind" = "archive"
+"place" = "seat"
+"head" = ""
+"condition" = 840
+"capacity" = 1000
+
+[["formations"]]
+"id" = "chariotry"
+"name" = "the royal chariot force"
+"strength" = 360
+"equipment_floor" = 64800
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "household_troops"
+"name" = "the royal infantry"
+"strength" = 1500
+"equipment_floor" = 52500
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "coast_watch"
+"name" = "the road guards"
+"strength" = 300
+"equipment_floor" = 10500
+"task" = "watch"
+"place" = "seat"
+
+[["house"]]
+"id" = "egypt_meriatum"
+"name" = "Meriatum"
+"sex" = "m"
+"age_years" = 46
+"health" = 720
+"spouse" = "egypt_queen"
+"own_agenda" = "keep the army and households supplied"
+
+[["house"]]
+"id" = "egypt_queen"
+"name" = "Tia, the queen"
+"sex" = "f"
+"age_years" = 44
+"health" = 760
+"spouse" = "egypt_meriatum"
+"own_agenda" = "secure her son’s succession"
+
+[["house"]]
+"id" = "egypt_queen_mother"
+"name" = "Henuttawy, the queen mother"
+"sex" = "f"
+"age_years" = 73
+"health" = 640
+"faction" = "queen_mother"
+"is_queen_mother" = true
+"own_agenda" = "retain the temple estates"
+
+[["house"]]
+"id" = "egypt_commander"
+"name" = "Hori, commander"
+"sex" = "m"
+"age_years" = 45
+"health" = 740
+"faction" = "harbour_house"
+"competence" = 880
+"loyalty" = 470
+"own_agenda" = "keep the army paid"
+
+[["house"]]
+"id" = "egypt_steward"
+"name" = "Panehsy, estate overseer"
+"sex" = "m"
+"age_years" = 39
+"health" = 710
+"faction" = "palace_house"
+"competence" = 420
+"loyalty" = 880
+"own_agenda" = "keep the estate accounts in order"
+
+[["house"]]
+"id" = "egypt_elder"
+"name" = "Pentaweret"
+"sex" = "m"
+"age_years" = 24
+"health" = 700
+"mother" = "egypt_queen"
+"father" = "egypt_meriatum"
+"faction" = "elder_prince"
+"own_agenda" = "receive the royal seal"
+
+[["house"]]
+"id" = "egypt_younger"
+"name" = "Nakht"
+"sex" = "m"
+"age_years" = 18
+"health" = 660
+"mother" = "egypt_queen"
+"father" = "egypt_meriatum"
+"faction" = "younger_prince"
+"own_agenda" = "receive command of the troops"
+
+[["house"]]
+"id" = "egypt_daughter"
+"name" = "Iset"
+"sex" = "f"
+"age_years" = 21
+"health" = 780
+"mother" = "egypt_queen"
+"father" = "egypt_meriatum"
+"own_agenda" = "arrange a marriage with another court"
+
+["diviner"]
+"competence" = 640
+"loyalty" = 700
+"faction" = "temple"
+
+[["correspondents"]]
+"actor" = "alashiya_gov"
+"place" = "alashiya"
+"topic" = "ships_sighted"
+"cadence" = 4
+"offset" = 0
+
+["correspondents"."facts"]
+"ships" = 8
+"men" = 30
+
+[["correspondents"]]
+"actor" = "ura_merchant"
+"place" = "ura"
+"topic" = "grain_offer"
+"cadence" = 5
+"offset" = 2
+
+["correspondents"."facts"]
+"grain" = 12000
+"price_copper" = 600
+
+[["correspondents"]]
+"actor" = "hatti_king"
+"place" = "hattusa"
+"topic" = "brother_greeting"
+"cadence" = 8
+"offset" = 2
+
+["correspondents"."facts"]
+"gift" = "silver vessels"
+"number" = 6
+
+[["correspondents"]]
+"actor" = "byblos_king"
+"place" = "byblos"
+"topic" = "vassal_plea"
+"cadence" = 5
+"offset" = 1
+
+["correspondents"."facts"]
+"towns_taken" = 2
+"enemy" = "raiders on the eastern road"
+
+[["correspondents"]]
+"actor" = "memphis_king"
+"place" = "memphis"
+"topic" = "tribute_due"
+"cadence" = 6
+"offset" = 3
+
+["correspondents"."facts"]
+"purple" = 20
+
+[["correspondents"]]
+"actor" = "babylon_king"
+"place" = "babylon"
+"topic" = "brother_greeting"
+"cadence" = 12
+"offset" = 4
+
+["correspondents"."facts"]
+"gift" = "lapis"
+"number" = 10
+
+[["relations"]]
+"other" = "alashiya_gov"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 650
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "ura_merchant"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 600
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "hatti_king"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 690
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "byblos_king"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 610
+"obligation" = 0
+"is_vassal" = true
+"report_bias" = 250
+
+[["relations"]]
+"other" = "memphis_king"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 660
+"obligation" = 0
+"is_vassal" = true
+"report_bias" = 250
+
+[["relations"]]
+"other" = "babylon_king"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 620
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["oaths"]]
+"id" = "oath_egypt_service"
+"parties" = ["egypt_meriatum", "byblos_king"]
+"superior" = "egypt_meriatum"
+"gods" = ["ra"]
+"sworn_turn" = -12
+"sworn_by" = "byblos_king"
+
+[["oaths"."clauses"]]
+"kind" = "provide_goods"
+"good" = "grain"
+"qty" = 60000
+"per_year" = true
+
+[["oaths"."clauses"]]
+"kind" = "provide_troops"
+"n" = 100
+"within" = 4
+
+["plague"]
+"beta" = 470
+"gamma" = 180
+"mortality" = 90
+"exposure" = 35
+"import_place" = "seat"
+"import_turn" = 20
+"import_cases" = 6
+
+[["rites"]]
+"id" = "opet_offering"
+"fortnight" = 1
+"hours" = 2
+"skip_legitimacy" = -100
+"skip_unrest" = 60
+
+["rites"."requires"]
+"grain" = 450
+"wine" = 40
+"oil" = 20
+
+[["rites"]]
+"id" = "first_fruits"
+"fortnight" = 9
+"hours" = 2
+"skip_legitimacy" = -70
+"skip_unrest" = 30
+
+["rites"."requires"]
+"grain" = 300
+"oil" = 15
+
+["case_overrides"]
+
+["case_overrides"."debt_shipwright"]
+"claim_text" = "Hori the chariot builder asks for 9,000 copper shekels owed by the palace."
+"counter_text" = "The workshop overseer reports defective fittings and offers 3,000."
+"petitioner" = "egypt_craft_claimant"
+"against" = "egypt_workshop_overseer"
+
+["case_overrides"."injury_quarry"]
+"claim_text" = "Nakht the royal builder lost the use of one hand on royal work. His household asks for 60,000 qa."
+"counter_text" = "The works overseer disputes the claim and offers 20,000 qa."
+"petitioner" = "egypt_injured_builder"
+"against" = "egypt_works_overseer"
+
+["case_overrides"."widows_ration"]
+"claim_text" = "the missing soldiers’ households ask for 180,000 qa in unpaid rations."
+"counter_text" = "The ration clerk records 60,000 qa owed for this season."
+"petitioner" = "egypt_soldier_households"
+"against" = "egypt_ration_clerk"
+
+["case_overrides"."shipwright_balance"]
+"claim_text" = "Hori the chariot builder received {paid:,} copper on turn {turn}. He asks for the remaining {balance:,}."
+"counter_text" = "The workshop overseer asks that the first settlement stand."
+"petitioner" = "egypt_craft_claimant"
+"against" = "egypt_workshop_overseer"
+
+["case_overrides"."shipwright_bread"]
+"claim_text" = "Hori the chariot builder received {paid:,} copper. His household now asks for 18,000 qa of grain."
+"counter_text" = "The workshop overseer says the debt was paid. The ration roll needs the grain."
+"petitioner" = "egypt_craft_claimant"
+"against" = "egypt_workshop_overseer"
+
+["case_overrides"."injury_quarry_balance"]
+"claim_text" = "Our household received {paid:,} qa for the injury. We ask for the remaining {balance:,}."
+"counter_text" = "The works overseer asks that the first settlement stand."
+"petitioner" = "egypt_injured_builder"
+"against" = "egypt_works_overseer"
+
+["case_overrides"."widows_ration_balance"]
+"claim_text" = "Our households received {paid:,} qa twelve fortnights ago. We ask for the remaining {balance:,}."
+"counter_text" = "The ration clerk asks that the first settlement stand."
+"petitioner" = "egypt_soldier_households"
+"against" = "egypt_ration_clerk"
+
+["revenue"]
+
+["revenue"."land"]
+"initial_rate" = 200
+"base_rate" = 200
+
+["revenue"."harbour"]
+"initial_rate" = 90
+"customary_rate" = 90
+
+["cohort_voices"]
+
+["cohort_voices"."cohort:seat_field_labour"]
+"name" = "the farming households of Pi-Ramesses"
+"representative" = "Meryre"
+
+["cohort_voices"."cohort:seat_craft"]
+"name" = "the craft households of Pi-Ramesses"
+"representative" = "Merit"
+
+["actor_names"]
+"memphis_king" = "the overseer of Memphis"
+"egypt_craft_claimant" = "Hori the chariot builder"
+"egypt_workshop_overseer" = "the workshop overseer"
+"egypt_injured_builder" = "Nakht the royal builder"
+"egypt_works_overseer" = "the works overseer"
+"egypt_soldier_households" = "the missing soldiers’ households"
+"egypt_ration_clerk" = "the ration clerk"
+
+["governance"]
+cycle = 6
+grain_quota = 12000
+temple_group = "cult_baal"
+"kind" = "egyptian"

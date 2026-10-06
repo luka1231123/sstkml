@@ -9,11 +9,13 @@ def plan(b: dict, selected: str = "", amount: int | None = None,
     grain = opening = max(0, b.get("stores", {}).get("grain", 0)
                           - b.get("ration_reserved", 0))
     need = 0
+    budget = 0
     for rank, gid in enumerate(order, 1):
         group = by_id[gid]
         owed = group["size"] * group["entitlement"]
         arrears = group.get("arrears_qa", 0)
         allowance = amount if gid == selected and amount is not None else group["allocated"]
+        budget += min(max(0, allowance), owed + min(arrears, owed))
         paid = min(grain, max(0, allowance), owed + min(arrears, owed))
         grain -= paid
         need += owed
@@ -24,7 +26,8 @@ def plan(b: dict, selected: str = "", amount: int | None = None,
                      next_status="full" if paid >= owed else "none" if not paid else "short")
     return {"groups": [by_id[gid] for gid in order], "remaining": grain,
             "spent": opening - grain, "need": need,
-            "coverage": grain // need if need else None}
+            "coverage": grain // need if need else None,
+            "budget": budget, "policy_coverage": opening // budget if budget else None}
 
 
 def repayment(b: dict, selected: str, qa: int) -> dict:
@@ -42,3 +45,28 @@ def repayment(b: dict, selected: str, qa: int) -> dict:
     return {"owed": owed, "remaining_debt": owed - qa, "free": free,
             "remaining_grain": free - qa, "refusal": refusal,
             "queue": plan(b if refusal else after)}
+
+
+def food_forecast(b: dict, selected: str = "", amount: int | None = None,
+                  priority: tuple = ()) -> dict:
+    """Known grain against the chosen queue; harvest income is not guaranteed."""
+    queue = plan(b, selected, amount, priority)
+    wheel = b.get("calendar", {}).get("wheel", ())
+    now = max(0, int(b.get("fortnight", 1)) - 1)
+    harvest = next((offset for offset in range(len(wheel))
+                    if wheel[(now + offset) % len(wheel)] == "harvest"), None)
+    # The next closing account harvests before paying its rations.
+    before_harvest = max(0, harvest - 1) if harvest is not None else None
+    return {**queue, "harvest_in": harvest, "before_harvest": before_harvest}
+
+
+def forecast_line(b: dict, queue: dict) -> str:
+    coverage = queue.get("policy_coverage")
+    if coverage is None:
+        return "Queue pays nobody; unpaid rations and lost work continue."
+    needed = food_forecast(b)["before_harvest"]
+    if needed is None:
+        return f"Chosen queue: {coverage} fortnights in store; no harvest date recorded."
+    margin = (f"{needed - coverage} short" if coverage < needed else
+              "no spare account" if coverage == needed else f"{coverage - needed} spare")
+    return f"Queue: {coverage} fortnights; {needed} before harvest. {margin}."

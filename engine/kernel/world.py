@@ -433,12 +433,13 @@ def _food_owners(kernel: Kernel, cohort: Cohort) -> set[EntityId]:
         # Its own harvest and nothing else.
         return {cohort.id}
     if tenure == "redistributive":
-        # The state granary, and only it.
-        return {controller}
+        # The ordinary roll comes from the state granary. A court grant or
+        # targeted aid also leaves real grain owned by these households.
+        return {controller, cohort.id}
     if tenure == "prebendal":
         # Fed by the house they serve, wherever they happen to live.
-        return {cohort.origin or controller}
-    return {settlement, controller}
+        return {cohort.origin or controller, cohort.id}
+    return {settlement, controller, cohort.id}
 
 
 def _local_food(kernel: Kernel, book: W.Book,

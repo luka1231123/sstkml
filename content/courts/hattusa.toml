@@ -1,0 +1,546 @@
+# Fictional royal household; historically inspired Late Bronze Age setting.
+"chosen_alu" = "hattusa"
+"campaign_name" = "Hattusa"
+"campaign_tagline" = "The Great King and the vassals"
+"campaign_description" = "The Hittite imperial court. Feed the capital, maintain the chariot forces and keep subordinate rulers answering. Rival branches of the royal family seek offices and the succession. This household is fictional."
+"actor" = "hattusa_tudhaliya"
+"seat" = "seat"
+"attention_base" = 12
+"house_names_f" = ["Danuhepa", "Hentia", "Tawananna", "Malnigal", "Asmunikal", "Hepat"]
+"house_names_m" = ["Tudhaliya", "Huzziya", "Arnuwanda", "Pihawalwi", "Kurunta", "Hesni"]
+"names" = ["Tudhaliya", "Huzziya", "Arnuwanda", "Pihawalwi", "Kurunta", "Hesni", "Danuhepa", "Hentia", "Tawananna", "Malnigal", "Asmunikal", "Hepat"]
+"priority" = ["household", "field_hands", "garrison_mahadu", "cult_baal", "smiths_palace", "weavers", "palace_dependents"]
+"land_capacity_per_mille" = 850
+"foreign_courts" = []
+"sovereign" = true
+
+["scribe"]
+"competence" = 920
+"fatigue" = 500
+
+["stores"]
+"grain" = 2400000
+"seed_grain" = 0
+"oil" = 5000
+"wine" = 4000
+"copper" = 84000
+"tin" = 4500
+"bronze" = 9000
+
+[["harbour_cargo"]]
+"id" = "hattusa_cargo_oil"
+"owner" = "ura_merchant"
+"place" = "seat"
+"good" = "oil"
+"quantity" = 2400
+
+[["groups"]]
+"id" = "household"
+"name" = "the king’s household"
+"size" = 160
+"entitlement" = 16
+"function" = "household"
+"place" = "seat"
+
+[["groups"]]
+"id" = "garrison_mahadu"
+"name" = "the royal guard"
+"size" = 220
+"entitlement" = 14
+"function" = "garrison"
+"place" = "seat"
+
+[["groups"]]
+"id" = "cult_baal"
+"name" = "the servants of the Storm God"
+"size" = 500
+"entitlement" = 13
+"function" = "cult"
+"place" = "seat"
+
+[["groups"]]
+"id" = "smiths_palace"
+"name" = "the royal bronze workshops"
+"size" = 450
+"entitlement" = 12
+"function" = "bronze_working"
+"place" = "seat"
+
+[["groups"]]
+"id" = "weavers"
+"name" = "the weaving households of Hattusa"
+"size" = 360
+"entitlement" = 11
+"function" = "weaving"
+"place" = "seat"
+
+[["groups"]]
+"id" = "field_hands"
+"name" = "the workers of the royal estates"
+"size" = 1800
+"entitlement" = 10
+"function" = "field_labour"
+"place" = "seat"
+
+[["groups"]]
+"id" = "palace_dependents"
+"name" = "the ration households of Hattusa"
+"size" = 28000
+"entitlement" = 10
+"function" = "populace"
+"place" = "seat"
+
+["metals"]
+"bronze_in_circulation" = 112000
+"melt_ledger" = 0
+
+[["workshops"]]
+"id" = "palace_forge"
+"name" = "the royal bronze workshops"
+"group_id" = "smiths_palace"
+"bronze_demand" = 650
+
+[["institutions"]]
+"id" = "harbour_mahadu"
+"name" = "the road depots"
+"kind" = "harbour"
+"place" = "seat"
+"group" = "garrison_mahadu"
+"head" = "harbourmaster"
+"condition" = 760
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 6
+
+[["institutions"]]
+"id" = "granary_seat"
+"name" = "the royal granaries"
+"kind" = "granary"
+"place" = "seat"
+"group" = "household"
+"head" = "steward_granary"
+"condition" = 760
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "forge_palace"
+"name" = "the royal bronze workshops"
+"kind" = "workshop"
+"place" = "seat"
+"group" = "smiths_palace"
+"head" = "master_smith"
+"condition" = 820
+"capacity" = 650
+
+[["institutions"]]
+"id" = "temple_baal"
+"name" = "the temple of the Storm God"
+"kind" = "temple"
+"place" = "seat"
+"group" = "cult_baal"
+"head" = "high_priest"
+"condition" = 850
+"capacity" = 1000
+
+["institutions"."upkeep"]
+"oil" = 10
+
+[["institutions"]]
+"id" = "walls_seat"
+"name" = "the walls of Hattusa"
+"kind" = "walls"
+"place" = "seat"
+"head" = ""
+"condition" = 820
+"capacity" = 1000
+
+[["institutions"]]
+"id" = "tablet_house"
+"name" = "the treaty archive"
+"kind" = "archive"
+"place" = "seat"
+"head" = ""
+"condition" = 840
+"capacity" = 1000
+
+[["formations"]]
+"id" = "chariotry"
+"name" = "the royal chariot force"
+"strength" = 280
+"equipment_floor" = 50400
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "household_troops"
+"name" = "the royal infantry"
+"strength" = 1100
+"equipment_floor" = 38500
+"task" = "garrison"
+"place" = "seat"
+
+[["formations"]]
+"id" = "coast_watch"
+"name" = "the road guards"
+"strength" = 220
+"equipment_floor" = 7700
+"task" = "watch"
+"place" = "seat"
+
+[["house"]]
+"id" = "hattusa_tudhaliya"
+"name" = "Tudhaliya"
+"sex" = "m"
+"age_years" = 54
+"health" = 720
+"spouse" = "hattusa_queen"
+"own_agenda" = "keep the army and households supplied"
+
+[["house"]]
+"id" = "hattusa_queen"
+"name" = "Danuhepa, the queen"
+"sex" = "f"
+"age_years" = 44
+"health" = 760
+"spouse" = "hattusa_tudhaliya"
+"own_agenda" = "secure her son’s succession"
+
+[["house"]]
+"id" = "hattusa_queen_mother"
+"name" = "Hentia, the queen mother"
+"sex" = "f"
+"age_years" = 73
+"health" = 640
+"faction" = "queen_mother"
+"is_queen_mother" = true
+"own_agenda" = "retain the temple estates"
+
+[["house"]]
+"id" = "hattusa_commander"
+"name" = "Huzziya, commander"
+"sex" = "m"
+"age_years" = 45
+"health" = 740
+"faction" = "harbour_house"
+"competence" = 880
+"loyalty" = 470
+"own_agenda" = "keep the army paid"
+
+[["house"]]
+"id" = "hattusa_steward"
+"name" = "Arnuwanda, estate overseer"
+"sex" = "m"
+"age_years" = 39
+"health" = 710
+"faction" = "palace_house"
+"competence" = 420
+"loyalty" = 880
+"own_agenda" = "keep the estate accounts in order"
+
+[["house"]]
+"id" = "hattusa_elder"
+"name" = "Pihawalwi"
+"sex" = "m"
+"age_years" = 24
+"health" = 700
+"mother" = "hattusa_queen"
+"father" = "hattusa_tudhaliya"
+"faction" = "elder_prince"
+"own_agenda" = "receive the royal seal"
+
+[["house"]]
+"id" = "hattusa_younger"
+"name" = "Kurunta"
+"sex" = "m"
+"age_years" = 18
+"health" = 660
+"mother" = "hattusa_queen"
+"father" = "hattusa_tudhaliya"
+"faction" = "younger_prince"
+"own_agenda" = "receive command of the troops"
+
+[["house"]]
+"id" = "hattusa_daughter"
+"name" = "Tawananna"
+"sex" = "f"
+"age_years" = 21
+"health" = 780
+"mother" = "hattusa_queen"
+"father" = "hattusa_tudhaliya"
+"own_agenda" = "arrange a marriage with another court"
+
+["diviner"]
+"competence" = 640
+"loyalty" = 700
+"faction" = "temple"
+
+[["correspondents"]]
+"actor" = "alashiya_gov"
+"place" = "alashiya"
+"topic" = "ships_sighted"
+"cadence" = 4
+"offset" = 0
+
+["correspondents"."facts"]
+"ships" = 8
+"men" = 30
+
+[["correspondents"]]
+"actor" = "ura_merchant"
+"place" = "ura"
+"topic" = "grain_offer"
+"cadence" = 5
+"offset" = 2
+
+["correspondents"."facts"]
+"grain" = 12000
+"price_copper" = 600
+
+[["correspondents"]]
+"actor" = "carchemish_viceroy"
+"place" = "carchemish"
+"topic" = "vassal_plea"
+"cadence" = 5
+"offset" = 1
+
+["correspondents"."facts"]
+"towns_taken" = 1
+"enemy" = "raiders at the river crossing"
+
+[["correspondents"]]
+"actor" = "mira_king"
+"place" = "mira"
+"topic" = "warning"
+"cadence" = 7
+"offset" = 2
+
+["correspondents"."facts"]
+"enemy" = "the Lukka"
+"ships" = 14
+
+[["correspondents"]]
+"actor" = "amurru_king"
+"place" = "amurru"
+"topic" = "vassal_plea"
+"cadence" = 6
+"offset" = 3
+
+["correspondents"."facts"]
+"towns_taken" = 2
+"enemy" = "men across the border"
+
+[["correspondents"]]
+"actor" = "pharaoh"
+"place" = "egypt"
+"topic" = "brother_greeting"
+"cadence" = 10
+"offset" = 4
+
+["correspondents"."facts"]
+"gift" = "gold"
+"number" = 12
+
+[["correspondents"]]
+"actor" = "assyria_king"
+"place" = "assur"
+"topic" = "brother_greeting"
+"cadence" = 12
+"offset" = 5
+
+["correspondents"."facts"]
+"gift" = "horses"
+"number" = 6
+
+[["relations"]]
+"other" = "alashiya_gov"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 650
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "ura_merchant"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 600
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "carchemish_viceroy"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 670
+"obligation" = 0
+"is_vassal" = true
+"report_bias" = 250
+
+[["relations"]]
+"other" = "mira_king"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 560
+"obligation" = 0
+"is_vassal" = true
+"report_bias" = 250
+
+[["relations"]]
+"other" = "amurru_king"
+"status_claim" = "lord"
+"their_status_claim" = "lord"
+"esteem" = 500
+"obligation" = 0
+"is_vassal" = true
+"report_bias" = 250
+
+[["relations"]]
+"other" = "pharaoh"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 650
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["relations"]]
+"other" = "assyria_king"
+"status_claim" = "brother"
+"their_status_claim" = "brother"
+"esteem" = 440
+"obligation" = 0
+"is_vassal" = false
+"report_bias" = 250
+
+[["oaths"]]
+"id" = "oath_hattusa_service"
+"parties" = ["hattusa_tudhaliya", "carchemish_viceroy"]
+"superior" = "hattusa_tudhaliya"
+"gods" = ["storm_god_of_hatti"]
+"sworn_turn" = -12
+"sworn_by" = "carchemish_viceroy"
+
+[["oaths"."clauses"]]
+"kind" = "provide_goods"
+"good" = "grain"
+"qty" = 90000
+"per_year" = true
+
+[["oaths"."clauses"]]
+"kind" = "provide_troops"
+"n" = 180
+"within" = 4
+
+["plague"]
+"beta" = 470
+"gamma" = 180
+"mortality" = 90
+"exposure" = 35
+"import_place" = "seat"
+"import_turn" = 20
+"import_cases" = 6
+
+[["rites"]]
+"id" = "purulli_festival"
+"fortnight" = 1
+"hours" = 2
+"skip_legitimacy" = -100
+"skip_unrest" = 60
+
+["rites"."requires"]
+"grain" = 450
+"wine" = 40
+"oil" = 20
+
+[["rites"]]
+"id" = "first_fruits"
+"fortnight" = 9
+"hours" = 2
+"skip_legitimacy" = -70
+"skip_unrest" = 30
+
+["rites"."requires"]
+"grain" = 300
+"oil" = 15
+
+["case_overrides"]
+
+["case_overrides"."debt_shipwright"]
+"claim_text" = "Pihawalwi the chariot smith asks for 9,000 copper shekels owed by the palace."
+"counter_text" = "The workshop overseer reports defective fittings and offers 3,000."
+"petitioner" = "hattusa_craft_claimant"
+"against" = "hattusa_workshop_overseer"
+
+["case_overrides"."injury_quarry"]
+"claim_text" = "Hesni the wall builder lost the use of one hand on royal work. His household asks for 60,000 qa."
+"counter_text" = "The works overseer disputes the claim and offers 20,000 qa."
+"petitioner" = "hattusa_injured_builder"
+"against" = "hattusa_works_overseer"
+
+["case_overrides"."widows_ration"]
+"claim_text" = "the missing border guards’ households ask for 180,000 qa in unpaid rations."
+"counter_text" = "The ration clerk records 60,000 qa owed for this season."
+"petitioner" = "hattusa_soldier_households"
+"against" = "hattusa_ration_clerk"
+
+["case_overrides"."shipwright_balance"]
+"claim_text" = "Pihawalwi the chariot smith received {paid:,} copper on turn {turn}. He asks for the remaining {balance:,}."
+"counter_text" = "The workshop overseer asks that the first settlement stand."
+"petitioner" = "hattusa_craft_claimant"
+"against" = "hattusa_workshop_overseer"
+
+["case_overrides"."shipwright_bread"]
+"claim_text" = "Pihawalwi the chariot smith received {paid:,} copper. His household now asks for 18,000 qa of grain."
+"counter_text" = "The workshop overseer says the debt was paid. The ration roll needs the grain."
+"petitioner" = "hattusa_craft_claimant"
+"against" = "hattusa_workshop_overseer"
+
+["case_overrides"."injury_quarry_balance"]
+"claim_text" = "Our household received {paid:,} qa for the injury. We ask for the remaining {balance:,}."
+"counter_text" = "The works overseer asks that the first settlement stand."
+"petitioner" = "hattusa_injured_builder"
+"against" = "hattusa_works_overseer"
+
+["case_overrides"."widows_ration_balance"]
+"claim_text" = "Our households received {paid:,} qa twelve fortnights ago. We ask for the remaining {balance:,}."
+"counter_text" = "The ration clerk asks that the first settlement stand."
+"petitioner" = "hattusa_soldier_households"
+"against" = "hattusa_ration_clerk"
+
+["revenue"]
+
+["revenue"."land"]
+"initial_rate" = 170
+"base_rate" = 170
+
+["revenue"."harbour"]
+"initial_rate" = 90
+"customary_rate" = 90
+
+["cohort_voices"]
+
+["cohort_voices"."cohort:seat_field_labour"]
+"name" = "the farming households of Hattusa"
+"representative" = "Hesni"
+
+["cohort_voices"."cohort:seat_craft"]
+"name" = "the craft households of Hattusa"
+"representative" = "Hepat"
+
+["actor_names"]
+"hattusa_craft_claimant" = "Pihawalwi the chariot smith"
+"hattusa_workshop_overseer" = "the workshop overseer"
+"hattusa_injured_builder" = "Hesni the wall builder"
+"hattusa_works_overseer" = "the works overseer"
+"hattusa_soldier_households" = "the missing border guards’ households"
+"hattusa_ration_clerk" = "the ration clerk"
+
+["governance"]
+service_place = "carchemish"
+cycle = 6
+muster_min = 100
+military_group = "garrison_mahadu"
+"kind" = "hittite"

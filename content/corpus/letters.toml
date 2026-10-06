@@ -4,128 +4,101 @@
 # from the letter's structured facts; no number appears that wasn't authored.
 
 [grain_owed]
-summary = "Hattusa. Royal seal. The grain owed under oath. Not warm."
+summary = "Hatti. Grain owed under oath."
 template = """To Ammurapi of Ugarit: thus the Sun, Great King, your lord.
-The grain you owe me under your oath has not come. {ships_promised} ships were
-promised to me; one has sailed. The season turns and my storehouses stand open
-and empty. See to it. Do not make me write to you a third time."""
+The grain owed under oath has not arrived. You promised {ships_promised} ships; {ships_sailed} have sailed. Send the remaining grain and write to me."""
 
 [grain_owed.labels]
 ships_promised = "ships you were promised"
 ships_sailed = "ships that have actually sailed"
 [ships_sighted]
-summary = "Alashiya. Sealed, the governor. Ships off the coast. He is afraid."
-template = """To the king of Ugarit, from {sender}, your servant.
-Ships not our own have been seen off my coast, {ships} of them, and I have but
-{men} men under arms. I have written to you before and had no answer. In the
-name of the gods, send word, and send men, before they are upon us."""
+summary = "Alashiya. The governor reports ships off the coast."
+template = """To the king of Ugarit: thus {sender}, your servant.
+{ships} ships not our own were seen off the coast. I have {men} men under arms. My earlier letter has no answer. Send men and instructions."""
 
 [ships_sighted.labels]
 men = "men you have under arms on the island"
 ships = "ships seen off your coast"
 [exemption]
-summary = "Sinaranu, merchant. Unsealed. Wants his exemption again."
-template = """To my lord the king: I, {sender}, your servant, at your feet.
-Again I ask my lord for the exemption on my ship that comes in from Crete. My
-oil and my copper serve your house and no other. Grant me this, my lord, and I
-shall not forget it, nor shall your storehouses."""
+summary = "Sinaranu asks for a lower harbour toll."
+template = """To my lord the king: thus {sender}, your servant.
+Lower the harbour toll on ships from Crete. My ship brings oil and copper for your house. Set a lower rate for all ships if you agree. Send your decision."""
 
 [greeting]
-summary = "The Delta. Warm words and gold from Pharaoh."
+summary = "Egypt. Pharaoh sends gold and asks for news."
 template = """To my brother, the king of Ugarit: thus the Sun, king of Egypt.
-May it be well with you, with your house, your wives, your sons, your troops.
-I have sent you {gold} talents of gold, a gift between brothers. Write to me of
-your health, and of the ships that pass before your harbour these days."""
+May it be well with you and your house. I sent {gold} talents of gold as a gift. Write of your health and the ships passing your harbour."""
 
 [greeting.labels]
 gold = "talents of gold you have sent him"
 [arrears_complaint]
-summary = "A servant of your house. The ration has not come."
-template = """To the king, my lord: I am {sender}, of {group}.
-The ration has not reached us these {weeks} fortnights. The children ask for it
-and I have no answer to give them. I have not forgotten my lord. I beg my lord:
-do not forget his servants."""
+summary = "A palace group reports unpaid rations."
+template = """To the king, my lord: thus {sender}, of {group}.
+Our ration has not arrived for {weeks} fortnights. Pay what is owed and send instructions."""
 
 [arrears_complaint.labels]
 group = "the body of people you belong to"
 weeks = "fortnights your ration has not come"
 [great_king_demand]
-summary = "The viceroy. Troops are summoned. A date is named."
-template = """To Ammurapi: thus {sender}. In the name of the Sun, my lord and
-yours, send me {troops} men of your household troops, and let them be here
-within {within} fortnights. The Sun does not ask twice. See that they come, and
-that they come armed. Do not write to me of the sea; write to me of soldiers."""
+summary = "The viceroy summons troops by a stated date."
+template = """To Ammurapi: thus {sender}.
+By the Great King’s command, send {troops} household troops within {within} fortnights. Send them armed and report their departure."""
 
 [great_king_demand.labels]
 troops = "household troops you are summoning"
 within = "fortnights he has to send them"
 [vassal_plea]
-summary = "A vassal. His towns are being taken. He begs, again."
-template = """To the king of Ugarit, my brother -- would that I could say my
-lord. This is {sender}. {enemy} have taken {towns_taken} of my towns, and no one
-comes. I have written and written. Behold, if help does not come before the sea
-opens, there will be no kingdom here to help. Send word to the Sun on my behalf,
-for he listens to you and not to me."""
+summary = "A ruler asks for help against an invading enemy."
+template = """To the king of Ugarit, my brother: thus {sender}.
+{enemy} have taken {towns_taken} of my towns. My earlier letters have no answer. Send help and write to the Sun on my behalf."""
 
 [vassal_plea.labels]
 enemy = "who is taking them"
 towns_taken = "towns of yours that have been taken"
 [tribute_due]
-summary = "Sidon. A reminder, courteous and cold, of what is owed."
-template = """To my brother the king of Ugarit, thus {sender}. The purple you
-promised for the house of the god -- {purple} measures -- has not come with the
-last ship. I say nothing of it to others. But the god counts, and so do I. Let
-it come with the next, and we remain brothers."""
+summary = "Sidon. The promised purple has not arrived."
+template = """To my brother, the king of Ugarit: thus {sender}.
+The {purple} measures of purple promised for the temple have not arrived. Send them on the next ship."""
 
 [tribute_due.labels]
 purple = "measures of purple you were promised"
 [brother_greeting]
-summary = "A great king, as an equal. Gifts, and a scale being taken."
-template = """To Ammurapi, my brother, thus {sender}: may it be well with you,
-your house, your wives, your sons, your chariots. I send you {number} of {gift}
-as a gift between brothers who are equals. Write to me of your health -- and tell
-me, my brother, what the king of Egypt last sent to your house. I would know it."""
+summary = "A foreign king sends a gift and asks about Egypt."
+template = """To Ammurapi, my brother: thus {sender}.
+May it be well with you and your house. I send {number} of {gift}. Write of your health and the gifts Egypt sent you."""
 
 [brother_greeting.labels]
 gift = "what you are sending"
 number = "how many you are sending"
 [grain_offer]
-summary = "Ura. Grain for copper, if the sea allows and the price suits."
-template = """To the house of the king of Ugarit, from {sender}. I have {grain}
-measures of good grain lying on the quay, and the season is short. I will let it
-go for {price_copper} of copper the measure, no less, for the risk is mine. Send
-word and send the metal, and it is yours before the sea shuts."""
+summary = "Ura. Grain offered at a stated copper price."
+template = """To the house of the king of Ugarit: thus {sender}.
+I offer {grain} qa of grain. The quoted price is {price_copper} copper. Send your answer before the sea closes."""
 
 [grain_offer.labels]
-grain = "measures of grain lying on your quay"
-price_copper = "copper you want per measure"
+grain = "qa of grain offered"
+price_copper = "quoted copper price"
 [gift_insult]
-summary = "A royal seal. The gift was weighed. The words are colder than the scale."
-template = """To the king of Ugarit: your gift has been weighed before my servants.
-You sent {quantity} of {good}. Is this how your house values mine? Other kings
-know the measure of honour. Send no explanation; send what is fitting."""
+summary = "A foreign ruler rejects the value of your gift."
+template = """To the king of Ugarit.
+Your gift was weighed: {quantity} of {good}. This is less than my house expects. Send a fitting gift."""
 
 [gift_insult.labels]
 good = "what he sent you"
 quantity = "how much he sent you"
 [warning]
-summary = "A distant hand. Movement, rumour, a name to remember."
-template = """To the king of Ugarit. I am {sender}, and I write what I have seen,
-not what I have been told. {enemy}. Believe it or not as you will; I have
-discharged my duty in the writing. Watch your coast, and count your friends."""
+summary = "A foreign court sends a warning."
+template = """To the king of Ugarit: thus {sender}.
+This is the report I received: {enemy}. Set your coast watch."""
 
 [warning.labels]
 enemy = "what you have heard of"
 ships = "ships said to be moving"
 
 [estate_report]
-summary = "An overseer. The fields, the hands, and a request."
-template = """To the king, my lord: thus {sender}, your servant, at the feet of my lord.
-Concerning {estate}: the sowing went into the ground, some {sown} hundred measures
-of it, and the ground took it as the ground does. But I am short of hands, my
-lord, by {hands_short} hundred days of labour before the season closes, and what
-is not worked is not reaped. Send me men, or send me word that none are coming,
-that I may know which of the fields to let go."""
+summary = "An estate overseer asks for field workers."
+template = """To the king, my lord: thus {sender}, your servant.
+At {estate}, {sown} hundred measures were sown. We lack {hands_short} hundred labour-days before the season closes. Send workers, or write that none are coming."""
 
 [estate_report.labels]
 estate = "which estate you are writing about"
@@ -133,15 +106,9 @@ hands_short = "hundreds of labour-days you are short of"
 sown = "hundreds of measures of seed that went into your ground"
 
 [daughter_abroad]
-summary = "Your daughter, from a court that is not yours. She hears things."
-template = """To the king my father, from your daughter, in the house of {court}.
-May it be well with you, and with my mother, and with my brothers.
-They speak of you here. I am held in regard -- some {regard} measures of it, as
-these things are counted -- and I hear that what is owed to this house from
-yours stands at {their_debt} hundreds, though nobody says it to me directly.
-I tell you what I hear, my father, and I ask only that you do not forget that I
-am also of this house now, and that what is good for it is not always what you
-would choose."""
+summary = "Your daughter reports from her husband’s court."
+template = """To the king my father: thus your daughter, at {court}.
+May it be well with you and my family. My standing here is reported as {regard}. This court owes your house {their_debt} hundreds. I report what I hear. Remember that I also belong to this house."""
 
 [daughter_abroad.labels]
 court = "the court you now live in"

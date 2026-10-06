@@ -7,6 +7,9 @@
 # The game is the order in which you let them starve.
 
 chosen_alu = "seat"
+campaign_name = "Ugarit"
+campaign_tagline = "Coastal kingdom under Hatti"
+campaign_description = "A trading port owing grain and troops to Hatti. Feed palace households, gather the harvest and maintain the coast watch."
 actor = "ammurapi"
 seat = "seat"
 attention_base = 10

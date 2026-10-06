@@ -229,7 +229,7 @@ def build_prompt(item: dict, decision: str) -> list[dict]:
          "You are answering a Late Bronze Age diplomatic tablet on clay. Write "
          "the letter only -- no title, no commentary, no signature block. Say "
          "the answer you were given and no other answer. Use no number that "
-         "was not given to you. Promise nothing further. /no_think"},
+         "was not given to you. Promise nothing further. Use short direct statements. No metaphor, moral lesson, invented scene, or repeated plea. /no_think"},
         {"role": "user", "content": prompt},
     ]
 

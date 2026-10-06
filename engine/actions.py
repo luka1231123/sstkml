@@ -29,6 +29,56 @@ class PayArrears:
 
 
 @dataclasses.dataclass(frozen=True)
+class GovernanceOrder:
+    kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class GovernanceRecorded:
+    kind: str
+    order: str
+    detail: str
+
+
+@dataclasses.dataclass(frozen=True)
+class GovernanceAccountClosed:
+    kind: str
+    served: bool
+    detail: str
+
+
+@dataclasses.dataclass(frozen=True)
+class MakeRoyalPledge:
+    kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class RoyalPledgeDeclared:
+    kind: str
+    due_turn: int
+
+
+@dataclasses.dataclass(frozen=True)
+class RoyalPledgeResolved:
+    kind: str
+    kept: bool
+    legitimacy_delta: int
+    unrest_delta: int
+
+
+@dataclasses.dataclass(frozen=True)
+class SetGrainMandate:
+    reserve_fortnights: int
+    max_copper: int
+
+
+@dataclasses.dataclass(frozen=True)
+class GrainMandateSet:
+    reserve_fortnights: int
+    max_copper: int
+
+
+@dataclasses.dataclass(frozen=True)
 class SetPriority:
     order: tuple[str, ...]   # group ids, pay-down order
 
@@ -1040,7 +1090,7 @@ class OfferingConsumed:
 
 _TYPES = {
     c.__name__: c for c in (
-        EndTurn, Allocate, PayArrears, SetPriority, ReadLetter, ArchiveLetter,
+        EndTurn, Allocate, PayArrears, GovernanceOrder, GovernanceRecorded, GovernanceAccountClosed, MakeRoyalPledge, RoyalPledgeDeclared, RoyalPledgeResolved, SetGrainMandate, GrainMandateSet, SetPriority, ReadLetter, ArchiveLetter,
         DelegateLetter, DictateReply, DispatchLetter, LetterTerm,
         RecordReplyText, CargoLanded,
         InspectLedger, SendGift, SendToHarvest, RaiseCorvee,

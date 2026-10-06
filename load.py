@@ -224,6 +224,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
     polities: dict[str, KernelPolity] = {}
     persons: dict[str, KernelPerson] = {}
     ruler_cfg = dict(cfg.get("rulers", {}))
+    independent_seat = bool(cfg.get("sovereign", False))
     for place in alus.values():
         settlement_id = f"settlement:{place.id}"
         pid = f"polity:{place.id}"
@@ -235,7 +236,8 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
             name=str(authored_ruler.get("name", f"the king of {place.name}")))
         overlord_alu = OVERLORD_SEATS.get(place.power, "")
         overlord = (f"polity:{overlord_alu}"
-                    if overlord_alu and overlord_alu != place.id else "")
+                    if overlord_alu and overlord_alu != place.id
+                    and not (independent_seat and place.id == cfg.get("seat")) else "")
         polities[pid] = KernelPolity(
             id=pid, name=place.name, ruler=ruler_id, seat=settlement_id,
             overlord=overlord, tenure=tenure_for(pid))
@@ -342,7 +344,7 @@ def mint_registry(places: dict, sites: tuple, cfg: dict) -> Registry:
         raise ValueError("; ".join(faults))
     return registry
 
-def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict, list]:
+def load_detail(registry: Registry, campaign: str = "seat", court_cfg: dict | None = None) -> tuple[Registry, W.Book, tuple, dict, dict, list]:
     """Fold `content/kernel/detail.toml` onto a minted registry.
 
     The scenario map says what exists and where; it cannot say how much ground
@@ -357,6 +359,41 @@ def load_detail(registry: Registry) -> tuple[Registry, W.Book, tuple, dict, dict
     parameters, not campaign-specific.
     """
     cfg = tomllib.loads((CONTENT / "kernel" / "detail.toml").read_text())
+    if campaign != "seat":
+        cfg = _campaign_slots(cfg, campaign)
+        fertility = int((court_cfg or {}).get("land_capacity_per_mille", 1000))
+        for site in cfg.get("sites", []):
+            if site["settlement"] == SEAT_SETTLEMENT:
+                authored = registry.sites.get(site["id"])
+                if authored and authored.function == "food":
+                    site["capacity"] = int(site["capacity"]) * fertility // 1000
+        for stock in cfg.get("stores", []):
+            if (stock["settlement"] == SEAT_SETTLEMENT
+                    and stock["good"] == "standing_grain"):
+                stock["quantity"] = max(1, int(stock["quantity"]) * fertility // 1000)
+        # The authored world stock includes a generic palace reserve. A playable
+        # court supplies its own opening budget instead, while household grain
+        # stays with the households rather than becoming spendable royal goods.
+        opening = []
+        for row in cfg.get("stores", []):
+            if (row["settlement"] == SEAT_SETTLEMENT
+                    and row.get("owner", SEAT_OWNER) == SEAT_OWNER
+                    and row["good"] != "standing_grain"):
+                if row["good"] == "grain":
+                    cohorts = [c for c in cfg["cohorts"]
+                               if c["settlement"] == SEAT_SETTLEMENT
+                               and c["kind"] != "palace"]
+                    total = sum(c["people"] for c in cohorts)
+                    remaining = int(row["quantity"])
+                    for index, cohort in enumerate(cohorts):
+                        quantity = (remaining if index == len(cohorts) - 1
+                                    else int(row["quantity"]) * cohort["people"] // total)
+                        remaining -= quantity
+                        opening.append({**row, "owner": cohort["id"],
+                                        "quantity": quantity})
+                continue
+            opening.append(row)
+        cfg["stores"] = opening
 
     def known(where: str, field: str, value: str, table) -> None:
         if value not in table:
@@ -533,7 +570,7 @@ def _with_drought(series: tuple[int, ...],
         for turn in range(CLIMATE_YEARS * 24))
 
 
-def load_idmap(registry: Registry) -> dict[str, dict[str, str]]:
+def load_idmap(registry: Registry, campaign: str = "seat") -> dict[str, dict[str, str]]:
     """The court-to-kernel names no rule derives (Task 2 C1).
 
     Every value must name an entity the registry has. An id map is read at the
@@ -551,6 +588,8 @@ def load_idmap(registry: Registry) -> dict[str, dict[str, str]]:
     if not path.exists():
         return {}
     idmap = tomllib.loads(path.read_text())
+    if campaign != "seat":
+        idmap = _campaign_slots(idmap, campaign)
     bad = sorted(
         f"[{section}] {court} -> {kernel}"
         for section, entries in idmap.items()
@@ -626,7 +665,52 @@ def playable_alus() -> tuple[str, ...]:
     return tuple(sorted(path.stem for path in (CONTENT / "courts").glob("*.toml")))
 
 
-def load_campaign(chosen_alu: str, seed: int) -> World:
+def playable_courts() -> list[dict[str, str]]:
+    """Authored campaign introductions for the native Reign window."""
+    courts = []
+    for slug in playable_alus():
+        cfg = tomllib.loads((CONTENT / "courts" / f"{slug}.toml").read_text())
+        courts.append({"id": slug,
+                       "name": str(cfg.get("campaign_name", "Ugarit")),
+                       "tagline": str(cfg.get("campaign_tagline", "The last harbour")),
+                       "description": str(cfg.get("campaign_description", "A rich harbour under Hatti, with a fragile coast and a divided royal house."))})
+    return sorted(courts, key=lambda court: (court["id"] != "seat", court["name"]))
+
+
+def _campaign_slots(value, campaign: str):
+    """Transpose two geographic cities while retaining the engine's court slot.
+
+    `seat` is a canonical player slot used by the palace payroll. Its contents
+    become the chosen city's real parcels, population, region and routes;
+    Ugarit continues autonomously under the other slot. This is a load-time
+    identity permutation, never a change to climate or geography.
+    """
+    if isinstance(value, dict):
+        return {_campaign_slots(key, campaign): (item if key in ("region", "regions", "climate")
+                                                 else _campaign_slots(item, campaign))
+                for key, item in value.items()}
+    if isinstance(value, list):
+        return [_campaign_slots(item, campaign) for item in value]
+    if not isinstance(value, str):
+        return value
+    if value == "seat":
+        return campaign
+    if value == campaign:
+        return "seat"
+    if value == f"org:{campaign}_council":
+        return SEAT_OWNER
+    for prefix in ("settlement:", "polity:", "site:", "cohort:", "org:"):
+        for old, new in (("seat", campaign), (campaign, "seat")):
+            stem = prefix + old
+            if value == stem or value.startswith(stem + "_"):
+                return prefix + new + value[len(stem):]
+    return value
+
+
+def load_campaign(chosen_alu: str, seed: int, *, court_content_from: int = 0,
+                  opening_rules_version: int = 1) -> World:
+    if opening_rules_version not in (0, 1):
+        raise ValueError("unsupported opening rules version")
     world_cfg = tomllib.loads((CONTENT / "world.toml").read_text())
     alus = {row["id"] for row in world_cfg.get("places", [])
             if row.get("kind", "alu") == "alu"}
@@ -636,6 +720,23 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     if not court_path.exists():
         raise ValueError(f"{chosen_alu!r} has no playable court")
     court_cfg = tomllib.loads(court_path.read_text())
+    if chosen_alu != "seat":
+        # Default ruler names must be minted before IDs are permuted, otherwise
+        # an unauthored island king would turn into a different `seat_king`.
+        world_cfg.setdefault("rulers", {})
+        for place in world_cfg.get("places", []):
+            if place.get("kind", "alu") == "alu":
+                world_cfg["rulers"].setdefault(place["id"], {
+                    "id": f"{place['id']}_king", "name": f"the king of {place['name']}"})
+        world_cfg = _campaign_slots(world_cfg, chosen_alu)
+        # Every playable court collects dues from village harvests; its named
+        # payroll is redistributive, but the remaining households own their food.
+        world_cfg["tenure"]["polities"]["polity:seat"] = "subsistence"
+        ruler = next((person for person in court_cfg.get("house", [])
+                      if person["id"] == court_cfg["actor"]), None)
+        world_cfg["rulers"]["seat"] = {
+            "id": court_cfg["actor"],
+            "name": ruler["name"] if ruler else court_cfg["actor"]}
     cfg = {**world_cfg, **court_cfg}
     relation_cfg = tomllib.loads((CONTENT / "relations.toml").read_text())
     names = cfg["names"]
@@ -680,11 +781,24 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
         legend=str(ground.get("legend", "")))
     sites = parse_sites(cfg, places)
     registry = mint_registry(places, sites, cfg)
-    kernel_registry, book, obligations, seasons, region_climate, drought_curve = load_detail(registry)
+    kernel_registry, book, obligations, seasons, region_climate, drought_curve = load_detail(registry, chosen_alu, court_cfg)
+    if chosen_alu != "seat":
+        voices = court_cfg.get("cohort_voices", {})
+        cohorts = dict(kernel_registry.cohorts)
+        for cid, voice in voices.items():
+            if cid in cohorts:
+                cohorts[cid] = dataclasses.replace(cohorts[cid],
+                    name=voice["name"], representative=voice["representative"])
+        kernel_registry = dataclasses.replace(kernel_registry, cohorts=cohorts)
+        persons = dict(kernel_registry.persons)
+        for actor, name in court_cfg.get("actor_names", {}).items():
+            ident = actor if actor.startswith("person:") else f"person:{actor}"
+            persons[ident] = KernelPerson(id=ident, name=name)
+        kernel_registry = dataclasses.replace(kernel_registry, persons=persons)
     # Read for its check. Nothing consumes the map yet -- the sections it will
     # carry belong to steps that have not run -- but a name that has gone stale
     # should fail on the run that broke it, not on the one that first needs it.
-    load_idmap(kernel_registry)
+    load_idmap(kernel_registry, chosen_alu)
 
     rulers = {polity.ruler for polity in kernel_registry.polities.values()}
 
@@ -762,7 +876,11 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     house_cfg = tomllib.loads((CONTENT / "house.toml").read_text())
     works_cfg = tomllib.loads((CONTENT / "works.toml").read_text())
     justice_cfg = tomllib.loads((CONTENT / "justice.toml").read_text())
+    for case in justice_cfg.get("cases", []):
+        case.update(court_cfg.get("case_overrides", {}).get(case["id"], {}))
     revenue_cfg = tomllib.loads((CONTENT / "revenue.toml").read_text())
+    for section in ("land", "harbour"):
+        revenue_cfg[section].update(cfg.get("revenue", {}).get(section, {}))
     justice_cases = tuple(
         Petition(
             id=case["id"], petitioner=case["petitioner"],
@@ -899,7 +1017,12 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     kernel, _ = farm.divide(kernel)
 
     world = World(
-        chosen_alu=chosen_alu,
+        chosen_alu=cfg["seat"],
+        court_content_from=court_content_from,
+        opening_rules_version=opening_rules_version,
+        governance_config=({**tomllib.loads((CONTENT / "governance.toml").read_text())["rules"],
+                            **court_cfg["governance"]}
+                           if court_cfg.get("governance") else {}),
         court=court,
         kernel=kernel,
         terrain=terrain,
@@ -916,7 +1039,9 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
             for point in relation_cfg["gifts"]["reciprocity"]),
         god_ranks={k: int(v) for k, v in relation_cfg["gods"]["rank"].items()},
         protocol_rules={
-            k: int(v) for k, v in relation_cfg["protocol"].items()},
+            **{k: int(v) for k, v in relation_cfg["protocol"].items()},
+            **{f"pledge_{k}": int(v) for k, v in tomllib.loads(
+                (CONTENT / "pledges.toml").read_text())["rules"].items()}},
         climate=climate_series(seed, CLIMATE_YEARS * 24, drought_curve),
         land_rules={
             **{k: int(v) for k, v in land_cfg["agriculture"].items()},
@@ -957,4 +1082,41 @@ def load_campaign(chosen_alu: str, seed: int) -> World:
     # The authored pay-down order is a fact about those people, so it is
     # written on them (Task 2 C3). `enrol` has to have run first: the cohorts
     # it ranks are the ones enrolment just put in the registry.
-    return seat_door.rank(world, tuple(cfg["priority"]))
+    world = seat_door.rank(world, tuple(cfg["priority"]))
+    if opening_rules_version == 1:
+        world = _opening_reserve(world, chosen_alu)
+    return world
+
+
+def _opening_reserve(world: World, campaign: str) -> World:
+    """Declare starting reserves after the actual living payroll is enrolled.
+
+    This is scenario setup at turn zero, not a continuing grant or production
+    rule. Merchant cargo remains merchant property until paid for or seized.
+    """
+    if campaign not in {"egypt", "hattusa", "alashiya"}:
+        return world
+    from engine import seat as seat_door
+    demand = sum(group.size * group.entitlement
+                 for group in seat_door.groups(world).values())
+    first_harvest = int(world.kernel.seasons["harvest"][0])
+    stores = seat_door.held(world)
+    stores["grain"] = max(stores.get("grain", 0),
+                          demand * (first_harvest + 2))
+    world = seat_door.put(world, stores, reason_up="authored",
+                          authority=world.kernel.seat_goods.owner)
+    if campaign == "alashiya":
+        view = world.kernel.seat_goods
+        # A grain factor offers the landed cargo here rather than exporting it
+        # on the general merchant policy before the player can reach Trade.
+        merchant = KernelOrganization(id="org:opening_grain_factor",
+            name="the imported grain factor", settlement=view.seat,
+            kind="merchant", policy="hold", authority=200)
+        orgs = {**world.kernel.registry.orgs, merchant.id: merchant}
+        book, _ = seat_goods.deposit(world.kernel.book,
+            {"grain": demand * 14}, seat=view.seat, owner=merchant.id,
+            authority=merchant.id)
+        world = dataclasses.replace(world,
+            kernel=dataclasses.replace(world.kernel, book=book,
+                registry=dataclasses.replace(world.kernel.registry, orgs=orgs)))
+    return world

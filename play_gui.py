@@ -40,11 +40,11 @@ from ai import narrator
 from engine import actions as A
 from engine.reduce import apply
 from engine.tick import advance
-from load import load_campaign
-from session import load_session, new_seed, save as save_session
+from load import load_campaign, playable_courts
+from session import load_session, new_seed, compatible_save, latest_campaign, save as save_session
 from ai import (commitments, composer as ai_composer, counsel as ai_counsel,
                 librarian, parser as ai_parser, voicer as ai_voicer)
-from tui import advice, collection, palace, aftermath, relief, reckoning, audience, dialog
+from tui import advice, collection, palace, aftermath, relief, reckoning, audience, dialog, reign, governance
 from tui import object as object_page
 from tui import ledgers as ledger_page
 from tui import inbox as inbox_page
@@ -158,7 +158,7 @@ class Game:
     switcher_notice = _window_notice("switcher")
 
     def __init__(self, chosen_alu: str = "seat", seed: int | None = None,
-                 *, playtest: bool = False) -> None:
+                 *, playtest: bool = False, welcome: bool = False) -> None:
         from tui.backend_tk import App
 
         self.seed = new_seed() if seed is None else seed
@@ -168,6 +168,13 @@ class Game:
         if playtest:
             run = datetime.now().strftime('%Y%m%d-%H%M%S-%f')
             self.save_path = self.save_path.parent / f"playtest-{run}" / "autosave.json"
+        self.awaiting_start = welcome
+        self.campaign_generation = 0
+        self.reign_scroll = 0
+        self.reign_new_review = False
+        self.city_selecting = False
+        self.city_pick = chosen_alu
+        self.last_receipt = []
         self.session_notice = ""
         self.load_armed = False
         self.world = load_campaign(chosen_alu, seed)
@@ -304,10 +311,14 @@ class Game:
             self.session_notice = "Playtest: F8 records a note. Your campaign has its own autosave."
             self.repaint()
 
+        if welcome:
+            self.open_reign()
+
     # --- state ---------------------------------------------------------------
 
     def _run_model(self, work, done) -> None:
         """Run the court's language work away from Tk and return on its loop."""
+        generation = getattr(self, "campaign_generation", 0)
         self._model_jobs += 1
         if self._model_jobs == 1:
             self.app.root().after(20, self._poll_model_results)
@@ -318,7 +329,7 @@ class Game:
                 error = None
             except Exception as caught:  # model failure is a UI result, not a crash
                 result, error = None, caught
-            self._model_results.put((done, result, error))
+            self._model_results.put((done, result, error, generation))
 
         threading.Thread(
             target=worker, name="stk-model", daemon=True).start()
@@ -326,11 +337,12 @@ class Game:
     def _poll_model_results(self) -> None:
         while True:
             try:
-                done, result, error = self._model_results.get_nowait()
+                done, result, error, generation = self._model_results.get_nowait()
             except queue.Empty:
                 break
             self._model_jobs = max(0, self._model_jobs - 1)
-            done(result, error)
+            if generation == getattr(self, "campaign_generation", 0):
+                done(result, error)
         if self._model_jobs:
             self.app.root().after(20, self._poll_model_results)
 
@@ -391,7 +403,7 @@ class Game:
                     "reply_"):
                 self._record_reply_text(item["id"], body)
             voiced = dict(item)
-            voiced["body"] = body
+            voiced["body"] = ai_voicer.court_address(item, body)
             voiced["body_source"] = source
             stack.append(voiced)
         enriched = dict(belief)
@@ -555,6 +567,9 @@ class Game:
         whichever surface asked. It is still truthy on success, so the existing
         `if self.do(...)` callers read the same.
         """
+        if getattr(self, "awaiting_start", False):
+            self.open_reign()
+            return registry.ActionResult(registry.REFUSAL, message="Choose a reign first.", hours_left=self.hours)
         descriptor = registry.describe(action)
         action_id = descriptor.id if descriptor else ""
         if cost is None:
@@ -596,14 +611,21 @@ class Game:
             else:
                 self.hours -= cost
                 receipt = []
-                if isinstance(action, A.PayArrears):
+                if isinstance(action, A.GovernanceOrder):
+                    receipt = [e.detail for e in events if isinstance(e, A.GovernanceRecorded)]
+                elif isinstance(action, A.MakeRoyalPledge):
+                    vow = self.world.court.royal_pledge
+                    receipt = [f"Public word sealed: {reign.PLEDGE_NAMES[action.kind]}; six closing accounts, due turn {vow.due_turn}."]
+                elif isinstance(action, A.PayArrears):
                     group = next(g for g in self.belief["groups"] if g["id"] == action.group_id)
                     receipt = [f"Keeper paid {action.qa:,} qa; arrears left {group['arrears_qa']:,} qa."]
                 elif isinstance(action, A.RulePetition):
                     ruled = next(e for e in events if isinstance(e, A.PetitionRuled))
-                    who = palace._name(ruled.beneficiary, self.belief)
+                    who = next((c["name"] for c in self.belief.get("cohorts", ())
+                                if c["id"] == ruled.beneficiary),
+                               palace._name(ruled.beneficiary, self.belief))
                     receipt = [f"{who} received {ruled.amount:,} {ruled.good}. The case is closed.",
-                               f"Court unrest changed {ruled.unrest_delta:+}."]
+                               f"City anger changed {ruled.unrest_delta:+}."]
                 elif isinstance(action, A.SendToHarvest):
                     p = harvest.plan(self.belief)
                     if p["need"] is not None and p["remaining"]:
@@ -620,13 +642,20 @@ class Game:
                     bought = next(e for e in events if isinstance(e, A.TradeFinanced))
                     receipt = [f"Received {bought.received_quantity:,} qa grain from cargo at the quay; "
                                f"paid {bought.quantity:,} copper shekels."]
+                if not receipt:
+                    receipt = render.events_lines(events, self.world.court)
+                if not receipt:
+                    receipt = [description + "."]
+                self.last_receipt = receipt
                 self.log.append({"turn": self.world.date.absolute,
                                  "action": A.to_dict(action), "receipt": receipt})
                 self.load_armed = False
                 result = registry.ActionResult(
                     registry.SUCCESS, action_id,
-                    "Entered: " + description + ".",
+                    receipt[0],
                     cost, self.hours)
+        if result.ok:
+            self.save_current(automatic=True)
         self.notify(result.message, result.status, window=target)
         self.repaint()
         return result
@@ -679,6 +708,7 @@ class Game:
             # confirmed dispatch can reliably leave the wet tablet.  Put the
             # recorded copy under the player's eyes rather than leaving the
             # old incoming letter selected behind the modal.
+            self.save_current(automatic=True)
             self.inbox_filter = "outbox"
             sent = [
                 item for item in self.belief.get("outbox", [])
@@ -704,13 +734,42 @@ class Game:
         self.repaint()
         return True
 
+    def saved_drafts(self) -> dict:
+        drafts = dict(getattr(self, "desk_drafts", {}))
+        active = getattr(self, "desk", None)
+        if active:
+            key = str(active.get("draft_key") or active.get("letter_id") or f"new:{active.get('recipient', '')}")
+            drafts[key] = active
+        fields = ("draft_key", "letter_id", "reply_to", "recipient", "target_place",
+                  "intent", "matter", "cursor", "blocks", "block_focus", "block_order",
+                  "block_edits", "term_builder", "term_focus", "term_pick", "scribe_id",
+                  "courier_id", "path")
+        out = {}
+        for key, draft in drafts.items():
+            stored = {name: draft[name] for name in fields if name in draft}
+            if draft.get("dictating"):
+                block = draft.get("editing_block")
+                if block:
+                    stored["block_edits"] = {**stored.get("block_edits", {}), block: draft.get("buffer", "")}
+                else:
+                    stored["matter"] = draft.get("buffer", "")
+            stored["terms"] = [dict(kind=t.kind, good=t.good, quantity=t.quantity,
+                person_id=t.person_id, destination=t.destination, due_turn=t.due_turn)
+                for t in draft.get("terms", ())]
+            if stored.get("matter") or stored["terms"] or stored.get("block_edits"):
+                out[key] = stored
+        return out
+
     def save_current(self, automatic: bool = False) -> bool:
         """Atomically save the replayable campaign at its current turn."""
+        if getattr(self, "awaiting_start", False):
+            return False
         try:
             save_session(
                 self.save_path, self.seed, self.chosen_alu,
                 self.world.date.absolute, self.log, self.world,
-                hours_left=self.hours, court_report=self.events)
+                hours_left=self.hours, court_report=self.events,
+                desk_drafts=self.saved_drafts(), last_receipt=getattr(self, "last_receipt", []))
         except (OSError, ValueError, TypeError) as error:
             self.session_notice = f"The campaign could not be saved: {error}."
             self.repaint()
@@ -735,35 +794,70 @@ class Game:
             self.session_notice = f"The campaign could not be loaded: {error}."
             self.repaint()
             return False
+        return self.adopt_campaign(world, data)
+
+    def adopt_campaign(self, world, data) -> bool:
+        attention = project(world)["attention"]
+        saved_hours = data.get("hours_left")
+        if saved_hours is not None and (type(saved_hours) is not int or not 0 <= saved_hours <= attention):
+            self.session_notice = "The campaign could not be loaded: invalid saved attention."
+            self.notify(self.session_notice, registry.REFUSAL, window="reign")
+            self.repaint()
+            return False
+        for key in list(self.app.windows):
+            if key not in {"hall", "reign"}:
+                self.app.close(key)
+        self.campaign_generation = getattr(self, "campaign_generation", 0) + 1
+        self.told = {}
+        self.awaiting_start = False
+        self.reign_new_review = False
+        self.reign_scroll = 0
+        self.last_receipt = list(data.get("last_receipt", ()))
         self.world = world
         self.seed = int(data["seed"])
         self.chosen_alu = str(data["chosen_alu"])
+        from ai.client import OllamaClient
+        self.client = OllamaClient(None, f"saves/{self.chosen_alu}/ai_cache")
+        self.city_selecting = False
+        if hasattr(self, "hall_window"):
+            self.hall_window.title = f"Court and Hall — seed {self.seed}"
+            self.hall_window.root.title(self.hall_window.title)
         self.log = list(data["log"])
         self.home_view, self.audience_pick, self.home_scroll = "court", "", 0
         self.receipts, self.hall_pick, self.why_open = (), "", False
         self.audience_deferred = set()
-        saved_hours = data.get("hours_left")
-        attention = self.belief["attention"]
-        if saved_hours is None:
-            self.hours = attention
-        elif not isinstance(saved_hours, int) or not 0 <= saved_hours <= attention:
-            self.load_armed = False
-            self.session_notice = (
-                "The campaign could not be loaded: invalid saved attention.")
-            self.repaint()
-            return False
-        else:
-            self.hours = saved_hours
+        self.hours = attention if saved_hours is None else saved_hours
         # Drafts and confirmations describe the world that was on screen, not
         # the one just loaded. None may leak forward from the abandoned state.
-        self.__dict__.pop("_ledger_state", None)
+        for name in ("_ledger_state", "_orders_state", "_palace_state"):
+            self.__dict__.pop(name, None)
+        self.notices.clear()
         self.works_corvee_draft = 0
+        self.works_pick = self.works_plan_pick = ""
+        self.trade_view, self.trade_pick, self.trade_scroll = "exchange", "", 0
+        self.world_place_pick, self.world_focus = self.belief["seat"], None
+        self.world_route_scroll, self.world_all_routes = 0, False
+        self.counsel_said, self.counsel_typed, self.counsel_thinking = [], "", False
+        self.archive_hits, self.archive_summary, self.archive_query = [], "", ""
+        self.archive_typing = False
+        self.altar_readings = []
+        self.command_history = []
+        self.focused_objects.clear()
+        self.focus_scroll.clear()
+        self.preset_replace = ""
         self.pending_action = None
         self.command_line = ""
         self.events = list(data.get("court_report", ()))
         self.fortnight_scroll = 0
         self.desk = None
         self.desk_drafts.clear()
+        for key, draft in data.get("desk_drafts", {}).items():
+            try:
+                restored = dict(draft)
+                restored["terms"] = tuple(A.LetterTerm(**term) for term in restored.get("terms", ()))
+                self.desk_drafts[key] = restored
+            except (TypeError, ValueError, KeyError):
+                continue
         self.counsel_pending = None
         self.open_letters.clear()
         self.archive_documents.clear()
@@ -803,8 +897,15 @@ class Game:
         return True
 
     def end_fortnight(self) -> None:
+        if getattr(self, "awaiting_start", False):
+            self.open_reign()
+            return
         if self.world.ended:
             self.session_notice = self.world.end_reason
+            self.repaint()
+            return
+        if getattr(self, "pending_action", None) is not None:
+            self.notify("Confirm or cancel the reviewed order before ending the fortnight.", registry.REFUSAL, window="hall")
             self.repaint()
             return
         if self.counsel_pending is not None:
@@ -838,17 +939,20 @@ class Game:
         self.events = (aftermath.lines(before, self.belief, self.log)
                        + render.events_lines(events, self.world.court))
         if self.world.date.absolute % 24 == 0:
-            self.events = reckoning.lines(self.belief, self.world.date.absolute // 24) + self.events
+            self.events += ["", "YEAR-END RECKONING"] + reckoning.lines(self.belief, self.world.date.absolute // 24)
         self.fortnight_scroll = 0
         self.home_view = "court"
         self.audience_pick = ""
         self.audience_deferred = set()
         self.home_scroll = 0
         self.save_current(automatic=True)
+        self.notify("A new audience opens. Tab enters Hall; L there reads what changed last fortnight.", "info", window="hall")
         self.app.close("fortnight")
         self.repaint()
         if hasattr(self, "hall_window"):
             self.hall_window.focus()
+        if self.world.ended:
+            self.open_reign()
 
     # --- windows -------------------------------------------------------------
 
@@ -872,6 +976,31 @@ class Game:
         # Every screen is handed the outcome of the last order given in it.
         # One lookup rather than a differently-named attribute per window.
         notice = self.notice_for(key)
+        if key == "reign":
+            if self.city_selecting:
+                return reign.cities(playable_courts(), self.city_pick, width, height, notice,
+                    saved=[city["id"] for city in playable_courts() if compatible_save(
+                        Path(__file__).parent / "saves" / city["id"] / "autosave.json")])
+            return reign.compose(b, width, height, hours=self.hours,
+                opening=getattr(self, "awaiting_start", False),
+                can_resume=compatible_save(self.save_path),
+                new_review=getattr(self, "reign_new_review", False),
+                receipt=getattr(self, "last_receipt", ()),
+                scroll=getattr(self, "reign_scroll", 0), notice=notice, city=self.chosen_alu)
+        if key == "charter":
+            return reign.charter(b, self.chosen_alu, width, height,
+                getattr(self, "charter_detail", False), getattr(self, "charter_scroll", 0), notice)
+        if key == "governance":
+            public = dict(b, attention=self.hours)
+            return governance.compose(public, width, height, notice)
+        if key == "pledges":
+            return reign.pledges(b, width, height, notice)
+        if key == "audience-evidence":
+            return audience.evidence(b, self.evidence_item, width, height, self.evidence_scroll)
+        if key == "grain-mandate":
+            return reign.grain_mandate(b, width, height, notice)
+        if key == "letter-presets":
+            return reign.letter_presets(width, height, notice)
         if key == "hall":
             if b.get("ended") or getattr(self, "home_view", "court") == "hall":
                 return hall.compose(b, width, height, hours_left=self.hours, notice=notice,
@@ -905,11 +1034,13 @@ class Game:
                         block_edits=self.desk.get("block_edits"),
                         bound=self._desk_bound(),
                         seal_data={
-                            "scribe": self.desk.get("scribe_id", "yabninu"),
-                            "courier": self.desk.get("courier_id", "iliya"),
-                            "route": " > ".join(path),
+                            "scribe": ("palace scribe" if b.get("governance") and self.desk.get("scribe_id", "yabninu") == "yabninu"
+                                       else render.actor_name(self.desk.get("scribe_id", "yabninu"), b.get("house"))),
+                            "courier": ("royal courier" if b.get("governance") and self.desk.get("courier_id", "iliya") == "iliya"
+                                        else render.actor_name(self.desk.get("courier_id", "iliya"), b.get("house"))),
+                            "route": " > ".join(render.place_name(place, b) for place in path),
                             "travel_time": worldmap.path_legs(b, path),
-                        })
+                        }, context=composer.court_context(self.belief))
             if getattr(self, "inbox_filter", "all") == "records":
                 opened = next(
                     (hit for hit in self.archive_hits
@@ -1118,6 +1249,8 @@ class Game:
             return wrapped
 
         bindings = {
+            "<F2>": bind(self.open_reign),
+            "<F3>": bind(self.open_charter),
             "<F8>": bind(self.playtest_note),
             "<colon>": guarded(self.open_palette),
             "<grave>": guarded(self.open_palette),
@@ -1147,6 +1280,335 @@ class Game:
             bindings[f"<{modifier}-Tab>"] = bind(self.cycle_windows)
             bindings[f"<{modifier}-Shift-Tab>"] = bind(lambda: self.cycle_windows(True))
         return bindings
+
+    def open_reign(self) -> None:
+        window = self.app.window(
+            "reign", "The Reign", *desktop.default_size("reign"),
+            on_key=self.on_reign_key, on_resize=self.on_resize,
+            on_close=self.close_reign)
+        self.repaint()
+        window.focus()
+        if getattr(self, "awaiting_start", False):
+            window.root.grab_set()
+
+    def close_reign(self) -> None:
+        if getattr(self, "awaiting_start", False):
+            self.quit()
+            return
+        self.reign_new_review = False
+        self.app.close("reign")
+
+    def on_reign_key(self, event) -> None:
+        command, key = getattr(event, "command", ""), event.keysym
+        raw = event.char or ""
+        char = (raw if raw.isprintable() else (key if len(key) == 1 else "")).lower()
+        opening = getattr(self, "awaiting_start", False)
+        review = getattr(self, "reign_new_review", False)
+        if self.city_selecting:
+            catalog = playable_courts()
+            ids = [city["id"] for city in catalog]
+            if key == "Escape":
+                self.city_selecting = False
+            elif command == "city:resume" or char in {"r", "9"}:
+                self.resume_selected_campaign()
+                return
+            elif command == "city:begin" or key == "Return":
+                self.begin_selected_campaign()
+                return
+            elif command.startswith("city:") and command[5:] in ids:
+                self.city_pick = command[5:]
+            elif char.isdigit() and 1 <= int(char) <= len(ids):
+                self.city_pick = ids[int(char) - 1]
+            elif key in {"Up", "Down"}:
+                self.city_pick = ids[(ids.index(self.city_pick) + (1 if key == "Down" else -1)) % len(ids)]
+            self.repaint()
+            return
+        if char.isdigit() and char != "0":
+            if opening or review:
+                commands = (["reign:resume", "reign:begin"]
+                            if compatible_save(self.save_path) and not review else ["reign:begin"])
+            else:
+                commands = (["reign:report", "reign:orders", "reign:begin"] if self.world.ended else
+                            ["reign:court", "reign:food", "reign:trade", "reign:relief", "reign:begin"])
+            index = int(char) - 1
+            command = commands[index] if index < len(commands) else ""
+        if command == "reign:cancel" or key == "Escape":
+            self.close_reign()
+        elif command == "reign:charter":
+            self.open_charter()
+        elif command == "reign:help" or char == "?":
+            window = self.app.windows.get("reign")
+            if window:
+                window.root.grab_release()
+            self.open_help()
+        elif command == "reign:resume":
+            if self.load_current():
+                window = self.app.windows.get("reign")
+                if window:
+                    window.root.grab_release()
+                self.repaint()
+        elif command == "reign:begin":
+            if self.pending_action:
+                self.notify("Confirm or cancel the order under review first.", registry.REFUSAL, window="reign")
+                self.repaint()
+                return
+            self.city_selecting = True
+            self.city_pick = self.chosen_alu
+            self.repaint()
+        elif command == "reign:new" or char == "n":
+            if self.pending_action:
+                self.notify("Finish or cancel the order under review first.", registry.REFUSAL, window="reign")
+            else:
+                self.reign_new_review = True
+            self.repaint()
+        elif command in {"reign:court", "reign:report"}:
+            self.home_view, self.home_scroll = command.split(":")[1], 0
+            self.app.close("reign")
+            self.raise_hall()
+        elif command == "reign:orders":
+            self.open_orders()
+        elif command == "reign:food":
+            self.storehouse_view = "roll"
+            self.open_ledger("t")
+        elif command in {"reign:trade", "reign:relief"}:
+            self.trade_view = "exchange" if command == "reign:trade" else "relief"
+            self.open_room("x")
+        elif key in {"Up", "Down", "Prior", "Next", "Home", "End"}:
+            step = {"Up": -1, "Down": 1, "Prior": -8, "Next": 8, "Home": -100000, "End": 100000}[key]
+            self.reign_scroll = max(0, min(100, self.reign_scroll + step))
+            self.repaint()
+
+    def resume_selected_campaign(self) -> None:
+        target = Path(__file__).parent / "saves" / self.city_pick / "autosave.json"
+        if not compatible_save(target):
+            self.notify("This throne has no saved reign from the current edition.", registry.REFUSAL, window="reign")
+            self.repaint()
+            return
+        try:
+            world, data = load_session(target)
+            if not self.awaiting_start and self.save_path != target and not self.save_current(automatic=True):
+                return
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            self.notify(f"This reign could not be resumed: {error}.", registry.REFUSAL, window="reign")
+            self.repaint()
+            return
+        if not self.adopt_campaign(world, data):
+            return
+        self.save_path = target
+        window = self.app.windows.get("reign")
+        if window:
+            window.root.grab_release()
+        self.repaint()
+
+    def begin_selected_campaign(self) -> None:
+        opening = self.awaiting_start
+        seed = self.seed if opening else new_seed()
+        target = Path(__file__).parent / "saves" / self.city_pick / "autosave.json"
+        try:
+            world, _ = advance(load_campaign(self.city_pick, seed))
+            if not opening and not self.save_current(automatic=True):
+                return
+            stamp = datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+            for path in {self.save_path, target}:
+                if path.exists():
+                    path.with_name(f"reign-{stamp}.json").write_bytes(path.read_bytes())
+        except (OSError, ValueError) as error:
+            self.notify(f"The reign could not begin: {error}.", registry.REFUSAL, window="reign")
+            self.repaint()
+            return
+        chosen = self.city_pick
+        self.save_path = target
+        self.adopt_campaign(world, {"seed": seed, "chosen_alu": chosen,
+            "log": [], "hours_left": project(world)["attention"], "court_report": []})
+        self.city_selecting = False
+        window = self.app.windows.get("reign")
+        if window:
+            window.root.grab_release()
+        self.save_current(automatic=True)
+        self.notify("F3 opens your city’s aims. Tab in Court enters Hall; Space there advances time.", "info", window="reign")
+        self.repaint()
+        self.open_charter()
+
+    def open_charter(self) -> None:
+        if self.awaiting_start:
+            return
+        self.charter_detail, self.charter_scroll = False, 0
+        window = self.app.window("charter", "The City's Charter", 76, 30,
+            on_key=self.on_charter_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("charter"))
+        self.repaint()
+        window.focus()
+
+    def on_charter_key(self, event) -> None:
+        command, char = getattr(event, "command", ""), (event.char or "").lower()
+        if event.keysym == "Escape":
+            self.app.close("charter")
+            return
+        if command == "charter:detail" or char in {"v", "5"}:
+            self.charter_detail = not self.charter_detail
+            self.charter_scroll = 0
+        elif command == "charter:governance" or char in {"g", "6"}:
+            self.open_governance()
+            return
+        elif command == "charter:pledge" or char in {"p", "4"}:
+            self.open_pledges()
+            return
+        elif command.startswith("charter:goal:") or char in {"1", "2", "3"}:
+            from belief.chapters import chapter
+            goals = chapter(self.belief, self.chosen_alu)["goals"]
+            index = int(command.rsplit(":", 1)[-1]) if command else int(char) - 1
+            if index >= len(goals):
+                return
+            where = goals[index]["where"]
+            if "Governance" in where:
+                self.open_governance()
+            elif "Household" in where:
+                self.palace_state.update(view="household", choosing="", scroll=0)
+                self.open_room("j")
+            elif "Grain instruction" in where:
+                self.open_grain_mandate()
+            elif where.startswith("Storehouse"):
+                self.storehouse_view = "land" if "Land" in where else "roll"
+                self.open_ledger("t")
+            elif where.startswith("Scribes"):
+                self.open_door("s")
+            elif where.startswith("Court"):
+                self.home_view, self.home_scroll = "court", 0
+                self.raise_hall()
+            elif where.startswith("Alu"):
+                self.open_room("y")
+            elif where.startswith("Trade"):
+                self.trade_view = "exchange"
+                self.open_room("x")
+            elif where.startswith("Muster"):
+                self.open_ledger("m")
+            else:
+                self.open_orders()
+            return
+        elif event.keysym in {"Up", "Down", "Prior", "Next"}:
+            self.charter_scroll = max(0, self.charter_scroll + {"Up": -1, "Down": 1, "Prior": -8, "Next": 8}[event.keysym])
+        self.repaint()
+
+    def open_governance(self) -> None:
+        window = self.app.window("governance", "Governing Orders", 80, 34,
+            on_key=self.on_governance_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("governance"))
+        self.repaint()
+        window.focus()
+
+    def on_governance_key(self, event) -> None:
+        if self.pending_action:
+            self.on_confirm_key(event)
+            return
+        if event.keysym == "Escape":
+            self.app.close("governance")
+            return
+        command, char = getattr(event, "command", ""), (event.char or "").lower()
+        options = self.belief.get("governance", {}).get("options", ())
+        choice = command.removeprefix("governance:") if command.startswith("governance:") else None
+        if not choice and char in {"1", "2", "3"} and int(char) <= len(options):
+            choice = options[int(char) - 1]["id"]
+        if choice:
+            self.do(A.GovernanceOrder(choice), window="governance")
+
+    def open_pledges(self) -> None:
+        window = self.app.window("pledges", "The King's Word", 76, 28,
+            on_key=self.on_pledge_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("pledges"))
+        self.repaint()
+        window.focus()
+
+    def on_pledge_key(self, event) -> None:
+        if self.pending_action:
+            self.on_confirm_key(event)
+            return
+        if event.keysym == "Escape":
+            self.app.close("pledges")
+            return
+        command, char = getattr(event, "command", ""), (event.char or "").lower()
+        kind = command[7:] if command.startswith("pledge:") else {"1": "bread", "2": "wages", "3": "justice"}.get(char)
+        if kind:
+            self.do(A.MakeRoyalPledge(kind), window="pledges")
+
+    def open_grain_mandate(self) -> None:
+        window = self.app.window("grain-mandate", "The Keeper's Mandate", 72, 24,
+            on_key=self.on_grain_mandate_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("grain-mandate"))
+        self.repaint()
+        window.focus()
+
+    def on_grain_mandate_key(self, event) -> None:
+        if self.pending_action:
+            self.on_confirm_key(event)
+            return
+        if event.keysym == "Escape":
+            self.app.close("grain-mandate")
+            return
+        command, char = getattr(event, "command", ""), event.char or ""
+        presets = reign.mandate_presets(self.belief)
+        if command.startswith("mandate:"):
+            _, reserve, purse = command.split(":")
+            values = (int(reserve), int(purse))
+        elif char and char in "1234":
+            values = presets[int(char) - 1]
+        else:
+            return
+        self.do(A.SetGrainMandate(*values), window="grain-mandate")
+
+    def open_letter_presets(self) -> None:
+        if self.desk is None:
+            return
+        window = self.app.window(
+            "letter-presets", "The Business of the Tablet", *desktop.default_size("letter-presets"),
+            on_key=self.on_letter_presets_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("letter-presets"))
+        self.repaint()
+        window.focus()
+
+    def on_letter_presets_key(self, event) -> None:
+        command, char = getattr(event, "command", ""), (event.char or "").lower()
+        if event.keysym == "Escape":
+            self.app.close("letter-presets")
+            return
+        kinds = ("aid", "gift", "reassure", "refuse", "warn")
+        kind = command.split(":", 1)[1] if command.startswith("preset:") else (
+            kinds[int(char) - 1] if char in "12345" and char else "")
+        if kind not in kinds or self.desk is None:
+            return
+        if self.desk.get("matter", "").strip() or self.desk.get("terms"):
+            if getattr(self, "preset_replace", "") != kind:
+                self.preset_replace = kind
+                self.notify("This replaces the current business. Choose the same option again to confirm.", registry.PREVIEW, window="letter-presets")
+                self.repaint()
+                return
+        self.preset_replace = ""
+        terms = ()
+        if kind == "aid":
+            quantity = max(1, relief.ration(self.belief))
+            matter = f"I ask you to send {quantity} qa of grain to my palace."
+            terms = (A.LetterTerm("request_good", good="grain", quantity=quantity),)
+        elif kind == "gift":
+            quantity = 100
+            matter = f"I send you {quantity} shekels of copper as a gift."
+            terms = (A.LetterTerm("gift", good="copper", quantity=quantity),)
+        else:
+            matter = {"reassure": "Our agreement stands. I will keep its terms.",
+                      "refuse": "I cannot meet this request.",
+                      "warn": "The roads are unsafe. Send guards with your couriers."}[kind]
+        self.desk.update(matter=matter, buffer=matter, cursor=len(matter), terms=terms,
+                         block_focus="matter", dictated=False, dictating=False)
+        self.desk.pop("advisor_origin", None)
+        order = list(self.desk.get("block_order", ()))
+        if terms and "terms" not in order:
+            order.insert(max(0, len(order) - 1), "terms")
+        self.desk["block_order"] = tuple(order)
+        self._regrade()
+        self._store_active_desk()
+        self.save_current(automatic=True)
+        self.app.close("letter-presets")
+        self.notify("Business prepared. Read, edit quantities in Terms, then Enter reviews the seal.", "info", window="stack")
+        self.repaint()
+        self.app.windows["stack"].focus()
 
     def request_load(self) -> None:
         if self.load_armed:
@@ -1565,11 +2027,11 @@ class Game:
             self.desk["target_place"] = target_place
             self.desk["path"] = tuple(saved.get("path") or route)
             self.desk["blocks"] = composer.normalize_blocks(
-                saved.get("blocks"), recipient)
+                saved.get("blocks"), recipient, context=composer.court_context(self.belief))
             self.desk["block_focus"] = saved.get("block_focus", "matter")
             self.desk["block_order"] = composer.normalise_order(
-                saved.get("block_order") or composer.opening_order(recipient),
-                recipient)
+                saved.get("block_order") or composer.opening_order(recipient, context=composer.court_context(self.belief)),
+                recipient, context=composer.court_context(self.belief))
             self.desk["block_edits"] = dict(saved.get("block_edits") or {})
             self.desk["matter"] = saved.get("matter", saved.get("buffer", ""))
             self.desk["terms"] = tuple(saved.get("terms", ()))
@@ -1609,7 +2071,7 @@ class Game:
                 "term_builder": builder,
                 "term_focus": "kind",
                 "blocks": composer.default_blocks(),
-                "block_order": composer.opening_order(recipient),
+                "block_order": composer.opening_order(recipient, context=composer.court_context(self.belief)),
                 "block_edits": {},
                 "block_focus": "matter",
                 "scribe_id": "yabninu",
@@ -1618,7 +2080,7 @@ class Game:
                 "generation": 0,
                 "composing": False,
                 "draft": composer.assemble(
-                    recipient, composer.default_blocks(), ""),
+                    recipient, composer.default_blocks(), "", context=composer.court_context(self.belief)),
             }
             if not reply_to:
                 self.desk["blocks"]["recognition"] = 2
@@ -1661,7 +2123,7 @@ class Game:
 
         def work():
             return ai_composer.correct_matter(
-                item["sender"], matter, self.seed, turn, self.client)
+                item["sender"], matter, self.seed, turn, self.client, context=composer.court_context(self.belief))
 
         def done(result, error) -> None:
             current = self.desk
@@ -1690,7 +2152,7 @@ class Game:
                     current["dictated"] = True
                     current["draft"] = composer.assemble(
                         item["sender"], current.get("blocks"),
-                        current["matter"], source=source)
+                        current["matter"], source=source, context=composer.court_context(self.belief))
                 if source != "model":
                     self.notify(
                         "Yabninu was unavailable; your words were not changed.",
@@ -1716,7 +2178,7 @@ class Game:
             item["sender"], self.desk.get("blocks"),
             self.desk.get("matter", ""), source="player",
             order=self.desk.get("block_order"),
-            edits=self.desk.get("block_edits"))
+            edits=self.desk.get("block_edits"), context=composer.court_context(self.belief))
 
     def _desk_commitments(self) -> tuple:
         """What the matter as written binds the crown to (`ai/commitments.py`).
@@ -1793,7 +2255,7 @@ class Game:
         if self.desk is None:
             return ()
         return composer.normalise_order(
-            self.desk.get("block_order"), self._desk_item()["sender"])
+            self.desk.get("block_order"), self._desk_item()["sender"], context=composer.court_context(self.belief))
 
     @staticmethod
     def _move_desk_cursor(text: str, cursor: int, vertical: int) -> int:
@@ -1824,6 +2286,10 @@ class Game:
         char = (event.char or "").lower()
         control = bool(getattr(event, "state", 0) & 4)
 
+        if not desk.get("dictating") and (command == "desk:presets" or char == "b"):
+            self.open_letter_presets()
+            return
+
         def item_for_desk() -> dict:
             return self._desk_item(desk)
 
@@ -1843,7 +2309,7 @@ class Game:
             block = desk.get("block_focus", "matter")
             if block == "matter":
                 return
-            choices = composer.block_choices(item_for_desk()["sender"]).get(block)
+            choices = composer.block_choices(item_for_desk()["sender"], context=composer.court_context(self.belief)).get(block)
             if not choices:
                 return
             # Cycling away from an edited piece restores the canned forms; the
@@ -1858,7 +2324,7 @@ class Game:
             """Put the next piece this register allows onto the tablet."""
             recipient = item_for_desk()["sender"]
             on = laid()
-            spare = [name for name in composer.permitted_blocks(recipient)
+            spare = [name for name in composer.permitted_blocks(recipient, context=composer.court_context(self.belief))
                      if name not in on]
             if not spare:
                 self.notify(
@@ -1867,7 +2333,7 @@ class Game:
                 return
             chosen = spare[0]
             desk["block_order"] = composer.normalise_order(
-                on + [chosen], recipient)
+                on + [chosen], recipient, context=composer.court_context(self.belief))
             desk["block_focus"] = chosen
             self._regrade()
             self.notify(
@@ -1883,7 +2349,7 @@ class Game:
                 return
             recipient = item_for_desk()["sender"]
             on = [name for name in laid() if name != block]
-            desk["block_order"] = composer.normalise_order(on, recipient)
+            desk["block_order"] = composer.normalise_order(on, recipient, context=composer.court_context(self.belief))
             desk.setdefault("block_edits", {}).pop(block, None)
             desk["block_focus"] = "matter"
             self._regrade()
@@ -2203,6 +2669,7 @@ class Game:
         if event.keysym == "Escape":
             self._store_active_desk()
             self.desk = None
+            self.save_current(automatic=True)
             self.repaint()
             return
         if command == "desk:discard" or char == "x":
@@ -2212,6 +2679,7 @@ class Game:
             self.__dict__.setdefault("desk_drafts", {}).pop(
                 draft_key, None)
             self.desk = None
+            self.save_current(automatic=True)
             self.repaint()
             return
         if command == "desk:undo-correction" or (
@@ -2233,7 +2701,7 @@ class Game:
                 # its place and its name; only the words become the king's.
                 picked = composer.selected_blocks(
                     item_for_desk()["sender"], desk.get("blocks"),
-                    desk.get("block_edits"))
+                    desk.get("block_edits"), context=composer.court_context(self.belief))
                 desk["editing_block"] = block
                 desk["edit_origin_text"] = desk.setdefault(
                     "block_edits", {}).get(
@@ -2284,7 +2752,7 @@ class Game:
             recipient = str(
                 desk.get("recipient") or item_for_desk().get("sender") or "")
             seal = composer.seal_id(
-                recipient, desk.get("blocks"))
+                recipient, desk.get("blocks"), context=composer.court_context(self.belief))
             if not seal:
                 self.notify(
                     "An unsealed tablet cannot be dispatched. Choose a seal.",
@@ -3318,6 +3786,20 @@ class Game:
 
     def _describe_order(self, action) -> str:
         b = self.belief
+        if isinstance(action, A.MakeRoyalPledge):
+            promises = {'bread': 'keep unreserved grain for two full payrolls',
+                        'wages': 'leave no ration debt on the local roll',
+                        'justice': 'leave no claim waiting beyond its grace'}
+            return (f"Publicly promise to {promises.get(action.kind, action.kind)} at each of the next six closing accounts.\n"
+                    "All six must meet the promise. Keeping it improves standing and calms anger; breaking it does the opposite.\n"
+                    "The pledge cannot be cancelled. Twelve fortnights between declarations.")
+        if isinstance(action, A.SetGrainMandate):
+            if not action.reserve_fortnights or not action.max_copper:
+                return "Cancel the keeper's standing grain purchases."
+            return (f"Keep {action.reserve_fortnights} fortnights of rations in the granary.\n"
+                    f"The keeper may spend up to {action.max_copper:,} copper every fortnight.\n"
+                    "Purchases use local merchant grain and unreserved copper.\n"
+                    "The mandate continues until cancelled; a vacant granary office stops it.")
         if isinstance(action, A.Allocate):
             group = next((g["name"] for g in b["groups"]
                           if g["id"] == action.group_id), action.group_id)
@@ -3368,9 +3850,9 @@ class Game:
             if requests:
                 lines.append(
                     "Uncertain: this asks for goods; it does not deliver any "
-                    "to Ugarit. The other court may refuse, delay, or stay silent.")
+                    "to your palace. The other court may refuse, delay, or stay silent.")
             lines.append("Courier route: " + " > ".join(
-                place.replace("_", " ") for place in action.path) + ".")
+                render.place_name(place, self.belief) for place in action.path) + ".")
             if len(action.path) == 1:
                 lines.append("Local courier; delivered when the fortnight advances.")
             if action.protocol_total >= 0:
@@ -3439,6 +3921,8 @@ class Game:
             return (
                 f"{action.offering:,} grain has been offered against "
                 f"{action.oath_id.replace('_', ' ')}")
+        if isinstance(action, A.GovernanceOrder):
+            return governance.describe(b, action.kind)
         if isinstance(action, A.RulePetition):
             petition = next((item for item in b.get("justice", {}).get(
                 "petitions", []) if item["id"] == action.petition_id), None)
@@ -3448,9 +3932,11 @@ class Game:
                            if outcome["amount"] else "no payment")
                 unrest = int(outcome["unrest"])
                 sign = "+" if unrest > 0 else ""
-                beneficiary = palace._name(outcome["beneficiary"], b)
+                beneficiary = (outcome.get("beneficiary_name")
+                               if outcome["beneficiary"] != petition["petitioner"]
+                               else palace._name(outcome["beneficiary"], b))
                 return (f"rule {action.verdict}: {payment} to {beneficiary}; "
-                        f"unrest {sign}{unrest}")
+                        f"anger {sign}{unrest}")
             return (f"judgement in {action.petition_id.replace('_', ' ')} "
                     f"is {action.verdict}")
         if isinstance(action, A.SetLandDue):
@@ -3483,8 +3969,7 @@ class Game:
         if any(isinstance(action, A.DictateReply) for action in actions):
             self.counsel_said.append((
                 "scribe",
-                "I will not put words in your mouth, my lord. The form of "
-                "letters is being reconsidered; for now, write at the Desk."))
+                "Write the answer at the Desk. Review it before sealing."))
             self.repaint()
             return
         if any(isinstance(action, A.EndTurn) for action in actions):
@@ -3540,8 +4025,7 @@ class Game:
         if any(isinstance(action, A.DictateReply) for action in actions):
             self.counsel_said.append((
                 "scribe",
-                "I will not put words in your mouth, my lord. Write that "
-                "answer at the Desk, where you can see the tablet it answers."))
+                "Write the answer at the Desk, beside the letter you are answering."))
             self.repaint()
             return
         if any(isinstance(action, A.EndTurn) for action in actions):
@@ -3799,6 +4283,7 @@ class Game:
                 self.repaint()
                 return
             self.hours -= OMEN_COST
+            self.save_current(automatic=True)
             self.log.append(
                 {"turn": self.world.date.absolute,
                  "action": A.to_dict(action)})
@@ -4639,6 +5124,9 @@ class Game:
         views = trade_page.VIEWS
         view = getattr(self, "trade_view", views[0])
         command = getattr(event, "command", "")
+        if command == "trade:mandate" or view == "exchange" and char == "k":
+            self.open_grain_mandate()
+            return
         if command.startswith("trade:open:"):
             _trade, _open, kind, number = command.split(":", 3)
             source = {"cargo": self.belief.get("trade", {}).get("cargo", ()),
@@ -4881,15 +5369,13 @@ class Game:
                 self.archive_summary = librarian.fallback_summary(query, hits)
                 self.archive_summary_source = "recovery"
                 self.notify(
-                    "The keeper could not finish his collation; the exact "
-                    "finding list remains.",
+                    "The archive summary is unavailable. Found tablets are listed below.",
                     registry.REFUSAL, window=window)
             else:
                 self.archive_summary, self.archive_summary_source = result
                 if self.archive_summary_source != "model":
                     self.notify(
-                        "The keeper could not finish his collation; the exact "
-                        "finding list remains.",
+                        "The archive summary is unavailable. Found tablets are listed below.",
                         registry.REFUSAL, window=window)
             self.repaint()
 
@@ -5124,6 +5610,46 @@ class Game:
             else:
                 self.repaint()
 
+    def act_on_report(self) -> None:
+        """Open the relevant account from the highlighted public report."""
+        own = hall.urgent(court_facts(self.belief))[:3]
+        if not own:
+            return
+        fact = hall.picked(own, self.hall_pick)
+        ident = fact["id"]
+        if ident in {"grain", "hunger", "arrears", "rations", "labour"}:
+            self.storehouse_view = "roll"
+            groups = self.belief.get("groups", ())
+            if groups:
+                group = max(groups, key=lambda g: g.get("next_short", 0) if ident == "hunger" else g.get("size", 0) * g.get("entitlement", 0))
+                self.ledger_state["roll"]["pick"] = group["id"]
+            self.open_ledger("t")
+        elif ident == "governance":
+            self.open_governance()
+        elif ident in {"summons", "troops", "raid"}:
+            self.open_door("m")
+        elif ident == "plague":
+            self.open_plague()
+        elif ident == "letters" or ident.startswith("claim:"):
+            self.open_door("s")
+        elif ident == "works":
+            self.open_door("y")
+        elif ident in {"quay", "copper", "tin", "bronze"}:
+            self.open_door("x")
+        elif ident in {"harvest", "land", "fields"}:
+            self.storehouse_view = "land"
+            self.open_ledger("t")
+        elif ident in {"claims", "petitions"}:
+            self.home_view, self.home_scroll = "court", 0
+            self.repaint()
+        else:
+            matters = advice.concerns(self.belief)
+            index = next((i for i, item in enumerate(matters) if item.id == ident), None)
+            if index is not None:
+                self.activate_concern(index)
+            else:
+                self.ask_why(ident)
+
     def activate_concern(self, index: int) -> None:
         """Open the evidence or put Yabninu's suggested order on his tablet."""
         matters = advice.concerns(self.belief)
@@ -5173,6 +5699,24 @@ class Game:
         elif door in ROOMS:
             self.open_room(door)
 
+    def open_audience_evidence(self, item) -> None:
+        self.evidence_item, self.evidence_scroll = item, 0
+        window = self.app.window("audience-evidence", "The Full Testimony", 76, 30,
+            on_key=self.on_evidence_key, on_resize=self.on_resize,
+            on_close=lambda: self.app.close("audience-evidence"))
+        self.repaint()
+        window.focus()
+
+    def on_evidence_key(self, event) -> None:
+        if event.keysym == "Escape":
+            self.app.close("audience-evidence")
+            self.raise_hall()
+            return
+        step = {"Up": -1, "Down": 1, "Prior": -8, "Next": 8, "Home": -100000, "End": 100000}.get(event.keysym)
+        if step is not None:
+            self.evidence_scroll = max(0, self.evidence_scroll + step)
+            self.repaint()
+
     def on_audience_key(self, event) -> bool:
         command = getattr(event, "command", "")
         key, char = event.keysym, (event.char or "").lower()
@@ -5185,6 +5729,12 @@ class Game:
         deferred = self.__dict__.setdefault("audience_deferred", set())
         b = self.belief
         item = audience.current(b, deferred, getattr(self, "audience_pick", ""))
+        if command == "home:charter":
+            self.open_charter()
+            return True
+        if command == "home:reign":
+            self.open_reign()
+            return True
         if command in {"home:court", "home:hall", "home:report"}:
             self.home_view = command.split(":")[1]
             self.home_scroll = 0
@@ -5199,6 +5749,12 @@ class Game:
             if command == "space" or key == "space":
                 self.end_fortnight()
                 return True
+            if key == "Return" or command == "home:act":
+                self.act_on_report()
+                return True
+            if char == "g":
+                self.open_governance()
+                return True
             if char == "l":
                 self.home_view, self.home_scroll = "report", 0
             elif command.startswith("concern:") or (char.isdigit() and char != "0"):
@@ -5207,7 +5763,7 @@ class Game:
                 self.ask_why(command[4:])
             elif key in {"Up", "Down"}:
                 fs = court_facts(b)
-                own = hall.urgent(fs)
+                own = hall.urgent(fs)[:3]
                 here = own.index(hall.picked(own, self.hall_pick))
                 self.hall_pick = own[(here + (1 if key == "Down" else -1)) % len(own)]["id"]
                 self.why_open = False
@@ -5252,6 +5808,9 @@ class Game:
                 self.notify("Deferred until next fortnight. R recalls deferred matters.", "info", window="hall")
         elif key == "space":
             self.home_view, self.home_scroll = "hall", 0
+        elif item and (command == "home:evidence" or char == "v" or (item["kind"] == "case" and key == "Return")):
+            self.open_audience_evidence(item)
+            return True
         elif item and item["kind"] == "case" and (command.startswith("home:verdict:") or char in {"f", "a", "s"}):
             verdict = command.split(":")[-1] if command else {"f": "for", "a": "against", "s": "split"}[char]
             self.do(A.RulePetition(item["case"]["id"], verdict), window="hall")
@@ -5446,7 +6005,8 @@ class Game:
 
     def quit(self) -> None:
         """The hall owns the session; every other window closes freely (D33)."""
-        self.save_current(automatic=True)
+        if not getattr(self, "awaiting_start", False):
+            self.save_current(automatic=True)
         # Where the windows were is part of what the player set up, so it is
         # written before the loop ends rather than left to the next crash.
         self.save_settings()
@@ -5491,11 +6051,12 @@ def main(argv: list[str]) -> int:
         print(required_model_message(detail))
         return 1
     args = [a for a in argv[1:] if not a.startswith("-")]
-    chosen_alu = args[0] if args else "seat"
+    chosen_alu = args[0] if args else latest_campaign()
     seed = int(args[1]) if len(args) > 1 else new_seed()
     print(f"seed {seed} — pass it back to play this same world again:\n"
           f"  ./run.sh {chosen_alu} {seed}")
-    Game(chosen_alu, seed, playtest="--playtest" in argv).run()
+    Game(chosen_alu, seed, playtest="--playtest" in argv,
+         welcome=not args and "--playtest" not in argv).run()
     return 0
 
 

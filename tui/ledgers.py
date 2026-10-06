@@ -21,7 +21,7 @@ import registry
 from belief import project
 from belief import muster as muster_preview
 from belief.rations import plan as ration_plan
-from belief.rations import repayment
+from belief.rations import repayment, forecast_line, food_forecast
 from tui import dues as due_text
 from tui import render, style
 from tui.grid import INDEX as C
@@ -33,7 +33,7 @@ from tui.workbench import Control, Row, affordable, compose, detail_room
 STEPS = {"roll": 50, "stores": 50, "corvee": 400,
          "land_due": 25, "expiate": 10}
 
-TASKS = ("garrison", "watch", "harvest", "campaign")
+TASKS = ("garrison", "watch", "campaign")
 # Which store rows are a ledger the king can have counted. `inspect_ledger`
 # takes `granary` or `seed` and nothing else, so the control is offered on
 # exactly those two rows and is plainly absent on the others.
@@ -232,10 +232,9 @@ def roll(b: dict, selected: str = "", width: int = 82, height: int = 28,
             (_change("arrears", group.get("arrears_qa", 0), group["next_arrears"], "qa"), "sand"),
             (_change("spent", before["spent"], draft["spent"], "qa") + "; "
              + _change("left", before["remaining"], draft["remaining"], "qa"), "clay"),
-            ((f"the grain left feeds the whole roll for "
-              f"{draft['coverage']} fortnight{'s' if draft['coverage'] != 1 else ''}"
-              if draft["need"] else "no ration demand is recorded, so this cannot be judged"),
-             "dim"),
+            (forecast_line(b, draft),
+             "barley" if (draft.get("policy_coverage") or 0) > (food_forecast(b)["before_harvest"] or 0)
+             else "gold" if draft.get("policy_coverage") == food_forecast(b)["before_harvest"] else "blood"),
             ("Current grain only; excludes arrivals, spoilage and other uses.", "dim"),
         ]
         if group.get("next_labour") is not None:

@@ -269,7 +269,7 @@ def compose(belief: dict, log: list[dict], now: int, hours: int = 0,
     if not any(control.key == "u" for control in controls):
         controls.append(workbench.Control(
             "countermand", "u", label="countermand", enabled=False,
-            why="this one cannot be unsaid"))
+            why="this order cannot be reversed"))
 
     return workbench.compose(
         "ORDERS", ("when", "what was ordered", "state"), (14, 36, 10),
@@ -346,5 +346,5 @@ def _detail(order: Order, belief: dict, now: int) -> list[tuple[str, str]]:
                       f"{slot.name if slot else 'this'} has replaced it.",
                       "ash"))
     else:
-        lines.append(("It is done. An order given cannot be unsaid.", "ash"))
+        lines.append(("This order has been carried out. It cannot be reversed.", "ash"))
     return lines

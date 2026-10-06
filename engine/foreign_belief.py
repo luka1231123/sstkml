@@ -58,7 +58,18 @@ def settlement_of(world: World, actor: str) -> str:
 
 
 def actor_of(world: World, actor: str) -> str:
-    return world.kernel.controller(settlement_of(world, actor))
+    settlement = settlement_of(world, actor)
+    if actor in {"sinaranu", "ura_merchant"}:
+        # These correspondents speak for the merchant house at their quay,
+        # whose independent goods and observations already exist in the kernel.
+        return next((org.id for org in sorted(
+            world.kernel.registry.orgs.values(), key=lambda item: item.id)
+            if org.settlement == settlement and org.kind == "merchant"), "")
+    # Other local officials cannot answer requests out of the player's own
+    # treasury by borrowing the settlement controller's identity.
+    if settlement == world.kernel.seat_goods.seat:
+        return ""
+    return world.kernel.controller(settlement)
 
 
 def belief_of(world: World, actor: str) -> Belief:

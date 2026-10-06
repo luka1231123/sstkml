@@ -74,6 +74,13 @@ def _spec(key, title, window_class, default=None, minimum=None) -> WindowSpec:
 # Entity windows are keyed by prefix: `institution:tablet_house` is a document.
 WINDOWS: dict[str, WindowSpec] = {
     spec.key: spec for spec in (
+        _spec("governance", "Governing Orders", "workbench", (80, 34), (76, 32)),
+        _spec("grain-mandate", "The Keeper's Mandate", "workbench", (72, 24), (68, 24)),
+        _spec("audience-evidence", "The Full Testimony", "document", (76, 30), (66, 24)),
+    _spec("charter", "The City’s Charter", "utility", (76, 30), (70, 28)),
+    _spec("pledges", "The King’s Word", "utility", (76, 28), (70, 26)),
+    _spec("reign", "The Reign", "workbench", (76, 32), (70, 30)),
+        _spec("letter-presets", "The Business of the Tablet", "utility", (68, 22), (64, 22)),
         # The Hall stops at the narrowest width that preserves its carved
         # palace column. Below 84 columns the room lost its identity and read
         # as another flat dashboard. It no longer shrinks vertically either:

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import dataclasses
+import base64
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -26,6 +28,28 @@ def load_formulae(path: str | Path | None = None) -> dict:
 
 
 def formula(data: dict, profile: str) -> dict:
+    if profile.startswith("court:"):
+        details = json.loads(base64.urlsafe_b64decode(profile[6:].encode()).decode())
+        direction = details["direction"]
+        base = {"up": "hatti.servant_to_lord", "down": "ugarit.lord_to_servant",
+                "level": "peer.equal_to_equal", "other": "ugarit.ruler_to_other"}[direction]
+        rule = dict(formula(data, base))
+        ruler, title, recipient = details["ruler"], details["title"], details["recipient"]
+        if direction == "up":
+            opening = f"To {recipient}, my lord: thus says {ruler}, your servant."
+        elif direction == "down":
+            opening = f"To {recipient}: thus says {ruler}, {title}, your lord."
+        elif direction == "level":
+            opening = f"To {recipient}, my brother: thus says {ruler}, your brother."
+        else:
+            opening = f"To {recipient}: thus says {ruler}, {title}."
+        rule.update(opening=opening, opening_regex="^" + re.escape(opening),
+                    closing="The palace scribe wrote it; the courier bears the sealed tablet.",
+                    label={"up": "a ruler writing to his overlord", "down": "the ruler writing to his subordinate",
+                           "level": "one king writing to another", "other": "a ruler writing without a rank formula"}[direction])
+        if details.get("gods") and direction != "up":
+            rule["deities"] = details["gods"]
+        return rule
     value: object = data
     for part in profile.split("."):
         if not isinstance(value, dict) or part not in value:
@@ -36,9 +60,40 @@ def formula(data: dict, profile: str) -> dict:
     return value
 
 
-def profile_for(recipient: str, data: dict | None = None) -> str:
+def court_context(b: dict) -> dict | None:
+    """Current court identity and recorded ranks, from public records only."""
+    house = b.get("house", {})
+    actor = house.get("ruler", b.get("actor", ""))
+    ruler = next((p.get("name", actor) for p in house.get("members", ())
+                  if p.get("id") == actor), actor)
+    city = str(b.get("scenario", ""))
+    if not ruler or not city:
+        return None
+    kind = b.get("governance", {}).get("kind", "")
+    title = {"egyptian": "Pharaoh", "hittite": "Great King of Hatti",
+             "mycenaean": "wanax of Pylos"}.get(kind, f"king of {city}")
+    gods = {"egyptian": ["Amun", "Ra"], "hittite": ["Storm God of Hatti", "Sun Goddess of Arinna"],
+            "mycenaean": ["Poseidon"]}.get(kind, [])
+    return {"ruler": str(ruler), "title": title, "gods": gods,
+            "relations": list(b.get("relations", ())), "city": city}
+
+
+def profile_for(recipient: str, data: dict | None = None, context: dict | None = None) -> str:
     data = data or load_formulae()
-    return data["recipients"].get(slug(recipient), "ugarit.ruler_to_other")
+    if not context:
+        return data["recipients"].get(slug(recipient), "ugarit.ruler_to_other")
+    relation = next((r for r in context.get("relations", ())
+                     if slug(str(r.get("other", ""))) == slug(recipient)), {})
+    rank = relation.get("status_claim", "")
+    direction = {"servant": "up", "lord": "down", "brother": "level"}.get(rank, "other")
+    recipient_name = str(relation.get("name") or "")
+    if not recipient_name or recipient_name in (recipient, slug(recipient)):
+        recipient_name = _ACTORS.get(slug(recipient), slug(recipient).replace("_", " "))
+    details = {"ruler": context["ruler"], "title": context["title"], "direction": direction,
+               "recipient": recipient_name,
+               "gods": context.get("gods", [])}
+    encoded = base64.urlsafe_b64encode(json.dumps(details, ensure_ascii=False, separators=(",", ":")).encode()).decode()
+    return "court:" + encoded
 
 
 # A wish for the other house takes several forms across the corpus; any of them
