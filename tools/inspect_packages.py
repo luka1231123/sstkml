@@ -15,6 +15,7 @@ for edition in ("offline", "ollama"):
     else:
         executable = dist / name / (name + (".exe" if sys.platform == "win32" else ""))
     directory = ROOT / "output" / f"package-{edition}"
+    directory.parent.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, STTKML_DATA_DIR=str(directory))
     subprocess.run([str(executable), "--package-info", "--package-ui-check"],
                    env=env, cwd=directory.parent, check=True, timeout=60)
