@@ -1,5 +1,7 @@
 # SAY TO THE KING, MY LORD
 
+**Playable alpha.** [Download the latest alpha](https://github.com/luka1231123/sstkml/releases/tag/v0.6.0-alpha.1).
+
 A Bronze Age court game about ruling through letters, accounts and people whose reports may be late or unreliable. You hear disputes, allocate grain, manage obligations and deal with neighbouring rulers through a desktop of movable text windows.
 
 The idea is interesting, and there are moments when an earlier decision comes back as a different problem. The game is an early alpha, though. Long campaigns need balancing, some claims become repetitive, and the interface needs more work.
