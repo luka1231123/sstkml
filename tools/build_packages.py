@@ -33,6 +33,8 @@ def build(edition):
     if destination.exists():
         shutil.rmtree(destination)
     shutil.copytree(app, destination, symlinks=True)
+    shutil.copy2(ROOT / "LICENSE", release / "LICENSE")
+    shutil.copy2(ROOT / "README.md", release / "README.md")
     model_note = ("No Python, Ollama or model download is needed.\n"
                   "Letters use authored text. Write letters normally; help and listed orders work offline.\n"
                   if edition == "offline" else
