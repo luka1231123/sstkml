@@ -41,6 +41,23 @@ Use `--edition offline` or `--edition ollama` to build one edition. PyInstaller
 builds for the current OS and architecture. Windows and Linux need native
 builds on those systems; the Mac ZIPs do not run there.
 
+The **Build game packages** GitHub Actions workflow builds Windows x64 on
+Windows Server 2022 and Linux x86-64 on Ubuntu 22.04, using Python 3.13.
+Run it from the repository's Actions tab, or with
+`gh workflow run packages.yml --ref main`. Version tags also trigger it.
+Each job uploads both editions and their checksums after loading the packaged
+game and opening its windows. No Ollama service is needed for these checks.
+
+Windows downloads are ZIPs: extract the whole archive, then run the `.exe`
+inside its game folder. Keep `_internal` beside the executable. These builds
+are not Authenticode signed. Linux downloads are `.tar.gz` archives: extract
+one and run `./Play.sh` in a desktop session. They require glibc 2.35 or newer;
+older distributions and Linux ARM are not covered by these builds.
+
+Windows saves use `%LOCALAPPDATA%/Say To The King/saves`. Linux saves use
+`~/.local/share/say-to-the-king/saves`, or the corresponding `XDG_DATA_HOME`
+location. Both editions share their platform's save directory.
+
 From source, `./run.sh --offline` selects offline play. The environment variable
 `STTKML_DATA_DIR` can select another player-data directory for portable use.
 
