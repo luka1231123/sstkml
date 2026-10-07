@@ -56,6 +56,7 @@ from tui import (altar, archive, atlas, alu, command as command_page,
                  composer, counsel, desktop, document, hall,
                  help as help_page, render, style, switcher, worldmap)
 import manual
+from paths import SAVES
 import palette as command_palette
 from tui.grid import InteractiveScreen, Screen
 
@@ -69,7 +70,7 @@ OMEN_COST = registry.BY_ID["consult_diviner"].cost
 
 # Where `STK_DUMP=1` writes what the windows are showing, for `tools/screens.py
 # live`. A running game is otherwise unreadable from outside without a camera.
-DUMP = Path(__file__).parent / "saves" / "screens.txt"
+DUMP = SAVES / "screens.txt"
 
 # key -> (window key, title, how to compose it from Belief). Sizes are not
 # here: they belong to `tui.desktop`, which states one default and one minimum
@@ -164,7 +165,7 @@ class Game:
         self.seed = new_seed() if seed is None else seed
         seed = self.seed
         self.chosen_alu = chosen_alu
-        self.save_path = Path(__file__).parent / "saves" / chosen_alu / "autosave.json"
+        self.save_path = SAVES / chosen_alu / "autosave.json"
         if playtest:
             run = datetime.now().strftime('%Y%m%d-%H%M%S-%f')
             self.save_path = self.save_path.parent / f"playtest-{run}" / "autosave.json"
@@ -188,15 +189,11 @@ class Game:
         self.receipts, self.told, self.hall_pick, self.why_open = (), {}, "", False
         # Presentation is remembered between runs; the world is not. A broken
         # settings file yields defaults rather than refusing to start.
-        self.settings_path = Path(__file__).parent / "saves" / "settings.json"
+        self.settings_path = SAVES / "settings.json"
         self.prefs = desktop.Preferences.load(self.settings_path)
         self.app = App(self.prefs)
-        # Language is part of the shipped court, not an optional embellishment.
-        # `main()` verifies the small local model before constructing the game;
-        # constructing Game directly remains useful to the Tk probe and
-        # headless controller tests, and still creates the same shared client.
-        from ai.client import OllamaClient
-        self.client = OllamaClient(None, f"saves/{chosen_alu}/ai_cache")
+        from ai.client import create_client
+        self.client = create_client(SAVES / chosen_alu / "ai_cache")
         self.voicer = ai_voicer.Voicer(self.client, seed)
         self._model_results: queue.SimpleQueue = queue.SimpleQueue()
         self._model_jobs = 0
@@ -348,6 +345,8 @@ class Game:
 
     def _voice(self, key: str, draft: str, work) -> None:
         """Ask the model for these words. The draft shows until they come."""
+        if self.client is None:
+            return
         def done(result, error) -> None:
             if result:
                 self.told[key] = (draft, result[0])
@@ -776,7 +775,7 @@ class Game:
             return False
         self.load_armed = False
         try:
-            shown_path = self.save_path.relative_to(Path(__file__).parent)
+            shown_path = self.save_path.relative_to(SAVES.parent)
         except ValueError:
             shown_path = self.save_path
         self.session_notice = (
@@ -816,8 +815,8 @@ class Game:
         self.world = world
         self.seed = int(data["seed"])
         self.chosen_alu = str(data["chosen_alu"])
-        from ai.client import OllamaClient
-        self.client = OllamaClient(None, f"saves/{self.chosen_alu}/ai_cache")
+        from ai.client import create_client
+        self.client = create_client(SAVES / self.chosen_alu / "ai_cache")
         self.city_selecting = False
         if hasattr(self, "hall_window"):
             self.hall_window.title = f"Court and Hall — seed {self.seed}"
@@ -980,7 +979,7 @@ class Game:
             if self.city_selecting:
                 return reign.cities(playable_courts(), self.city_pick, width, height, notice,
                     saved=[city["id"] for city in playable_courts() if compatible_save(
-                        Path(__file__).parent / "saves" / city["id"] / "autosave.json")])
+                        SAVES / city["id"] / "autosave.json")])
             return reign.compose(b, width, height, hours=self.hours,
                 opening=getattr(self, "awaiting_start", False),
                 can_resume=compatible_save(self.save_path),
@@ -1379,7 +1378,7 @@ class Game:
             self.repaint()
 
     def resume_selected_campaign(self) -> None:
-        target = Path(__file__).parent / "saves" / self.city_pick / "autosave.json"
+        target = SAVES / self.city_pick / "autosave.json"
         if not compatible_save(target):
             self.notify("This throne has no saved reign from the current edition.", registry.REFUSAL, window="reign")
             self.repaint()
@@ -1403,7 +1402,7 @@ class Game:
     def begin_selected_campaign(self) -> None:
         opening = self.awaiting_start
         seed = self.seed if opening else new_seed()
-        target = Path(__file__).parent / "saves" / self.city_pick / "autosave.json"
+        target = SAVES / self.city_pick / "autosave.json"
         try:
             world, _ = advance(load_campaign(self.city_pick, seed))
             if not opening and not self.save_current(automatic=True):
@@ -2155,8 +2154,9 @@ class Game:
                         current["matter"], source=source, context=composer.court_context(self.belief))
                 if source != "model":
                     self.notify(
-                        "Yabninu was unavailable; your words were not changed.",
-                        registry.REFUSAL, window="stack")
+                        ("Your words were kept as written." if self.client is None else
+                         "The scribe was unavailable; your words were not changed."),
+                        registry.SUCCESS if self.client is None else registry.REFUSAL, window="stack")
                 else:
                     self.notify(
                         "Yabninu corrected the matter; meaning and numbers kept.",
@@ -5373,7 +5373,7 @@ class Game:
                     registry.REFUSAL, window=window)
             else:
                 self.archive_summary, self.archive_summary_source = result
-                if self.archive_summary_source != "model":
+                if self.archive_summary_source != "model" and self.client is not None:
                     self.notify(
                         "The archive summary is unavailable. Found tablets are listed below.",
                         registry.REFUSAL, window=window)
@@ -6027,11 +6027,14 @@ def report(check: dict) -> None:
 
 def main(argv: list[str]) -> int:
     from tui.backend_tk import available, diagnose
-    from ai.client import model_status, required_model_message
+    from ai.client import model_status, required_model_message, offline
+
+    if "--offline" in argv:
+        os.environ["STTKML_OFFLINE"] = "1"
 
     if "--check" in argv:
         report(diagnose())
-        ready, detail = model_status()
+        ready, detail = (True, "Offline edition; no local model needed") if offline() else model_status()
         print("  court model :", detail)
         return 0 if ready else 1
     if not available():
@@ -6046,7 +6049,7 @@ def main(argv: list[str]) -> int:
               "  apt install python3-tk        (debian/ubuntu)\n"
               "\nthe terminal game is unaffected:  ./run.sh --cli")
         return 1
-    ready, detail = model_status()
+    ready, detail = (True, "Offline edition; no local model needed") if offline() else model_status()
     if not ready:
         print(required_model_message(detail))
         return 1

@@ -14,7 +14,16 @@ The game tracks goods, labour, trade, journeys, disease, households and debts. D
 
 ## Run
 
-The windowed game needs Python with Tk and a running Ollama server:
+Downloadable builds include Python and Tk. The offline edition needs no model;
+the Ollama edition uses a separately installed local model. See [packaging notes](docs/PACKAGING.md).
+
+To run from source without Ollama:
+
+```sh
+./run.sh --offline
+```
+
+To run from source with Ollama:
 
 ```sh
 ollama pull qwen3:4b-instruct

@@ -498,9 +498,7 @@ def parse(line: str, belief: dict, hours_left: int, seed: int, turn: int,
     if redirected is not None:
         return redirected
     if client is None:
-        # Headless tests and runtime recovery may still exercise the exact
-        # grammar directly. The shipped controllers require a client and send
-        # free-form court language through it first.
+        # Offline play uses the listed grammar.
         quick = preparse(line, belief)
         if quick:
             return quick

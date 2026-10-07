@@ -141,10 +141,10 @@ regenerated.
 
 ### 2.7 The local model supplies language, not truth
 
-The supported lightweight local model is required in normal windowed play. It
-voices people, corrects player-written matter, interprets tablets, parses
-orders, summarizes permitted records, and narrates the fortnight from the facts
-layer (`belief/facts.py`).
+The Ollama edition uses a supported local model for language and free-form
+orders. The offline edition uses authored text, deterministic advice and the
+listed order grammar, without contacting a model service. Both editions use
+the same simulation, windows and save format.
 
 It may not:
 

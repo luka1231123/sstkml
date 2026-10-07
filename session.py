@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import secrets
 from pathlib import Path
+from paths import SAVES
 
 from engine.actions import from_dict, to_dict
 from engine.reduce import apply
@@ -115,7 +116,7 @@ def compatible_save(path: str | Path) -> bool:
 
 def latest_campaign() -> str:
     from load import playable_courts
-    root = Path(__file__).parent / "saves"
+    root = SAVES
     saves = [(root / city["id"] / "autosave.json", city["id"])
              for city in playable_courts()]
     saves = [(path, city) for path, city in saves if compatible_save(path)]

@@ -16,7 +16,7 @@ sit inside the ordinary letter budget of 25 to 90 words (spec 3.5).
 Nothing here decides anything, and no `World` object is reachable: the item is a
 plain dict from `belief/project.py` and every prompt field passes
 `ai.client.safe_fields`. When the model fails, `recovery_text` is a plain
-formulaic reading of the same facts -- crash recovery, not a second AI-off mode.
+formulaic reading of the same facts, also used by the offline edition.
 Accepted text is stored on the case and projected back as `body`, so replay
 reads words rather than asking a model for them again (spec 2.6).
 """
@@ -235,12 +235,8 @@ def build_prompt(item: dict, decision: str) -> list[dict]:
 
 
 def recovery_text(item: dict, width: int = 64) -> str:
-    """The plain reading when the court's voice cannot be had.
-
-    Formulaic and short, and built from the same facts the model would have
-    been given. It exists for a failed service; it is not a mode.
-    """
-    sender = _name(str(item.get("sender", "a foreign court")))
+    """A plain reading of the recorded decision for offline play or recovery."""
+    sender = item.get("sender_name") or _name(str(item.get("sender", "a foreign court")))
     decision = decision_of(item)
     if not decision:
         return (f"An answer from {sender}. The seal is unbroken; nothing of "

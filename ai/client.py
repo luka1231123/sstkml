@@ -1,11 +1,4 @@
-"""Required lightweight local-language transport.
-
-The simulation owns facts and consequences; the model is the court's language
-layer. The windowed product requires the supported local model at startup, then
-uses this transport for compact tablets, scribes, advisers, and interpretation.
-Fallback text remains crash recovery and a headless-test aid, not the reference
-player experience.
-"""
+"""Optional local-language transport; offline play uses authored text."""
 from __future__ import annotations
 
 import hashlib
@@ -20,6 +13,14 @@ from pathlib import Path
 MODEL = "qwen3:4b-instruct"
 COMPATIBLE_MODELS = (MODEL, "qwen3:14b")
 OLLAMA = "http://127.0.0.1:11434/api/chat"
+
+
+def offline() -> bool:
+    return os.environ.get("STTKML_OFFLINE") == "1"
+
+
+def create_client(cache_dir=None):
+    return None if offline() else OllamaClient(cache_dir=cache_dir)
 
 
 class ModelUnavailable(RuntimeError):
